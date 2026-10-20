@@ -3,7 +3,7 @@
 import * as THREE from "three";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Billboard, Text } from "@react-three/drei";
+import { Html } from "@react-three/drei";
 import { BonecoGLB, BonecoProcedural, HIPS, useAnimacao, type BonecoHandle, type Pose } from "./Boneco";
 import { BONECO } from "../data/bonecos";
 import { AREAS, NIVEL } from "../data/org";
@@ -12,7 +12,6 @@ import { useEscritorio, removerAgente, type Agente as AgenteDef } from "../store
 import type { Evento } from "../data/eventos";
 import { caixa, mat } from "./geo";
 
-const FONTE = "/fonts/inter-600.woff";
 // Velocidade de caminhada (m/s). ?turbo=N acelera a cena (útil pra testes em máquina lenta).
 const TURBO = typeof window !== "undefined" ? Number(new URLSearchParams(window.location.search).get("turbo") || 1) : 1;
 const VEL = 1.7 * TURBO;
@@ -143,25 +142,22 @@ export function Agente({ def }: { def: AgenteDef }) {
       {carregando && <mesh geometry={caixa(0.36, 0.26, 0.3)} material={mat("#C9A063")} position={[0, 0.72, 0.3]} />}
       {/* anel de seleção */}
       {selecionado && <mesh geometry={new THREE.RingGeometry(0.32, 0.4, 32)} material={mat(corArea, { emissive: corArea, ei: 0.8 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} />}
-      {/* crachá flutuante: nome + nível */}
-      <Billboard position={[0, 1.55, 0]}>
-        <mesh geometry={caixa(Math.max(0.9, def.nome.length * 0.09 + 0.3), 0.3, 0.01)} material={mat("#111418", { opacity: 0.82 })} />
-        <mesh geometry={caixa(0.06, 0.3, 0.012)} material={mat(nivel.cor)} position={[-Math.max(0.9, def.nome.length * 0.09 + 0.3) / 2 + 0.03, 0, 0]} />
-        <Text font={FONTE} fontSize={0.13} color="#FFFFFF" anchorX="center" anchorY="middle" position={[0.03, 0.045, 0.01]}>{def.nome}</Text>
-        <Text font={FONTE} fontSize={0.085} color="#C9CFD8" anchorX="center" anchorY="middle" position={[0.03, -0.085, 0.01]}>{nivel.nome.toUpperCase()}</Text>
-        {marca && (
-          <group position={[0, 0.34, 0]}>
-            <mesh geometry={caixa(0.3, 0.3, 0.01)} material={mat(marca === "!" ? "#E53935" : "#FFFFFF")} />
-            <Text font={FONTE} fontSize={0.2} color={marca === "!" ? "#FFFFFF" : "#333"} anchorX="center" anchorY="middle" position={[0, 0, 0.01]}>{marca}</Text>
-          </group>
-        )}
-        {fala && !marca && (
-          <group position={[0, 0.36, 0]}>
-            <mesh geometry={caixa(Math.min(3.2, fala.length * 0.075 + 0.3), 0.26, 0.01)} material={mat("#FFFFFF", { opacity: 0.95 })} />
-            <Text font={FONTE} fontSize={0.11} color="#2B2F36" anchorX="center" anchorY="middle" position={[0, 0, 0.01]} maxWidth={3}>{fala.length > 40 ? fala.slice(0, 38) + "…" : fala}</Text>
-          </group>
-        )}
-      </Billboard>
+      {/* crachá flutuante (HTML: tamanho fixo na tela, sempre legível) */}
+      <Html position={[0, 1.5, 0]} center zIndexRange={[50, 0]} style={{ pointerEvents: "none" }}>
+        <div className="flex flex-col items-center gap-1 select-none" style={{ transform: "translateY(-100%)" }}>
+          {marca && (
+            <div className="rounded-full px-3 py-0.5 text-[18px] font-black shadow-md" style={{ background: marca === "!" ? "#E53935" : "#FFFFFF", color: marca === "!" ? "#FFF" : "#333" }}>{marca}</div>
+          )}
+          {fala && !marca && (
+            <div className="max-w-[260px] rounded-2xl bg-white px-3 py-1.5 text-center text-[14px] font-medium leading-tight text-[#2B2F36] shadow-lg">{fala.length > 60 ? fala.slice(0, 58) + "…" : fala}</div>
+          )}
+          <div className="flex items-center gap-2 rounded-full bg-[#111418]/90 py-1 pl-1.5 pr-3 shadow-lg">
+            <span className="h-4 w-4 rounded-full" style={{ background: nivel.cor }} />
+            <span className="text-[15px] font-bold leading-none text-white">{def.nome}</span>
+            <span className="text-[11px] font-semibold uppercase leading-none text-white/60">{nivel.nome}</span>
+          </div>
+        </div>
+      </Html>
     </group>
   );
 }

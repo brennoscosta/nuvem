@@ -39,7 +39,7 @@ export function BarraTopo() {
               <span className="font-medium">{a.nome}</span>
               <span className="rounded-full px-1.5 text-[9px] font-bold uppercase" style={{ background: NIVEL[a.nivel].cor, color: "#111" }}>{NIVEL[a.nivel].nome}</span>
             </button>); })}
-          {total === 0 && <span className="text-xs text-white/50">Nenhum agente ainda. Contrate o primeiro.</span>}
+          {total === 0 && <span className="text-xs text-white/50">Escritório vazio. Clique em “Contratar agente” pra trazer o primeiro.</span>}
         </div>
         {sirene && <span className="animate-pulse rounded-full bg-[#E53935] px-2 py-1 text-[10px] font-bold">APROVAÇÃO PENDENTE</span>}
         <button onClick={() => setSimulando(!simulando)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${simulando ? "bg-white/10 text-white" : "bg-white/5 text-white/50"}`}>{simulando ? "Simulação: ligada" : "Simulação: pausada"}</button>
@@ -168,10 +168,12 @@ export function ModalContratar() {
 }
 
 // Preenche o escritório com um time inicial (demo), um de cada vez
+// Só com ?demo=1 na URL; por padrão o escritório começa vazio e o admin contrata cada agente.
 export function useTimeInicial() {
   useEffect(() => {
     const s = useEscritorio.getState();
     if (s.ordem.length) return;
+    if (!new URLSearchParams(window.location.search).has("demo")) return;
     const time: Array<[string, AreaId, Nivel, string, string]> = [
       ["Helena", "suporte", "ceo", "Gestão", "Focado"],
       ["Rafael", "suporte", "gerente", "Atendente N2", "Comunicativo"],
