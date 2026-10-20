@@ -74,10 +74,10 @@ export function ModalContratar() {
   const [personalidade, setPersonalidade] = useState(PERSONALIDADES[0]);
   const [boneco, setBoneco] = useState(BONECOS[0].id);
   const [erro, setErro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
   useEffect(() => { setFuncao(nivel === "ceo" || nivel === "diretor" ? "Gestão" : FUNCOES[area][0]); }, [area, nivel]);
   if (!aberto) return null;
   const temCeo = Object.values(agentes).some((a) => a.nivel === "ceo");
-  const [enviando, setEnviando] = useState(false);
   const enviar = async () => {
     setEnviando(true);
     try {
