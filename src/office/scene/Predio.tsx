@@ -97,16 +97,19 @@ export function Predio() {
   return (
     <group>
       {/* chão geral + corredor */}
-      <mesh geometry={plano(40, 22)} material={mat("#D8DCE2", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow />
       <mesh geometry={plano(36, 3.2)} material={mat("#E6E3DC", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow />
       {SALAS.map((s) => <Piso key={s.id} s={s} />)}
       {SALAS.map((s) => <Etiqueta key={s.id} s={s} />)}
 
       {/* paredes externas */}
       <Parede de={[-18, -9]} ate={[18, -9]} altura={2.6} espessura={0.2} />
-      <Parede de={[-18, -9]} ate={[-18, 9]} altura={ALT_PAREDE} espessura={0.2} />
+      <Parede de={[-18, -9]} ate={[-18, -3.2]} altura={ALT_PAREDE} espessura={0.2} />
+      <Parede de={[-18, -0.8]} ate={[-18, 9]} altura={ALT_PAREDE} espessura={0.2} />
+      {/* porta de vidro da entrada (lado oeste, junto à recepção) */}
+      <mesh geometry={caixa(0.06, 2.2, 2.4)} material={mat(COR.vidro, { rough: 0.1, opacity: 0.35 })} position={[-18, 1.1, -2]} />
+      <mesh geometry={caixa(0.12, 2.3, 0.08)} material={mat(COR.preto)} position={[-18, 1.15, -2]} />
       <Parede de={[18, -9]} ate={[18, 9]} altura={ALT_PAREDE} espessura={0.2} />
-      <Parede de={[-18, 9]} ate={[18, 9]} altura={0.45} espessura={0.2} />
+      <Parede de={[-18, 9]} ate={[18, 9]} altura={ALT_PAREDE} espessura={0.2} />
 
       {/* divisórias entre salas (deixando a abertura pro corredor) */}
       {SALAS.map((s) => {

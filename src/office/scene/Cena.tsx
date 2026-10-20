@@ -4,6 +4,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { MapControls, ContactShadows, SoftShadows } from "@react-three/drei";
 import * as THREE from "three";
 import { Predio } from "./Predio";
+import { Entorno } from "./Entorno";
 import { Agente, handlers } from "./Agente";
 import { useEscritorio } from "../store";
 import { MESA } from "../data/layout";
@@ -52,7 +53,7 @@ function Luzes() {
       <directionalLight
         position={[12, 22, 10]} intensity={2.2} color="#FFF6E8" castShadow
         shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-normalBias={0.02}
-        shadow-camera-left={-24} shadow-camera-right={24} shadow-camera-top={16} shadow-camera-bottom={-16} shadow-camera-near={1} shadow-camera-far={60}
+        shadow-camera-left={-40} shadow-camera-right={40} shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-near={1} shadow-camera-far={60}
       />
       <directionalLight position={[-14, 10, -8]} intensity={0.5} color="#DCE8FF" />
     </>
@@ -69,16 +70,17 @@ export function Cena() {
   return (
     <Canvas shadows dpr={[1, 1.75]} camera={{ position: CAM ? [CAM[0], CAM[1], CAM[2]] : [10, 30, 34], fov: 32, near: 0.5, far: 200 }} gl={{ antialias: true, powerPreference: "high-performance" }}
       onPointerMissed={() => useEscritorio.getState().selecionar(null)}>
-      <color attach="background" args={["#DFE5EC"]} />
-      <fog attach="fog" args={["#DFE5EC", 55, 110]} />
+      <color attach="background" args={["#CFE3F5"]} />
+      <fog attach="fog" args={["#CFE3F5", 70, 150]} />
       <SoftShadows size={18} samples={10} focus={0.6} />
       <Luzes />
       <Suspense fallback={null}>
+        <Entorno />
         <Predio />
         {ordem.map((id) => agentes[id] && <Agente key={id} def={agentes[id]} />)}
       </Suspense>
       <Despachante />
-      <MapControls ref={controles} target={CAM ? [CAM[3], CAM[4], CAM[5]] : [0, 0, 1]} minDistance={5} maxDistance={48} minPolarAngle={0.35} maxPolarAngle={1.2} dampingFactor={0.08} enableDamping />
+      <MapControls ref={controles} target={CAM ? [CAM[3], CAM[4], CAM[5]] : [0, 0, 1]} minDistance={5} maxDistance={70} minPolarAngle={0.35} maxPolarAngle={1.2} dampingFactor={0.08} enableDamping />
       <FocoCamera controles={controles} />
     </Canvas>
   );
