@@ -16,10 +16,16 @@ export function temBanco() {
 
 function conectar() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL não configurada");
-  return postgres(process.env.DATABASE_URL, { max: 5, idle_timeout: 30, connect_timeout: 10, transform: postgres.camel });
+  return postgres(process.env.DATABASE_URL, { max: 5, idle_timeout: 30, connect_timeout: 10, transform: postgres.camel, onnotice: () => {} });
 }
 
-export const sql = (globalThis.__nuvemSql ??= conectar());
+// Conexão preguiçosa: só abre na primeira consulta (no build do Next não existe DATABASE_URL).
+type Sql = ReturnType<typeof postgres>;
+function obter(): Sql { return (globalThis.__nuvemSql ??= conectar()); }
+export const sql: Sql = new Proxy(function () {} as unknown as Sql, {
+  apply: (_t, _this, args) => (obter() as unknown as (...a: unknown[]) => unknown)(...args),
+  get: (_t, prop) => { const real = obter() as unknown as Record<string | symbol, unknown>; const v = real[prop]; return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(real) : v; },
+});
 
 export async function migrar() {
   if (!globalThis.__nuvemMigrado) {
