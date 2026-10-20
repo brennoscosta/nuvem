@@ -6,6 +6,9 @@ import { usuarioAtual } from "@/server/usuarios";
 import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
 import { BotaoSair, BotaoAvisar } from "../_conta";
 
+import { meta } from "../seo";
+
+export const metadata = meta({ titulo: "Meu escritório — WorkEnd", caminho: "/app", indexar: false });
 export const dynamic = "force-dynamic";
 
 export default async function App() {

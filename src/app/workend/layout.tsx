@@ -1,12 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./workend.css";
+import { meta, jsonLdLanding } from "./seo";
 
-export const metadata: Metadata = {
-  title: "WorkEnd — o escritório virtual da sua empresa",
-  description: "Agentes de IA especialistas trabalham no seu escritório virtual e você recebe relatórios completos de campanhas, faturamento e custos. Você é o CEO.",
-  icons: { icon: "/workend/icone-64.png", apple: "/workend/icone-192.png" },
-  openGraph: { title: "WorkEnd — o escritório virtual da sua empresa", description: "Agentes de IA especialistas fazem o trabalho. Você recebe os relatórios.", images: ["/workend/poster.jpg"], locale: "pt_BR", type: "website" },
-};
+export const metadata: Metadata = meta({ caminho: "/" });
+export const viewport: Viewport = { themeColor: "#FFFFFF", width: "device-width", initialScale: 1, colorScheme: "light" };
 
 export default function WorkendLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +12,8 @@ export default function WorkendLayout({ children }: { children: React.ReactNode 
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+      {/* dados estruturados (organização, site, produto, página e vídeo) */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdLanding()) }} />
       {children}
     </div>
   );

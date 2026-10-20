@@ -3,6 +3,9 @@ import { usuarioAtual } from "@/server/usuarios";
 import { Topo, Rodape } from "../_partes";
 import { FormCadastro } from "../_conta";
 
+import { meta } from "../seo";
+
+export const metadata = meta({ titulo: "Criar conta — WorkEnd", descricao: "Crie sua conta grátis no WorkEnd e seja avisado primeiro quando abrir pra montar o seu escritório virtual com agentes de IA.", caminho: "/cadastro" });
 export const dynamic = "force-dynamic";
 
 export default async function Cadastro() {

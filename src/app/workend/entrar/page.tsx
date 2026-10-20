@@ -3,6 +3,9 @@ import { usuarioAtual } from "@/server/usuarios";
 import { Topo, Rodape } from "../_partes";
 import { FormEntrar } from "../_conta";
 
+import { meta } from "../seo";
+
+export const metadata = meta({ titulo: "Entrar — WorkEnd", descricao: "Entre na sua conta do WorkEnd pra ver seu escritório e o catálogo de especialistas.", caminho: "/entrar" });
 export const dynamic = "force-dynamic";
 
 export default async function Entrar() {
