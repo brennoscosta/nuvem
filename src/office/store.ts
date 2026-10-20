@@ -33,6 +33,9 @@ interface Estado {
   eventos: Evento[]; // fila consumida pela cena
   historico: Evento[]; // últimos eventos (barra lateral)
   selecionado: string | null;
+  hover: string | null; // agente sob o mouse (menu rápido)
+  menuReuniao: string | null; // agente que está convocando
+  reuniaoAtiva: { convocadorId: string; participantes: string[]; setores: AreaId[]; inicio: number } | null;
   modalContratar: boolean;
   sirene: boolean;
   simulando: boolean;
@@ -47,6 +50,10 @@ interface Estado {
   consumirEventos: () => Evento[];
   setStatus: (id: string, status: Status, fala?: string) => void;
   selecionar: (id: string | null) => void;
+  setHover: (id: string | null) => void;
+  setMenuReuniao: (id: string | null) => void;
+  convocarReuniao: (convocadorId: string, setores: AreaId[]) => Promise<void>;
+  encerrarReuniao: () => void;
   setModal: (v: boolean) => void;
   setSirene: (v: boolean) => void;
   setSimulando: (v: boolean) => void;
@@ -71,6 +78,9 @@ export const useEscritorio = create<Estado>((set, get) => ({
   eventos: [],
   historico: [],
   selecionado: null,
+  hover: null,
+  menuReuniao: null,
+  reuniaoAtiva: null,
   modalContratar: false,
   sirene: false,
   simulando: false,
@@ -154,6 +164,30 @@ export const useEscritorio = create<Estado>((set, get) => ({
   }),
 
   selecionar: (id) => set({ selecionado: id }),
+  setHover: (id) => set({ hover: id }),
+  setMenuReuniao: (id) => set({ menuReuniao: id }),
+
+  // Chama pra sala de reunião: o convocador + só o gerente de cada setor escolhido (ou o diretor, se não houver gerente)
+  convocarReuniao: async (convocadorId, setores) => {
+    const s = get(); const conv = s.agentes[convocadorId]; if (!conv) return;
+    const todos = Object.values(s.agentes);
+    const participantes: string[] = [convocadorId];
+    for (const area of setores) {
+      const ger = todos.find((a) => a.area === area && a.nivel === "gerente") ?? todos.find((a) => a.area === area && a.nivel === "diretor");
+      if (ger && !participantes.includes(ger.id)) participantes.push(ger.id);
+    }
+    const nomes = participantes.slice(1).map((id) => s.agentes[id].nome);
+    const texto = nomes.length ? `Reunião com ${nomes.join(", ")}` : "Foi pra sala de reunião (ninguém dos setores escolhidos ainda)";
+    set({ reuniaoAtiva: { convocadorId, participantes, setores, inicio: Date.now() }, menuReuniao: null });
+    participantes.forEach((id, i) => get().emitir(id, "reuniao", i === 0 ? texto : `Reunião chamada por ${conv.nome}`, { assento: i }));
+    if (conv.real) fetch("/api/reunioes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ convocadorId, participantes, setores }) }).catch(() => {});
+  },
+
+  encerrarReuniao: () => {
+    const r = get().reuniaoAtiva; if (!r) return;
+    r.participantes.forEach((id) => get().agentes[id] && get().emitir(id, "voltou", "Reunião encerrada"));
+    set({ reuniaoAtiva: null });
+  },
   setModal: (v) => set({ modalContratar: v }),
   setSirene: (v) => set({ sirene: v }),
   setSimulando: (v) => set({ simulando: v }),

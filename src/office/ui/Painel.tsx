@@ -5,6 +5,7 @@ import { BONECOS } from "../data/bonecos";
 import { useEscritorio } from "../store";
 import { useSimulador } from "../sim/simulador";
 import { PainelAgente, STATUS } from "./PainelAgente";
+import { MenuAgente } from "./MenuAgente";
 
 export function BarraTopo() {
   const agentes = useEscritorio((s) => s.agentes);
@@ -161,7 +162,7 @@ function useServidor() {
         desde = r.agora;
         for (const ev of r.eventos as { agenteId: string | null; tipo: string; texto: string | null }[]) {
           if (!ev.agenteId || !st.agentes[ev.agenteId]) { if (ev.tipo === "contratado") carregar(); continue; }
-          if (["contratado", "demitido"].includes(ev.tipo)) continue; // já tratados localmente por quem disparou
+          if (["contratado", "demitido", "reuniao"].includes(ev.tipo)) continue; // já tratados localmente por quem disparou
           st.emitir(ev.agenteId, ev.tipo as never, ev.texto ?? undefined);
         }
       } catch { /* servidor fora: tenta de novo no próximo ciclo */ }
@@ -177,9 +178,10 @@ export function Painel() {
   return (
     <>
       <BarraTopo />
+      <MenuAgente />
       <PainelAgente />
       <ModalContratar />
-      <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur">Arraste pra mover · roda do mouse pra zoom · botão direito pra girar · clique no boneco pra ver a ficha</div>
+      <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur">Arraste pra mover · roda do mouse pra zoom · botão direito pra girar · clique no boneco pra ver a ficha · passe o mouse pra chamar reunião</div>
     </>
   );
 }

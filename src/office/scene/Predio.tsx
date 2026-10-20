@@ -53,28 +53,35 @@ function Etiqueta({ s }: { s: Sala }) {
   );
 }
 
-// Parede com "Nuvem" em letras 3D (SVG do logo extrudado)
+// Parede com "Nuvem" em letras 3D (SVG do logo extrudado), estilo letreiro iluminado
 function ParedeNuvem() {
   const svg = useLoader(SVGLoader, "/brand/nuvem.svg");
   const geo = useMemo(() => {
     const shapes = svg.paths.flatMap((p) => p.toShapes());
-    const g = new THREE.ExtrudeGeometry(shapes, { depth: 60, bevelEnabled: true, bevelThickness: 6, bevelSize: 4, bevelSegments: 2 });
+    const g = new THREE.ExtrudeGeometry(shapes, { depth: 120, bevelEnabled: true, bevelThickness: 14, bevelSize: 10, bevelSegments: 4, curveSegments: 24 });
     g.computeBoundingBox();
     const b = g.boundingBox!; const w = b.max.x - b.min.x;
-    const esc = 5.2 / w; // 5,2 m de largura
+    const esc = 5.6 / w; // 5,6 m de largura
     g.translate(-(b.min.x + b.max.x) / 2, -(b.min.y + b.max.y) / 2, 0);
-    g.scale(esc, -esc, esc); // SVG tem y pra baixo
+    g.scale(esc, -esc, esc); // SVG tem y pra baixo; a extrusão (depth) sai pra +z, de frente pra sala
     g.computeVertexNormals();
     return g;
   }, [svg]);
+  const matLetra = useMemo(() => new THREE.MeshStandardMaterial({ color: "#FFFFFF", roughness: 0.35, metalness: 0.0, emissive: "#F4F7FF", emissiveIntensity: 0.22 }), []);
   return (
     <group position={[-14, 0, -8.9]}>
-      {/* painel de fundo em pedra escura + faixa colorida */}
-      <mesh geometry={caixa(7.6, 2.5, 0.25)} material={mat("#2A3340", { rough: 0.95 })} position={[0, 1.5, 0]} receiveShadow />
-      <mesh geometry={caixa(7.6, 0.08, 0.27)} material={mat("#4F7DF3", { emissive: "#4F7DF3", ei: 0.4 })} position={[0, 0.3, 0]} />
-      <mesh geometry={geo} material={mat("#FFFFFF", { rough: 0.35 })} position={[0, 1.65, 0.16]} castShadow />
+      {/* painel de fundo escuro com ripas (textura) */}
+      <mesh geometry={caixa(7.8, 2.6, 0.28)} material={mat("#232B36", { rough: 0.95 })} position={[0, 1.5, 0]} receiveShadow />
+      {Array.from({ length: 25 }).map((_, i) => (
+        <mesh key={i} geometry={caixa(0.06, 2.4, 0.03)} material={mat("#30394A", { rough: 0.9 })} position={[-3.6 + i * 0.3, 1.5, 0.15]} />
+      ))}
+      {/* faixa azul em baixo */}
+      <mesh geometry={caixa(7.8, 0.08, 0.3)} material={mat("#4F7DF3", { emissive: "#4F7DF3", ei: 0.6 })} position={[0, 0.3, 0]} />
+      {/* letras */}
+      <mesh geometry={geo} material={matLetra} position={[0, 1.6, 0.18]} castShadow />
       {/* spots */}
-      {[-2.2, 0, 2.2].map((x) => <spotLight key={x} position={[x, 2.9, 1.6]} target-position={[x, 1.4, 0]} angle={0.7} penumbra={0.6} intensity={6} color="#FFF3E0" />)}
+      <pointLight position={[-2, 1.7, 1.2]} intensity={5} distance={7} color="#DCE8FF" />
+      <pointLight position={[2, 1.7, 1.2]} intensity={5} distance={7} color="#DCE8FF" />
     </group>
   );
 }
@@ -161,7 +168,7 @@ export function Predio() {
       <Puff position={[-13.8, 0, -2.4]} cor="#FFD600" />
       <Planta position={[-10.6, 0, -8.2]} />
       <Sirene ligada={sirene} position={[-17.5, ALT_PAREDE + 0.05, -2.4]} />
-      <Luminaria position={[-14, 2.75, -5]} r={1.1} />
+      <Luminaria position={[-14, 2.75, -3.2]} r={0.9} />
 
       {/* reunião, CEO, diretoria */}
       <MesaReuniao />

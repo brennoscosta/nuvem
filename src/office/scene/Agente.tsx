@@ -50,6 +50,7 @@ export function Agente({ def }: { def: AgenteDef }) {
   const setStatus = useEscritorio((s) => s.setStatus);
   const selecionar = useEscritorio((s) => s.selecionar);
   const selecionado = useEscritorio((s) => s.selecionado === def.id);
+  const setHover = useEscritorio((s) => s.setHover);
 
   const irParaMesa = (depois: Pose = "sit"): Acao[] => [{ tipo: "andar", para: cadeira.pos, rotFinal: cadeira.rot, pose: depois }];
 
@@ -84,7 +85,7 @@ export function Agente({ def }: { def: AgenteDef }) {
           break;
         }
         case "reuniao": {
-          limpar(); const i = Math.floor(Math.random() * 6); const p = assentoReuniao(i);
+          limpar(); const i = typeof ev.payload?.assento === "number" ? (ev.payload.assento as number) : Math.floor(Math.random() * 6); const p = assentoReuniao(i);
           f.push({ tipo: "andar", para: p, rotFinal: Math.atan2(PONTOS.mesaReuniao[0] - p[0], PONTOS.mesaReuniao[2] - p[2]), pose: "sit" }, { tipo: "fn", fn: () => setStatus(def.id, "reuniao", ev.texto) });
           break;
         }
@@ -136,7 +137,9 @@ export function Agente({ def }: { def: AgenteDef }) {
   const fala = def.fala && def.status !== "chegando" ? def.fala : undefined;
 
   return (
-    <group ref={grupo} position={PONTOS.elevador} onClick={(e) => { e.stopPropagation(); selecionar(def.id); }}>
+    <group ref={grupo} position={PONTOS.elevador} onClick={(e) => { e.stopPropagation(); selecionar(def.id); }}
+      onPointerOver={(e) => { e.stopPropagation(); setHover(def.id); document.body.style.cursor = "pointer"; }}
+      onPointerOut={() => { document.body.style.cursor = "auto"; }}>
       {usaGLB ? <BonecoGLB ref={boneco} arquivo={bdef.arquivo!} /> : <BonecoProcedural ref={boneco} def={bdef} camisa={corArea} headset={def.area === "suporte" || def.area === "vendas"} cracha={nivel.cor} />}
       {/* caixa de papelão (demissão) */}
       {carregando && <mesh geometry={caixa(0.36, 0.26, 0.3)} material={mat("#C9A063")} position={[0, 0.72, 0.3]} />}
