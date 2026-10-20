@@ -71,7 +71,7 @@ export function Mural() {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="flex items-center gap-1 rounded-full bg-[#22A86B]/20 px-2 py-0.5 text-[10px] font-semibold text-[#7EE2B0]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#22A86B]" />ao vivo</span>
-          <button onClick={() => setAberto(false)} title="Recolher" className="rounded-full px-2 py-0.5 text-sm text-white/60 hover:bg-white/10">—</button>
+          <button onClick={() => setAberto(false)} title="Minimizar o mural" className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/20">Minimizar ▾</button>
         </div>
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3 text-xs">
