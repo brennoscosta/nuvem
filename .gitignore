@@ -45,3 +45,5 @@ next-env.d.ts
 public/cenario/
 # modelos 3D baixados no build (scripts/cidade/baixar.mjs)
 public/modelos/
+# screenshots das prévias
+/previa*.jpg
