@@ -3,13 +3,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { AREAS, AREAS_OPERACIONAIS, FUNCOES, type AreaId } from "@/office/data/org";
 
+export const DEMO = "https://nuvem.nuvemhost.cloud/?vista=fora";
+
 export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
   return (
-    <header className="faixa flex items-center justify-between py-5">
+    <header className="faixa flex items-center justify-between py-4">
       <Link href="/" aria-label="WorkEnd — início" className="flex items-center">
-        <Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} priority className="h-9 w-auto" />
+        <Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} priority className="h-8 w-auto" />
       </Link>
-      <nav className="flex items-center gap-2 text-[15px]">
+      <nav className="flex items-center gap-3 text-[15px]">
         {logado ? (
           <>
             <span className="hidden text-[var(--tinta-2)] sm:inline">Olá, {nome?.split(" ")[0]}</span>
@@ -17,8 +19,8 @@ export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
           </>
         ) : (
           <>
-            <Link href="/entrar" className="btn btn-linha">Entrar</Link>
-            <Link href="/cadastro" className="btn btn-azul">Criar conta</Link>
+            <Link href="/entrar" className="px-2 py-2 font-medium hover:text-[var(--tinta-2)]">Entrar</Link>
+            <Link href="/cadastro" className="btn btn-azul">Criar conta grátis</Link>
           </>
         )}
       </nav>
@@ -28,17 +30,27 @@ export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
 
 export function Rodape() {
   return (
-    <footer className="fundo-tinta">
-      <div className="faixa flex flex-col gap-6 py-10 text-[15px] text-white/75 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Image src="/workend/logo-branca.png" alt="WorkEnd" width={1259} height={355} className="h-8 w-auto" />
+    <footer className="rodape">
+      <div className="faixa grid gap-10 py-14 text-[15px] text-[var(--tinta-2)] md:grid-cols-[1.4fr_1fr_1fr]">
+        <div>
+          <Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} className="h-8 w-auto" />
+          <p className="mt-4 max-w-[34ch]">O escritório virtual da sua empresa, com agentes de IA especialistas em cada setor.</p>
         </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2">
-          <Link href="/cadastro" className="hover:text-white">Criar conta</Link>
-          <Link href="/entrar" className="hover:text-white">Entrar</Link>
-          <a href="mailto:contato@workend.online" className="hover:text-white">contato@workend.online</a>
+        <div>
+          <div className="mb-3 font-semibold text-[var(--tinta)]">Produto</div>
+          <ul className="space-y-2">
+            <li><Link href="/cadastro">Criar conta</Link></li>
+            <li><Link href="/entrar">Entrar</Link></li>
+            <li><a href={DEMO} target="_blank" rel="noreferrer">Ver um escritório funcionando</a></li>
+          </ul>
         </div>
-        <div>© {new Date().getFullYear()} WorkEnd · workend.online</div>
+        <div>
+          <div className="mb-3 font-semibold text-[var(--tinta)]">Empresa</div>
+          <ul className="space-y-2">
+            <li><a href="mailto:contato@workend.online">contato@workend.online</a></li>
+            <li>© {new Date().getFullYear()} WorkEnd</li>
+          </ul>
+        </div>
       </div>
     </footer>
   );

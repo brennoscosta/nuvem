@@ -11,10 +11,10 @@ export const metadata: Metadata = {
 export default function WorkendLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="we">
-      {/* Sora pros títulos (geométrica, casa com o wordmark do logo); Inter no corpo */}
+      {/* Inter em todos os pesos (títulos pesados, estilo notion.com) */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       {children}
     </div>
   );

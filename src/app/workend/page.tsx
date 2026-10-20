@@ -1,83 +1,93 @@
-// Landing do WorkEnd (workend.online), versão enxuta: herói com vídeo, relatórios (sem números), como funciona, setores, chamada.
+// Landing do WorkEnd (workend.online), no estilo pedido pelo Brenno (referência: notion.com):
+// branco, título enorme centralizado com uma palavra em pílula, dois botões, produto numa janela, cartões cinza, "Comece hoje".
 import Link from "next/link";
+import Image from "next/image";
 import { usuarioAtual } from "@/server/usuarios";
-import { Topo, Rodape, SETORES } from "./_partes";
+import { Topo, Rodape, SETORES, DEMO } from "./_partes";
 
 export const dynamic = "force-dynamic";
 
+const CARTOES = [
+  { eyebrow: "Dê a ordem", titulo: "Fale com o gerente do setor como falaria com uma pessoa.", img: "/workend/cenas/ordem.jpg", alt: "Painel de tarefas de um gerente do escritório" },
+  { eyebrow: "Veja acontecer", titulo: "Cada setor é uma sala. Os agentes trabalham à vista.", img: "/workend/cenas/setores.jpg", alt: "Salas dos setores do escritório virtual" },
+  { eyebrow: "Aprove antes de sair", titulo: "Nada é publicado, gasto ou enviado sem o seu ok.", img: "/workend/cenas/aprovar.jpg", alt: "Gerente de design gráfico na mesa dele" },
+  { eyebrow: "Receba o relatório", titulo: "Campanhas, faturamento e custos, explicados por quem fez.", img: "/workend/cenas/predio.jpg", alt: "Fachada de vidro do escritório virtual" },
+];
+
 export default async function Landing() {
   const u = await usuarioAtual().catch(() => null);
-  const cta = { href: u ? "/app" : "/cadastro", texto: u ? "Abrir meu escritório" : "Criar minha conta" };
+  const cta = { href: u ? "/app" : "/cadastro", texto: u ? "Abrir meu escritório" : "Criar conta grátis" };
   return (
     <>
       <Topo logado={!!u} nome={u?.nome} />
 
-      {/* herói */}
-      <section className="faixa grid items-center gap-10 pb-20 pt-8 lg:grid-cols-[1fr_1.05fr] lg:pt-14">
-        <div>
-          <h1>O escritório virtual da sua empresa.</h1>
-          <p className="mt-5 max-w-[40ch] text-xl text-[var(--tinta-2)]">Agentes de IA especialistas fazem o trabalho. Você dá as ordens e recebe os relatórios.</p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href={cta.href} className="btn btn-azul text-[1.05rem]">{cta.texto}</Link>
-            <a href="#como-funciona" className="btn btn-linha">Como funciona</a>
-          </div>
+      {/* herói centralizado */}
+      <section className="faixa flex flex-col items-center pt-10 text-center lg:pt-20">
+        <h1 className="max-w-[16ch]">O escritório onde agentes de IA <span className="pilula">trabalham</span> por você.</h1>
+        <p className="mt-6 max-w-[52ch] text-lg text-[var(--tinta-2)] lg:text-xl">Monte os setores da sua empresa, contrate especialistas já treinados e receba os relatórios. Você é o CEO.</p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Link href={cta.href} className="btn btn-azul btn-grande">{cta.texto}</Link>
+          <a href={DEMO} target="_blank" rel="noreferrer" className="btn btn-claro btn-grande">Ver um escritório funcionando</a>
         </div>
-        <div className="vitrine">
+        <div className="janela mt-14 w-full max-w-[1000px]">
+          <div className="barra" aria-hidden="true"><i /><i /><i /></div>
           <video src="/workend/demo.mp4" poster="/workend/poster.jpg" autoPlay muted loop playsInline controls preload="metadata" aria-label="Demonstração do escritório virtual WorkEnd" />
-          <span className="faixa-branca" style={{ top: 0 }} />
-          <span className="faixa-branca" style={{ bottom: 0 }} />
         </div>
       </section>
 
-      {/* relatórios, sem números */}
-      <section className="fundo-claro secao">
-        <div className="faixa grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
-          <h2 className="max-w-[18ch]">Você não gerencia ferramenta. Você lê o relatório.</h2>
-          <ul className="grid gap-5 text-lg text-[var(--tinta-2)]">
-            <li><span className="font-semibold text-[var(--tinta)]">Campanhas</span> — o que está no ar, o que rendeu e o que o gestor recomenda.</li>
-            <li><span className="font-semibold text-[var(--tinta)]">Faturamento</span> — o que entrou, de onde veio e o que vem pela frente.</li>
-            <li><span className="font-semibold text-[var(--tinta)]">Custos</span> — quanto cada setor e cada agente gastou.</li>
-          </ul>
+      {/* faixa de setores (no lugar da faixa de logos) */}
+      <section className="faixa py-14 text-center">
+        <p className="text-[var(--tinta-2)]">Setores que já funcionam no WorkEnd.</p>
+        <ul className="mt-6 flex flex-wrap justify-center gap-2.5">
+          {SETORES.map((s) => <li key={s.id}><span className="placa placa-cinza" style={{ ["--cor" as string]: s.cor }}><b />{s.nome}</span></li>)}
+        </ul>
+      </section>
+
+      {/* cartões */}
+      <section className="faixa secao">
+        <h2 className="max-w-[20ch]">Agentes onde a sua empresa trabalha.</h2>
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          {CARTOES.map((c) => (
+            <Link key={c.eyebrow} href={cta.href} className="cartao group">
+              <div className="topo">
+                <div><small>{c.eyebrow}</small><h3>{c.titulo}</h3></div>
+                <span className="seta" aria-hidden="true">→</span>
+              </div>
+              <div className="janela janela-10">
+                <div className="barra" aria-hidden="true"><i /><i /><i /></div>
+                <Image src={c.img} alt={c.alt} width={1200} height={750} />
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 
-      {/* como funciona */}
-      <section id="como-funciona" className="secao">
-        <div className="faixa">
-          <h2>Como funciona</h2>
-          <ol className="mt-10 grid gap-8 md:grid-cols-3">
-            {[
-              ["Monte seu escritório", "Escolha os setores que a sua empresa precisa. Cada um vira uma sala no prédio."],
-              ["Contrate especialistas", "Gestor de tráfego, designer, dev, atendente. Chegam treinados e aprendem a sua empresa."],
-              ["Dê a ordem e aprove", "Fale com o gerente do setor. A equipe executa, nada sai sem o seu ok, e o relatório chega."],
-            ].map(([t, d], i) => (
-              <li key={t} className="border-t-2 border-[var(--tinta)] pt-5">
-                <div className="display text-sm text-[var(--azul)]">{i + 1}</div>
-                <h3 className="mt-2">{t}</h3>
-                <p className="mt-2 text-[var(--tinta-2)]">{d}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
+      {/* como funciona, em três linhas */}
+      <section className="faixa secao pt-0">
+        <h2 className="max-w-[20ch]">Simples assim.</h2>
+        <ol className="mt-8 grid gap-6 md:grid-cols-3">
+          {[
+            ["Monte seu escritório", "Escolha os setores. Cada um vira uma sala no prédio."],
+            ["Contrate especialistas", "Gestor de tráfego, designer, dev, atendente. Chegam treinados."],
+            ["Dê a ordem e aprove", "A equipe executa, você aprova, o relatório chega."],
+          ].map(([t, d], i) => (
+            <li key={t} className="rounded-2xl bg-[var(--cinza)] p-6">
+              <div className="text-sm font-semibold text-[var(--tinta-2)]">{i + 1}</div>
+              <h3 className="mt-2">{t}</h3>
+              <p className="mt-2 text-[var(--tinta-2)]">{d}</p>
+            </li>
+          ))}
+        </ol>
       </section>
 
-      {/* setores: só as placas */}
-      <section className="fundo-tinta secao">
-        <div className="faixa">
-          <h2 className="max-w-[26ch]">Um setor pra cada parte da sua empresa</h2>
-          <ul className="mt-8 flex flex-wrap gap-3">
-            {SETORES.map((s) => (
-              <li key={s.id}><span className="placa" style={{ ["--cor" as string]: s.cor }}><b />{s.nome}</span></li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* chamada final */}
-      <section className="secao">
-        <div className="faixa flex flex-col items-start gap-5">
-          <h2 className="max-w-[24ch]">Você é o CEO. A sala tem o seu nome.</h2>
-          <Link href={cta.href} className="btn btn-azul text-[1.05rem]">{cta.texto}</Link>
+      {/* comece hoje */}
+      <section className="fundo-cinza secao">
+        <div className="faixa flex flex-col items-center text-center">
+          <h2>Comece hoje mesmo.</h2>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Link href={cta.href} className="btn btn-azul btn-grande">{cta.texto}</Link>
+            <a href={DEMO} target="_blank" rel="noreferrer" className="btn btn-claro btn-grande">Ver um escritório funcionando</a>
+          </div>
         </div>
       </section>
 

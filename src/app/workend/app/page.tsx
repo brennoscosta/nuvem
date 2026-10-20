@@ -3,11 +3,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
-import { Rodape, SETORES, ESPECIALISTAS } from "../_partes";
+import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
 import { BotaoSair, BotaoAvisar } from "../_conta";
 
 export const dynamic = "force-dynamic";
-const DEMO = "https://nuvem.nuvemhost.cloud/?vista=fora";
 
 export default async function App() {
   const u = await usuarioAtual().catch(() => null);
@@ -27,7 +26,7 @@ export default async function App() {
 
       {/* seu escritório: estado vazio com direção */}
       <section className="faixa mt-10 grid gap-8 lg:grid-cols-[1.1fr_1fr]">
-        <div className="rounded-2xl border-[1.5px] border-dashed border-[var(--linha)] bg-white p-7">
+        <div className="rounded-2xl bg-[var(--cinza)] p-7">
           <h2 className="text-[1.5rem]">Seu escritório</h2>
           <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">Ainda não tem prédio no seu terreno. A compra de escritório abre em breve: quem já tem conta entra primeiro, com condição de fundador.</p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -36,11 +35,10 @@ export default async function App() {
           </div>
         </div>
         <div className="vitrine">
-          <a href={DEMO} target="_blank" rel="noreferrer" aria-label="Abrir um escritório de demonstração funcionando ao vivo">
-            <Image src="/workend/poster.jpg" alt="" width={1280} height={720} />
-          </a>
-          <span className="faixa-branca" style={{ top: 0 }} />
-          <span className="faixa-branca" style={{ bottom: 0 }} />
+          <div className="janela">
+            <div className="barra" aria-hidden="true"><i /><i /><i /></div>
+            <a href={DEMO} target="_blank" rel="noreferrer" aria-label="Abrir um escritório de demonstração funcionando ao vivo"><Image src="/workend/poster.jpg" alt="" width={1280} height={720} /></a>
+          </div>
           <a href={DEMO} target="_blank" rel="noreferrer" className="btn btn-tinta absolute bottom-5 left-5 z-10">Ver um escritório funcionando ao vivo</a>
         </div>
       </section>

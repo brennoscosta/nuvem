@@ -16,7 +16,7 @@ export default async function Entrar() {
           <h1 className="text-[2.2rem] lg:text-[2.8rem]">Bem-vindo de volta.</h1>
           <p className="mt-5 max-w-[48ch] text-[var(--tinta-2)]">Entre pra ver seu escritório e o catálogo de especialistas.</p>
         </div>
-        <div className="rounded-2xl border-[1.5px] border-[var(--linha)] bg-white p-6 lg:p-8"><FormEntrar /></div>
+        <div className="rounded-2xl bg-[var(--cinza)] p-6 lg:p-8"><FormEntrar /></div>
       </section>
       <Rodape />
     </>
