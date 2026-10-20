@@ -2,6 +2,7 @@
 import { executarPublicacao } from "@/server/tarefas";
 import { ok, erro, corpo } from "@/server/http";
 import { ehAdmin, naoAutorizado } from "@/server/auth";
+import { base } from "@/server/conexoes";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -12,6 +13,6 @@ export async function POST(req: Request, { params }: Ctx) {
   try {
     const { id } = await params;
     const ajustes = await corpo<{ titulo?: string; descricao?: string; privacidade?: "public" | "unlisted" | "private" }>(req).catch(() => ({}));
-    return ok(await executarPublicacao(id, ajustes));
+    return ok(await executarPublicacao(id, base(req), ajustes));
   } catch (e) { return erro(e); }
 }

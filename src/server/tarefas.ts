@@ -8,6 +8,8 @@ import { EMPRESA_PADRAO, fichaCompleta, gravarEvento, registrarUso, salvarFalaPu
 import { montarSistema, custoBRL, temIA } from "./motor";
 import { gravarMural } from "./mural";
 import { publicarNoYouTube } from "./youtube";
+import { publicarNoInstagram } from "./instagram";
+import { publicarNoTikTok } from "./tiktok";
 
 export const DIR_UPLOADS = process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads");
 export type StatusTarefa = "planejando" | "aguardando_aprovacao" | "executando" | "concluida" | "falhou" | "cancelada";
@@ -102,7 +104,7 @@ Responda SÓ um JSON com: {"titulo": string (máx. 90 caracteres, sem aspas), "d
 }
 
 // 3) Dono aprovou (podendo editar título/descrição): executa de verdade.
-export async function executarPublicacao(tid: string, ajustes?: Partial<Pick<PlanoPublicacao, "titulo" | "descricao" | "privacidade">>) {
+export async function executarPublicacao(tid: string, baseUrl: string, ajustes?: Partial<Pick<PlanoPublicacao, "titulo" | "descricao" | "privacidade">>) {
   const t = await obterTarefa(tid); if (!t) throw new Error("Tarefa não encontrada");
   if (!["aguardando_aprovacao", "falhou"].includes(t.status)) throw new Error(`Tarefa não está aguardando aprovação (status: ${t.status}).`);
   const f = await fichaCompleta(t.agenteId); if (!f) throw new Error("Agente não encontrado");
@@ -114,14 +116,17 @@ export async function executarPublicacao(tid: string, ajustes?: Partial<Pick<Pla
   const erros: string[] = [];
   for (const p of plano.plataformas) {
     try {
-      if (p === "youtube") resultado.youtube = await publicarNoYouTube({ caminho: arq.caminho, mime: arq.mime, tamanho: arq.tamanho, titulo: plano.titulo, descricao: plano.descricao, tags: plano.tags, privacidade: plano.privacidade });
+      if (p === "youtube") resultado.youtube = await publicarNoYouTube({ caminho: arq.caminho, mime: arq.mime, tamanho: Number(arq.tamanho), titulo: plano.titulo, descricao: plano.descricao, tags: plano.tags, privacidade: plano.privacidade });
+      else if (p === "instagram") resultado.instagram = await publicarNoInstagram({ videoUrl: `${baseUrl}/api/arquivos/${arq.id}/raw`, legenda: plano.descricao });
+      else if (p === "tiktok") { const r = await publicarNoTikTok({ caminho: arq.caminho, tamanho: Number(arq.tamanho), titulo: plano.descricao, publico: plano.privacidade === "public" }); resultado.tiktok = r; if (r.aviso) erros.push(`tiktok: ${r.aviso}`); }
       else erros.push(`${p}: ainda não integrado`);
     } catch (e) { erros.push(`${p}: ${(e as Error).message}`); }
   }
   const okPlat = Object.keys(resultado);
   if (okPlat.length) {
     const links = okPlat.map((p) => `${p}: ${(resultado[p] as { url: string }).url}`).join(" · ");
-    const fala = "Acabei de publicar um vídeo novo 🎬";
+    const redes = okPlat.map((p) => ({ youtube: "YouTube", instagram: "Instagram", tiktok: "TikTok" }[p] ?? p)).join(", ");
+    const fala = `Acabei de publicar um vídeo novo no ${redes} 🎬`;
     await salvarFalaPublica(t.agenteId, fala);
     await gravarEvento(f.agente.empresaId, t.agenteId, "aprovado", fala, { links });
     await gravarMural({ autorTipo: "agente", autorNome: f.agente.nome, agenteId: t.agenteId, texto: `Publiquei "${plano.titulo}" — ${links}${erros.length ? ` (pendente: ${erros.join("; ")})` : ""}`, publico: `${f.agente.nome} publicou um vídeo novo 🎬` });

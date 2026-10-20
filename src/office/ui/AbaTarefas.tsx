@@ -16,11 +16,15 @@ const STATUS: Record<string, { nome: string; cor: string }> = {
   planejando: { nome: "Planejando", cor: "#8B6CF0" }, aguardando_aprovacao: { nome: "Aguardando seu ok", cor: "#D9A23A" }, executando: { nome: "Publicando…", cor: "#4F7DF3" },
   concluida: { nome: "Publicado", cor: "#22A86B" }, falhou: { nome: "Falhou", cor: "#E2575B" }, cancelada: { nome: "Cancelada", cor: "#9AA3AD" },
 };
-const PLATAFORMAS = [{ id: "youtube", nome: "YouTube", pronto: true }, { id: "instagram", nome: "Instagram", pronto: false }, { id: "tiktok", nome: "TikTok", pronto: false }];
+const PLATAFORMAS = [
+  { id: "youtube", nome: "YouTube", cor: "#FF0000", icone: "▶", variaveis: "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET", nota: "" },
+  { id: "instagram", nome: "Instagram", cor: "#E1306C", icone: "◎", variaveis: "INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET", nota: "conta profissional (Business ou Creator)" },
+  { id: "tiktok", nome: "TikTok", cor: "#111111", icone: "♪", variaveis: "TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET", nota: "até o app ser auditado, publica como 'somente eu'" },
+];
 const inp = "rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#4F7DF3]";
 
 export function AbaTarefas({ agenteId, nomeAgente }: { agenteId: string; nomeAgente: string }) {
-  const [conexoes, setConexoes] = useState<{ configurado: { youtube: boolean }; conexoes: Conexao[] } | null>(null);
+  const [conexoes, setConexoes] = useState<{ configurado: Record<string, boolean>; conexoes: Conexao[] } | null>(null);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -31,7 +35,8 @@ export function AbaTarefas({ agenteId, nomeAgente }: { agenteId: string; nomeAge
   // volta do Google (?conexao=youtube&ok=... | &erro=...)
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    if (p.get("conexao") === "youtube") { setAviso(p.get("ok") ? `YouTube conectado: ${p.get("ok")}` : `Falhou ao conectar: ${p.get("erro")}`); window.history.replaceState(null, "", "/"); }
+    const cx = p.get("conexao");
+    if (cx) { const nome = PLATAFORMAS.find((x) => x.id === cx)?.nome ?? cx; setAviso(p.get("ok") ? `${nome} conectado: ${p.get("ok")}` : `Falhou ao conectar ${nome}: ${p.get("erro")}`); window.history.replaceState(null, "", "/"); }
   }, []);
   // enquanto houver tarefa em andamento, atualiza a cada 4 s
   useEffect(() => {
@@ -39,7 +44,6 @@ export function AbaTarefas({ agenteId, nomeAgente }: { agenteId: string; nomeAge
     const i = setInterval(carregar, 4000); return () => clearInterval(i);
   }, [tarefas, carregar]);
 
-  const yt = conexoes?.conexoes.find((c) => c.provedor === "youtube");
   return (
     <div className="flex flex-col gap-4 text-sm">
       {aviso && <div className="rounded-xl bg-[#E8F3FF] px-3 py-2 text-xs text-[#1D4E89]">{aviso} <button onClick={() => setAviso(null)} className="ml-2 underline">ok</button></div>}
@@ -48,17 +52,19 @@ export function AbaTarefas({ agenteId, nomeAgente }: { agenteId: string; nomeAge
       {/* conexões */}
       <section className="rounded-2xl border border-black/10 p-3">
         <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[#5B6472]">Contas conectadas</div>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-[#FF0000] text-xs font-black text-white">▶</span>
-            <div><div className="font-semibold">YouTube</div><div className="text-[11px] text-[#5B6472]">{yt ? `canal: ${yt.contaNome || yt.contaId}` : conexoes && !conexoes.configurado.youtube ? "falta GOOGLE_CLIENT_ID / SECRET no CapRover" : "não conectado"}</div></div></div>
-          {yt
-            ? <button onClick={async () => { if (!confirm("Desconectar o YouTube?")) return; await api("/api/conexoes/youtube", "DELETE"); carregar(); }} className="rounded-full bg-black/5 px-3 py-1.5 text-xs font-semibold">Desconectar</button>
-            : <a href="/api/conexoes/youtube" className={`rounded-full px-3 py-1.5 text-xs font-bold text-white ${conexoes?.configurado.youtube ? "bg-[#4F7DF3]" : "pointer-events-none bg-black/20"}`}>Conectar YouTube</a>}
+        <div className="flex flex-col gap-2">
+          {PLATAFORMAS.map((p) => { const c = conexoes?.conexoes.find((x) => x.provedor === p.id); const cfg = conexoes?.configurado[p.id]; return (
+            <div key={p.id} className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg text-sm font-black text-white" style={{ background: p.cor }}>{p.icone}</span>
+                <div><div className="font-semibold">{p.nome}</div><div className="text-[11px] text-[#5B6472]">{c ? `conta: ${c.contaNome || c.contaId}` : conexoes && !cfg ? `falta ${p.variaveis} no CapRover` : p.nota || "não conectado"}</div></div></div>
+              {c
+                ? <button onClick={async () => { if (!confirm(`Desconectar o ${p.nome}?`)) return; await api(`/api/conexoes/${p.id}`, "DELETE"); carregar(); }} className="rounded-full bg-black/5 px-3 py-1.5 text-xs font-semibold">Desconectar</button>
+                : <a href={`/api/conexoes/${p.id}`} className={`rounded-full px-3 py-1.5 text-xs font-bold text-white ${cfg ? "bg-[#4F7DF3]" : "pointer-events-none bg-black/20"}`}>Conectar</a>}
+            </div>); })}
         </div>
-        <div className="mt-2 text-[11px] text-[#5B6472]">Instagram e TikTok: em breve (Instagram precisa de conta Business + app Meta; TikTok publica só como privado até o app ser auditado).</div>
       </section>
 
-      <NovaPublicacao agenteId={agenteId} nomeAgente={nomeAgente} aoCriar={carregar} ytConectado={!!yt} />
+      <NovaPublicacao agenteId={agenteId} nomeAgente={nomeAgente} aoCriar={carregar} conectadas={(conexoes?.conexoes ?? []).map((c) => c.provedor)} />
 
       {/* histórico */}
       <section>
@@ -70,11 +76,11 @@ export function AbaTarefas({ agenteId, nomeAgente }: { agenteId: string; nomeAge
   );
 }
 
-function NovaPublicacao({ agenteId, nomeAgente, aoCriar, ytConectado }: { agenteId: string; nomeAgente: string; aoCriar: () => Promise<void>; ytConectado: boolean }) {
+function NovaPublicacao({ agenteId, nomeAgente, aoCriar, conectadas }: { agenteId: string; nomeAgente: string; aoCriar: () => Promise<void>; conectadas: string[] }) {
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [legenda, setLegenda] = useState("");
   const [titulo, setTitulo] = useState("");
-  const [plataformas, setPlataformas] = useState<string[]>(["youtube"]);
+  const [plataformas, setPlataformas] = useState<string[]>(["youtube", "instagram", "tiktok"]);
   const [privacidade, setPrivacidade] = useState<"public" | "unlisted" | "private">("public");
   const [fase, setFase] = useState<"idle" | "enviando" | "planejando">("idle");
   const [progresso, setProgresso] = useState(0);
@@ -110,9 +116,9 @@ function NovaPublicacao({ agenteId, nomeAgente, aoCriar, ytConectado }: { agente
         <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Título (opcional — o CEO cria se ficar vazio)" className={inp} />
         <textarea value={legenda} onChange={(e) => setLegenda(e.target.value)} placeholder="Legenda / descrição do post" rows={4} className={inp} />
         <div className="flex flex-wrap items-center gap-1.5">
-          {PLATAFORMAS.map((p) => { const on = plataformas.includes(p.id); return (
-            <button key={p.id} disabled={!p.pronto} onClick={() => setPlataformas(on ? plataformas.filter((x) => x !== p.id) : [...plataformas, p.id])} title={p.pronto ? "" : "em breve"}
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${on ? "border-transparent bg-[#4F7DF3] text-white" : "border-black/10 text-[#5B6472]"} disabled:opacity-40`}>{p.nome}{!p.pronto && " · em breve"}</button>); })}
+          {PLATAFORMAS.map((p) => { const on = plataformas.includes(p.id); const ok = conectadas.includes(p.id); return (
+            <button key={p.id} onClick={() => setPlataformas(on ? plataformas.filter((x) => x !== p.id) : [...plataformas, p.id])} title={ok ? "" : "conta não conectada"}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${on ? "border-transparent text-white" : "border-black/10 text-[#5B6472]"}`} style={on ? { background: ok ? "#4F7DF3" : "#9AA3AD" } : {}}>{p.nome}{!ok && " ·⚠"}</button>); })}
           <select value={privacidade} onChange={(e) => setPrivacidade(e.target.value as typeof privacidade)} className="ml-auto rounded-full border border-black/10 px-2 py-1 text-xs">
             <option value="public">Público</option><option value="unlisted">Não listado</option><option value="private">Privado</option>
           </select>
@@ -122,7 +128,7 @@ function NovaPublicacao({ agenteId, nomeAgente, aoCriar, ytConectado }: { agente
         <button onClick={enviar} disabled={fase !== "idle" || !arquivo || !legenda.trim() || !plataformas.length} className="rounded-xl bg-[#4F7DF3] px-4 py-2 text-sm font-bold text-white disabled:opacity-40">
           {fase === "enviando" ? `Enviando vídeo… ${progresso}%` : fase === "planejando" ? `${nomeAgente} está preparando o post…` : `Entregar pro ${nomeAgente}`}
         </button>
-        {!ytConectado && plataformas.includes("youtube") && <div className="text-[11px] text-[#7A5A00]">Conecte o YouTube acima antes de aprovar a publicação (dá pra enviar o vídeo agora e conectar depois).</div>}
+        {plataformas.some((p) => !conectadas.includes(p)) && <div className="text-[11px] text-[#7A5A00]">Rede marcada com ⚠ ainda não está conectada: conecte acima antes de aprovar (dá pra enviar o vídeo agora e conectar depois).</div>}
         <div className="text-[11px] text-[#5B6472]">O {nomeAgente} lê a legenda, propõe título/descrição/tags e espera o seu ok antes de publicar.</div>
       </div>
     </section>
@@ -140,7 +146,6 @@ function CartaoTarefa({ t, nomeAgente, recarregar }: { t: Tarefa; nomeAgente: st
     setOcupado(true); setErro(null);
     try { await api(`/api/tarefas/${t.id}/executar`, "POST", editando ? { titulo, descricao } : {}); await recarregar(); } catch (e) { setErro((e as Error).message); await recarregar(); } finally { setOcupado(false); }
   };
-  const yt = t.resultado?.youtube as { url?: string; canal?: string } | undefined;
   return (
     <div className="rounded-2xl border border-black/10 p-3">
       <div className="flex items-start justify-between gap-2">
@@ -169,7 +174,8 @@ function CartaoTarefa({ t, nomeAgente, recarregar }: { t: Tarefa; nomeAgente: st
           </div>
         </div>
       )}
-      {t.status === "concluida" && yt?.url && <div className="mt-2 text-xs">✅ No YouTube{yt.canal ? ` (${yt.canal})` : ""}: <a href={yt.url} target="_blank" rel="noreferrer" className="font-semibold text-[#4F7DF3] underline">{yt.url}</a></div>}
+      {t.status === "concluida" && PLATAFORMAS.map((p) => { const r = t.resultado?.[p.id] as { url?: string; canal?: string; conta?: string } | undefined; return r?.url ? (
+        <div key={p.id} className="mt-1 text-xs">✅ {p.nome}{(r.canal ?? r.conta) ? ` (${r.canal ?? r.conta})` : ""}: <a href={r.url} target="_blank" rel="noreferrer" className="font-semibold text-[#4F7DF3] underline">{r.url}</a></div>) : null; })}
       {Array.isArray(t.resultado?.pendentes) && (t.resultado!.pendentes as string[]).length > 0 && <div className="mt-1 text-[11px] text-[#7A5A00]">Pendente: {(t.resultado!.pendentes as string[]).join("; ")}</div>}
       {(t.status === "falhou" || erro) && (
         <div className="mt-2 rounded-xl bg-[#FDE8E8] p-2 text-xs text-[#8A2A2A]">{erro ?? t.erro}

@@ -1,23 +1,15 @@
 // YouTube: conexão OAuth da conta do dono + upload de vídeo (resumable). Sem SDK, só fetch.
 // Variáveis: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (CapRover). Redirect: <site>/api/conexoes/youtube/callback
 import fs from "node:fs";
-import { sql, id, migrar } from "./db";
-import { EMPRESA_PADRAO } from "./agentes";
+import { base as baseUrl, urlCallback as cb, salvarConexao, atualizarTokens, obterConexao, resumoErro, type Conexao } from "./conexoes";
 
 const ESCOPOS = ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"];
 
-export interface Conexao { id: string; provedor: string; contaNome: string; contaId: string; accessToken: string; refreshToken: string; expiraEm: Date | null; escopo: string; criadoEm: Date }
 
 export function youtubeConfigurado() { return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET); }
 
-export function base(req: Request) {
-  // atrás do proxy do CapRover o host vem no header
-  const h = req.headers;
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  return `${proto}://${host}`;
-}
-export function urlCallback(req: Request) { return `${base(req)}/api/conexoes/youtube/callback`; }
+export const base = baseUrl;
+export function urlCallback(req: Request) { return cb(req, "youtube"); }
 
 export function urlAutorizacao(req: Request, state: string) {
   const p = new URLSearchParams({
@@ -46,7 +38,7 @@ async function renovar(c: Conexao) {
   const j = await r.json();
   if (!r.ok) throw new Error(`Não consegui renovar o acesso ao YouTube (${j.error_description ?? j.error ?? r.status}). Reconecte a conta.`);
   const expiraEm = new Date(Date.now() + (j.expires_in - 60) * 1000);
-  await sql`UPDATE conexao SET access_token = ${j.access_token}, expira_em = ${expiraEm}, atualizado_em = now() WHERE id = ${c.id}`;
+  await atualizarTokens(c.id, { accessToken: j.access_token, expiraEm });
   return { ...c, accessToken: j.access_token as string, expiraEm };
 }
 
@@ -58,30 +50,13 @@ async function canal(accessToken: string) {
 }
 
 export async function conectarComCodigo(req: Request, code: string) {
-  await migrar();
   const t = await trocarCodigo(req, code);
   const ch = await canal(t.access_token);
-  const expiraEm = new Date(Date.now() + (t.expires_in - 60) * 1000);
-  await sql`INSERT INTO conexao (id, empresa_id, provedor, conta_nome, conta_id, access_token, refresh_token, expira_em, escopo)
-    VALUES (${id("cx")}, ${EMPRESA_PADRAO.id}, 'youtube', ${ch.nome}, ${ch.id}, ${t.access_token}, ${t.refresh_token ?? ""}, ${expiraEm}, ${t.scope})
-    ON CONFLICT (empresa_id, provedor) DO UPDATE SET conta_nome = EXCLUDED.conta_nome, conta_id = EXCLUDED.conta_id, access_token = EXCLUDED.access_token,
-      refresh_token = CASE WHEN EXCLUDED.refresh_token = '' THEN conexao.refresh_token ELSE EXCLUDED.refresh_token END, expira_em = EXCLUDED.expira_em, escopo = EXCLUDED.escopo, atualizado_em = now()`;
+  await salvarConexao({ provedor: "youtube", contaNome: ch.nome, contaId: ch.id, accessToken: t.access_token, refreshToken: t.refresh_token, expiraEm: new Date(Date.now() + (t.expires_in - 60) * 1000), escopo: t.scope });
   return ch;
 }
 
-export async function obterConexao(provedor = "youtube"): Promise<Conexao | null> {
-  await migrar();
-  const [c] = await sql<Conexao[]>`SELECT id, provedor, conta_nome, conta_id, access_token, refresh_token, expira_em, escopo, criado_em FROM conexao WHERE empresa_id = ${EMPRESA_PADRAO.id} AND provedor = ${provedor}`;
-  return c ?? null;
-}
-export async function listarConexoes() {
-  await migrar();
-  const rows = await sql<{ provedor: string; contaNome: string; contaId: string; criadoEm: Date }[]>`SELECT provedor, conta_nome, conta_id, criado_em FROM conexao WHERE empresa_id = ${EMPRESA_PADRAO.id}`;
-  return rows;
-}
-export async function desconectar(provedor: string) {
-  await sql`DELETE FROM conexao WHERE empresa_id = ${EMPRESA_PADRAO.id} AND provedor = ${provedor}`;
-}
+export { listarConexoes, desconectar } from "./conexoes";
 
 async function tokenValido(): Promise<Conexao> {
   const c = await obterConexao("youtube");
@@ -115,6 +90,3 @@ export async function publicarNoYouTube(v: VideoParaPublicar) {
   return { videoId, url: `https://youtu.be/${videoId}`, canal: c.contaNome, privacidade: meta.status.privacyStatus };
 }
 
-function resumoErro(t: string) {
-  try { const j = JSON.parse(t); return j.error?.message ?? j.error?.errors?.[0]?.reason ?? t.slice(0, 200); } catch { return t.slice(0, 200); }
-}
