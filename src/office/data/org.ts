@@ -2,7 +2,7 @@
 
 // Setores com time de IA: planejamento, criacao, social, trafego, desenvolvimento, analise, atendimento, vendas.
 // Diretoria (pessoas reais) e apoio (financeiro, rh, juridico) completam o prédio.
-export type AreaId = "planejamento" | "criacao" | "social" | "trafego" | "desenvolvimento" | "analise" | "atendimento" | "vendas"
+export type AreaId = "planejamento" | "criacao" | "social" | "trafego" | "webdesign" | "designgrafico" | "desenvolvimento" | "analise" | "atendimento" | "vendas"
   | "diretoria" | "financeiro" | "rh" | "juridico";
 
 export interface Area {
@@ -15,8 +15,10 @@ export interface Area {
 export const AREAS: Record<AreaId, Area> = {
   planejamento: { id: "planejamento", nome: "Planejamento", cor: "#5C6BC0", piso: "#E4E6F7" },
   criacao: { id: "criacao", nome: "Criação", cor: "#EC6B8D", piso: "#FBE6EC" },
-  social: { id: "social", nome: "Social", cor: "#F2913D", piso: "#FDEBDD" },
-  trafego: { id: "trafego", nome: "Tráfego", cor: "#00ACC1", piso: "#DFF3F6" },
+  social: { id: "social", nome: "Social media", cor: "#F2913D", piso: "#FDEBDD" },
+  trafego: { id: "trafego", nome: "Gestão de tráfego", cor: "#00ACC1", piso: "#DFF3F6" },
+  webdesign: { id: "webdesign", nome: "Web design", cor: "#7E57C2", piso: "#EDE7F6" },
+  designgrafico: { id: "designgrafico", nome: "Design gráfico", cor: "#FF7043", piso: "#FBE9E7" },
   desenvolvimento: { id: "desenvolvimento", nome: "Desenvolvimento", cor: "#4F7DF3", piso: "#E4EBFB" },
   analise: { id: "analise", nome: "Análise", cor: "#8B6CF0", piso: "#ECE6FB" },
   atendimento: { id: "atendimento", nome: "Atendimento", cor: "#3FBFA8", piso: "#DFF4F0" },
@@ -27,7 +29,7 @@ export const AREAS: Record<AreaId, Area> = {
   juridico: { id: "juridico", nome: "Jurídico", cor: "#6D4C41", piso: "#EFE7E3" },
 };
 
-export const AREAS_OPERACIONAIS: AreaId[] = ["planejamento", "criacao", "social", "trafego", "desenvolvimento", "analise", "atendimento", "vendas", "financeiro", "rh", "juridico"];
+export const AREAS_OPERACIONAIS: AreaId[] = ["planejamento", "criacao", "social", "trafego", "webdesign", "designgrafico", "desenvolvimento", "analise", "atendimento", "vendas", "financeiro", "rh", "juridico"];
 
 export type Nivel = "estagiario" | "junior" | "pleno" | "senior" | "gerente" | "diretor" | "ceo";
 
@@ -54,7 +56,9 @@ export const NIVEL: Record<Nivel, NivelInfo> = Object.fromEntries(NIVEIS.map((n)
 
 export const FUNCOES: Record<AreaId, string[]> = {
   planejamento: ["Planejador(a) estratégico", "Gestor(a) de projetos", "Analista de processos", "Cronograma e prazos"],
-  criacao: ["Roteirista", "Redator(a) / copy", "Designer gráfico", "Editor(a) de vídeo", "Diretor(a) de arte"],
+  criacao: ["Roteirista", "Redator(a) / copy", "Editor(a) de vídeo", "Diretor(a) de arte", "Produtor(a) de conteúdo"],
+  webdesign: ["Web designer", "Designer de produto (UI/UX)", "Landing pages", "Prototipagem"],
+  designgrafico: ["Designer gráfico", "Motion designer", "Ilustrador(a)", "Identidade visual"],
   social: ["Social media", "Community manager", "Programação de posts", "Monitoramento de comentários"],
   trafego: ["Gestor(a) de tráfego", "Analista de campanhas", "Otimização de anúncios", "Pixel e conversões"],
   desenvolvimento: ["Dev front-end", "Dev back-end", "Dev mobile", "QA", "DevOps / automações"],

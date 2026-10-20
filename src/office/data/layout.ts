@@ -65,16 +65,18 @@ export const SALAS: Sala[] = [
   { id: "diretoria", nome: "Diretoria", area: "diretoria", andar: 0, tipo: "diretoria", x0: -18, x1: -12, z0: 1.6, z1: 9, entrada: [-15, 0, 1.6], piso: "#F6EEDF", vidro: true },
   { id: "copa", nome: "Copa", andar: 0, tipo: "copa", x0: -12, x1: -7, z0: 1.6, z1: 9, entrada: [-9.5, 0, 1.6], piso: "#E9F2E4" },
   { id: "lounge", nome: "Lounge & jogos", andar: 0, tipo: "lounge", x0: -7, x1: 0, z0: 1.6, z1: 9, entrada: [-3.5, 0, 1.6], piso: "#F1E7DC" },
-  // ---- ala leste ---- Norte
-  { id: "planejamento", nome: "Planejamento", area: "planejamento", andar: 0, tipo: "area", x0: 0, x1: 9, z0: -9, z1: -1.6, entrada: [4.5, 0, -1.6], piso: "#E4E6F7" },
-  { id: "social", nome: "Social", area: "social", andar: 0, tipo: "area", x0: 9, x1: 18, z0: -9, z1: -1.6, entrada: [13.5, 0, -1.6], piso: "#FDEBDD" },
-  { id: "trafego", nome: "Tráfego", area: "trafego", andar: 0, tipo: "area", x0: 18, x1: 27, z0: -9, z1: -1.6, entrada: [22.5, 0, -1.6], piso: "#DFF3F6" },
-  { id: "analise", nome: "Análise", area: "analise", andar: 0, tipo: "area", x0: 27, x1: 36, z0: -9, z1: -1.6, entrada: [31.5, 0, -1.6], piso: "#ECE6FB" },
-  // ---- ala leste ---- Sul
-  { id: "financeiro", nome: "Financeiro", area: "financeiro", andar: 0, tipo: "area", x0: 0, x1: 9, z0: 1.6, z1: 9, entrada: [4.5, 0, 1.6], piso: "#E0F0E1" },
-  { id: "rh", nome: "RH & Cultura", area: "rh", andar: 0, tipo: "area", x0: 9, x1: 18, z0: 1.6, z1: 9, entrada: [13.5, 0, 1.6], piso: "#FBE4EC" },
-  { id: "juridico", nome: "Jurídico", area: "juridico", andar: 0, tipo: "area", x0: 18, x1: 27, z0: 1.6, z1: 9, entrada: [22.5, 0, 1.6], piso: "#EFE7E3", vidro: true },
-  { id: "auditorio", nome: "Auditório", andar: 0, tipo: "auditorio", x0: 27, x1: 36, z0: 1.6, z1: 9, entrada: [31.5, 0, 1.6], piso: "#E8E4F0", vidro: true },
+  // ---- ala leste ---- Norte (5 salas de 7,2 m)
+  { id: "planejamento", nome: "Planejamento", area: "planejamento", andar: 0, tipo: "area", x0: 0, x1: 7.2, z0: -9, z1: -1.6, entrada: [3.6, 0, -1.6], piso: "#E4E6F7" },
+  { id: "social", nome: "Social media", area: "social", andar: 0, tipo: "area", x0: 7.2, x1: 14.4, z0: -9, z1: -1.6, entrada: [10.8, 0, -1.6], piso: "#FDEBDD" },
+  { id: "trafego", nome: "Gestão de tráfego", area: "trafego", andar: 0, tipo: "area", x0: 14.4, x1: 21.6, z0: -9, z1: -1.6, entrada: [18, 0, -1.6], piso: "#DFF3F6" },
+  { id: "analise", nome: "Análise", area: "analise", andar: 0, tipo: "area", x0: 21.6, x1: 28.8, z0: -9, z1: -1.6, entrada: [25.2, 0, -1.6], piso: "#ECE6FB" },
+  { id: "webdesign", nome: "Web design", area: "webdesign", andar: 0, tipo: "area", x0: 28.8, x1: 36, z0: -9, z1: -1.6, entrada: [32.4, 0, -1.6], piso: "#EDE7F6" },
+  // ---- ala leste ---- Sul (5 salas de 7,2 m)
+  { id: "financeiro", nome: "Financeiro", area: "financeiro", andar: 0, tipo: "area", x0: 0, x1: 7.2, z0: 1.6, z1: 9, entrada: [3.6, 0, 1.6], piso: "#E0F0E1" },
+  { id: "rh", nome: "RH & Cultura", area: "rh", andar: 0, tipo: "area", x0: 7.2, x1: 14.4, z0: 1.6, z1: 9, entrada: [10.8, 0, 1.6], piso: "#FBE4EC" },
+  { id: "juridico", nome: "Jurídico", area: "juridico", andar: 0, tipo: "area", x0: 14.4, x1: 21.6, z0: 1.6, z1: 9, entrada: [18, 0, 1.6], piso: "#EFE7E3", vidro: true },
+  { id: "designgrafico", nome: "Design gráfico", area: "designgrafico", andar: 0, tipo: "area", x0: 21.6, x1: 28.8, z0: 1.6, z1: 9, entrada: [25.2, 0, 1.6], piso: "#FBE9E7" },
+  { id: "auditorio", nome: "Auditório", andar: 0, tipo: "auditorio", x0: 28.8, x1: 36, z0: 1.6, z1: 9, entrada: [32.4, 0, 1.6], piso: "#E8E4F0", vidro: true },
 ];
 
 export const SALA: Record<string, Sala> = Object.fromEntries(SALAS.map((s) => [s.id, s]));

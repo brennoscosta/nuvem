@@ -209,9 +209,22 @@ export function Predio() {
       {/* auditório (ala leste) */}
       {SALAS.filter((s) => s.tipo === "auditorio").map((s) => <Auditorio key={s.id} s={s} />)}
 
-      {/* colunas e luminárias do corredor */}
+      {/* corredor: faixa central, colunas, luminárias, jardineiras e banquinhos (dá vida à circulação) */}
+      <mesh geometry={plano(x1 - x0 - 0.4, 0.7)} material={mat("#F3F0E9", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} />
       {[-27, -18, -9, 0, 9, 18, 27].map((x) => <mesh key={x} geometry={cilindro(0.18, 0.18, 2.8, 12)} material={mat("#CFD3D9", { rough: 0.6 })} position={[x, 1.4, 0]} castShadow />)}
       {[-31.5, -22.5, -13.5, -4.5, 4.5, 13.5, 22.5, 31.5].map((x) => <Luminaria key={x} position={[x, 2.75, 0]} r={0.6} />)}
+      {[-27, -18, -9, 0, 9, 18, 27].map((x) => (
+        <group key={"j" + x}>
+          <mesh geometry={caixa(1.1, 0.42, 0.42)} material={mat("#D8D3CA", { rough: 0.9 })} position={[x, 0.21, -1.25]} castShadow />
+          <Planta position={[x - 0.3, 0.3, -1.25]} pequena /><Planta position={[x + 0.3, 0.3, -1.25]} pequena />
+          <mesh geometry={caixa(1.1, 0.42, 0.42)} material={mat("#D8D3CA", { rough: 0.9 })} position={[x, 0.21, 1.25]} castShadow />
+          <Planta position={[x - 0.3, 0.3, 1.25]} pequena /><Planta position={[x + 0.3, 0.3, 1.25]} pequena />
+        </group>
+      ))}
+      {[-22.5, -4.5, 13.5, 31.5].map((x) => <Puff key={"p" + x} position={[x, 0, 1.2]} cor={["#FFD600", "#40C4FF", "#FF4081", "#64DD17"][Math.abs(Math.round(x / 9)) % 4]} r={0.3} />)}
+      {[-13.5, 4.5, 22.5].map((x) => <Puff key={"q" + x} position={[x, 0, -1.2]} cor={["#64DD17", "#FFD600", "#40C4FF"][Math.abs(Math.round(x / 9)) % 3]} r={0.3} />)}
+      {/* tapete da recepção */}
+      <mesh geometry={plano(5.5, 3.2)} material={mat("#4F7DF3", { rough: 1, opacity: 0.35 })} rotation={[-Math.PI / 2, 0, 0]} position={[-32.5, 0.004, -4]} />
 
       {/* móveis fixos da ala oeste (desenhados com o prédio centrado; deslocados em DX) */}
       <group position={[DX, 0, 0]}>
