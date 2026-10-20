@@ -1,14 +1,14 @@
 // Volta do Google: troca o código por tokens, guarda a conexão e volta pro painel.
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { conectarComCodigo } from "@/server/youtube";
+import { conectarComCodigo, base } from "@/server/youtube";
 import { ehAdmin } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const u = new URL(req.url);
-  const volta = (msg: string, okFlag: boolean) => NextResponse.redirect(`${u.origin}/?conexao=youtube&${okFlag ? "ok" : "erro"}=${encodeURIComponent(msg)}`);
+  const volta = (msg: string, okFlag: boolean) => NextResponse.redirect(`${base(req)}/?conexao=youtube&${okFlag ? "ok" : "erro"}=${encodeURIComponent(msg)}`);
   if (!(await ehAdmin())) return volta("Entre como admin antes de conectar o YouTube.", false);
   const jar = await cookies();
   const esperado = jar.get("nuvem_oauth_state")?.value;

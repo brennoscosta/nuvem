@@ -10,7 +10,7 @@ export interface Conexao { id: string; provedor: string; contaNome: string; cont
 
 export function youtubeConfigurado() { return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET); }
 
-function base(req: Request) {
+export function base(req: Request) {
   // atrás do proxy do CapRover o host vem no header
   const h = req.headers;
   const proto = h.get("x-forwarded-proto") ?? "https";
