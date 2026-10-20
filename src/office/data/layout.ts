@@ -9,7 +9,7 @@ export interface Mesa {
   sala: string;
   pos: V3; // centro da mesa
   rot: number; // rotação em Y (rad). A cadeira fica "atrás" da mesa, olhando pra ela.
-  tipo: "comum" | "senior" | "gerente" | "diretor" | "ceo";
+  tipo: "comum" | "senior" | "gerente" | "diretor" | "ceo" | "balcao";
 }
 
 // Andares: térreo (0) e 1º andar (1). Toda posição no 1º andar tem y = ALT_ANDAR.
@@ -113,6 +113,8 @@ export const MESAS: Mesa[] = [
   { id: "diretoria-d4", sala: "diretoria", pos: [-13.5, 0, 7], rot: Math.PI, tipo: "diretor" },
   // CEO
   { id: "ceo-mesa", sala: "ceo", pos: [-3, 0, -6.2], rot: 0, tipo: "ceo" },
+  // recepção: a recepcionista fica atrás do balcão (o balcão já é desenhado pelo prédio; esta mesa é só o lugar)
+  { id: "recepcao-balcao", sala: "recepcao", pos: [-31.5, 0, -7.2], rot: 0, tipo: "balcao" },
 ];
 
 export const MESA: Record<string, Mesa> = Object.fromEntries(MESAS.map((m) => [m.id, m]));
@@ -132,6 +134,7 @@ export function mesaParaNivel(area: AreaId, nivel: Nivel, ocupadas: Set<string>)
   if (nivel === "ceo") return MESA["ceo-mesa"];
   if (nivel === "diretor") return MESAS.find((m) => m.sala === "diretoria" && !ocupadas.has(m.id));
   const mesas = MESAS.filter((m) => m.sala === area);
+  if (area === "recepcao") return mesas.find((m) => !ocupadas.has(m.id));
   const tipo = nivel === "gerente" ? "gerente" : nivel === "senior" ? "senior" : "comum";
   return mesas.find((m) => m.tipo === tipo && !ocupadas.has(m.id)) ?? mesas.find((m) => m.tipo === "comum" && !ocupadas.has(m.id));
 }

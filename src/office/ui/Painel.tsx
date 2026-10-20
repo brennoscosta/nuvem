@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { AREAS, AREAS_OPERACIONAIS, FUNCOES, NIVEIS, NIVEL, PERSONALIDADES, type AreaId, type Nivel } from "../data/org";
+import { AREAS, AREAS_OPERACIONAIS, AREAS_APOIO, FUNCOES, NIVEIS, NIVEL, PERSONALIDADES, type AreaId, type Nivel } from "../data/org";
 import { BONECOS } from "../data/bonecos";
 import { useEscritorio } from "../store";
 import { useSimulador } from "../sim/simulador";
@@ -96,7 +96,7 @@ export function ModalContratar() {
           <label className="flex flex-col gap-1"><span className="text-xs font-semibold text-[#5B6472]">Nome</span><input value={nome} onChange={(e) => setNome(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2" /></label>
           <label className="flex flex-col gap-1"><span className="text-xs font-semibold text-[#5B6472]">Área</span>
             <select value={area} onChange={(e) => setArea(e.target.value as AreaId)} className="rounded-xl border border-black/10 px-3 py-2" disabled={nivel === "ceo"}>
-              {AREAS_OPERACIONAIS.map((id) => <option key={id} value={id}>{AREAS[id].nome}</option>)}
+              {[...AREAS_OPERACIONAIS, ...AREAS_APOIO].map((id) => <option key={id} value={id}>{AREAS[id].nome}</option>)}
             </select></label>
           <label className="flex flex-col gap-1 col-span-2"><span className="text-xs font-semibold text-[#5B6472]">Cargo</span>
             <div className="flex flex-wrap gap-1.5">

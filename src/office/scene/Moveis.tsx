@@ -226,6 +226,8 @@ export function Elevador() {
 export function Balcao() {
   return (
     <group position={[-13.5, 0, -7.2]}>
+      {/* cadeira da recepcionista (atrás do balcão, mesma convenção da mesa: 0,62 m atrás) */}
+      <Cadeira position={[0, 0, -0.62]} cor="#4A4F58" />
       <mesh geometry={caixa(3.2, 1.05, 0.7)} material={mat(COR.madeira, { rough: 0.5 })} position={[0, 0.52, 0]} castShadow />
       <mesh geometry={caixa(3.3, 0.06, 0.8)} material={mat(COR.branco, { rough: 0.4 })} position={[0, 1.08, 0]} />
       <Fax position={[-1.1, 1.11, 0]} rotation={0.2} />

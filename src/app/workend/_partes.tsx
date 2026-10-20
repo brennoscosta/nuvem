@@ -72,6 +72,7 @@ export const ENTREGA: Record<AreaId, string> = {
   rh: "recrutamento e cultura do time",
   juridico: "contratos, compliance e LGPD",
   diretoria: "direção da empresa",
+  recepcao: "quem chega é bem recebido",
 };
 
 export const SETORES = AREAS_OPERACIONAIS.map((id) => ({ id, nome: AREAS[id].nome, cor: AREAS[id].cor, entrega: ENTREGA[id], funcoes: FUNCOES[id] }));

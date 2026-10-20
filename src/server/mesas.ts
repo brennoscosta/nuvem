@@ -24,6 +24,7 @@ export function areaCorreta(a: Pick<AgenteDB, "area" | "nivel" | "funcao">): Are
 export function mesaValida(a: Pick<AgenteDB, "mesaId" | "area" | "nivel">, ocupadas: Set<string>) {
   const m = a.mesaId ? MESA[a.mesaId] : undefined;
   if (!m || ocupadas.has(m.id) || m.sala !== salaDoNivel(a.area as AreaId, a.nivel as Nivel)) return false;
+  if (m.sala === "recepcao") return true;
   const esperado = a.nivel === "ceo" ? "ceo" : a.nivel === "diretor" ? "diretor" : a.nivel === "gerente" ? "gerente" : a.nivel === "senior" ? "senior" : "comum";
   if (m.tipo === esperado) return true;
   if (m.tipo !== "comum") return false;

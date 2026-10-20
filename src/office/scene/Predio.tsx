@@ -190,7 +190,7 @@ export function Predio() {
       })}
 
       {/* mesas */}
-      {MESAS.map((m) => <Mesa key={m.id} def={m} ligada={!!mesasLigadas.get(m.id)} cor={corDaMesa(m.sala)} />)}
+      {MESAS.filter((m) => m.tipo !== "balcao").map((m) => <Mesa key={m.id} def={m} ligada={!!mesasLigadas.get(m.id)} cor={corDaMesa(m.sala)} />)}
 
       {/* equipamentos por área: impressora + planta + quadro */}
       {SALAS.filter((s) => s.tipo === "area").map((s) => {

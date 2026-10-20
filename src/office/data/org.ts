@@ -2,7 +2,8 @@
 
 // Setores com time de IA: planejamento, criacao, social, trafego, desenvolvimento, analise, atendimento, vendas.
 // Diretoria (pessoas reais) e apoio (financeiro, rh, juridico) completam o prédio.
-export type AreaId = "planejamento" | "criacao" | "social" | "trafego" | "webdesign" | "designgrafico" | "desenvolvimento" | "analise" | "atendimento" | "vendas"
+export type AreaId =
+  | "recepcao" | "planejamento" | "criacao" | "social" | "trafego" | "webdesign" | "designgrafico" | "desenvolvimento" | "analise" | "atendimento" | "vendas"
   | "diretoria" | "financeiro" | "rh" | "juridico";
 
 export interface Area {
@@ -27,7 +28,10 @@ export const AREAS: Record<AreaId, Area> = {
   financeiro: { id: "financeiro", nome: "Financeiro", cor: "#2E7D32", piso: "#E0F0E1" },
   rh: { id: "rh", nome: "RH & Cultura", cor: "#EC407A", piso: "#FBE4EC" },
   juridico: { id: "juridico", nome: "Jurídico", cor: "#6D4C41", piso: "#EFE7E3" },
+  recepcao: { id: "recepcao", nome: "Recepção", cor: "#90A4AE", piso: "#EFEAE2" },
 };
+// Áreas de apoio: têm lugar no prédio mas não são "setores" vendidos (não entram na landing nem no catálogo)
+export const AREAS_APOIO: AreaId[] = ["recepcao"];
 
 export const AREAS_OPERACIONAIS: AreaId[] = ["planejamento", "criacao", "social", "trafego", "webdesign", "designgrafico", "desenvolvimento", "analise", "atendimento", "vendas", "financeiro", "rh", "juridico"];
 
@@ -69,6 +73,7 @@ export const FUNCOES: Record<AreaId, string[]> = {
   financeiro: ["Analista financeiro", "Contas a pagar/receber", "Controller"],
   rh: ["Recrutador(a)", "Onboarding", "Cultura e comunicação interna"],
   juridico: ["Contratos", "Compliance", "Privacidade (LGPD)"],
+  recepcao: ["Recepcionista"],
 };
 
 export const PERSONALIDADES = ["Animado", "Focado", "Calmo", "Detalhista", "Comunicativo", "Criativo"];
