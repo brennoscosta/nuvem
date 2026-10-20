@@ -259,6 +259,7 @@ function CartaoTarefa({ t, nomeAgente, recarregar }: { t: Tarefa; nomeAgente: st
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [destino, setDestino] = useState("");
+  useEffect(() => { setErro(null); }, [t.status]); // mudou de status no servidor: limpa erro antigo (ex.: 504 do proxy enquanto gerava)
   const aprovar = async () => {
     setOcupado(true); setErro(null);
     try { await api(`/api/tarefas/${t.id}/executar`, "POST", editando ? (arte ? { titulo, prompt } : { titulo, descricao }) : {}); await recarregar(); } catch (e) { setErro((e as Error).message); await recarregar(); } finally { setOcupado(false); }
