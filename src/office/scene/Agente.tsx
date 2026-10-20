@@ -146,7 +146,7 @@ export function Agente({ def }: { def: AgenteDef }) {
       {/* anel de seleção */}
       {selecionado && <mesh geometry={new THREE.RingGeometry(0.32, 0.4, 32)} material={mat(corArea, { emissive: corArea, ei: 0.8 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} />}
       {/* crachá flutuante (HTML: tamanho fixo na tela, sempre legível) */}
-      <Html position={[0, 1.5, 0]} center zIndexRange={[50, 0]} style={{ pointerEvents: "none" }}>
+      <Html position={[0, 1.5, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
         <div className="flex flex-col items-center gap-1 select-none" style={{ transform: "translateY(-100%)" }}>
           {marca && (
             <div className="rounded-full px-3 py-0.5 text-[18px] font-black shadow-md" style={{ background: marca === "!" ? "#E53935" : "#FFFFFF", color: marca === "!" ? "#FFF" : "#333" }}>{marca}</div>
