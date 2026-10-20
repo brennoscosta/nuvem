@@ -31,49 +31,50 @@ export interface Sala {
   vidro?: boolean; // paredes de vidro
 }
 
-export const CORREDOR = { z0: -1.6, z1: 1.6, x0: -18, x1: 18 };
+export const CORREDOR = { z0: -1.6, z1: 1.6, x0: -36, x1: 36 };
 
+// O prédio tem 72 m (x de -36 a 36), um corredor central em z=0. Ala oeste (x<0): recepção, Desenvolvimento, Criação,
+// reunião, CEO, Vendas, Atendimento, Diretoria, copa, lounge. Ala leste (x>0): Planejamento, Social, Tráfego, Análise,
+// Financeiro, RH, Jurídico, Auditório.
+export const PREDIO = { x0: -36, x1: 36, z0: -9, z1: 9 };
 export const PONTOS = {
-  elevador: [-17.2, 0, -5.5] as V3, // porta do elevador (recepção)
-  elevador1: [-17.2, ALT_ANDAR, -5.5] as V3, // mesma porta, 1º andar (hall)
-  recepcaoEspera: [-14, 0, -3] as V3,
-  hallEspera: [-14, ALT_ANDAR, -3] as V3,
-  mesaReuniao: [9.5, 0, -5.2] as V3,
-  copaBalcao: [8.5, 0, 5.2] as V3,
-  loungeSofa: [13.5, 0, 6.2] as V3,
-  loungeSinuca: [15.2, 0, 3.6] as V3,
-  loungeFliperama: [11.6, 0, 8.3] as V3,
-  caixaSaida: [-17.2, 0, -5.5] as V3,
+  elevador: [-35.2, 0, -5.5] as V3, // porta do elevador (recepção)
+  elevador1: [-35.2, ALT_ANDAR, -5.5] as V3, // (reservado) mesma porta num andar superior
+  recepcaoEspera: [-32, 0, -3] as V3,
+  hallEspera: [-32, ALT_ANDAR, -3] as V3,
+  mesaReuniao: [-8.5, 0, -5.2] as V3,
+  copaBalcao: [-9.5, 0, 5.2] as V3,
+  loungeSofa: [-4.5, 0, 6.2] as V3,
+  loungeSinuca: [-2.8, 0, 3.6] as V3,
+  loungeFliperama: [-6.4, 0, 8.3] as V3,
+  caixaSaida: [-35.2, 0, -5.5] as V3,
 };
 export const elevadorNoAndar = (a: Andar): V3 => (a === 1 ? PONTOS.elevador1 : PONTOS.elevador);
 export const esperaNoAndar = (a: Andar): V3 => (a === 1 ? PONTOS.hallEspera : PONTOS.recepcaoEspera);
 
 export const SALAS: Sala[] = [
-  // Norte
-  { id: "recepcao", nome: "Recepção", andar: 0, tipo: "recepcao", x0: -18, x1: -10, z0: -9, z1: -1.6, entrada: [-14, 0, -1.6], piso: "#EFEAE2" },
-  { id: "engenharia", nome: "Engenharia", andar: 0, area: "engenharia", tipo: "area", x0: -10, x1: -1, z0: -9, z1: -1.6, entrada: [-5.5, 0, -1.6], piso: "#E4EBFB" },
-  { id: "marketing", nome: "Marketing", andar: 0, area: "marketing", tipo: "area", x0: -1, x1: 7, z0: -9, z1: -1.6, entrada: [3, 0, -1.6], piso: "#FBE6EC" },
-  { id: "reuniao", nome: "Sala de reunião", andar: 0, tipo: "reuniao", x0: 7, x1: 12, z0: -9, z1: -1.6, entrada: [9.5, 0, -1.6], piso: "#ECEFF4", vidro: true },
-  { id: "ceo", nome: "Sala do CEO", andar: 0, tipo: "ceo", x0: 12, x1: 18, z0: -9, z1: -1.6, entrada: [15, 0, -1.6], piso: "#F6EEDF", vidro: true },
-  // Sul
-  { id: "vendas", nome: "Vendas", andar: 0, area: "vendas", tipo: "area", x0: -18, x1: -9, z0: 1.6, z1: 9, entrada: [-13.5, 0, 1.6], piso: "#E2F4EA" },
-  { id: "suporte", nome: "Suporte", andar: 0, area: "suporte", tipo: "area", x0: -9, x1: 0, z0: 1.6, z1: 9, entrada: [-4.5, 0, 1.6], piso: "#ECE6FB" },
-  { id: "diretoria", nome: "Diretoria", andar: 0, area: "diretoria", tipo: "diretoria", x0: 0, x1: 6, z0: 1.6, z1: 9, entrada: [3, 0, 1.6], piso: "#F6EEDF", vidro: true },
-  { id: "copa", nome: "Copa", andar: 0, tipo: "copa", x0: 6, x1: 11, z0: 1.6, z1: 9, entrada: [8.5, 0, 1.6], piso: "#E9F2E4" },
-  { id: "lounge", nome: "Lounge & jogos", andar: 0, tipo: "lounge", x0: 11, x1: 18, z0: 1.6, z1: 9, entrada: [14.5, 0, 1.6], piso: "#F1E7DC" },
-  // ---- 1º andar (10 salas) ----
-  // Norte
-  { id: "hall1", nome: "Hall & biblioteca", andar: 1, tipo: "hall", x0: -18, x1: -12, z0: -9, z1: -1.6, entrada: [-15, ALT_ANDAR, -1.6], piso: "#EFEAE2" },
-  { id: "design", nome: "Design", area: "design", andar: 1, tipo: "area", x0: -12, x1: -4.5, z0: -9, z1: -1.6, entrada: [-8.25, ALT_ANDAR, -1.6], piso: "#FDEBDD" },
-  { id: "produto", nome: "Produto", area: "produto", andar: 1, tipo: "area", x0: -4.5, x1: 3, z0: -9, z1: -1.6, entrada: [-0.75, ALT_ANDAR, -1.6], piso: "#DFF4F0" },
-  { id: "dados", nome: "Dados & IA", area: "dados", andar: 1, tipo: "area", x0: 3, x1: 10.5, z0: -9, z1: -1.6, entrada: [6.75, ALT_ANDAR, -1.6], piso: "#E4E6F7" },
-  { id: "financeiro", nome: "Financeiro", area: "financeiro", andar: 1, tipo: "area", x0: 10.5, x1: 18, z0: -9, z1: -1.6, entrada: [14.25, ALT_ANDAR, -1.6], piso: "#E0F0E1" },
-  // Sul
-  { id: "rh", nome: "RH & Cultura", area: "rh", andar: 1, tipo: "area", x0: -18, x1: -10.8, z0: 1.6, z1: 9, entrada: [-14.4, ALT_ANDAR, 1.6], piso: "#FBE4EC" },
-  { id: "juridico", nome: "Jurídico", area: "juridico", andar: 1, tipo: "area", x0: -10.8, x1: -3.6, z0: 1.6, z1: 9, entrada: [-7.2, ALT_ANDAR, 1.6], piso: "#EFE7E3", vidro: true },
-  { id: "parcerias", nome: "Parcerias", area: "parcerias", andar: 1, tipo: "area", x0: -3.6, x1: 3.6, z0: 1.6, z1: 9, entrada: [0, ALT_ANDAR, 1.6], piso: "#DFF3F6" },
-  { id: "sucesso", nome: "Sucesso do cliente", area: "sucesso", andar: 1, tipo: "area", x0: 3.6, x1: 10.8, z0: 1.6, z1: 9, entrada: [7.2, ALT_ANDAR, 1.6], piso: "#EBF4DF" },
-  { id: "auditorio", nome: "Auditório", andar: 1, tipo: "auditorio", x0: 10.8, x1: 18, z0: 1.6, z1: 9, entrada: [14.4, ALT_ANDAR, 1.6], piso: "#E8E4F0", vidro: true },
+  // ---- ala oeste ---- Norte
+  { id: "recepcao", nome: "Recepção", andar: 0, tipo: "recepcao", x0: -36, x1: -28, z0: -9, z1: -1.6, entrada: [-32, 0, -1.6], piso: "#EFEAE2" },
+  { id: "desenvolvimento", nome: "Desenvolvimento", area: "desenvolvimento", andar: 0, tipo: "area", x0: -28, x1: -19, z0: -9, z1: -1.6, entrada: [-23.5, 0, -1.6], piso: "#E4EBFB" },
+  { id: "criacao", nome: "Criação", area: "criacao", andar: 0, tipo: "area", x0: -19, x1: -11, z0: -9, z1: -1.6, entrada: [-15, 0, -1.6], piso: "#FBE6EC" },
+  { id: "reuniao", nome: "Sala de reunião", andar: 0, tipo: "reuniao", x0: -11, x1: -6, z0: -9, z1: -1.6, entrada: [-8.5, 0, -1.6], piso: "#ECEFF4", vidro: true },
+  { id: "ceo", nome: "Sala do CEO", andar: 0, tipo: "ceo", x0: -6, x1: 0, z0: -9, z1: -1.6, entrada: [-3, 0, -1.6], piso: "#F6EEDF", vidro: true },
+  // ---- ala oeste ---- Sul
+  { id: "vendas", nome: "Vendas", area: "vendas", andar: 0, tipo: "area", x0: -36, x1: -27, z0: 1.6, z1: 9, entrada: [-31.5, 0, 1.6], piso: "#E2F4EA" },
+  { id: "atendimento", nome: "Atendimento", area: "atendimento", andar: 0, tipo: "area", x0: -27, x1: -18, z0: 1.6, z1: 9, entrada: [-22.5, 0, 1.6], piso: "#DFF4F0" },
+  { id: "diretoria", nome: "Diretoria", area: "diretoria", andar: 0, tipo: "diretoria", x0: -18, x1: -12, z0: 1.6, z1: 9, entrada: [-15, 0, 1.6], piso: "#F6EEDF", vidro: true },
+  { id: "copa", nome: "Copa", andar: 0, tipo: "copa", x0: -12, x1: -7, z0: 1.6, z1: 9, entrada: [-9.5, 0, 1.6], piso: "#E9F2E4" },
+  { id: "lounge", nome: "Lounge & jogos", andar: 0, tipo: "lounge", x0: -7, x1: 0, z0: 1.6, z1: 9, entrada: [-3.5, 0, 1.6], piso: "#F1E7DC" },
+  // ---- ala leste ---- Norte
+  { id: "planejamento", nome: "Planejamento", area: "planejamento", andar: 0, tipo: "area", x0: 0, x1: 9, z0: -9, z1: -1.6, entrada: [4.5, 0, -1.6], piso: "#E4E6F7" },
+  { id: "social", nome: "Social", area: "social", andar: 0, tipo: "area", x0: 9, x1: 18, z0: -9, z1: -1.6, entrada: [13.5, 0, -1.6], piso: "#FDEBDD" },
+  { id: "trafego", nome: "Tráfego", area: "trafego", andar: 0, tipo: "area", x0: 18, x1: 27, z0: -9, z1: -1.6, entrada: [22.5, 0, -1.6], piso: "#DFF3F6" },
+  { id: "analise", nome: "Análise", area: "analise", andar: 0, tipo: "area", x0: 27, x1: 36, z0: -9, z1: -1.6, entrada: [31.5, 0, -1.6], piso: "#ECE6FB" },
+  // ---- ala leste ---- Sul
+  { id: "financeiro", nome: "Financeiro", area: "financeiro", andar: 0, tipo: "area", x0: 0, x1: 9, z0: 1.6, z1: 9, entrada: [4.5, 0, 1.6], piso: "#E0F0E1" },
+  { id: "rh", nome: "RH & Cultura", area: "rh", andar: 0, tipo: "area", x0: 9, x1: 18, z0: 1.6, z1: 9, entrada: [13.5, 0, 1.6], piso: "#FBE4EC" },
+  { id: "juridico", nome: "Jurídico", area: "juridico", andar: 0, tipo: "area", x0: 18, x1: 27, z0: 1.6, z1: 9, entrada: [22.5, 0, 1.6], piso: "#EFE7E3", vidro: true },
+  { id: "auditorio", nome: "Auditório", andar: 0, tipo: "auditorio", x0: 27, x1: 36, z0: 1.6, z1: 9, entrada: [31.5, 0, 1.6], piso: "#E8E4F0", vidro: true },
 ];
 
 export const SALA: Record<string, Sala> = Object.fromEntries(SALAS.map((s) => [s.id, s]));
@@ -104,12 +105,12 @@ function mesasDaArea(s: Sala): Mesa[] {
 export const MESAS: Mesa[] = [
   ...SALAS.filter((s) => s.tipo === "area").flatMap(mesasDaArea),
   // diretoria: 4 mesas de diretor
-  { id: "diretoria-d1", sala: "diretoria", pos: [1.5, 0, 3.6], rot: Math.PI, tipo: "diretor" },
-  { id: "diretoria-d2", sala: "diretoria", pos: [4.5, 0, 3.6], rot: Math.PI, tipo: "diretor" },
-  { id: "diretoria-d3", sala: "diretoria", pos: [1.5, 0, 7], rot: Math.PI, tipo: "diretor" },
-  { id: "diretoria-d4", sala: "diretoria", pos: [4.5, 0, 7], rot: Math.PI, tipo: "diretor" },
+  { id: "diretoria-d1", sala: "diretoria", pos: [-16.5, 0, 3.6], rot: Math.PI, tipo: "diretor" },
+  { id: "diretoria-d2", sala: "diretoria", pos: [-13.5, 0, 3.6], rot: Math.PI, tipo: "diretor" },
+  { id: "diretoria-d3", sala: "diretoria", pos: [-16.5, 0, 7], rot: Math.PI, tipo: "diretor" },
+  { id: "diretoria-d4", sala: "diretoria", pos: [-13.5, 0, 7], rot: Math.PI, tipo: "diretor" },
   // CEO
-  { id: "ceo-mesa", sala: "ceo", pos: [15, 0, -6.2], rot: 0, tipo: "ceo" },
+  { id: "ceo-mesa", sala: "ceo", pos: [-3, 0, -6.2], rot: 0, tipo: "ceo" },
 ];
 
 export const MESA: Record<string, Mesa> = Object.fromEntries(MESAS.map((m) => [m.id, m]));
@@ -179,7 +180,7 @@ export function mesaDoChefe(area: AreaId, nivel: Nivel): V3 | undefined {
   // onde o subordinado vai pedir revisão: gerente da área; gerente vai à diretoria; diretor vai ao CEO
   if (nivel === "ceo") return undefined;
   if (nivel === "diretor") return [MESA["ceo-mesa"].pos[0], 0, MESA["ceo-mesa"].pos[2] + 1.1];
-  if (nivel === "gerente") return [3, 0, 5.3];
+  if (nivel === "gerente") return [-15, 0, 5.3];
   const g = MESA[`${area}-gerente`];
   if (!g) return undefined;
   const norte = SALA[area].z1 <= 0;

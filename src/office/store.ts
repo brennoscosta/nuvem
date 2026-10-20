@@ -1,7 +1,7 @@
 "use client";
 import { create } from "zustand";
 import type { AreaId, Nivel } from "./data/org";
-import { NIVEL } from "./data/org";
+import { NIVEL, AREAS } from "./data/org";
 import { MESAS, MESA, mesaParaNivel, salaDoNivel } from "./data/layout";
 import type { Evento, TipoEvento } from "./data/eventos";
 
@@ -79,9 +79,11 @@ interface AgenteServidor { id: string; nome: string; area: AreaId; nivel: Nivel;
 
 function doServidor(a: AgenteServidor, ocupadas: Set<string>): Agente | null {
   let mesaId = a.mesaId;
-  if (!mesaId || ocupadas.has(mesaId)) { const m = mesaParaNivel(a.area, a.nivel, ocupadas); if (!m) return null; mesaId = m.id; }
+  // mesa inexistente (planta mudou), ocupada ou de outra área: realoca. Área desconhecida (setor antigo): cai na diretoria/planejamento.
+  const area: AreaId = AREAS[a.area] ? a.area : (a.nivel === "diretor" || a.nivel === "ceo" ? "diretoria" : "planejamento");
+  if (!mesaId || !MESA[mesaId] || ocupadas.has(mesaId)) { const m = mesaParaNivel(area, a.nivel, ocupadas); if (!m) return null; mesaId = m.id; }
   ocupadas.add(mesaId);
-  return { id: a.id, nome: a.nome, area: a.area, nivel: a.nivel, funcao: a.funcao, personalidade: a.personalidade ?? "", boneco: a.boneco, mesaId, sala: salaDoNivel(a.area, a.nivel), status: "disponivel", criadoEm: new Date(a.criadoEm).getTime(), tarefasConcluidas: 0, gastoHoje: 0, real: true, falaPublica: a.falaPublica };
+  return { id: a.id, nome: a.nome, area, nivel: a.nivel, funcao: a.funcao, personalidade: a.personalidade ?? "", boneco: a.boneco, mesaId, sala: salaDoNivel(area, a.nivel), status: "disponivel", criadoEm: new Date(a.criadoEm).getTime(), tarefasConcluidas: 0, gastoHoje: 0, real: true, falaPublica: a.falaPublica };
 }
 
 export const useEscritorio = create<Estado>((set, get) => ({
@@ -108,6 +110,7 @@ export const useEscritorio = create<Estado>((set, get) => ({
   mesasOcupadas: () => new Set(Object.values(get().agentes).map((a) => a.mesaId)),
 
   carregarDoServidor: async () => {
+    const primeiraCarga = !get().checado;
     try {
       const st = await fetch("/api/status").then((r) => r.json());
       set({ statusServidor: st, online: st.banco === "ok", checado: true, admin: !!st.admin, senhaConfigurada: !!st.senhaConfigurada });
@@ -119,7 +122,9 @@ export const useEscritorio = create<Estado>((set, get) => ({
       const atuais = get().agentes;
       for (const id of ordem) if (atuais[id]) agentes[id] = { ...agentes[id], status: atuais[id].status, fala: atuais[id].fala ?? agentes[id].falaPublica, mesaId: atuais[id].mesaId, tarefasConcluidas: atuais[id].tarefasConcluidas, gastoHoje: atuais[id].gastoHoje };
       set({ agentes, ordem });
-      // quem acabou de aparecer e ainda não estava na cena: entra pelo elevador
+      // quem apareceu depois da primeira carga (contratado em outra aba/sessão) entra pelo elevador;
+      // na primeira carga todo mundo já nasce sentado na própria mesa (ninguém "chega andando" ao abrir a tela)
+      if (primeiraCarga) return;
       for (const id of ordem) if (!atuais[id]) get().emitir(id, "contratado", `${agentes[id].nome} entrou como ${NIVEL[agentes[id].nivel].nome}`);
     } catch (e) { console.warn("[escritorio] sem servidor:", e); set({ online: false, checado: true }); }
   },

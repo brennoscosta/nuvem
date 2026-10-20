@@ -9,7 +9,7 @@ import { Horizonte } from "./Horizonte";
 import { Fachada } from "./Fachada";
 import { Agente, handlers } from "./Agente";
 import { useEscritorio } from "../store";
-import { MESA, ALT_ANDAR, andarDeY } from "../data/layout";
+import { MESA } from "../data/layout";
 import type { Evento } from "../data/eventos";
 
 // Entrega os eventos da fila pros agentes
@@ -38,27 +38,15 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
     const a = selecionado ? useEscritorio.getState().agentes[selecionado] : null;
     if (!a) { alvo.current = null; return; }
     const m = MESA[a.mesaId]; alvo.current = new THREE.Vector3(m.pos[0], m.pos[1] + 0.5, m.pos[2]);
-    // selecionou alguém de outro andar: muda o andar visto
-    const st = useEscritorio.getState(); const an = andarDeY(m.pos[1]);
-    if (st.vista === "dentro" && st.andar !== an) useEscritorio.setState({ andar: an });
   }, [selecionado]);
-  // trocar de andar: a câmera sobe/desce junto (mantém o enquadramento)
-  const andar = useEscritorio((s) => s.andar);
-  const andarAnterior = useRef(andar);
-  useFrame(({ camera }) => {
-    if (andarAnterior.current === andar) return;
-    const dy = (andar - andarAnterior.current) * ALT_ANDAR; andarAnterior.current = andar;
-    const c = controles.current; if (!c) return;
-    camera.position.y += dy; c.target.y += dy; c.update();
-  });
   // trocar de vista (por fora / por dentro) leva a câmera pra um enquadramento bom
   const vista = useEscritorio((s) => s.vista);
   const posAlvo = useRef<THREE.Vector3 | null>(null);
   const primeira = useRef(true);
   useEffect(() => {
     if (primeira.current || CAM) { primeira.current = false; return; } // não mexe na câmera inicial nem nas prévias (?cam)
-    if (vista === "fora") { alvo.current = new THREE.Vector3(0, 2, 2); posAlvo.current = new THREE.Vector3(16, 30, 46); }
-    else { alvo.current = new THREE.Vector3(0, 0, 1); posAlvo.current = new THREE.Vector3(10, 30, 34); }
+    if (vista === "fora") { alvo.current = new THREE.Vector3(0, 2, 2); posAlvo.current = new THREE.Vector3(22, 34, 62); }
+    else { alvo.current = new THREE.Vector3(0, 0, 1); posAlvo.current = new THREE.Vector3(14, 42, 50); }
   }, [vista]);
   useFrame(({ camera }, dt) => {
     const c = controles.current; if (!c) return;
@@ -91,7 +79,7 @@ export function Cena() {
   const ordem = useEscritorio((s) => s.ordem);
   const controles = useRef<any>(null);
   return (
-    <Canvas shadows dpr={[1, 1.75]} camera={{ position: CAM ? [CAM[0], CAM[1], CAM[2]] : [10, 30, 34], fov: 32, near: 0.5, far: 200 }} gl={{ antialias: true, powerPreference: "high-performance" }}
+    <Canvas shadows dpr={[1, 1.75]} camera={{ position: CAM ? [CAM[0], CAM[1], CAM[2]] : [14, 42, 50], fov: 32, near: 0.5, far: 260 }} gl={{ antialias: true, powerPreference: "high-performance" }}
       onPointerMissed={() => useEscritorio.getState().selecionar(null)}>
       <color attach="background" args={["#CFE3F5"]} />
       <fog attach="fog" args={["#CFE3F5", 90, 220]} />
@@ -105,7 +93,7 @@ export function Cena() {
         {ordem.map((id) => agentes[id] && <Agente key={id} def={agentes[id]} />)}
       </Suspense>
       <Despachante />
-      <MapControls ref={controles} target={CAM ? [CAM[3], CAM[4], CAM[5]] : [0, 0, 1]} minDistance={5} maxDistance={58} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
+      <MapControls ref={controles} target={CAM ? [CAM[3], CAM[4], CAM[5]] : [0, 0, 1]} minDistance={5} maxDistance={85} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
       <FocoCamera controles={controles} />
     </Canvas>
   );

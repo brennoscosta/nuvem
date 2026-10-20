@@ -9,19 +9,19 @@ import { BonecoProcedural, HIPS, useAnimacao, type BonecoHandle } from "./Boneco
 import { BONECOS } from "../data/bonecos";
 import { ComFallback, Modelo, ModeloInstanciado } from "./Modelos";
 
-// Prédio ocupa x -18..18, z -9..9. Entorno vai até ±60 x ±45.
+// Prédio ocupa x -36..36, z -9..9. Entorno vai até ±64 x ±48.
 const T = { x: 64, z: 48 };
 
 // posições fixas (memorizadas fora do componente pra instanciar uma vez)
-const ARVORES = [[-30, -8], [-30, 6], [30, -6], [30, 8], [-10, 14.2], [8, 14.2], [20, 14.2], [-6, -14.2], [14, -14.2], [-24, -14.2], [-44, -25], [-50, 10], [48, -20], [52, 14], [-38, 34], [36, 36], [-20, -34], [22, -36], [-55, -36], [56, 34], [0, 40], [-46, 40], [40, -40], [-60, 30], [60, -10], [10, 36]]
+const ARVORES = [[-42, -7], [-42, 6], [42, -6], [42, 8], [-28, 14.2], [-10, 14.2], [8, 14.2], [20, 14.2], [34, 14.2], [-32, -14.2], [-6, -14.2], [14, -14.2], [-24, -14.2], [28, -14.2], [-48, -25], [-52, 10], [50, -22], [52, 14], [-38, 34], [36, 36], [-20, -34], [22, -36], [-55, -36], [56, 34], [0, 40], [-46, 40], [40, -40], [-60, 30], [60, -10], [10, 36]]
   .map(([x, z], i) => ({ pos: [x, 0, z] as [number, number, number], rot: (i * 1.3) % (Math.PI * 2), altura: 4.2 + ((i * 7) % 5) * 0.45 }));
 // banco: o encosto do modelo fica no -z local; rot vira a frente pra calçada
 const BANCOS = [
   { pos: [-6, 0, 13.3], rot: Math.PI }, { pos: [4, 0, 13.3], rot: Math.PI }, { pos: [14, 0, 13.3], rot: Math.PI },
-  { pos: [-22.6, 0, 3.5], rot: Math.PI / 2 }, { pos: [22.3, 0, -3], rot: -Math.PI / 2 }, { pos: [2, 0, -13.3], rot: 0 },
+  { pos: [-40.6, 0, 3.5], rot: Math.PI / 2 }, { pos: [40.3, 0, -3], rot: -Math.PI / 2 }, { pos: [2, 0, -13.3], rot: 0 }, { pos: [-20, 0, 13.3], rot: Math.PI }, { pos: [26, 0, 13.3], rot: Math.PI }, { pos: [22, 0, -13.3], rot: 0 },
   { pos: [-40, 0, 30], rot: Math.PI }, { pos: [38, 0, -30], rot: 0 },
 ].map((b) => ({ ...b, pos: b.pos as [number, number, number], altura: 0.95 }));
-const POSTES = [[-26, 15.2, Math.PI], [-2, 15.2, Math.PI], [22, 15.2, Math.PI], [-14, -15.2, 0], [12, -15.2, 0], [-48, 22.5, Math.PI], [48, 22.5, Math.PI], [-40, -22.5, 0], [40, -22.5, 0]]
+const POSTES = [[-34, 15.2, Math.PI], [-14, 15.2, Math.PI], [6, 15.2, Math.PI], [26, 15.2, Math.PI], [-26, -15.2, 0], [-6, -15.2, 0], [14, -15.2, 0], [32, -15.2, 0], [-48, 22.5, Math.PI], [48, 22.5, Math.PI], [-40, -22.5, 0], [40, -22.5, 0]]
   .map(([x, z, rot]) => ({ pos: [x, 0, z] as [number, number, number], rot, altura: 5 }));
 
 function Arvore({ position, escala = 1 }: { position: [number, number, number]; escala?: number }) {
@@ -119,12 +119,12 @@ export function Entorno() {
     const cores = ["#F2913D", "#3FBFA8", "#E2575B", "#FFD600", "#40C4FF", "#8B6CF0", "#22A86B", "#EC6B8D"];
     const lista: { trajeto: [number, number, number][]; velocidade: number; boneco: number; camisa: string; fase: number }[] = [];
     // calçada da frente (z = 12.5) e de trás (z = -12.5), laterais (x = ±21.5)
-    for (let i = 0; i < 5; i++) lista.push({ trajeto: [[-28 + i * 3, 0, 12.5 + (i % 2) * 0.8], [28 - i * 2, 0, 12.5 + (i % 2) * 0.8]], velocidade: 1.1 + Math.random() * 0.5, boneco: i, camisa: cores[i % cores.length], fase: i * 1.7 });
-    for (let i = 0; i < 3; i++) lista.push({ trajeto: [[26 - i * 4, 0, -12.5 - (i % 2) * 0.8], [-26 + i * 3, 0, -12.5 - (i % 2) * 0.8]], velocidade: 1.0 + Math.random() * 0.5, boneco: i + 3, camisa: cores[(i + 4) % cores.length], fase: i * 2.3 });
-    for (let i = 0; i < 2; i++) lista.push({ trajeto: [[-21.5 - i * 0.8, 0, -11 + i], [-21.5 - i * 0.8, 0, 11 - i]], velocidade: 1.0, boneco: i + 1, camisa: cores[(i + 2) % cores.length], fase: i * 3.1 });
-    for (let i = 0; i < 2; i++) lista.push({ trajeto: [[21.5 + i * 0.8, 0, 11 - i], [21.5 + i * 0.8, 0, -11 + i]], velocidade: 1.2, boneco: i + 5, camisa: cores[(i + 6) % cores.length], fase: i * 2.9 });
+    for (let i = 0; i < 5; i++) lista.push({ trajeto: [[-46 + i * 3, 0, 12.5 + (i % 2) * 0.8], [46 - i * 2, 0, 12.5 + (i % 2) * 0.8]], velocidade: 1.1 + Math.random() * 0.5, boneco: i, camisa: cores[i % cores.length], fase: i * 1.7 });
+    for (let i = 0; i < 3; i++) lista.push({ trajeto: [[44 - i * 4, 0, -12.5 - (i % 2) * 0.8], [-44 + i * 3, 0, -12.5 - (i % 2) * 0.8]], velocidade: 1.0 + Math.random() * 0.5, boneco: i + 3, camisa: cores[(i + 4) % cores.length], fase: i * 2.3 });
+    for (let i = 0; i < 2; i++) lista.push({ trajeto: [[-39.5 - i * 0.8, 0, -11 + i], [-39.5 - i * 0.8, 0, 11 - i]], velocidade: 1.0, boneco: i + 1, camisa: cores[(i + 2) % cores.length], fase: i * 3.1 });
+    for (let i = 0; i < 2; i++) lista.push({ trajeto: [[39.5 + i * 0.8, 0, 11 - i], [39.5 + i * 0.8, 0, -11 + i]], velocidade: 1.2, boneco: i + 5, camisa: cores[(i + 6) % cores.length], fase: i * 2.9 });
     // quem entra e sai da empresa pela porta oeste (x=-18, z=-2)
-    lista.push({ trajeto: [[-22, 0, 8], [-22, 0, -2], [-18.8, 0, -2]], velocidade: 0.9, boneco: 6, camisa: "#8B6CF0", fase: 4 });
+    lista.push({ trajeto: [[-40, 0, 8], [-40, 0, -2], [-36.8, 0, -2]], velocidade: 0.9, boneco: 6, camisa: "#8B6CF0", fase: 4 });
     return lista;
   }, []);
 
@@ -137,9 +137,9 @@ export function Entorno() {
         <mesh key={i} geometry={new THREE.CircleGeometry(r, 24)} material={mat("#6FB15F", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[x, -0.02, z]} />
       ))}
       {/* calçada ao redor do prédio */}
-      <mesh geometry={plano(48, 30)} material={mat("#D9D5CC", { rough: 0.95 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow />
+      <mesh geometry={plano(84, 30)} material={mat("#D9D5CC", { rough: 0.95 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow />
       {/* laje do prédio (base) */}
-      <mesh geometry={caixa(37, 0.3, 19)} material={mat("#C9C5BC", { rough: 0.9 })} position={[0, -0.16, 0]} receiveShadow />
+      <mesh geometry={caixa(73, 0.3, 19)} material={mat("#C9C5BC", { rough: 0.9 })} position={[0, -0.16, 0]} receiveShadow />
       {/* rua na frente (z 16..22) e atrás */}
       <mesh geometry={plano(130, 6)} material={mat("#4A4E55", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 19]} receiveShadow />
       <mesh geometry={plano(130, 6)} material={mat("#4A4E55", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, -19]} receiveShadow />
@@ -151,9 +151,9 @@ export function Entorno() {
         </group>
       ))}
       {/* faixa de pedestres na frente da entrada */}
-      {Array.from({ length: 7 }).map((_, i) => <mesh key={i} geometry={plano(0.6, 5.4)} material={mat("#F2EFE6")} rotation={[-Math.PI / 2, 0, 0]} position={[-23 + i * 0.95, 0.001, 19]} />)}
+      {Array.from({ length: 7 }).map((_, i) => <mesh key={i} geometry={plano(0.6, 5.4)} material={mat("#F2EFE6")} rotation={[-Math.PI / 2, 0, 0]} position={[-41 + i * 0.95, 0.001, 19]} />)}
       {/* caminho da calçada até a entrada (lado oeste) */}
-      <mesh geometry={plano(4.5, 3.2)} material={mat("#E6E2D8", { rough: 0.9 })} rotation={[-Math.PI / 2, 0, 0]} position={[-20.3, 0.0, -2]} />
+      <mesh geometry={plano(4.5, 3.2)} material={mat("#E6E2D8", { rough: 0.9 })} rotation={[-Math.PI / 2, 0, 0]} position={[-38.3, 0.0, -2]} />
       {/* carros */}
       <Carro position={[-20, 0, 17.7]} cor="#E53935" sentido={1} />
       <Carro position={[12, 0, 17.7]} cor="#1E88E5" sentido={1} />
@@ -172,12 +172,15 @@ export function Entorno() {
         <ModeloInstanciado nome="poste" itens={POSTES} />
       </ComFallback>
       {/* canteiros de flores na frente */}
-      <Canteiro position={[-9, 0, 11.2]} w={5} d={0.9} cor="#EC6B8D" />
-      <Canteiro position={[9, 0, 11.2]} w={5} d={0.9} cor="#FFD600" />
+      <Canteiro position={[-27, 0, 11.2]} w={5} d={0.9} cor="#EC6B8D" />
+      <Canteiro position={[-9, 0, 11.2]} w={5} d={0.9} cor="#FFD600" />
+      <Canteiro position={[9, 0, 11.2]} w={5} d={0.9} cor="#EC6B8D" />
+      <Canteiro position={[27, 0, 11.2]} w={5} d={0.9} cor="#FFD600" />
       <Canteiro position={[-19.5, 0, -11.2]} w={4} d={0.9} cor="#F2913D" />
+      <Canteiro position={[18, 0, -11.2]} w={4} d={0.9} cor="#8B6CF0" />
       {/* letreiro da fachada (sobre a porta oeste) */}
-      <mesh geometry={caixa(0.2, 0.9, 4.6)} material={mat("#2A3340", { rough: 0.9 })} position={[-18.2, 2.4, -2]} />
-      <mesh geometry={caixa(0.05, 0.4, 3.8)} material={mat("#FFFFFF", { emissive: "#FFFFFF", ei: 0.6 })} position={[-18.32, 2.4, -2]} />
+      <mesh geometry={caixa(0.2, 0.9, 4.6)} material={mat("#2A3340", { rough: 0.9 })} position={[-36.2, 2.4, -2]} />
+      <mesh geometry={caixa(0.05, 0.4, 3.8)} material={mat("#FFFFFF", { emissive: "#FFFFFF", ei: 0.6 })} position={[-36.32, 2.4, -2]} />
       {/* pedestres */}
       {pedestres.map((p, i) => <Pedestre key={i} {...p} />)}
     </group>

@@ -1,7 +1,9 @@
 // Estrutura da empresa: áreas, níveis (cargos), funções e personalidades.
 
-export type AreaId = "engenharia" | "marketing" | "vendas" | "suporte" | "diretoria"
-  | "design" | "produto" | "dados" | "financeiro" | "rh" | "juridico" | "parcerias" | "sucesso";
+// Setores com time de IA: planejamento, criacao, social, trafego, desenvolvimento, analise, atendimento, vendas.
+// Diretoria (pessoas reais) e apoio (financeiro, rh, juridico) completam o prédio.
+export type AreaId = "planejamento" | "criacao" | "social" | "trafego" | "desenvolvimento" | "analise" | "atendimento" | "vendas"
+  | "diretoria" | "financeiro" | "rh" | "juridico";
 
 export interface Area {
   id: AreaId;
@@ -11,23 +13,21 @@ export interface Area {
 }
 
 export const AREAS: Record<AreaId, Area> = {
-  engenharia: { id: "engenharia", nome: "Engenharia", cor: "#4F7DF3", piso: "#E4EBFB" },
-  marketing: { id: "marketing", nome: "Marketing", cor: "#EC6B8D", piso: "#FBE6EC" },
+  planejamento: { id: "planejamento", nome: "Planejamento", cor: "#5C6BC0", piso: "#E4E6F7" },
+  criacao: { id: "criacao", nome: "Criação", cor: "#EC6B8D", piso: "#FBE6EC" },
+  social: { id: "social", nome: "Social", cor: "#F2913D", piso: "#FDEBDD" },
+  trafego: { id: "trafego", nome: "Tráfego", cor: "#00ACC1", piso: "#DFF3F6" },
+  desenvolvimento: { id: "desenvolvimento", nome: "Desenvolvimento", cor: "#4F7DF3", piso: "#E4EBFB" },
+  analise: { id: "analise", nome: "Análise", cor: "#8B6CF0", piso: "#ECE6FB" },
+  atendimento: { id: "atendimento", nome: "Atendimento", cor: "#3FBFA8", piso: "#DFF4F0" },
   vendas: { id: "vendas", nome: "Vendas", cor: "#22A86B", piso: "#E2F4EA" },
-  suporte: { id: "suporte", nome: "Suporte", cor: "#8B6CF0", piso: "#ECE6FB" },
   diretoria: { id: "diretoria", nome: "Diretoria", cor: "#D9A23A", piso: "#F6EEDF" },
-  // 1º andar
-  design: { id: "design", nome: "Design", cor: "#F2913D", piso: "#FDEBDD" },
-  produto: { id: "produto", nome: "Produto", cor: "#3FBFA8", piso: "#DFF4F0" },
-  dados: { id: "dados", nome: "Dados & IA", cor: "#5C6BC0", piso: "#E4E6F7" },
   financeiro: { id: "financeiro", nome: "Financeiro", cor: "#2E7D32", piso: "#E0F0E1" },
   rh: { id: "rh", nome: "RH & Cultura", cor: "#EC407A", piso: "#FBE4EC" },
   juridico: { id: "juridico", nome: "Jurídico", cor: "#6D4C41", piso: "#EFE7E3" },
-  parcerias: { id: "parcerias", nome: "Parcerias", cor: "#00ACC1", piso: "#DFF3F6" },
-  sucesso: { id: "sucesso", nome: "Sucesso do cliente", cor: "#7CB342", piso: "#EBF4DF" },
 };
 
-export const AREAS_OPERACIONAIS: AreaId[] = ["engenharia", "marketing", "vendas", "suporte", "design", "produto", "dados", "financeiro", "rh", "juridico", "parcerias", "sucesso"];
+export const AREAS_OPERACIONAIS: AreaId[] = ["planejamento", "criacao", "social", "trafego", "desenvolvimento", "analise", "atendimento", "vendas", "financeiro", "rh", "juridico"];
 
 export type Nivel = "estagiario" | "junior" | "pleno" | "senior" | "gerente" | "diretor" | "ceo";
 
@@ -53,19 +53,18 @@ export const NIVEIS: NivelInfo[] = [
 export const NIVEL: Record<Nivel, NivelInfo> = Object.fromEntries(NIVEIS.map((n) => [n.id, n])) as Record<Nivel, NivelInfo>;
 
 export const FUNCOES: Record<AreaId, string[]> = {
-  engenharia: ["Dev front-end", "Dev back-end", "QA", "DevOps", "Dev mobile"],
-  marketing: ["Social media", "Designer", "Redator(a)", "Analista de SEO", "Editor(a) de vídeo"],
-  vendas: ["SDR", "Closer", "Customer success", "Analista comercial"],
-  suporte: ["Atendente N1", "Atendente N2", "Analista de qualidade", "Base de conhecimento"],
+  planejamento: ["Planejador(a) estratégico", "Gestor(a) de projetos", "Analista de processos", "Cronograma e prazos"],
+  criacao: ["Roteirista", "Redator(a) / copy", "Designer gráfico", "Editor(a) de vídeo", "Diretor(a) de arte"],
+  social: ["Social media", "Community manager", "Programação de posts", "Monitoramento de comentários"],
+  trafego: ["Gestor(a) de tráfego", "Analista de campanhas", "Otimização de anúncios", "Pixel e conversões"],
+  desenvolvimento: ["Dev front-end", "Dev back-end", "Dev mobile", "QA", "DevOps / automações"],
+  analise: ["Analista de dados", "Analista de BI", "Relatórios e métricas", "Cientista de dados"],
+  atendimento: ["Atendente N1", "Atendente N2", "Sucesso do cliente", "Base de conhecimento"],
+  vendas: ["SDR", "Closer", "Follow-up", "Analista comercial"],
   diretoria: ["Gestão"],
-  design: ["Designer gráfico", "Motion designer", "Designer de produto (UI/UX)", "Diretor(a) de arte", "Ilustrador(a)"],
-  produto: ["Product manager", "Product owner", "Analista de produto", "Pesquisador(a) de usuário"],
-  dados: ["Engenheiro(a) de dados", "Cientista de dados", "Analista de BI", "Engenheiro(a) de IA"],
-  financeiro: ["Analista financeiro", "Contas a pagar/receber", "Controller", "Tesouraria"],
-  rh: ["Recrutador(a)", "Business partner", "Onboarding", "Cultura e comunicação interna"],
-  juridico: ["Advogado(a)", "Contratos", "Compliance", "Privacidade (LGPD)"],
-  parcerias: ["Gerente de parcerias", "Afiliados", "Canais", "Eventos"],
-  sucesso: ["Customer success", "Onboarding de clientes", "Retenção", "Suporte N2"],
+  financeiro: ["Analista financeiro", "Contas a pagar/receber", "Controller"],
+  rh: ["Recrutador(a)", "Onboarding", "Cultura e comunicação interna"],
+  juridico: ["Contratos", "Compliance", "Privacidade (LGPD)"],
 };
 
 export const PERSONALIDADES = ["Animado", "Focado", "Calmo", "Detalhista", "Comunicativo", "Criativo"];

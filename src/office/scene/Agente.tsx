@@ -36,18 +36,17 @@ export function Agente({ def }: { def: AgenteDef }) {
   const boneco = useRef<BonecoHandle>(null);
   const fila = useRef<Acao[]>([]);
   const atual = useRef<Acao | null>(null);
-  const pose = useRef<Pose>("idle");
-  const rotAlvo = useRef(0);
+  const pose = useRef<Pose>("sit");
   const espera = useRef(0);
   const caixaRef = useRef(false);
   const [carregando, setCarregando] = useState(false);
   const [marca, setMarca] = useState<"!" | "..." | "zzz" | null>(null);
-  const [oculto, setOculto] = useState(false);
   const fase = useMemo(() => Math.random() * 10, []);
   const bdef = BONECO[def.boneco] ?? BONECO.classico;
   const usaGLB = !!bdef.arquivo;
   const hips = usaGLB ? HIPS.glb : HIPS.procedural;
   const cadeira = useMemo(() => pontoCadeira(MESA[def.mesaId]), [def.mesaId]);
+  const rotAlvo = useRef(cadeira.rot);
   const andarDaMesa = andarDeY(cadeira.pos[1]);
   const elevador = elevadorNoAndar(andarDaMesa);
   const setStatus = useEscritorio((s) => s.setStatus);
@@ -103,8 +102,12 @@ export function Agente({ def }: { def: AgenteDef }) {
     return () => { handlers.delete(def.id); };
   }, [def.id, def.area, def.nivel, cadeira, setStatus]);
 
-  // mudou de mesa (promoção): vai pra nova cadeira
-  useEffect(() => { if (grupo.current && atual.current === null && fila.current.length === 0) fila.current.push(...irParaMesa("sit")); }, [def.mesaId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // mudou de mesa (promoção/realocação): vai pra nova cadeira. Na primeira montagem não anda: já nasce sentado na mesa.
+  const primeiraMesa = useRef(true);
+  useEffect(() => {
+    if (primeiraMesa.current) { primeiraMesa.current = false; return; }
+    if (grupo.current && atual.current === null && fila.current.length === 0) fila.current.push(...irParaMesa("sit"));
+  }, [def.mesaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- loop de movimento ----
   const rota = useRef<V3[]>([]);
@@ -139,10 +142,6 @@ export function Agente({ def }: { def: AgenteDef }) {
     // rotação suave
     let d = rotAlvo.current - g.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
     g.rotation.y += d * Math.min(1, dt * 10);
-    // só aparece no andar que está sendo visto (por fora, aparece sempre)
-    const st = useEscritorio.getState();
-    const vis = st.vista === "fora" || andarDeY(g.position.y) === st.andar;
-    if (vis !== g.visible) { g.visible = vis; setOculto(!vis); }
   });
   useAnimacao(boneco, () => pose.current, fase, hips.base, hips.escala);
 
@@ -151,16 +150,16 @@ export function Agente({ def }: { def: AgenteDef }) {
   const fala = def.fala && def.status !== "chegando" ? def.fala : undefined;
 
   return (
-    <group ref={grupo} position={elevador} onClick={(e) => { e.stopPropagation(); selecionar(def.id); }}
+    <group ref={grupo} position={cadeira.pos} rotation={[0, cadeira.rot, 0]} onClick={(e) => { e.stopPropagation(); selecionar(def.id); }}
       onPointerOver={(e) => { e.stopPropagation(); setHover(def.id); document.body.style.cursor = "pointer"; }}
       onPointerOut={() => { document.body.style.cursor = "auto"; }}>
-      {usaGLB ? <BonecoGLB ref={boneco} arquivo={bdef.arquivo!} /> : <BonecoProcedural ref={boneco} def={bdef} camisa={corArea} headset={def.area === "suporte" || def.area === "vendas"} cracha={nivel.cor} />}
+      {usaGLB ? <BonecoGLB ref={boneco} arquivo={bdef.arquivo!} /> : <BonecoProcedural ref={boneco} def={bdef} camisa={corArea} headset={def.area === "atendimento" || def.area === "vendas"} cracha={nivel.cor} />}
       {/* caixa de papelão (demissão) */}
       {carregando && <mesh geometry={caixa(0.36, 0.26, 0.3)} material={mat("#C9A063")} position={[0, 0.72, 0.3]} />}
       {/* anel de seleção */}
       {selecionado && <mesh geometry={new THREE.RingGeometry(0.32, 0.4, 32)} material={mat(corArea, { emissive: corArea, ei: 0.8 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} />}
       {/* crachá flutuante (HTML: tamanho fixo na tela, sempre legível) */}
-      <Html position={[0, 1.5, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none", display: oculto ? "none" : undefined }}>
+      <Html position={[0, 1.5, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
         <div className="flex flex-col items-center gap-1 select-none" style={{ transform: "translateY(-100%)" }}>
           {marca && (
             <div className="rounded-full px-3 py-0.5 text-[18px] font-black shadow-md" style={{ background: marca === "!" ? "#E53935" : "#FFFFFF", color: marca === "!" ? "#FFF" : "#333" }}>{marca}</div>

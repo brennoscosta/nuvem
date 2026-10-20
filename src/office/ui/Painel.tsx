@@ -26,8 +26,6 @@ export function BarraTopo() {
   const statusServidor = useEscritorio((s) => s.statusServidor);
   const vista = useEscritorio((s) => s.vista);
   const setVista = useEscritorio((s) => s.setVista);
-  const andar = useEscritorio((s) => s.andar);
-  const setAndar = useEscritorio((s) => s.setAndar);
   const temSimulados = ordem.some((id) => agentes[id] && !agentes[id].real);
   const total = ordem.length;
   const trabalhando = ordem.filter((id) => agentes[id]?.status === "trabalhando").length;
@@ -51,12 +49,6 @@ export function BarraTopo() {
         </div>
         {sirene && <span className="animate-pulse rounded-full bg-[#E53935] px-2 py-1 text-[10px] font-bold">APROVAÇÃO PENDENTE</span>}
         <span title={statusServidor ? `banco: ${statusServidor.banco} · IA: ${statusServidor.ia}${statusServidor.detalhe ? " · " + statusServidor.detalhe : ""}` : "conectando"} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${online && statusServidor?.ia === "ok" ? "bg-[#22A86B]/20 text-[#7EE2B0]" : online ? "bg-[#F2913D]/20 text-[#FFC48A]" : "bg-white/5 text-white/50"}`}><span className={`h-1.5 w-1.5 rounded-full ${online ? (statusServidor?.ia === "ok" ? "bg-[#22A86B]" : "bg-[#F2913D]") : "bg-white/30"}`} />{!checado ? "Conectando…" : online ? (statusServidor?.ia === "ok" ? "Agentes reais" : "Banco ok · sem IA") : "Offline"}</span>
-        {vista === "dentro" && (
-          <div className="flex overflow-hidden rounded-full bg-white/10 text-xs font-semibold" title="Andar">
-            <button onClick={() => setAndar(0)} className={`px-3 py-1.5 ${andar === 0 ? "bg-[#4F7DF3] text-white" : "text-white/70 hover:bg-white/10"}`}>⬇ Térreo</button>
-            <button onClick={() => setAndar(1)} className={`px-3 py-1.5 ${andar === 1 ? "bg-[#4F7DF3] text-white" : "text-white/70 hover:bg-white/10"}`}>⬆ 1º andar</button>
-          </div>
-        )}
         <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório" : "Ver o prédio por fora"} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">{vista === "fora" ? "🏢 Ver por dentro" : "🌆 Ver por fora"}</button>
         {temSimulados && <button onClick={() => setSimulando(!simulando)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${simulando ? "bg-white/10 text-white" : "bg-white/5 text-white/50"}`}>{simulando ? "Simulação: ligada" : "Simulação: pausada"}</button>}
         {(admin || !online) && <button onClick={() => setModal(true)} className="rounded-full bg-[#4F7DF3] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#3f6ae0]">+ Contratar agente</button>}
@@ -75,10 +67,10 @@ export function ModalContratar() {
   const setModal = useEscritorio((s) => s.setModal);
   const contratar = useEscritorio((s) => s.contratar);
   const agentes = useEscritorio((s) => s.agentes);
-  const [area, setArea] = useState<AreaId>("suporte");
+  const [area, setArea] = useState<AreaId>("planejamento");
   const [nivel, setNivel] = useState<Nivel>("junior");
   const [nome, setNome] = useState(NOMES[Math.floor(Math.random() * NOMES.length)]);
-  const [funcao, setFuncao] = useState(FUNCOES.suporte[0]);
+  const [funcao, setFuncao] = useState(FUNCOES.planejamento[0]);
   const [personalidade, setPersonalidade] = useState(PERSONALIDADES[0]);
   const [boneco, setBoneco] = useState(BONECOS[0].id);
   const [erro, setErro] = useState<string | null>(null);
@@ -148,17 +140,17 @@ export function useTimeInicial() {
     if (s.ordem.length) return;
     if (!new URLSearchParams(window.location.search).has("demo")) return;
     const time: Array<[string, AreaId, Nivel, string, string]> = [
-      ["Helena", "suporte", "ceo", "Gestão", "Focado"],
-      ["Rafael", "suporte", "gerente", "Atendente N2", "Comunicativo"],
-      ["Ana", "suporte", "junior", "Atendente N1", "Animado"],
-      ["Bruno", "suporte", "estagiario", "Atendente N1", "Calmo"],
+      ["Helena", "atendimento", "ceo", "Gestão", "Focado"],
+      ["Rafael", "atendimento", "gerente", "Atendente N2", "Comunicativo"],
+      ["Ana", "atendimento", "junior", "Atendente N1", "Animado"],
+      ["Bruno", "atendimento", "estagiario", "Atendente N1", "Calmo"],
       ["Marina", "vendas", "gerente", "Closer", "Comunicativo"],
       ["Diego", "vendas", "pleno", "SDR", "Animado"],
-      ["Gabi", "marketing", "senior", "Social media", "Criativo"],
-      ["Léo", "marketing", "junior", "Editor(a) de vídeo", "Criativo"],
-      ["Sofia", "engenharia", "gerente", "Dev back-end", "Detalhista"],
-      ["Tiago", "engenharia", "pleno", "Dev front-end", "Focado"],
-      ["Iara", "engenharia", "diretor", "Gestão", "Detalhista"],
+      ["Gabi", "criacao", "senior", "Social media", "Criativo"],
+      ["Léo", "criacao", "junior", "Editor(a) de vídeo", "Criativo"],
+      ["Sofia", "desenvolvimento", "gerente", "Dev back-end", "Detalhista"],
+      ["Tiago", "desenvolvimento", "pleno", "Dev front-end", "Focado"],
+      ["Iara", "desenvolvimento", "diretor", "Gestão", "Detalhista"],
     ];
     useEscritorio.setState({ simulando: true, online: false });
     const timers = time.map(([nome, area, nivel, funcao, personalidade], i) => setTimeout(() => {
@@ -201,7 +193,7 @@ function PainelOuCartao() {
 export function Painel() {
   useSimulador();
   // ?vista=fora abre já na vista externa (prévias e links)
-  useEffect(() => { const q = new URLSearchParams(window.location.search); if (q.get("vista") === "fora") useEscritorio.getState().setVista("fora"); if (q.get("andar") === "1") useEscritorio.getState().setAndar(1); }, []);
+  useEffect(() => { const q = new URLSearchParams(window.location.search); if (q.get("vista") === "fora") useEscritorio.getState().setVista("fora"); }, []);
   // voltou do Google (?conexao=youtube): abre o painel do CEO na aba Tarefas assim que os agentes carregarem
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has("conexao")) return;
