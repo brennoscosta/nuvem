@@ -6,6 +6,7 @@ import { useEscritorio } from "../store";
 import { useSimulador } from "../sim/simulador";
 import { PainelAgente, STATUS } from "./PainelAgente";
 import { MenuAgente } from "./MenuAgente";
+import { ModalLogin, CartaoPublico } from "./Login";
 
 export function BarraTopo() {
   const agentes = useEscritorio((s) => s.agentes);
@@ -17,6 +18,10 @@ export function BarraTopo() {
   const setSimulando = useEscritorio((s) => s.setSimulando);
   const sirene = useEscritorio((s) => s.sirene);
   const online = useEscritorio((s) => s.online);
+  const checado = useEscritorio((s) => s.checado);
+  const admin = useEscritorio((s) => s.admin);
+  const setModalLogin = useEscritorio((s) => s.setModalLogin);
+  const logout = useEscritorio((s) => s.logout);
   const statusServidor = useEscritorio((s) => s.statusServidor);
   const temSimulados = ordem.some((id) => agentes[id] && !agentes[id].real);
   const total = ordem.length;
@@ -37,12 +42,15 @@ export function BarraTopo() {
               <span className="font-medium">{a.nome}</span>
               <span className="rounded-full px-1.5 text-[9px] font-bold uppercase" style={{ background: NIVEL[a.nivel].cor, color: "#111" }}>{NIVEL[a.nivel].nome}</span>
             </button>); })}
-          {total === 0 && <span className="text-xs text-white/50">Escritório vazio. Clique em “Contratar agente” pra trazer o primeiro.</span>}
+          {total === 0 && <span className="text-xs text-white/50">{admin || !online ? "Escritório vazio. Clique em “Contratar agente” pra trazer o primeiro." : "Escritório vazio."}</span>}
         </div>
         {sirene && <span className="animate-pulse rounded-full bg-[#E53935] px-2 py-1 text-[10px] font-bold">APROVAÇÃO PENDENTE</span>}
-        <span title={statusServidor ? `banco: ${statusServidor.banco} · IA: ${statusServidor.ia}${statusServidor.detalhe ? " · " + statusServidor.detalhe : ""}` : "conectando"} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${online && statusServidor?.ia === "ok" ? "bg-[#22A86B]/20 text-[#7EE2B0]" : online ? "bg-[#F2913D]/20 text-[#FFC48A]" : "bg-white/5 text-white/50"}`}><span className={`h-1.5 w-1.5 rounded-full ${online ? (statusServidor?.ia === "ok" ? "bg-[#22A86B]" : "bg-[#F2913D]") : "bg-white/30"}`} />{online ? (statusServidor?.ia === "ok" ? "Agentes reais" : "Banco ok · sem IA") : "Offline"}</span>
+        <span title={statusServidor ? `banco: ${statusServidor.banco} · IA: ${statusServidor.ia}${statusServidor.detalhe ? " · " + statusServidor.detalhe : ""}` : "conectando"} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${online && statusServidor?.ia === "ok" ? "bg-[#22A86B]/20 text-[#7EE2B0]" : online ? "bg-[#F2913D]/20 text-[#FFC48A]" : "bg-white/5 text-white/50"}`}><span className={`h-1.5 w-1.5 rounded-full ${online ? (statusServidor?.ia === "ok" ? "bg-[#22A86B]" : "bg-[#F2913D]") : "bg-white/30"}`} />{!checado ? "Conectando…" : online ? (statusServidor?.ia === "ok" ? "Agentes reais" : "Banco ok · sem IA") : "Offline"}</span>
         {temSimulados && <button onClick={() => setSimulando(!simulando)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${simulando ? "bg-white/10 text-white" : "bg-white/5 text-white/50"}`}>{simulando ? "Simulação: ligada" : "Simulação: pausada"}</button>}
-        <button onClick={() => setModal(true)} className="rounded-full bg-[#4F7DF3] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#3f6ae0]">+ Contratar agente</button>
+        {(admin || !online) && <button onClick={() => setModal(true)} className="rounded-full bg-[#4F7DF3] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#3f6ae0]">+ Contratar agente</button>}
+        {online && (admin
+          ? <button onClick={logout} title="Sair do modo admin" className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">Admin · sair</button>
+          : <button onClick={() => setModalLogin(true)} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">Entrar</button>)}
       </div>
     </div>
   );
@@ -164,11 +172,18 @@ function useServidor() {
           if (!ev.agenteId || !st.agentes[ev.agenteId]) { if (ev.tipo === "contratado") carregar(); continue; }
           if (["contratado", "demitido", "reuniao"].includes(ev.tipo)) continue; // já tratados localmente por quem disparou
           st.emitir(ev.agenteId, ev.tipo as never, ev.texto ?? undefined);
+          if (ev.tipo === "aprovado" && ev.texto) st.atualizarLocal(ev.agenteId, { falaPublica: ev.texto });
         }
       } catch { /* servidor fora: tenta de novo no próximo ciclo */ }
     }, 4000);
     return () => clearInterval(t);
   }, [carregar]);
+}
+
+function PainelOuCartao() {
+  const admin = useEscritorio((s) => s.admin);
+  const online = useEscritorio((s) => s.online);
+  return admin || !online ? <PainelAgente /> : <CartaoPublico />;
 }
 
 export function Painel() {
@@ -179,7 +194,8 @@ export function Painel() {
     <>
       <BarraTopo />
       <MenuAgente />
-      <PainelAgente />
+      <PainelOuCartao />
+      <ModalLogin />
       <ModalContratar />
       <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur">Arraste pra mover · roda do mouse pra zoom · botão direito pra girar · clique no boneco pra ver a ficha · passe o mouse pra chamar reunião</div>
     </>

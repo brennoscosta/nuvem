@@ -1,12 +1,14 @@
-import { garantirEmpresa, listarAgentes, criarAgente, gravarEvento, type NovoAgente } from "@/server/agentes";
+import { garantirEmpresa, listarAgentes, criarAgente, gravarEvento, resumoPublico, type NovoAgente } from "@/server/agentes";
 import { ok, erro, corpo } from "@/server/http";
+import { ehAdmin, naoAutorizado } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  try { const emp = await garantirEmpresa(); return ok(await listarAgentes(emp)); } catch (e) { return erro(e); }
+  try { const emp = await garantirEmpresa(); const lista = await listarAgentes(emp); return ok((await ehAdmin()) ? lista : lista.map(resumoPublico)); } catch (e) { return erro(e); }
 }
 export async function POST(req: Request) {
+  if (!(await ehAdmin())) return naoAutorizado();
   try {
     const emp = await garantirEmpresa();
     const b = await corpo<NovoAgente>(req);

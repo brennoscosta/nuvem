@@ -23,6 +23,7 @@ export function useSimulador() {
       const agora = Date.now();
       for (const a of Object.values(s.agentes)) {
         if (a.real) continue; // agentes reais são movidos pelo motor, não pelo simulador
+        if (s.reuniaoAtiva?.participantes.includes(a.id)) continue; // reunião convocada pelo admin: só termina quando ele encerrar
         const t0 = desde.get(a.id + a.status) ?? (desde.set(a.id + a.status, agora), agora);
         const dt = (agora - t0) / 1000;
         const emitir = (tipo: Parameters<typeof s.emitir>[1], texto?: string) => { desde.delete(a.id + a.status); s.emitir(a.id, tipo, texto); };

@@ -1,6 +1,6 @@
 // Motor do agente: monta a "mente" dele a partir da ficha (perfil + conhecimento + skills + regras) e conversa.
 import OpenAI from "openai";
-import { fichaCompleta, gravarMensagem, listarMensagens, registrarUso, gastoHoje, gravarEvento, type SkillDB } from "./agentes";
+import { fichaCompleta, gravarMensagem, listarMensagens, registrarUso, gastoHoje, gravarEvento, salvarFalaPublica, type SkillDB } from "./agentes";
 import { NIVEL, AREAS, type Nivel, type AreaId } from "@/office/data/org";
 
 // Preço aproximado em R$ por 1M tokens (entrada / saída). Ajustável.
@@ -60,7 +60,7 @@ export async function conversar(agenteId: string, texto: string, autor = "admin"
     throw new Error(`Teto diário de gasto atingido (R$ ${gasto.toFixed(2)} de R$ ${teto.toFixed(2)}). Aumente o teto na ficha do agente pra continuar.`);
   }
   const pergunta = await gravarMensagem({ agenteId, papel: "user", autor, conteudo: texto });
-  await gravarEvento(f.agente.empresaId, agenteId, "tarefa_recebida", resumo(texto));
+  await gravarEvento(f.agente.empresaId, agenteId, "tarefa_recebida", "Recebi uma mensagem, já estou vendo.");
   const historico = await listarMensagens(agenteId, 40);
   const msgs: OpenAI.Chat.ChatCompletionMessageParam[] = [{ role: "system", content: montarSistema(f) }];
   for (const m of historico) {
@@ -78,8 +78,24 @@ export async function conversar(agenteId: string, texto: string, autor = "admin"
   const custo = custoBRL(modelo, tin, tout);
   const msg = await gravarMensagem({ agenteId, papel: "assistant", autor: `agente:${agenteId}`, conteudo: resposta, custoBrl: custo, tokensIn: tin, tokensOut: tout });
   await registrarUso({ agenteId, modelo, tokensIn: tin, tokensOut: tout, custoBrl: custo });
-  await gravarEvento(f.agente.empresaId, agenteId, "aprovado", resumo(resposta), { ms: Date.now() - t0, custo });
+  // fala pública: o que um visitante vê ("tô online fazendo um criativo"), sem detalhes
+  const fala = await falaPublica(f.agente.nome, f.agente.funcao, texto, resposta).catch(() => "");
+  if (fala) await salvarFalaPublica(agenteId, fala);
+  await gravarEvento(f.agente.empresaId, agenteId, "aprovado", fala || resumo(resposta), { ms: Date.now() - t0, custo });
   return { mensagem: msg, custo, tokensIn: tin, tokensOut: tout, gastoHoje: gasto + custo, teto };
+}
+
+async function falaPublica(nome: string, funcao: string, pedido: string, resposta: string) {
+  const r = await openai().chat.completions.create({
+    model: "gpt-4.1-nano", temperature: 0.7, max_completion_tokens: 40,
+    messages: [
+      { role: "system", content: `Você é ${nome} (${funcao}). Escreva UMA frase curta (máx. 12 palavras), em primeira pessoa, informal e subjetiva, dizendo o que está fazendo agora, sem revelar conteúdo, nomes, números ou dados do trabalho. Exemplos: "Tô online montando um plano pra semana." / "Revisando uma entrega do time." Responda só a frase.` },
+      { role: "user", content: `Pedido recebido: ${pedido.slice(0, 300)}
+
+O que você fez: ${resposta.slice(0, 500)}` },
+    ],
+  });
+  return r.choices[0]?.message?.content?.trim().replace(/^["']|["']$/g, "") ?? "";
 }
 
 function resumo(t: string, n = 70) {

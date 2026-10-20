@@ -7,6 +7,7 @@ export interface AgenteDB {
   id: string; empresaId: string; nome: string; area: string; nivel: string; funcao: string;
   personalidade: string; tomDeVoz: string; descricao: string; modelo: string; boneco: string;
   mesaId: string | null; chefeId: string | null; tetoDiarioBrl: string; ativo: boolean; criadoEm: Date; atualizadoEm: Date;
+  falaPublica: string; falaPublicaEm: Date | null;
 }
 export interface ConhecimentoDB { id: string; agenteId: string; titulo: string; conteudo: string; origem: string; ativo: boolean; criadoEm: Date }
 export interface SkillDB { id: string; agenteId: string; nome: string; quandoUsar: string; passos: string; ativo: boolean; ordem: number; criadoEm: Date }
@@ -119,6 +120,15 @@ export async function gravarEvento(empresaId: string, agenteId: string | null, t
 }
 export async function eventosDesde(empresaId: string, desde: Date) {
   return sql<{ id: string; agenteId: string | null; tipo: string; texto: string | null; payload: unknown; criadoEm: Date }[]>`SELECT id, agente_id, tipo, texto, payload, criado_em FROM evento WHERE empresa_id = ${empresaId} AND criado_em > ${desde} ORDER BY criado_em LIMIT 200`;
+}
+
+export async function salvarFalaPublica(agenteId: string, fala: string) {
+  await sql`UPDATE agente SET fala_publica = ${fala}, fala_publica_em = now() WHERE id = ${agenteId}`;
+}
+
+// Versão do agente que um visitante pode ver (sem nada sensível)
+export function resumoPublico(a: AgenteDB) {
+  return { id: a.id, nome: a.nome, area: a.area, nivel: a.nivel, funcao: a.funcao, boneco: a.boneco, mesaId: a.mesaId, criadoEm: a.criadoEm, falaPublica: a.falaPublica, falaPublicaEm: a.falaPublicaEm };
 }
 
 export function modeloPadrao(nivel: string) {

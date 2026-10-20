@@ -14,6 +14,8 @@ export function MenuAgente() {
   const convocar = useEscritorio((s) => s.convocarReuniao);
   const encerrar = useEscritorio((s) => s.encerrarReuniao);
   const setHover = useEscritorio((s) => s.setHover);
+  const admin = useEscritorio((s) => s.admin);
+  const online = useEscritorio((s) => s.online);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [fixo, setFixo] = useState<string | null>(null); // menu "preso" quando o mouse entra nele
   const [setores, setSetores] = useState<AreaId[]>([]);
@@ -27,7 +29,7 @@ export function MenuAgente() {
 
   const id = menuReuniao ?? fixo ?? hover;
   const a = id ? agentes[id] : null;
-  if (!a) return null;
+  if (!a || (online && !admin)) return null;
   const podeConvocar = ["ceo", "diretor", "gerente"].includes(a.nivel);
   const gerentes = Object.values(agentes).filter((x) => x.nivel === "gerente" || x.nivel === "diretor");
   const left = Math.min(pos.x + 14, window.innerWidth - 300), top = Math.min(pos.y + 10, window.innerHeight - 320);

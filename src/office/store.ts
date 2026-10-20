@@ -23,6 +23,7 @@ export interface Agente {
   tarefasConcluidas: number;
   gastoHoje: number; // R$
   real: boolean; // veio do banco (agente de verdade) ou é simulado
+  falaPublica?: string; // o que um visitante vê
 }
 
 export interface NovoAgente { nome: string; area: AreaId; nivel: Nivel; funcao: string; personalidade: string; boneco: string }
@@ -40,8 +41,15 @@ interface Estado {
   sirene: boolean;
   simulando: boolean;
   online: boolean; // banco + IA disponíveis
+  checado: boolean; // já consultou o servidor pelo menos uma vez
+  admin: boolean; // sessão de admin válida
+  senhaConfigurada: boolean;
+  modalLogin: boolean;
   statusServidor: { banco: string; ia: string; detalhe?: string } | null;
   carregarDoServidor: () => Promise<void>;
+  login: (senha: string) => Promise<string | null>;
+  logout: () => Promise<void>;
+  setModalLogin: (v: boolean) => void;
   contratar: (dados: NovoAgente) => Promise<Agente | null>;
   demitir: (id: string) => Promise<void>;
   promover: (id: string, nivel: Nivel) => Promise<void>;
@@ -63,13 +71,13 @@ interface Estado {
 let seq = 1;
 const uid = (p: string) => `${p}-${Date.now().toString(36)}-${seq++}`;
 
-interface AgenteServidor { id: string; nome: string; area: AreaId; nivel: Nivel; funcao: string; personalidade: string; boneco: string; mesaId: string | null; criadoEm: string }
+interface AgenteServidor { id: string; nome: string; area: AreaId; nivel: Nivel; funcao: string; personalidade?: string; boneco: string; mesaId: string | null; criadoEm: string; falaPublica?: string }
 
 function doServidor(a: AgenteServidor, ocupadas: Set<string>): Agente | null {
   let mesaId = a.mesaId;
   if (!mesaId || ocupadas.has(mesaId)) { const m = mesaParaNivel(a.area, a.nivel, ocupadas); if (!m) return null; mesaId = m.id; }
   ocupadas.add(mesaId);
-  return { id: a.id, nome: a.nome, area: a.area, nivel: a.nivel, funcao: a.funcao, personalidade: a.personalidade, boneco: a.boneco, mesaId, sala: salaDoNivel(a.area, a.nivel), status: "disponivel", criadoEm: new Date(a.criadoEm).getTime(), tarefasConcluidas: 0, gastoHoje: 0, real: true };
+  return { id: a.id, nome: a.nome, area: a.area, nivel: a.nivel, funcao: a.funcao, personalidade: a.personalidade ?? "", boneco: a.boneco, mesaId, sala: salaDoNivel(a.area, a.nivel), status: "disponivel", criadoEm: new Date(a.criadoEm).getTime(), tarefasConcluidas: 0, gastoHoje: 0, real: true, falaPublica: a.falaPublica };
 }
 
 export const useEscritorio = create<Estado>((set, get) => ({
@@ -85,6 +93,10 @@ export const useEscritorio = create<Estado>((set, get) => ({
   sirene: false,
   simulando: false,
   online: false,
+  checado: false,
+  admin: false,
+  senhaConfigurada: false,
+  modalLogin: false,
   statusServidor: null,
 
   mesasOcupadas: () => new Set(Object.values(get().agentes).map((a) => a.mesaId)),
@@ -92,21 +104,33 @@ export const useEscritorio = create<Estado>((set, get) => ({
   carregarDoServidor: async () => {
     try {
       const st = await fetch("/api/status").then((r) => r.json());
-      set({ statusServidor: st, online: st.banco === "ok" });
+      set({ statusServidor: st, online: st.banco === "ok", checado: true, admin: !!st.admin, senhaConfigurada: !!st.senhaConfigurada });
       if (st.banco !== "ok") return;
       const lista: AgenteServidor[] = await fetch("/api/agentes").then((r) => r.json());
       const ocupadas = new Set<string>(); const agentes: Record<string, Agente> = {}; const ordem: string[] = [];
       for (const a of lista) { const ag = doServidor(a, ocupadas); if (ag) { agentes[ag.id] = ag; ordem.push(ag.id); } }
       // agentes já na cena mantêm status/mesa
       const atuais = get().agentes;
-      for (const id of ordem) if (atuais[id]) agentes[id] = { ...agentes[id], status: atuais[id].status, fala: atuais[id].fala, mesaId: atuais[id].mesaId, tarefasConcluidas: atuais[id].tarefasConcluidas, gastoHoje: atuais[id].gastoHoje };
+      for (const id of ordem) if (atuais[id]) agentes[id] = { ...agentes[id], status: atuais[id].status, fala: atuais[id].fala ?? agentes[id].falaPublica, mesaId: atuais[id].mesaId, tarefasConcluidas: atuais[id].tarefasConcluidas, gastoHoje: atuais[id].gastoHoje };
       set({ agentes, ordem });
       // quem acabou de aparecer e ainda não estava na cena: entra pelo elevador
       for (const id of ordem) if (!atuais[id]) get().emitir(id, "contratado", `${agentes[id].nome} entrou como ${NIVEL[agentes[id].nivel].nome}`);
-    } catch (e) { console.warn("[escritorio] sem servidor:", e); set({ online: false }); }
+    } catch (e) { console.warn("[escritorio] sem servidor:", e); set({ online: false, checado: true }); }
   },
 
+  login: async (senha) => {
+    const r = await fetch("/api/auth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ senha }) });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); return j.erro ?? "Falha no login"; }
+    set({ admin: true, modalLogin: false });
+    await get().carregarDoServidor();
+    return null;
+  },
+  logout: async () => { await fetch("/api/auth", { method: "DELETE" }); set({ admin: false, selecionado: null, modalContratar: false }); await get().carregarDoServidor(); },
+  setModalLogin: (v) => set({ modalLogin: v }),
+
   contratar: async (dados) => {
+    if (!get().checado) await get().carregarDoServidor();
+    if (get().online && !get().admin) throw new Error("Faça login como admin pra contratar.");
     const mesa = mesaParaNivel(dados.area, dados.nivel, get().mesasOcupadas());
     if (!mesa) return null;
     if (dados.nivel === "ceo" && Object.values(get().agentes).some((a) => a.nivel === "ceo")) return null;
