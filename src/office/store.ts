@@ -81,7 +81,8 @@ function doServidor(a: AgenteServidor, ocupadas: Set<string>): Agente | null {
   let mesaId = a.mesaId;
   // mesa inexistente (planta mudou), ocupada ou de outra área: realoca. Área desconhecida (setor antigo): cai na diretoria/planejamento.
   const area: AreaId = AREAS[a.area] ? a.area : (a.nivel === "diretor" || a.nivel === "ceo" ? "diretoria" : "planejamento");
-  if (!mesaId || !MESA[mesaId] || ocupadas.has(mesaId)) { const m = mesaParaNivel(area, a.nivel, ocupadas); if (!m) return null; mesaId = m.id; }
+  const sala = salaDoNivel(area, a.nivel);
+  if (!mesaId || !MESA[mesaId] || MESA[mesaId].sala !== sala || ocupadas.has(mesaId)) { const m = mesaParaNivel(area, a.nivel, ocupadas); if (!m) return null; mesaId = m.id; }
   ocupadas.add(mesaId);
   return { id: a.id, nome: a.nome, area, nivel: a.nivel, funcao: a.funcao, personalidade: a.personalidade ?? "", boneco: a.boneco, mesaId, sala: salaDoNivel(area, a.nivel), status: "disponivel", criadoEm: new Date(a.criadoEm).getTime(), tarefasConcluidas: 0, gastoHoje: 0, real: true, falaPublica: a.falaPublica };
 }
@@ -118,9 +119,9 @@ export const useEscritorio = create<Estado>((set, get) => ({
       const lista: AgenteServidor[] = await fetch("/api/agentes").then((r) => r.json());
       const ocupadas = new Set<string>(); const agentes: Record<string, Agente> = {}; const ordem: string[] = [];
       for (const a of lista) { const ag = doServidor(a, ocupadas); if (ag) { agentes[ag.id] = ag; ordem.push(ag.id); } }
-      // agentes já na cena mantêm status/mesa
+      // agentes já na cena mantêm status; a mesa é a que o servidor manda (se mudou de sala, o boneco anda até a nova)
       const atuais = get().agentes;
-      for (const id of ordem) if (atuais[id]) agentes[id] = { ...agentes[id], status: atuais[id].status, fala: atuais[id].fala ?? agentes[id].falaPublica, mesaId: atuais[id].mesaId, tarefasConcluidas: atuais[id].tarefasConcluidas, gastoHoje: atuais[id].gastoHoje };
+      for (const id of ordem) if (atuais[id]) agentes[id] = { ...agentes[id], status: atuais[id].status, fala: atuais[id].fala ?? agentes[id].falaPublica, tarefasConcluidas: atuais[id].tarefasConcluidas, gastoHoje: atuais[id].gastoHoje };
       set({ agentes, ordem });
       // quem apareceu depois da primeira carga (contratado em outra aba/sessão) entra pelo elevador;
       // na primeira carga todo mundo já nasce sentado na própria mesa (ninguém "chega andando" ao abrir a tela)
