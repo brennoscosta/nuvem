@@ -20,7 +20,9 @@ export function Mural() {
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [aberto, setAberto] = useState(false); // visitante começa com o mural recolhido; admin, aberto
   const fim = useRef<HTMLDivElement>(null);
+  useEffect(() => { setAberto(admin); }, [admin]);
 
   // carrega e atualiza o mural a cada 6 s
   useEffect(() => {
@@ -33,6 +35,13 @@ export function Mural() {
   useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [itens.length, historico.length]);
 
   if (vista !== "fora") return null;
+  if (!aberto) {
+    return (
+      <button onClick={() => setAberto(true)} className="pointer-events-auto absolute left-3 top-16 z-10 flex items-center gap-2 rounded-full bg-[#111418]/88 px-3 py-2 text-xs font-semibold text-white shadow-xl backdrop-blur">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#22A86B]" />Mural da Nuvem · ao vivo <span className="text-white/50">▸</span>
+      </button>
+    );
+  }
 
   // mistura mensagens do mural com os últimos eventos da cena (o que está acontecendo agora)
   const eventos = historico.slice(0, 15).map((e) => ({ id: e.id, ts: e.ts, autor: agentes[e.agenteId]?.nome ?? "Escritório", tipo: "sistema" as const, texto: e.texto ?? e.tipo.replace(/_/g, " "), agenteId: e.agenteId }));
@@ -60,7 +69,10 @@ export function Mural() {
           <div className="text-sm font-bold">Mural da Nuvem</div>
           <div className="text-[10px] text-white/50">{online ? "o que está acontecendo lá dentro, em tempo real" : "offline — sem conexão com o escritório"}</div>
         </div>
-        <span className="flex items-center gap-1 rounded-full bg-[#22A86B]/20 px-2 py-0.5 text-[10px] font-semibold text-[#7EE2B0]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#22A86B]" />ao vivo</span>
+        <div className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1 rounded-full bg-[#22A86B]/20 px-2 py-0.5 text-[10px] font-semibold text-[#7EE2B0]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#22A86B]" />ao vivo</span>
+          <button onClick={() => setAberto(false)} title="Recolher" className="rounded-full px-2 py-0.5 text-sm text-white/60 hover:bg-white/10">—</button>
+        </div>
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3 text-xs">
         {linhas.length === 0 && <div className="text-white/40">Ainda não há movimento por aqui. Quando os agentes trabalharem, aparece aqui.</div>}

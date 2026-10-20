@@ -6,8 +6,9 @@ import { useMemo } from "react";
 import { caixa, plano, mat } from "./geo";
 import { LetreiroNuvem, IconeNuvem } from "./Predio";
 import { useEscritorio } from "../store";
+import { ALT_ANDAR } from "../data/layout";
 
-const W = 37.6, D = 19.6, H = 4.8; // envelope ao redor do prédio (x ±18.8, z ±9.8)
+const W = 37.6, D = 19.6, H = ALT_ANDAR * 2 + 0.9; // envelope ao redor do prédio (x ±18.8, z ±9.8), 2 andares
 const ESTRUTURA = "#1F2630";
 
 function Vidro({ w, h, position, rotation }: { w: number; h: number; position: [number, number, number]; rotation: [number, number, number] }) {
@@ -27,6 +28,9 @@ function ParedeVidro({ comprimento, position, rotation }: { comprimento: number;
       {/* travessas */}
       <mesh geometry={caixa(comprimento, 0.22, 0.2)} material={mat(ESTRUTURA, { rough: 0.6, metal: 0.3 })} position={[0, 0.11, 0]} />
       <mesh geometry={caixa(comprimento, 0.1, 0.16)} material={mat(ESTRUTURA, { rough: 0.6, metal: 0.3 })} position={[0, 2.4, 0]} />
+      {/* faixa da laje do 1º andar */}
+      <mesh geometry={caixa(comprimento, 0.4, 0.34)} material={mat("#F4F1EB", { rough: 0.9 })} position={[0, ALT_ANDAR - 0.15, 0]} />
+      <mesh geometry={caixa(comprimento, 0.1, 0.16)} material={mat(ESTRUTURA, { rough: 0.6, metal: 0.3 })} position={[0, ALT_ANDAR + 2.4, 0]} />
       <mesh geometry={caixa(comprimento, 0.3, 0.3)} material={mat(ESTRUTURA, { rough: 0.6, metal: 0.3 })} position={[0, H - 0.15, 0]} castShadow />
     </group>
   );
@@ -56,7 +60,7 @@ export function Fachada() {
       <mesh geometry={caixa(0.1, 2.3, 3.8)} material={mat("#8FB9E8", { rough: 0.1, metal: 0.2, opacity: 0.6 })} position={[-W / 2 - 0.02, 1.25, -2]} />
       <mesh geometry={caixa(2.6, 0.16, 5.4)} material={mat("#F4F1EB", { rough: 0.9 })} position={[-W / 2 - 1.1, 2.9, -2]} castShadow />
       {/* nome na fachada da frente (sul) e letreiro grande no topo */}
-      <group position={[0, 1.1, D / 2 + 0.35]}><LetreiroNuvem fundo={false} tamanho={1.5} /></group>
+      <group position={[0, ALT_ANDAR + 0.9, D / 2 + 0.35]}><LetreiroNuvem fundo={false} tamanho={1.6} /></group>
       <group position={[0, H + 0.6, -2]}>
         <mesh geometry={caixa(13, 0.5, 2)} material={mat(ESTRUTURA, { rough: 0.8 })} position={[0, 0.25, 0]} castShadow />
         <group position={[0, 0.5, 0.2]}><LetreiroNuvem fundo={false} tamanho={2.6} /></group>

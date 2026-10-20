@@ -3,10 +3,10 @@
 import * as THREE from "three";
 import { useMemo } from "react";
 import { Text } from "@react-three/drei";
-import { SALAS, salaGerente, MESAS, PONTOS, type Sala } from "../data/layout";
+import { SALAS, salaGerente, MESAS, PONTOS, ALT_ANDAR, yDoAndar, type Sala, type Andar as NumAndar } from "../data/layout";
 import { AREAS } from "../data/org";
 import { caixa, capsula, cilindro, esfera, mat, plano, COR } from "./geo";
-import { Balcao, Copa, Elevador, Fliperama, Impressora, Mesa, MesaBaixa, MesaReuniao, Planta, Puff, Quadro, Sinuca, Sirene, Sofa } from "./Moveis";
+import { Balcao, Cadeira, Copa, Elevador, Fliperama, Impressora, Mesa, MesaBaixa, MesaReuniao, Planta, Puff, Quadro, Sinuca, Sirene, Sofa } from "./Moveis";
 import { useEscritorio } from "../store";
 
 const FONTE = "/fonts/inter-700.woff";
@@ -103,9 +103,45 @@ function Luminaria({ position, r = 0.8 }: { position: [number, number, number]; 
   return <mesh geometry={new THREE.TorusGeometry(r, 0.05, 8, 40)} material={mat("#FFFFFF", { emissive: "#FFF4D6", ei: 1.4 })} position={position} rotation={[Math.PI / 2, 0, 0]} />;
 }
 
-export function Predio() {
+// Estante de livros (hall/biblioteca do 1º andar)
+function Estante({ position, rotation = 0, largura = 2.4 }: { position: [number, number, number]; rotation?: number; largura?: number }) {
+  const cores = ["#E2575B", "#4F7DF3", "#22A86B", "#D9A23A", "#8B6CF0", "#F2913D", "#3FBFA8", "#EC6B8D"];
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh geometry={caixa(largura, 2.1, 0.35)} material={mat("#8D6E63", { rough: 0.85 })} position={[0, 1.05, 0]} castShadow />
+      {[0.45, 0.95, 1.45, 1.95].map((y) => <mesh key={y} geometry={caixa(largura - 0.1, 0.04, 0.33)} material={mat("#A1887F")} position={[0, y, 0.01]} />)}
+      {[0.45, 0.95, 1.45].flatMap((y, r) => Array.from({ length: Math.floor((largura - 0.3) / 0.16) }).map((_, i) => (
+        <mesh key={`${r}-${i}`} geometry={caixa(0.12, 0.3 + ((i * 7 + r) % 3) * 0.05, 0.22)} material={mat(cores[(i + r * 3) % cores.length], { rough: 0.9 })} position={[-largura / 2 + 0.25 + i * 0.16, y + 0.19, 0.03]} />
+      )))}
+    </group>
+  );
+}
+
+// Auditório: telão no fundo, palco baixo e fileiras de cadeiras viradas pra ele
+function Auditorio({ s }: { s: Sala }) {
+  const cx = (s.x0 + s.x1) / 2, fundo = s.z1; // sala ao sul: fundo em z1
+  const cadeiras: [number, number][] = [];
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) cadeiras.push([s.x0 + 1.1 + c * 1.0, fundo - 2.6 - r * 1.1]);
+  return (
+    <group>
+      <mesh geometry={caixa(s.x1 - s.x0 - 0.6, 0.18, 1.8)} material={mat("#4A4E55", { rough: 0.8 })} position={[cx, 0.09, fundo - 1.1]} receiveShadow />
+      <mesh geometry={caixa(4.6, 2.3, 0.08)} material={mat(COR.preto, { rough: 0.3 })} position={[cx, 1.7, fundo - 0.14]} />
+      <mesh geometry={caixa(4.4, 2.1, 0.02)} material={mat("#CFE6FF", { emissive: "#7FB4FF", ei: 0.6 })} position={[cx, 1.7, fundo - 0.09]} />
+      <mesh geometry={caixa(0.6, 1.1, 0.4)} material={mat("#B07A4A", { rough: 0.8 })} position={[s.x1 - 1.6, 0.73, fundo - 1.2]} castShadow />
+      {cadeiras.map(([x, z], i) => <Cadeira key={i} position={[x, 0, z]} cor={i % 2 ? "#5C6BC0" : "#3F51B5"} />)}
+      <Planta position={[s.x0 + 0.6, 0, fundo - 0.6]} />
+      <Planta position={[s.x1 - 0.6, 0, s.z0 + 0.6]} />
+    </group>
+  );
+}
+
+// Um andar inteiro: pisos, paredes, mesas e móveis das salas daquele andar. Tudo em coordenadas locais (y=0) dentro de um group na altura do andar.
+function Andar({ nivel }: { nivel: NumAndar }) {
   const agentes = useEscritorio((s) => s.agentes);
   const sirene = useEscritorio((s) => s.sirene);
+  const salas = useMemo(() => SALAS.filter((s) => s.andar === nivel), [nivel]);
+  const ids = useMemo(() => new Set(salas.map((s) => s.id)), [salas]);
+  const mesas = useMemo(() => MESAS.filter((m) => ids.has(m.sala)).map((m) => ({ ...m, pos: [m.pos[0], 0, m.pos[2]] as [number, number, number] })), [ids]);
   const mesasLigadas = useMemo(() => {
     const m = new Map<string, boolean>();
     for (const a of Object.values(agentes)) m.set(a.mesaId, a.status === "trabalhando");
@@ -113,26 +149,36 @@ export function Predio() {
   }, [agentes]);
   const corDaMesa = (sala: string) => { const s = SALAS.find((x) => x.id === sala); return s?.area ? AREAS[s.area].cor : "#D9A23A"; };
   const areaAtiva = (sala: string) => Object.values(agentes).some((a) => a.sala === sala && a.status === "trabalhando");
+  const terreo = nivel === 0;
 
   return (
-    <group>
+    <group position={[0, yDoAndar(nivel), 0]}>
+      {/* laje (no 1º andar também é o teto do térreo) */}
+      {!terreo && <mesh geometry={caixa(36.4, 0.3, 18.4)} material={mat("#D9D5CC", { rough: 0.9 })} position={[0, -0.15, 0]} receiveShadow castShadow />}
       {/* chão geral + corredor */}
       <mesh geometry={plano(36, 3.2)} material={mat("#E6E3DC", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow />
-      {SALAS.map((s) => <Piso key={s.id} s={s} />)}
-      {SALAS.map((s) => <Etiqueta key={s.id} s={s} />)}
+      {salas.map((s) => <Piso key={s.id} s={s} />)}
+      {salas.map((s) => <Etiqueta key={s.id} s={s} />)}
 
       {/* paredes externas */}
-      <Parede de={[-18, -9]} ate={[18, -9]} altura={2.6} espessura={0.2} />
+      <Parede de={[-18, -9]} ate={[18, -9]} altura={terreo ? 2.6 : ALT_PAREDE} espessura={0.2} />
       <Parede de={[-18, -9]} ate={[-18, -3.2]} altura={ALT_PAREDE} espessura={0.2} />
       <Parede de={[-18, -0.8]} ate={[-18, 9]} altura={ALT_PAREDE} espessura={0.2} />
-      {/* porta de vidro da entrada (lado oeste, junto à recepção) */}
-      <mesh geometry={caixa(0.06, 2.2, 2.4)} material={mat(COR.vidro, { rough: 0.1, opacity: 0.35 })} position={[-18, 1.1, -2]} />
-      <mesh geometry={caixa(0.12, 2.3, 0.08)} material={mat(COR.preto)} position={[-18, 1.15, -2]} />
+      {terreo ? (
+        <>
+          {/* porta de vidro da entrada (lado oeste, junto à recepção) */}
+          <mesh geometry={caixa(0.06, 2.2, 2.4)} material={mat(COR.vidro, { rough: 0.1, opacity: 0.35 })} position={[-18, 1.1, -2]} />
+          <mesh geometry={caixa(0.12, 2.3, 0.08)} material={mat(COR.preto)} position={[-18, 1.15, -2]} />
+        </>
+      ) : (
+        /* no 1º andar o vão vira janela */
+        <mesh geometry={caixa(0.06, 1.0, 2.4)} material={mat(COR.vidro, { rough: 0.1, opacity: 0.35 })} position={[-18, 0.6, -2]} />
+      )}
       <Parede de={[18, -9]} ate={[18, 9]} altura={ALT_PAREDE} espessura={0.2} />
       <Parede de={[-18, 9]} ate={[18, 9]} altura={ALT_PAREDE} espessura={0.2} />
 
       {/* divisórias entre salas (deixando a abertura pro corredor) */}
-      {SALAS.map((s) => {
+      {salas.map((s) => {
         const norte = s.z1 <= 0;
         const zc = norte ? s.z1 : s.z0; // lado do corredor
         const zf = norte ? s.z0 : s.z1; // fundo
@@ -155,10 +201,10 @@ export function Predio() {
       })}
 
       {/* mesas */}
-      {MESAS.map((m) => <Mesa key={m.id} def={m} ligada={!!mesasLigadas.get(m.id)} cor={corDaMesa(m.sala)} />)}
+      {mesas.map((m) => <Mesa key={m.id} def={m} ligada={!!mesasLigadas.get(m.id)} cor={corDaMesa(m.sala)} />)}
 
       {/* equipamentos por área: impressora + planta + quadro */}
-      {SALAS.filter((s) => s.tipo === "area").map((s) => {
+      {salas.filter((s) => s.tipo === "area").map((s) => {
         const norte = s.z1 <= 0; const zf = norte ? s.z0 : s.z1; const d = norte ? 1 : -1;
         return (
           <group key={s.id}>
@@ -171,46 +217,78 @@ export function Predio() {
         );
       })}
 
-      {/* recepção */}
-      <ParedeNuvem />
-      <Elevador />
-      <Balcao />
-      <Sofa position={[-11.2, 0, -3.2]} rotation={-Math.PI / 2} cor="#FF7043" largura={2} />
-      <MesaBaixa position={[-12.6, 0, -3.2]} />
-      <Puff position={[-13.8, 0, -4.2]} cor="#40C4FF" />
-      <Puff position={[-13.8, 0, -2.4]} cor="#FFD600" />
-      <Planta position={[-10.6, 0, -8.2]} />
-      <Sirene ligada={sirene} position={[-17.5, ALT_PAREDE + 0.05, -2.4]} />
-      <Luminaria position={[-14, 2.75, -3.2]} r={0.9} />
-
-      {/* reunião, CEO, diretoria */}
-      <MesaReuniao />
-      <Quadro position={[16.5, 1.5, -8.88]} largura={2.4} />
-      <Planta position={[12.7, 0, -8.2]} />
-      <Sofa position={[17.0, 0, -4.0]} rotation={-Math.PI / 2} cor="#8D6E63" largura={1.6} />
-      <Planta position={[5.4, 0, 8.3]} />
-      <Quadro position={[0.08, 1.0, 5.3]} rotation={Math.PI / 2} largura={2.4} />
-
-      {/* copa */}
-      <Copa />
-
-      {/* lounge & jogos */}
-      <Sinuca position={PONTOS.loungeSinuca} rotation={0} />
-      <Fliperama position={PONTOS.loungeFliperama} rotation={Math.PI} />
-      <Sofa position={[13.5, 0, 7.2]} rotation={Math.PI} cor="#7C4DFF" largura={2.2} />
-      <Puff position={[12.2, 0, 5.3]} cor="#64DD17" />
-      <Puff position={[14.8, 0, 5.4]} cor="#FF4081" />
-      <MesaBaixa position={[13.5, 0, 5.4]} />
-      <Planta position={[17.3, 0, 8.3]} />
-      <Luminaria position={[14.5, 2.75, 5.5]} r={1.2} />
-      <Luminaria position={[14.5, 2.4, 5.5]} r={0.7} />
-      {/* TV do lounge */}
-      <mesh geometry={caixa(0.06, 1.1, 2.0)} material={mat(COR.preto, { rough: 0.3 })} position={[17.9, 1.8, 6.5]} />
-      <mesh geometry={caixa(0.01, 1.0, 1.9)} material={mat("#CFE6FF", { emissive: "#7FB4FF", ei: 0.7 })} position={[17.86, 1.8, 6.5]} />
-
       {/* colunas e luminárias do corredor */}
       {[-9, 0, 9].map((x) => <mesh key={x} geometry={cilindro(0.18, 0.18, 2.8, 12)} material={mat("#CFD3D9", { rough: 0.6 })} position={[x, 1.4, 0]} castShadow />)}
       {[-13.5, -4.5, 4.5, 13.5].map((x) => <Luminaria key={x} position={[x, 2.75, 0]} r={0.6} />)}
+
+      {terreo ? (
+        <>
+          {/* recepção */}
+          <ParedeNuvem />
+          <Elevador />
+          <Balcao />
+          <Sofa position={[-11.2, 0, -3.2]} rotation={-Math.PI / 2} cor="#FF7043" largura={2} />
+          <MesaBaixa position={[-12.6, 0, -3.2]} />
+          <Puff position={[-13.8, 0, -4.2]} cor="#40C4FF" />
+          <Puff position={[-13.8, 0, -2.4]} cor="#FFD600" />
+          <Planta position={[-10.6, 0, -8.2]} />
+          <Sirene ligada={sirene} position={[-17.5, ALT_PAREDE + 0.05, -2.4]} />
+          <Luminaria position={[-14, 2.75, -3.2]} r={0.9} />
+
+          {/* reunião, CEO, diretoria */}
+          <MesaReuniao />
+          <Quadro position={[16.5, 1.5, -8.88]} largura={2.4} />
+          <Planta position={[12.7, 0, -8.2]} />
+          <Sofa position={[17.0, 0, -4.0]} rotation={-Math.PI / 2} cor="#8D6E63" largura={1.6} />
+          <Planta position={[5.4, 0, 8.3]} />
+          <Quadro position={[0.08, 1.0, 5.3]} rotation={Math.PI / 2} largura={2.4} />
+
+          {/* copa */}
+          <Copa />
+
+          {/* lounge & jogos */}
+          <Sinuca position={PONTOS.loungeSinuca} rotation={0} />
+          <Fliperama position={PONTOS.loungeFliperama} rotation={Math.PI} />
+          <Sofa position={[13.5, 0, 7.2]} rotation={Math.PI} cor="#7C4DFF" largura={2.2} />
+          <Puff position={[12.2, 0, 5.3]} cor="#64DD17" />
+          <Puff position={[14.8, 0, 5.4]} cor="#FF4081" />
+          <MesaBaixa position={[13.5, 0, 5.4]} />
+          <Planta position={[17.3, 0, 8.3]} />
+          <Luminaria position={[14.5, 2.75, 5.5]} r={1.2} />
+          <Luminaria position={[14.5, 2.4, 5.5]} r={0.7} />
+          {/* TV do lounge */}
+          <mesh geometry={caixa(0.06, 1.1, 2.0)} material={mat(COR.preto, { rough: 0.3 })} position={[17.9, 1.8, 6.5]} />
+          <mesh geometry={caixa(0.01, 1.0, 1.9)} material={mat("#CFE6FF", { emissive: "#7FB4FF", ei: 0.7 })} position={[17.86, 1.8, 6.5]} />
+        </>
+      ) : (
+        <>
+          {/* hall & biblioteca */}
+          <Elevador />
+          <Estante position={[-13.2, 0, -8.72]} rotation={0} largura={3.2} />
+          <Estante position={[-12.3, 0, -5.4]} rotation={Math.PI / 2} largura={2.6} />
+          <Sofa position={[-15.6, 0, -4.2]} rotation={Math.PI / 2} cor="#26A69A" largura={2} />
+          <MesaBaixa position={[-14.4, 0, -4.2]} />
+          <Puff position={[-14.6, 0, -2.6]} cor="#FFD600" />
+          <Planta position={[-17.3, 0, -8.2]} />
+          <Luminaria position={[-15, 2.75, -5]} r={0.9} />
+          <Quadro position={[-15, 1.5, -8.88]} largura={1.6} cor="#DDE6EE" />
+          {/* auditório */}
+          {salas.filter((s) => s.tipo === "auditorio").map((s) => <Auditorio key={s.id} s={s} />)}
+        </>
+      )}
+    </group>
+  );
+}
+
+export function Predio() {
+  const andar = useEscritorio((s) => s.andar);
+  const vista = useEscritorio((s) => s.vista);
+  // por dentro: só o andar escolhido (o de cima esconderia o térreo); por fora: os dois, vistos pelo vidro
+  const mostrar1 = vista === "fora" || andar === 1;
+  return (
+    <group>
+      <Andar nivel={0} />
+      {mostrar1 && <Andar nivel={1} />}
     </group>
   );
 }

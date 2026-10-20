@@ -12,11 +12,19 @@ export interface Mesa {
   tipo: "comum" | "senior" | "gerente" | "diretor" | "ceo";
 }
 
+// Andares: térreo (0) e 1º andar (1). Toda posição no 1º andar tem y = ALT_ANDAR.
+export const ALT_ANDAR = 4.0;
+export const ANDARES = [0, 1] as const;
+export type Andar = (typeof ANDARES)[number];
+export const andarDeY = (y: number): Andar => (y >= ALT_ANDAR / 2 ? 1 : 0);
+export const yDoAndar = (a: Andar) => a * ALT_ANDAR;
+
 export interface Sala {
   id: string;
   nome: string;
   area?: AreaId;
-  tipo: "recepcao" | "area" | "gerencia" | "diretoria" | "ceo" | "reuniao" | "copa" | "lounge";
+  andar: Andar;
+  tipo: "recepcao" | "hall" | "area" | "gerencia" | "diretoria" | "ceo" | "reuniao" | "copa" | "lounge" | "auditorio";
   x0: number; x1: number; z0: number; z1: number; // retângulo no plano
   entrada: V3; // ponto de entrada (junto ao corredor)
   piso: string;
@@ -27,7 +35,9 @@ export const CORREDOR = { z0: -1.6, z1: 1.6, x0: -18, x1: 18 };
 
 export const PONTOS = {
   elevador: [-17.2, 0, -5.5] as V3, // porta do elevador (recepção)
+  elevador1: [-17.2, ALT_ANDAR, -5.5] as V3, // mesma porta, 1º andar (hall)
   recepcaoEspera: [-14, 0, -3] as V3,
+  hallEspera: [-14, ALT_ANDAR, -3] as V3,
   mesaReuniao: [9.5, 0, -5.2] as V3,
   copaBalcao: [8.5, 0, 5.2] as V3,
   loungeSofa: [13.5, 0, 6.2] as V3,
@@ -35,20 +45,35 @@ export const PONTOS = {
   loungeFliperama: [11.6, 0, 8.3] as V3,
   caixaSaida: [-17.2, 0, -5.5] as V3,
 };
+export const elevadorNoAndar = (a: Andar): V3 => (a === 1 ? PONTOS.elevador1 : PONTOS.elevador);
+export const esperaNoAndar = (a: Andar): V3 => (a === 1 ? PONTOS.hallEspera : PONTOS.recepcaoEspera);
 
 export const SALAS: Sala[] = [
   // Norte
-  { id: "recepcao", nome: "Recepção", tipo: "recepcao", x0: -18, x1: -10, z0: -9, z1: -1.6, entrada: [-14, 0, -1.6], piso: "#EFEAE2" },
-  { id: "engenharia", nome: "Engenharia", area: "engenharia", tipo: "area", x0: -10, x1: -1, z0: -9, z1: -1.6, entrada: [-5.5, 0, -1.6], piso: "#E4EBFB" },
-  { id: "marketing", nome: "Marketing", area: "marketing", tipo: "area", x0: -1, x1: 7, z0: -9, z1: -1.6, entrada: [3, 0, -1.6], piso: "#FBE6EC" },
-  { id: "reuniao", nome: "Sala de reunião", tipo: "reuniao", x0: 7, x1: 12, z0: -9, z1: -1.6, entrada: [9.5, 0, -1.6], piso: "#ECEFF4", vidro: true },
-  { id: "ceo", nome: "Sala do CEO", tipo: "ceo", x0: 12, x1: 18, z0: -9, z1: -1.6, entrada: [15, 0, -1.6], piso: "#F6EEDF", vidro: true },
+  { id: "recepcao", nome: "Recepção", andar: 0, tipo: "recepcao", x0: -18, x1: -10, z0: -9, z1: -1.6, entrada: [-14, 0, -1.6], piso: "#EFEAE2" },
+  { id: "engenharia", nome: "Engenharia", andar: 0, area: "engenharia", tipo: "area", x0: -10, x1: -1, z0: -9, z1: -1.6, entrada: [-5.5, 0, -1.6], piso: "#E4EBFB" },
+  { id: "marketing", nome: "Marketing", andar: 0, area: "marketing", tipo: "area", x0: -1, x1: 7, z0: -9, z1: -1.6, entrada: [3, 0, -1.6], piso: "#FBE6EC" },
+  { id: "reuniao", nome: "Sala de reunião", andar: 0, tipo: "reuniao", x0: 7, x1: 12, z0: -9, z1: -1.6, entrada: [9.5, 0, -1.6], piso: "#ECEFF4", vidro: true },
+  { id: "ceo", nome: "Sala do CEO", andar: 0, tipo: "ceo", x0: 12, x1: 18, z0: -9, z1: -1.6, entrada: [15, 0, -1.6], piso: "#F6EEDF", vidro: true },
   // Sul
-  { id: "vendas", nome: "Vendas", area: "vendas", tipo: "area", x0: -18, x1: -9, z0: 1.6, z1: 9, entrada: [-13.5, 0, 1.6], piso: "#E2F4EA" },
-  { id: "suporte", nome: "Suporte", area: "suporte", tipo: "area", x0: -9, x1: 0, z0: 1.6, z1: 9, entrada: [-4.5, 0, 1.6], piso: "#ECE6FB" },
-  { id: "diretoria", nome: "Diretoria", area: "diretoria", tipo: "diretoria", x0: 0, x1: 6, z0: 1.6, z1: 9, entrada: [3, 0, 1.6], piso: "#F6EEDF", vidro: true },
-  { id: "copa", nome: "Copa", tipo: "copa", x0: 6, x1: 11, z0: 1.6, z1: 9, entrada: [8.5, 0, 1.6], piso: "#E9F2E4" },
-  { id: "lounge", nome: "Lounge & jogos", tipo: "lounge", x0: 11, x1: 18, z0: 1.6, z1: 9, entrada: [14.5, 0, 1.6], piso: "#F1E7DC" },
+  { id: "vendas", nome: "Vendas", andar: 0, area: "vendas", tipo: "area", x0: -18, x1: -9, z0: 1.6, z1: 9, entrada: [-13.5, 0, 1.6], piso: "#E2F4EA" },
+  { id: "suporte", nome: "Suporte", andar: 0, area: "suporte", tipo: "area", x0: -9, x1: 0, z0: 1.6, z1: 9, entrada: [-4.5, 0, 1.6], piso: "#ECE6FB" },
+  { id: "diretoria", nome: "Diretoria", andar: 0, area: "diretoria", tipo: "diretoria", x0: 0, x1: 6, z0: 1.6, z1: 9, entrada: [3, 0, 1.6], piso: "#F6EEDF", vidro: true },
+  { id: "copa", nome: "Copa", andar: 0, tipo: "copa", x0: 6, x1: 11, z0: 1.6, z1: 9, entrada: [8.5, 0, 1.6], piso: "#E9F2E4" },
+  { id: "lounge", nome: "Lounge & jogos", andar: 0, tipo: "lounge", x0: 11, x1: 18, z0: 1.6, z1: 9, entrada: [14.5, 0, 1.6], piso: "#F1E7DC" },
+  // ---- 1º andar (10 salas) ----
+  // Norte
+  { id: "hall1", nome: "Hall & biblioteca", andar: 1, tipo: "hall", x0: -18, x1: -12, z0: -9, z1: -1.6, entrada: [-15, ALT_ANDAR, -1.6], piso: "#EFEAE2" },
+  { id: "design", nome: "Design", area: "design", andar: 1, tipo: "area", x0: -12, x1: -4.5, z0: -9, z1: -1.6, entrada: [-8.25, ALT_ANDAR, -1.6], piso: "#FDEBDD" },
+  { id: "produto", nome: "Produto", area: "produto", andar: 1, tipo: "area", x0: -4.5, x1: 3, z0: -9, z1: -1.6, entrada: [-0.75, ALT_ANDAR, -1.6], piso: "#DFF4F0" },
+  { id: "dados", nome: "Dados & IA", area: "dados", andar: 1, tipo: "area", x0: 3, x1: 10.5, z0: -9, z1: -1.6, entrada: [6.75, ALT_ANDAR, -1.6], piso: "#E4E6F7" },
+  { id: "financeiro", nome: "Financeiro", area: "financeiro", andar: 1, tipo: "area", x0: 10.5, x1: 18, z0: -9, z1: -1.6, entrada: [14.25, ALT_ANDAR, -1.6], piso: "#E0F0E1" },
+  // Sul
+  { id: "rh", nome: "RH & Cultura", area: "rh", andar: 1, tipo: "area", x0: -18, x1: -10.8, z0: 1.6, z1: 9, entrada: [-14.4, ALT_ANDAR, 1.6], piso: "#FBE4EC" },
+  { id: "juridico", nome: "Jurídico", area: "juridico", andar: 1, tipo: "area", x0: -10.8, x1: -3.6, z0: 1.6, z1: 9, entrada: [-7.2, ALT_ANDAR, 1.6], piso: "#EFE7E3", vidro: true },
+  { id: "parcerias", nome: "Parcerias", area: "parcerias", andar: 1, tipo: "area", x0: -3.6, x1: 3.6, z0: 1.6, z1: 9, entrada: [0, ALT_ANDAR, 1.6], piso: "#DFF3F6" },
+  { id: "sucesso", nome: "Sucesso do cliente", area: "sucesso", andar: 1, tipo: "area", x0: 3.6, x1: 10.8, z0: 1.6, z1: 9, entrada: [7.2, ALT_ANDAR, 1.6], piso: "#EBF4DF" },
+  { id: "auditorio", nome: "Auditório", andar: 1, tipo: "auditorio", x0: 10.8, x1: 18, z0: 1.6, z1: 9, entrada: [14.4, ALT_ANDAR, 1.6], piso: "#E8E4F0", vidro: true },
 ];
 
 export const SALA: Record<string, Sala> = Object.fromEntries(SALAS.map((s) => [s.id, s]));
@@ -57,19 +82,22 @@ export const SALA: Record<string, Sala> = Object.fromEntries(SALAS.map((s) => [s
 function mesasDaArea(s: Sala): Mesa[] {
   const out: Mesa[] = [];
   const norte = s.z1 <= 0; // sala ao norte do corredor
+  const y = yDoAndar(s.andar);
+  const larg = s.x1 - s.x0;
+  const passo = larg >= 8.5 ? 2.4 : 2.1; // salas mais estreitas (1º andar) com mesas mais juntas
   const cx = (s.x0 + s.x1) / 2;
   const fundo = norte ? s.z0 : s.z1; // parede do fundo
   const dir = norte ? 1 : -1; // sentido "em direção ao corredor"
   // open space: 2 fileiras (z) x 3 (x); cadeiras viradas pra parede do fundo (quem olha vê o rosto de quem trabalha)
   for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) {
-    const x = cx - 2.4 + c * 2.4;
+    const x = cx - passo + c * passo;
     const z = fundo + dir * (2.4 + r * 2.3);
-    out.push({ id: `${s.id}-m${r * 3 + c + 1}`, sala: s.id, pos: [x, 0, z], rot: norte ? 0 : Math.PI, tipo: "comum" });
+    out.push({ id: `${s.id}-m${r * 3 + c + 1}`, sala: s.id, pos: [x, y, z], rot: norte ? 0 : Math.PI, tipo: "comum" });
   }
   // sênior: mesa maior, junto à parede lateral
-  out.push({ id: `${s.id}-senior`, sala: s.id, pos: [s.x0 + 1.4, 0, fundo + dir * 5.5], rot: Math.PI / 2, tipo: "senior" });
+  out.push({ id: `${s.id}-senior`, sala: s.id, pos: [s.x0 + 1.4, y, fundo + dir * 5.5], rot: Math.PI / 2, tipo: "senior" });
   // gerente: sala de vidro no canto do fundo, do lado oposto
-  out.push({ id: `${s.id}-gerente`, sala: s.id, pos: [s.x1 - 1.7, 0, fundo + dir * 1.6], rot: norte ? 0 : Math.PI, tipo: "gerente" });
+  out.push({ id: `${s.id}-gerente`, sala: s.id, pos: [s.x1 - 1.7, y, fundo + dir * 1.6], rot: norte ? 0 : Math.PI, tipo: "gerente" });
   return out;
 }
 
@@ -110,24 +138,35 @@ export function pontoCadeira(m: Mesa): { pos: V3; rot: number } {
   const d = 0.62;
   const x = m.pos[0] - Math.sin(m.rot) * d;
   const z = m.pos[2] - Math.cos(m.rot) * d;
-  return { pos: [x, 0, z], rot: m.rot };
+  return { pos: [x, m.pos[1], z], rot: m.rot };
 }
 
-// Caminho entre dois pontos usando o corredor (evita atravessar paredes).
+// Caminho entre dois pontos usando o corredor (evita atravessar paredes). Entre andares, passa pelo elevador:
+// anda até a porta do elevador no andar de origem, "sobe/desce" (trecho vertical) e sai pela porta no andar de destino.
 export function caminho(de: V3, para: V3): V3[] {
+  const aDe = andarDeY(de[1]), aPara = andarDeY(para[1]);
+  if (aDe !== aPara) {
+    const e1 = elevadorNoAndar(aDe), e2 = elevadorNoAndar(aPara);
+    return [...caminhoNoAndar(de, e1), e2, ...caminhoNoAndar(e2, para).slice(1)];
+  }
+  return caminhoNoAndar(de, para);
+}
+function caminhoNoAndar(de: V3, para: V3): V3[] {
+  const y = yDoAndar(andarDeY(de[1]));
   const salaDe = salaDoPonto(de), salaPara = salaDoPonto(para);
   if (salaDe && salaPara && salaDe.id === salaPara.id) return [de, para];
   const pts: V3[] = [de];
-  if (salaDe) pts.push(salaDe.entrada, [salaDe.entrada[0], 0, 0]);
-  else pts.push([de[0], 0, 0]);
-  if (salaPara) pts.push([salaPara.entrada[0], 0, 0], salaPara.entrada);
-  else pts.push([para[0], 0, 0]);
+  if (salaDe) pts.push(salaDe.entrada, [salaDe.entrada[0], y, 0]);
+  else pts.push([de[0], y, 0]);
+  if (salaPara) pts.push([salaPara.entrada[0], y, 0], salaPara.entrada);
+  else pts.push([para[0], y, 0]);
   pts.push(para);
   return pts;
 }
 
 export function salaDoPonto(p: V3): Sala | undefined {
-  return SALAS.find((s) => p[0] >= s.x0 && p[0] <= s.x1 && p[2] >= Math.min(s.z0, s.z1) && p[2] <= Math.max(s.z0, s.z1));
+  const a = andarDeY(p[1]);
+  return SALAS.find((s) => s.andar === a && p[0] >= s.x0 && p[0] <= s.x1 && p[2] >= Math.min(s.z0, s.z1) && p[2] <= Math.max(s.z0, s.z1));
 }
 
 export function salaDoNivel(area: AreaId, nivel: Nivel): string {
@@ -142,6 +181,7 @@ export function mesaDoChefe(area: AreaId, nivel: Nivel): V3 | undefined {
   if (nivel === "diretor") return [MESA["ceo-mesa"].pos[0], 0, MESA["ceo-mesa"].pos[2] + 1.1];
   if (nivel === "gerente") return [3, 0, 5.3];
   const g = MESA[`${area}-gerente`];
+  if (!g) return undefined;
   const norte = SALA[area].z1 <= 0;
-  return [g.pos[0], 0, g.pos[2] + (norte ? 1.1 : -1.1)];
+  return [g.pos[0], g.pos[1], g.pos[2] + (norte ? 1.1 : -1.1)];
 }

@@ -9,7 +9,7 @@ import { Horizonte } from "./Horizonte";
 import { Fachada } from "./Fachada";
 import { Agente, handlers } from "./Agente";
 import { useEscritorio } from "../store";
-import { MESA } from "../data/layout";
+import { MESA, ALT_ANDAR, andarDeY } from "../data/layout";
 import type { Evento } from "../data/eventos";
 
 // Entrega os eventos da fila pros agentes
@@ -37,8 +37,20 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
   useEffect(() => {
     const a = selecionado ? useEscritorio.getState().agentes[selecionado] : null;
     if (!a) { alvo.current = null; return; }
-    const m = MESA[a.mesaId]; alvo.current = new THREE.Vector3(m.pos[0], 0.5, m.pos[2]);
+    const m = MESA[a.mesaId]; alvo.current = new THREE.Vector3(m.pos[0], m.pos[1] + 0.5, m.pos[2]);
+    // selecionou alguém de outro andar: muda o andar visto
+    const st = useEscritorio.getState(); const an = andarDeY(m.pos[1]);
+    if (st.vista === "dentro" && st.andar !== an) useEscritorio.setState({ andar: an });
   }, [selecionado]);
+  // trocar de andar: a câmera sobe/desce junto (mantém o enquadramento)
+  const andar = useEscritorio((s) => s.andar);
+  const andarAnterior = useRef(andar);
+  useFrame(({ camera }) => {
+    if (andarAnterior.current === andar) return;
+    const dy = (andar - andarAnterior.current) * ALT_ANDAR; andarAnterior.current = andar;
+    const c = controles.current; if (!c) return;
+    camera.position.y += dy; c.target.y += dy; c.update();
+  });
   // trocar de vista (por fora / por dentro) leva a câmera pra um enquadramento bom
   const vista = useEscritorio((s) => s.vista);
   const posAlvo = useRef<THREE.Vector3 | null>(null);

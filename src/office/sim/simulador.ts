@@ -2,6 +2,7 @@
 // Simulador de comportamentos. Emite eventos no mesmo formato que o orquestrador real vai emitir.
 import { useEffect } from "react";
 import { useEscritorio, type Status } from "../store";
+import type { AreaId } from "../data/org";
 
 const FALAS = {
   suporte: ["Respondendo um cliente", "Analisando um ticket", "Buscando na base de conhecimento", "Fechando o chamado #4821"],
@@ -27,7 +28,7 @@ export function useSimulador() {
         const t0 = desde.get(a.id + a.status) ?? (desde.set(a.id + a.status, agora), agora);
         const dt = (agora - t0) / 1000;
         const emitir = (tipo: Parameters<typeof s.emitir>[1], texto?: string) => { desde.delete(a.id + a.status); s.emitir(a.id, tipo, texto); };
-        const falas = FALAS[a.area] ?? FALAS.diretoria;
+        const falas = (FALAS as Partial<Record<AreaId, string[]>>)[a.area] ?? FALAS.diretoria;
         switch (a.status as Status) {
           case "disponivel":
             if (dt > rnd(2, 6)) {

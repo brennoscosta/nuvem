@@ -7,7 +7,7 @@ import { Html } from "@react-three/drei";
 import { BonecoGLB, BonecoProcedural, HIPS, useAnimacao, type BonecoHandle, type Pose } from "./Boneco";
 import { BONECO } from "../data/bonecos";
 import { AREAS, NIVEL } from "../data/org";
-import { MESA, PONTOS, caminho, mesaDoChefe, pontoCadeira, type V3 } from "../data/layout";
+import { MESA, PONTOS, caminho, mesaDoChefe, pontoCadeira, andarDeY, elevadorNoAndar, esperaNoAndar, type V3 } from "../data/layout";
 import { useEscritorio, removerAgente, type Agente as AgenteDef } from "../store";
 import type { Evento } from "../data/eventos";
 import { caixa, mat } from "./geo";
@@ -42,11 +42,14 @@ export function Agente({ def }: { def: AgenteDef }) {
   const caixaRef = useRef(false);
   const [carregando, setCarregando] = useState(false);
   const [marca, setMarca] = useState<"!" | "..." | "zzz" | null>(null);
+  const [oculto, setOculto] = useState(false);
   const fase = useMemo(() => Math.random() * 10, []);
   const bdef = BONECO[def.boneco] ?? BONECO.classico;
   const usaGLB = !!bdef.arquivo;
   const hips = usaGLB ? HIPS.glb : HIPS.procedural;
   const cadeira = useMemo(() => pontoCadeira(MESA[def.mesaId]), [def.mesaId]);
+  const andarDaMesa = andarDeY(cadeira.pos[1]);
+  const elevador = elevadorNoAndar(andarDaMesa);
   const setStatus = useEscritorio((s) => s.setStatus);
   const selecionar = useEscritorio((s) => s.selecionar);
   const selecionado = useEscritorio((s) => s.selecionado === def.id);
@@ -61,10 +64,10 @@ export function Agente({ def }: { def: AgenteDef }) {
       const limpar = () => { fila.current.length = 0; atual.current = null; setMarca(null); };
       switch (ev.tipo) {
         case "contratado": {
-          if (grupo.current) grupo.current.position.set(...PONTOS.elevador);
+          if (grupo.current) grupo.current.position.set(...elevador);
           limpar();
           const chefe = mesaDoChefe(def.area, def.nivel);
-          f.push({ tipo: "esperar", s: 0.6 }, { tipo: "andar", para: PONTOS.recepcaoEspera });
+          f.push({ tipo: "esperar", s: 0.6 }, { tipo: "andar", para: esperaNoAndar(andarDaMesa) });
           if (chefe) f.push({ tipo: "andar", para: chefe, pose: "idle" }, { tipo: "esperar", s: 1.5 });
           f.push(...irParaMesa("sit"), { tipo: "fn", fn: () => setStatus(def.id, "disponivel", "Pronto pra começar") });
           break;
@@ -92,8 +95,8 @@ export function Agente({ def }: { def: AgenteDef }) {
         case "pausa": { limpar(); const l = lugarPausa(); f.push({ tipo: "andar", para: l.p, rotFinal: l.rot, pose: l.pose }, { tipo: "fn", fn: () => setStatus(def.id, "pausa", ev.texto) }); break; }
         case "voltou": limpar(); f.push(...irParaMesa("sit"), { tipo: "fn", fn: () => setStatus(def.id, "disponivel", ev.texto) }); break;
         case "promovido": limpar(); f.push({ tipo: "pose", pose: "celebrate" }, { tipo: "esperar", s: 2 }, { tipo: "fn", fn: () => setStatus(def.id, "disponivel", ev.texto) }); break;
-        case "expediente_encerrado": limpar(); f.push({ tipo: "andar", para: PONTOS.elevador, pose: "idle" }, { tipo: "fn", fn: () => removerAgente(def.id) }); break;
-        case "demitido": limpar(); caixaRef.current = true; setCarregando(true); f.push({ tipo: "pose", pose: "carry" }, { tipo: "esperar", s: 1.2 }, { tipo: "andar", para: PONTOS.elevador, pose: "carry" }, { tipo: "fn", fn: () => removerAgente(def.id) }); break;
+        case "expediente_encerrado": limpar(); f.push({ tipo: "andar", para: elevadorNoAndar(andarDeY(grupo.current?.position.y ?? 0)), pose: "idle" }, { tipo: "fn", fn: () => removerAgente(def.id) }); break;
+        case "demitido": limpar(); caixaRef.current = true; setCarregando(true); f.push({ tipo: "pose", pose: "carry" }, { tipo: "esperar", s: 1.2 }, { tipo: "andar", para: elevadorNoAndar(andarDeY(grupo.current?.position.y ?? 0)), pose: "carry" }, { tipo: "fn", fn: () => removerAgente(def.id) }); break;
       }
     };
     handlers.set(def.id, h);
@@ -111,7 +114,7 @@ export function Agente({ def }: { def: AgenteDef }) {
     if (!atual.current) {
       const prox = fila.current.shift(); if (!prox) return;
       atual.current = prox;
-      if (prox.tipo === "andar") { rota.current = caminho([g.position.x, 0, g.position.z], prox.para).slice(1); pose.current = caixaRef.current ? "carry" : "walk"; }
+      if (prox.tipo === "andar") { rota.current = caminho([g.position.x, g.position.y, g.position.z], prox.para).slice(1); pose.current = caixaRef.current ? "carry" : "walk"; }
       if (prox.tipo === "esperar") espera.current = prox.s;
       if (prox.tipo === "pose") { pose.current = prox.pose; if (prox.rot !== undefined) rotAlvo.current = prox.rot; atual.current = null; }
       if (prox.tipo === "fn") { prox.fn(); atual.current = null; }
@@ -121,7 +124,14 @@ export function Agente({ def }: { def: AgenteDef }) {
     if (a.tipo === "andar") {
       const alvo = rota.current[0];
       if (!alvo) { atual.current = null; pose.current = a.pose ?? "idle"; if (a.rotFinal !== undefined) rotAlvo.current = a.rotFinal; return; }
-      const dx = alvo[0] - g.position.x, dz = alvo[2] - g.position.z; const dist = Math.hypot(dx, dz);
+      const dx = alvo[0] - g.position.x, dy = alvo[1] - g.position.y, dz = alvo[2] - g.position.z; const dist = Math.hypot(dx, dz);
+      if (Math.abs(dy) > 0.01 && dist < 0.05) {
+        // elevador: sobe/desce parado, de pé
+        pose.current = "idle"; const v = 2.2 * dt;
+        if (Math.abs(dy) <= v) { g.position.y = alvo[1]; rota.current.shift(); pose.current = caixaRef.current ? "carry" : "walk"; }
+        else g.position.y += Math.sign(dy) * v;
+        return;
+      }
       const passo = 1.7 * dt * (pose.current === "carry" ? 0.75 : 1);
       if (dist <= passo) { g.position.x = alvo[0]; g.position.z = alvo[2]; rota.current.shift(); }
       else { g.position.x += (dx / dist) * passo; g.position.z += (dz / dist) * passo; rotAlvo.current = Math.atan2(dx, dz); }
@@ -129,6 +139,10 @@ export function Agente({ def }: { def: AgenteDef }) {
     // rotação suave
     let d = rotAlvo.current - g.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
     g.rotation.y += d * Math.min(1, dt * 10);
+    // só aparece no andar que está sendo visto (por fora, aparece sempre)
+    const st = useEscritorio.getState();
+    const vis = st.vista === "fora" || andarDeY(g.position.y) === st.andar;
+    if (vis !== g.visible) { g.visible = vis; setOculto(!vis); }
   });
   useAnimacao(boneco, () => pose.current, fase, hips.base, hips.escala);
 
@@ -137,7 +151,7 @@ export function Agente({ def }: { def: AgenteDef }) {
   const fala = def.fala && def.status !== "chegando" ? def.fala : undefined;
 
   return (
-    <group ref={grupo} position={PONTOS.elevador} onClick={(e) => { e.stopPropagation(); selecionar(def.id); }}
+    <group ref={grupo} position={elevador} onClick={(e) => { e.stopPropagation(); selecionar(def.id); }}
       onPointerOver={(e) => { e.stopPropagation(); setHover(def.id); document.body.style.cursor = "pointer"; }}
       onPointerOut={() => { document.body.style.cursor = "auto"; }}>
       {usaGLB ? <BonecoGLB ref={boneco} arquivo={bdef.arquivo!} /> : <BonecoProcedural ref={boneco} def={bdef} camisa={corArea} headset={def.area === "suporte" || def.area === "vendas"} cracha={nivel.cor} />}
@@ -146,7 +160,7 @@ export function Agente({ def }: { def: AgenteDef }) {
       {/* anel de seleção */}
       {selecionado && <mesh geometry={new THREE.RingGeometry(0.32, 0.4, 32)} material={mat(corArea, { emissive: corArea, ei: 0.8 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} />}
       {/* crachá flutuante (HTML: tamanho fixo na tela, sempre legível) */}
-      <Html position={[0, 1.5, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
+      <Html position={[0, 1.5, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none", display: oculto ? "none" : undefined }}>
         <div className="flex flex-col items-center gap-1 select-none" style={{ transform: "translateY(-100%)" }}>
           {marca && (
             <div className="rounded-full px-3 py-0.5 text-[18px] font-black shadow-md" style={{ background: marca === "!" ? "#E53935" : "#FFFFFF", color: marca === "!" ? "#FFF" : "#333" }}>{marca}</div>
