@@ -43,7 +43,11 @@ async function tokenValido(): Promise<Conexao> {
 async function post(path: string, tk: string, body: unknown) {
   const r = await fetch(`${API}${path}`, { method: "POST", headers: { authorization: `Bearer ${tk}`, "content-type": "application/json; charset=UTF-8" }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || (j.error && j.error.code && j.error.code !== "ok")) throw new Error(`TikTok (${path.split("/").filter(Boolean).slice(-2).join("/")}): ${j.error?.message ?? j.error?.code ?? r.status}`);
+  if (!r.ok || (j.error && j.error.code && j.error.code !== "ok")) {
+    const code = j.error?.code ?? String(r.status), msg = j.error?.message ?? "";
+    if (code === "unaudited_client_can_only_post_to_private_accounts" || /integration guidelines/i.test(msg)) throw new Error("TikTok: enquanto o app não é auditado, o TikTok só publica em contas configuradas como privadas. Ligue 'Conta privada' no TikTok (Configurações → Privacidade) e tente de novo; o vídeo sai como 'somente eu' e você muda pra público no app.");
+    throw new Error(`TikTok (${path.split("/").filter(Boolean).slice(-2).join("/")}): ${msg || code}`);
+  }
   return j;
 }
 
