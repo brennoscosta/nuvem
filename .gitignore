@@ -42,3 +42,4 @@ next-env.d.ts
 
 # fontes brutas da marca (ficam fora do repo)
 /brand-src/
+public/cenario/

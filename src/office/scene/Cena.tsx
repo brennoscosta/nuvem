@@ -5,6 +5,7 @@ import { MapControls, ContactShadows, SoftShadows } from "@react-three/drei";
 import * as THREE from "three";
 import { Predio } from "./Predio";
 import { Entorno } from "./Entorno";
+import { Horizonte } from "./Horizonte";
 import { Agente, handlers } from "./Agente";
 import { useEscritorio } from "../store";
 import { MESA } from "../data/layout";
@@ -71,16 +72,17 @@ export function Cena() {
     <Canvas shadows dpr={[1, 1.75]} camera={{ position: CAM ? [CAM[0], CAM[1], CAM[2]] : [10, 30, 34], fov: 32, near: 0.5, far: 200 }} gl={{ antialias: true, powerPreference: "high-performance" }}
       onPointerMissed={() => useEscritorio.getState().selecionar(null)}>
       <color attach="background" args={["#CFE3F5"]} />
-      <fog attach="fog" args={["#CFE3F5", 70, 150]} />
+      <fog attach="fog" args={["#CFE3F5", 90, 220]} />
       <SoftShadows size={18} samples={10} focus={0.6} />
       <Luzes />
       <Suspense fallback={null}>
+        <Horizonte />
         <Entorno />
         <Predio />
         {ordem.map((id) => agentes[id] && <Agente key={id} def={agentes[id]} />)}
       </Suspense>
       <Despachante />
-      <MapControls ref={controles} target={CAM ? [CAM[3], CAM[4], CAM[5]] : [0, 0, 1]} minDistance={5} maxDistance={70} minPolarAngle={0.35} maxPolarAngle={1.2} dampingFactor={0.08} enableDamping />
+      <MapControls ref={controles} target={CAM ? [CAM[3], CAM[4], CAM[5]] : [0, 0, 1]} minDistance={5} maxDistance={58} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
       <FocoCamera controles={controles} />
     </Canvas>
   );
