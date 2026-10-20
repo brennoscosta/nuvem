@@ -6,6 +6,7 @@ import { BONECOS } from "../data/bonecos";
 import { SALA } from "../data/layout";
 import { useEscritorio, type Status } from "../store";
 import { SKILLS_PRONTAS } from "../data/skillsProntas";
+import { AbaTarefas } from "./AbaTarefas";
 
 export const STATUS: Record<Status, { nome: string; cor: string }> = {
   chegando: { nome: "Chegando", cor: "#9AA3AD" }, disponivel: { nome: "Disponível", cor: "#3FBFA8" }, trabalhando: { nome: "Trabalhando", cor: "#4F7DF3" },
@@ -33,21 +34,21 @@ const api = async (url: string, method = "GET", body?: unknown) => {
   return j;
 };
 
-type Aba = "perfil" | "conhecimento" | "skills" | "regras" | "conversar";
+type Aba = "perfil" | "conhecimento" | "skills" | "regras" | "conversar" | "tarefas";
 
 export function PainelAgente() {
   const id = useEscritorio((s) => s.selecionado);
   const a = useEscritorio((s) => (id ? s.agentes[id] : undefined));
   const online = useEscritorio((s) => s.online);
   const selecionar = useEscritorio((s) => s.selecionar);
-  const [aba, setAba] = useState<Aba>("conversar");
+  const [aba, setAba] = useState<Aba>(() => (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("conexao")) ? "tarefas" : "conversar");
   const [ficha, setFicha] = useState<Ficha | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const carregar = useCallback(async () => { if (!id) return; try { setFicha(await api(`/api/agentes/${id}`)); setErro(null); } catch (e) { setErro((e as Error).message); } }, [id]);
   useEffect(() => { setFicha(null); if (id && a?.real) carregar(); }, [id, a?.real, carregar]);
   if (!a) return null;
   const st = STATUS[a.status]; const nv = NIVEL[a.nivel]; const area = AREAS[a.area];
-  const abas: { id: Aba; nome: string }[] = [{ id: "conversar", nome: "Conversar" }, { id: "perfil", nome: "Perfil" }, { id: "conhecimento", nome: "Conhecimento" }, { id: "skills", nome: "Skills" }, { id: "regras", nome: "Regras" }];
+  const abas: { id: Aba; nome: string }[] = [{ id: "conversar", nome: "Conversar" }, { id: "tarefas", nome: "Tarefas" }, { id: "perfil", nome: "Perfil" }, { id: "conhecimento", nome: "Conhecimento" }, { id: "skills", nome: "Skills" }, { id: "regras", nome: "Regras" }];
   return (
     <div className="absolute right-3 top-20 bottom-3 z-10 flex w-[440px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl bg-white/97 text-[#1D2128] shadow-2xl backdrop-blur">
       <div className="flex items-start justify-between px-4 pt-4">
@@ -73,6 +74,7 @@ export function PainelAgente() {
         {a.real && ficha && aba === "skills" && <AbaSkills ficha={ficha} recarregar={carregar} />}
         {a.real && ficha && aba === "regras" && <AbaRegras ficha={ficha} recarregar={carregar} />}
         {a.real && ficha && aba === "conversar" && <AbaConversar ficha={ficha} recarregar={carregar} />}
+        {a.real && ficha && aba === "tarefas" && <AbaTarefas agenteId={ficha.agente.id} nomeAgente={ficha.agente.nome} />}
         {!a.real && <FichaSimulada />}
       </div>
     </div>

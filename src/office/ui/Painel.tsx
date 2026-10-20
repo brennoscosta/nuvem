@@ -194,6 +194,14 @@ export function Painel() {
   useSimulador();
   // ?vista=fora abre já na vista externa (prévias e links)
   useEffect(() => { if (new URLSearchParams(window.location.search).get("vista") === "fora") useEscritorio.getState().setVista("fora"); }, []);
+  // voltou do Google (?conexao=youtube): abre o painel do CEO na aba Tarefas assim que os agentes carregarem
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has("conexao")) return;
+    const tentar = () => { const s = useEscritorio.getState(); const ceo = Object.values(s.agentes).find((a) => a.nivel === "ceo"); if (ceo) { s.selecionar(ceo.id); return true; } return false; };
+    if (tentar()) return;
+    const un = useEscritorio.subscribe(() => { if (tentar()) un(); });
+    return un;
+  }, []);
   useTimeInicial();
   useServidor();
   return (

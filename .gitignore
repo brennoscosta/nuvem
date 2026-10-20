@@ -47,3 +47,5 @@ public/cenario/
 public/modelos/
 # screenshots das prévias
 /previa*.jpg
+# vídeos enviados pelo dono (ficam no disco do servidor)
+/uploads/
