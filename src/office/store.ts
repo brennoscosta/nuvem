@@ -45,6 +45,8 @@ interface Estado {
   admin: boolean; // sessão de admin válida
   senhaConfigurada: boolean;
   modalLogin: boolean;
+  vista: "dentro" | "fora"; // por dentro (planta) ou por fora (prédio de vidro + mural)
+  setVista: (v: "dentro" | "fora") => void;
   statusServidor: { banco: string; ia: string; detalhe?: string } | null;
   carregarDoServidor: () => Promise<void>;
   login: (senha: string) => Promise<string | null>;
@@ -97,6 +99,7 @@ export const useEscritorio = create<Estado>((set, get) => ({
   admin: false,
   senhaConfigurada: false,
   modalLogin: false,
+  vista: "dentro",
   statusServidor: null,
 
   mesasOcupadas: () => new Set(Object.values(get().agentes).map((a) => a.mesaId)),
@@ -127,6 +130,7 @@ export const useEscritorio = create<Estado>((set, get) => ({
   },
   logout: async () => { await fetch("/api/auth", { method: "DELETE" }); set({ admin: false, selecionado: null, modalContratar: false }); await get().carregarDoServidor(); },
   setModalLogin: (v) => set({ modalLogin: v }),
+  setVista: (v) => set({ vista: v, selecionado: null, hover: null }),
 
   contratar: async (dados) => {
     if (!get().checado) await get().carregarDoServidor();

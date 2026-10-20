@@ -6,6 +6,7 @@ import { useEscritorio } from "../store";
 import { useSimulador } from "../sim/simulador";
 import { PainelAgente, STATUS } from "./PainelAgente";
 import { MenuAgente } from "./MenuAgente";
+import { Mural } from "./Mural";
 import { ModalLogin, CartaoPublico } from "./Login";
 
 export function BarraTopo() {
@@ -23,6 +24,8 @@ export function BarraTopo() {
   const setModalLogin = useEscritorio((s) => s.setModalLogin);
   const logout = useEscritorio((s) => s.logout);
   const statusServidor = useEscritorio((s) => s.statusServidor);
+  const vista = useEscritorio((s) => s.vista);
+  const setVista = useEscritorio((s) => s.setVista);
   const temSimulados = ordem.some((id) => agentes[id] && !agentes[id].real);
   const total = ordem.length;
   const trabalhando = ordem.filter((id) => agentes[id]?.status === "trabalhando").length;
@@ -46,6 +49,7 @@ export function BarraTopo() {
         </div>
         {sirene && <span className="animate-pulse rounded-full bg-[#E53935] px-2 py-1 text-[10px] font-bold">APROVAÇÃO PENDENTE</span>}
         <span title={statusServidor ? `banco: ${statusServidor.banco} · IA: ${statusServidor.ia}${statusServidor.detalhe ? " · " + statusServidor.detalhe : ""}` : "conectando"} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${online && statusServidor?.ia === "ok" ? "bg-[#22A86B]/20 text-[#7EE2B0]" : online ? "bg-[#F2913D]/20 text-[#FFC48A]" : "bg-white/5 text-white/50"}`}><span className={`h-1.5 w-1.5 rounded-full ${online ? (statusServidor?.ia === "ok" ? "bg-[#22A86B]" : "bg-[#F2913D]") : "bg-white/30"}`} />{!checado ? "Conectando…" : online ? (statusServidor?.ia === "ok" ? "Agentes reais" : "Banco ok · sem IA") : "Offline"}</span>
+        <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório" : "Ver o prédio por fora"} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">{vista === "fora" ? "🏢 Ver por dentro" : "🌆 Ver por fora"}</button>
         {temSimulados && <button onClick={() => setSimulando(!simulando)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${simulando ? "bg-white/10 text-white" : "bg-white/5 text-white/50"}`}>{simulando ? "Simulação: ligada" : "Simulação: pausada"}</button>}
         {(admin || !online) && <button onClick={() => setModal(true)} className="rounded-full bg-[#4F7DF3] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#3f6ae0]">+ Contratar agente</button>}
         {online && (admin
@@ -188,12 +192,15 @@ function PainelOuCartao() {
 
 export function Painel() {
   useSimulador();
+  // ?vista=fora abre já na vista externa (prévias e links)
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("vista") === "fora") useEscritorio.getState().setVista("fora"); }, []);
   useTimeInicial();
   useServidor();
   return (
     <>
       <BarraTopo />
       <MenuAgente />
+      <Mural />
       <PainelOuCartao />
       <ModalLogin />
       <ModalContratar />

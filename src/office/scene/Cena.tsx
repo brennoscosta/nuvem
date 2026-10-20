@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { Predio } from "./Predio";
 import { Entorno } from "./Entorno";
 import { Horizonte } from "./Horizonte";
+import { Fachada } from "./Fachada";
 import { Agente, handlers } from "./Agente";
 import { useEscritorio } from "../store";
 import { MESA } from "../data/layout";
@@ -38,11 +39,20 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
     if (!a) { alvo.current = null; return; }
     const m = MESA[a.mesaId]; alvo.current = new THREE.Vector3(m.pos[0], 0.5, m.pos[2]);
   }, [selecionado]);
-  useFrame((_, dt) => {
-    const c = controles.current; if (!c || !alvo.current) return;
-    c.target.lerp(alvo.current, Math.min(1, dt * 3));
-    if (c.target.distanceTo(alvo.current) < 0.05) alvo.current = null;
-    c.update();
+  // trocar de vista (por fora / por dentro) leva a câmera pra um enquadramento bom
+  const vista = useEscritorio((s) => s.vista);
+  const posAlvo = useRef<THREE.Vector3 | null>(null);
+  const primeira = useRef(true);
+  useEffect(() => {
+    if (primeira.current) { primeira.current = false; return; } // não mexe na câmera inicial (?cam das prévias)
+    if (vista === "fora") { alvo.current = new THREE.Vector3(0, 2, 2); posAlvo.current = new THREE.Vector3(16, 30, 46); }
+    else { alvo.current = new THREE.Vector3(0, 0, 1); posAlvo.current = new THREE.Vector3(10, 30, 34); }
+  }, [vista]);
+  useFrame(({ camera }, dt) => {
+    const c = controles.current; if (!c) return;
+    if (posAlvo.current) { camera.position.lerp(posAlvo.current, Math.min(1, dt * 3)); if (camera.position.distanceTo(posAlvo.current) < 0.1) posAlvo.current = null; }
+    if (alvo.current) { c.target.lerp(alvo.current, Math.min(1, dt * 3)); if (c.target.distanceTo(alvo.current) < 0.05) alvo.current = null; }
+    if (posAlvo.current || alvo.current) c.update();
   });
   return null;
 }
@@ -79,6 +89,7 @@ export function Cena() {
         <Horizonte />
         <Entorno />
         <Predio />
+        <Fachada />
         {ordem.map((id) => agentes[id] && <Agente key={id} def={agentes[id]} />)}
       </Suspense>
       <Despachante />

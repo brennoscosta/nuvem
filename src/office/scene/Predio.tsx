@@ -2,12 +2,10 @@
 // Piso, paredes, salas e a parede "Nuvem" em letras 3D.
 import * as THREE from "three";
 import { useMemo } from "react";
-import { useLoader } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
-import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import { SALAS, salaGerente, MESAS, PONTOS, type Sala } from "../data/layout";
 import { AREAS } from "../data/org";
-import { caixa, cilindro, mat, plano, COR } from "./geo";
+import { caixa, capsula, cilindro, esfera, mat, plano, COR } from "./geo";
 import { Balcao, Copa, Elevador, Fliperama, Impressora, Mesa, MesaBaixa, MesaReuniao, Planta, Puff, Quadro, Sinuca, Sirene, Sofa } from "./Moveis";
 import { useEscritorio } from "../store";
 
@@ -53,37 +51,52 @@ function Etiqueta({ s }: { s: Sala }) {
   );
 }
 
-// Parede com "Nuvem" em letras 3D (SVG do logo extrudado), estilo letreiro iluminado
-function ParedeNuvem() {
-  const svg = useLoader(SVGLoader, "/brand/nuvem.svg");
-  const geo = useMemo(() => {
-    const shapes = svg.paths.flatMap((p) => p.toShapes());
-    const g = new THREE.ExtrudeGeometry(shapes, { depth: 120, bevelEnabled: true, bevelThickness: 14, bevelSize: 10, bevelSegments: 4, curveSegments: 24 });
-    g.computeBoundingBox();
-    const b = g.boundingBox!; const w = b.max.x - b.min.x;
-    const esc = 5.6 / w; // 5,6 m de largura
-    g.translate(-(b.min.x + b.max.x) / 2, -(b.min.y + b.max.y) / 2, 0);
-    g.scale(esc, -esc, esc); // SVG tem y pra baixo; a extrusão (depth) sai pra +z, de frente pra sala
-    g.computeVertexNormals();
-    return g;
-  }, [svg]);
-  const matLetra = useMemo(() => new THREE.MeshStandardMaterial({ color: "#FFFFFF", roughness: 0.35, metalness: 0.0, emissive: "#F4F7FF", emissiveIntensity: 0.22 }), []);
+// Ícone de nuvem em 3D (esferas sobre uma base arredondada) — a marca, sem depender do SVG traçado
+export function IconeNuvem({ position, escala = 1, cor = "#FFFFFF", ei = 0.25 }: { position: [number, number, number]; escala?: number; cor?: string; ei?: number }) {
+  const m = useMemo(() => new THREE.MeshStandardMaterial({ color: cor, roughness: 0.4, emissive: cor, emissiveIntensity: ei }), [cor, ei]);
   return (
-    <group position={[-14, 0, -8.9]}>
-      {/* painel de fundo escuro com ripas (textura) */}
-      <mesh geometry={caixa(7.8, 2.6, 0.28)} material={mat("#232B36", { rough: 0.95 })} position={[0, 1.5, 0]} receiveShadow />
-      {Array.from({ length: 25 }).map((_, i) => (
-        <mesh key={i} geometry={caixa(0.06, 2.4, 0.03)} material={mat("#30394A", { rough: 0.9 })} position={[-3.6 + i * 0.3, 1.5, 0.15]} />
-      ))}
-      {/* faixa azul em baixo */}
-      <mesh geometry={caixa(7.8, 0.08, 0.3)} material={mat("#4F7DF3", { emissive: "#4F7DF3", ei: 0.6 })} position={[0, 0.3, 0]} />
-      {/* letras */}
-      <mesh geometry={geo} material={matLetra} position={[0, 1.6, 0.18]} castShadow />
-      {/* spots */}
-      <pointLight position={[-2, 1.7, 1.2]} intensity={5} distance={7} color="#DCE8FF" />
-      <pointLight position={[2, 1.7, 1.2]} intensity={5} distance={7} color="#DCE8FF" />
+    <group position={position} scale={escala}>
+      <mesh geometry={esfera(0.42, 24)} material={m} position={[0.05, 0.62, 0]} castShadow />
+      <mesh geometry={esfera(0.3, 20)} material={m} position={[-0.42, 0.42, 0]} castShadow />
+      <mesh geometry={esfera(0.32, 20)} material={m} position={[0.5, 0.44, 0]} castShadow />
+      <mesh geometry={capsula(0.26, 0.75)} material={m} position={[0.02, 0.26, 0]} rotation={[0, 0, Math.PI / 2]} castShadow />
     </group>
   );
+}
+
+// Letreiro "Nuvem": texto limpo com profundidade (camadas) + ícone de nuvem, sobre painel escuro iluminado
+export function LetreiroNuvem({ largura = 7.8, altura = 2.6, tamanho = 1.05, cor = "#FFFFFF", fundo = true }: { largura?: number; altura?: number; tamanho?: number; cor?: string; fundo?: boolean }) {
+  const camadas = 6;
+  return (
+    <group>
+      {fundo && (
+        <>
+          <mesh geometry={caixa(largura, altura, 0.28)} material={mat("#1F2630", { rough: 0.95 })} position={[0, altura / 2 + 0.2, 0]} receiveShadow />
+          {Array.from({ length: Math.round(largura / 0.3) }).map((_, i) => (
+            <mesh key={i} geometry={caixa(0.06, altura - 0.2, 0.03)} material={mat("#2C3544", { rough: 0.9 })} position={[-largura / 2 + 0.3 + i * 0.3, altura / 2 + 0.2, 0.15]} />
+          ))}
+          <mesh geometry={caixa(largura, 0.08, 0.3)} material={mat("#4F7DF3", { emissive: "#4F7DF3", ei: 0.6 })} position={[0, 0.3, 0]} />
+        </>
+      )}
+      <IconeNuvem position={[-tamanho * 2.55, altura / 2 - tamanho * 0.45 + 0.2, 0.2]} escala={tamanho * 0.95} cor={cor} />
+      {/* camadas de trás pra frente dão a profundidade; a da frente é branca e levemente emissiva */}
+      {Array.from({ length: camadas }).map((_, i) => {
+        const frente = i === camadas - 1;
+        return (
+          <Text key={i} font={FONTE} fontSize={tamanho} letterSpacing={-0.02} anchorX="center" anchorY="middle" position={[tamanho * 0.55, altura / 2 + 0.2, 0.16 + i * 0.035]} color={frente ? cor : "#8EA3C7"}>
+            Nuvem
+            {frente ? <meshStandardMaterial color={cor} emissive={cor} emissiveIntensity={0.3} roughness={0.4} /> : <meshStandardMaterial color="#7F93B5" roughness={0.6} />}
+          </Text>
+        );
+      })}
+      <pointLight position={[-2, altura * 0.7, 1.3]} intensity={5} distance={7} color="#DCE8FF" />
+      <pointLight position={[2, altura * 0.7, 1.3]} intensity={5} distance={7} color="#DCE8FF" />
+    </group>
+  );
+}
+
+function ParedeNuvem() {
+  return <group position={[-14, 0, -8.9]}><LetreiroNuvem /></group>;
 }
 
 function Luminaria({ position, r = 0.8 }: { position: [number, number, number]; r?: number }) {

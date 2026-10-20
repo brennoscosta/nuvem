@@ -82,7 +82,7 @@ export async function conversar(agenteId: string, texto: string, autor = "admin"
   const fala = await falaPublica(f.agente.nome, f.agente.funcao, texto, resposta).catch(() => "");
   if (fala) await salvarFalaPublica(agenteId, fala);
   await gravarEvento(f.agente.empresaId, agenteId, "aprovado", fala || resumo(resposta), { ms: Date.now() - t0, custo });
-  return { mensagem: msg, custo, tokensIn: tin, tokensOut: tout, gastoHoje: gasto + custo, teto };
+  return { mensagem: msg, fala, custo, tokensIn: tin, tokensOut: tout, gastoHoje: gasto + custo, teto };
 }
 
 async function falaPublica(nome: string, funcao: string, pedido: string, resposta: string) {
