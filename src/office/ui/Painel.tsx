@@ -175,6 +175,7 @@ function useServidor() {
         for (const ev of r.eventos as { agenteId: string | null; tipo: string; texto: string | null }[]) {
           if (!ev.agenteId || !st.agentes[ev.agenteId]) { if (ev.tipo === "contratado") carregar(); continue; }
           if (["contratado", "demitido", "reuniao"].includes(ev.tipo)) continue; // já tratados localmente por quem disparou
+          if (ev.tipo === "promovido") await carregar(); // área/mesa mudaram no servidor: recarrega antes de animar (o boneco vai pra sala nova)
           st.emitir(ev.agenteId, ev.tipo as never, ev.texto ?? undefined);
           if (ev.tipo === "aprovado" && ev.texto) st.atualizarLocal(ev.agenteId, { falaPublica: ev.texto });
         }

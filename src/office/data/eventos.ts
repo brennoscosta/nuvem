@@ -16,6 +16,7 @@ export type TipoEvento =
   | "voltou" // volta pra mesa
   | "expediente_encerrado" // vai embora
   | "promovido" // troca de mesa/crachá
+  | "concluido" // terminou uma tarefa real: comemora e fica com o balão "✓ Tarefa concluída" até o dono clicar nele
   | "demitido"; // sai com a caixa
 
 export interface Evento {

@@ -19,7 +19,7 @@ interface Skill { id: string; nome: string; quandoUsar: string; passos: string; 
 interface Regra { id: string; texto: string; ativo: boolean; criadoEm: string }
 interface Mensagem { id: string; papel: string; conteudo: string; avaliacao: number | null; correcao: string | null; custoBrl: string; criadoEm: string }
 interface Ficha {
-  agente: { id: string; nome: string; area: AreaId; nivel: Nivel; funcao: string; personalidade: string; tomDeVoz: string; descricao: string; modelo: string; boneco: string; chefeId: string | null; tetoDiarioBrl: string };
+  agente: { id: string; nome: string; area: AreaId; nivel: Nivel; funcao: string; personalidade: string; tomDeVoz: string; descricao: string; modelo: string; boneco: string; chefeId: string | null; mesaId?: string | null; tetoDiarioBrl: string; config?: { aoConcluir?: { encaminharPara?: string | null } } };
   conhecimentos: Conhecimento[]; skills: Skill[]; regras: Regra[];
   empresa: { id: string; nome: string; sobre: string };
   chefe: { id: string; nome: string; nivel: Nivel } | null;
@@ -42,6 +42,9 @@ export function PainelAgente() {
   const online = useEscritorio((s) => s.online);
   const selecionar = useEscritorio((s) => s.selecionar);
   const [aba, setAba] = useState<Aba>(() => (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("conexao")) ? "tarefas" : "conversar");
+  const abaPedida = useEscritorio((s) => s.abaPedida);
+  const setAbaPedida = useEscritorio((s) => s.setAbaPedida);
+  useEffect(() => { if (abaPedida) { setAba(abaPedida as Aba); setAbaPedida(null); } }, [abaPedida, setAbaPedida]);
   const [ficha, setFicha] = useState<Ficha | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const carregar = useCallback(async () => { if (!id) return; try { setFicha(await api(`/api/agentes/${id}`)); setErro(null); } catch (e) { setErro((e as Error).message); } }, [id]);
@@ -74,7 +77,7 @@ export function PainelAgente() {
         {a.real && ficha && aba === "skills" && <AbaSkills ficha={ficha} recarregar={carregar} />}
         {a.real && ficha && aba === "regras" && <AbaRegras ficha={ficha} recarregar={carregar} />}
         {a.real && ficha && aba === "conversar" && <AbaConversar ficha={ficha} recarregar={carregar} />}
-        {a.real && ficha && aba === "tarefas" && <AbaTarefas agenteId={ficha.agente.id} nomeAgente={ficha.agente.nome} />}
+        {a.real && ficha && aba === "tarefas" && <AbaTarefas agenteId={ficha.agente.id} nomeAgente={ficha.agente.nome} area={ficha.agente.area} nivel={ficha.agente.nivel} config={ficha.agente.config} recarregarFicha={carregar} />}
         {!a.real && <FichaSimulada />}
       </div>
     </div>
@@ -91,9 +94,17 @@ function AbaPerfil({ ficha, recarregar }: { ficha: Ficha; recarregar: () => Prom
   const [f, setF] = useState({ nome: ag.nome, area: ag.area, nivel: ag.nivel, funcao: ag.funcao, personalidade: ag.personalidade, tomDeVoz: ag.tomDeVoz, descricao: ag.descricao, modelo: ag.modelo, boneco: ag.boneco, tetoDiarioBrl: Number(ag.tetoDiarioBrl) });
   const [salvando, setSalvando] = useState(false); const [msg, setMsg] = useState<string | null>(null);
   const atualizarLocal = useEscritorio((s) => s.atualizarLocal);
+  const carregarDoServidor = useEscritorio((s) => s.carregarDoServidor);
   const salvar = async () => {
     setSalvando(true); setMsg(null);
-    try { await api(`/api/agentes/${ag.id}`, "PATCH", f); atualizarLocal(ag.id, { nome: f.nome, funcao: f.funcao, personalidade: f.personalidade, boneco: f.boneco }); await recarregar(); setMsg("Salvo."); }
+    try {
+      const novo = await api(`/api/agentes/${ag.id}`, "PATCH", f);
+      atualizarLocal(ag.id, { nome: f.nome, funcao: f.funcao, personalidade: f.personalidade, boneco: f.boneco });
+      // área/cargo/mesa vêm do servidor (ele escolhe a mesa na sala certa); recarregar a cena faz o boneco andar até lá
+      await carregarDoServidor(); await recarregar();
+      setF((x) => ({ ...x, area: novo.area ?? x.area, nivel: novo.nivel ?? x.nivel }));
+      setMsg(novo.area !== ag.area || novo.mesaId !== ficha.agente.mesaId ? "Salvo. Mudou de sala — indo pra mesa nova." : "Salvo.");
+    }
     catch (e) { setMsg((e as Error).message); } finally { setSalvando(false); }
   };
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));

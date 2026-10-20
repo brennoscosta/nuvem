@@ -45,6 +45,7 @@ interface Estado {
   admin: boolean; // sessão de admin válida
   senhaConfigurada: boolean;
   modalLogin: boolean;
+  abaPedida: string | null; // aba que o painel deve abrir ao selecionar (ex.: "tarefas" ao clicar no balão de concluído)
   vista: "dentro" | "fora"; // por dentro (planta) ou por fora (prédio de vidro + mural)
   setVista: (v: "dentro" | "fora") => void;
   andar: 0 | 1; // andar que está sendo visto (por dentro)
@@ -54,6 +55,7 @@ interface Estado {
   login: (senha: string) => Promise<string | null>;
   logout: () => Promise<void>;
   setModalLogin: (v: boolean) => void;
+  setAbaPedida: (v: string | null) => void;
   contratar: (dados: NovoAgente) => Promise<Agente | null>;
   demitir: (id: string) => Promise<void>;
   promover: (id: string, nivel: Nivel) => Promise<void>;
@@ -104,6 +106,7 @@ export const useEscritorio = create<Estado>((set, get) => ({
   admin: false,
   senhaConfigurada: false,
   modalLogin: false,
+  abaPedida: null,
   vista: "dentro",
   andar: 0,
   statusServidor: null,
@@ -139,6 +142,7 @@ export const useEscritorio = create<Estado>((set, get) => ({
   },
   logout: async () => { await fetch("/api/auth", { method: "DELETE" }); set({ admin: false, selecionado: null, modalContratar: false }); await get().carregarDoServidor(); },
   setModalLogin: (v) => set({ modalLogin: v }),
+  setAbaPedida: (v) => set({ abaPedida: v }),
   setVista: (v) => set({ vista: v, selecionado: null, hover: null }),
   setAndar: (a) => set({ andar: a, selecionado: null, hover: null }),
 

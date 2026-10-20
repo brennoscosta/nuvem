@@ -8,7 +8,10 @@ export interface AgenteDB {
   personalidade: string; tomDeVoz: string; descricao: string; modelo: string; boneco: string;
   mesaId: string | null; chefeId: string | null; tetoDiarioBrl: string; ativo: boolean; criadoEm: Date; atualizadoEm: Date;
   falaPublica: string; falaPublicaEm: Date | null;
+  config: ConfigAgente;
 }
+// Ações automáticas e preferências do agente (coluna config, JSONB)
+export interface ConfigAgente { aoConcluir?: { encaminharPara?: string | null } }
 export interface ConhecimentoDB { id: string; agenteId: string; titulo: string; conteudo: string; origem: string; ativo: boolean; criadoEm: Date }
 export interface SkillDB { id: string; agenteId: string; nome: string; quandoUsar: string; passos: string; ativo: boolean; ordem: number; criadoEm: Date }
 export interface RegraDB { id: string; agenteId: string; texto: string; origemMensagemId: string | null; ativo: boolean; criadoEm: Date }
@@ -63,7 +66,11 @@ export async function atualizarAgente(agenteId: string, campos: Partial<Omit<Age
   const dados: Record<string, unknown> = {};
   for (const k of permitidos) if (k in campos) dados[k] = (campos as Record<string, unknown>)[k];
   dados.atualizadoEm = new Date();
-  const [a] = await sql<AgenteDB[]>`UPDATE agente SET ${sql(dados)} WHERE id = ${agenteId} RETURNING *`;
+  let [a] = await sql<AgenteDB[]>`UPDATE agente SET ${sql(dados)} WHERE id = ${agenteId} RETURNING *`;
+  // config (JSONB) é mesclada por cima da atual, não substituída
+  if (campos.config && typeof campos.config === "object") {
+    [a] = await sql<AgenteDB[]>`UPDATE agente SET config = config || ${sql.json(campos.config as never)}, atualizado_em = now() WHERE id = ${agenteId} RETURNING *`;
+  }
   return a;
 }
 

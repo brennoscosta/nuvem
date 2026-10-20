@@ -40,7 +40,7 @@ export function Agente({ def }: { def: AgenteDef }) {
   const espera = useRef(0);
   const caixaRef = useRef(false);
   const [carregando, setCarregando] = useState(false);
-  const [marca, setMarca] = useState<"!" | "..." | "zzz" | null>(null);
+  const [marca, setMarca] = useState<"!" | "..." | "zzz" | "✓" | null>(null);
   const fase = useMemo(() => Math.random() * 10, []);
   const bdef = BONECO[def.boneco] ?? BONECO.classico;
   const usaGLB = !!bdef.arquivo;
@@ -93,7 +93,17 @@ export function Agente({ def }: { def: AgenteDef }) {
         }
         case "pausa": { limpar(); const l = lugarPausa(); f.push({ tipo: "andar", para: l.p, rotFinal: l.rot, pose: l.pose }, { tipo: "fn", fn: () => setStatus(def.id, "pausa", ev.texto) }); break; }
         case "voltou": limpar(); f.push(...irParaMesa("sit"), { tipo: "fn", fn: () => setStatus(def.id, "disponivel", ev.texto) }); break;
-        case "promovido": limpar(); f.push({ tipo: "pose", pose: "celebrate" }, { tipo: "esperar", s: 2 }, { tipo: "fn", fn: () => setStatus(def.id, "disponivel", ev.texto) }); break;
+        case "concluido": limpar(); f.push({ tipo: "pose", pose: "celebrate" }, { tipo: "esperar", s: 2.5 }, { tipo: "pose", pose: "sit" }, { tipo: "fn", fn: () => { setMarca("✓"); setStatus(def.id, "disponivel", ev.texto); } }); break;
+        case "promovido": {
+          // promoção ou troca de sala: comemora (se foi promoção) e vai pra mesa atual do servidor (lida na hora, não a do fechamento)
+          limpar();
+          if (!/mudou de sala/i.test(ev.texto ?? "")) f.push({ tipo: "pose", pose: "celebrate" }, { tipo: "esperar", s: 2 });
+          f.push({ tipo: "fn", fn: () => {
+            const m = MESA[useEscritorio.getState().agentes[def.id]?.mesaId ?? def.mesaId]; const c = pontoCadeira(m);
+            fila.current.push({ tipo: "andar", para: c.pos, rotFinal: c.rot, pose: "sit" }, { tipo: "fn", fn: () => setStatus(def.id, "disponivel", ev.texto) });
+          } });
+          break;
+        }
         case "expediente_encerrado": limpar(); f.push({ tipo: "andar", para: elevadorNoAndar(andarDeY(grupo.current?.position.y ?? 0)), pose: "idle" }, { tipo: "fn", fn: () => removerAgente(def.id) }); break;
         case "demitido": limpar(); caixaRef.current = true; setCarregando(true); f.push({ tipo: "pose", pose: "carry" }, { tipo: "esperar", s: 1.2 }, { tipo: "andar", para: elevadorNoAndar(andarDeY(grupo.current?.position.y ?? 0)), pose: "carry" }, { tipo: "fn", fn: () => removerAgente(def.id) }); break;
       }
@@ -150,7 +160,7 @@ export function Agente({ def }: { def: AgenteDef }) {
   const fala = def.fala && def.status !== "chegando" ? def.fala : undefined;
 
   return (
-    <group ref={grupo} position={cadeira.pos} rotation={[0, cadeira.rot, 0]} onClick={(e) => { e.stopPropagation(); selecionar(def.id); }}
+    <group ref={grupo} position={cadeira.pos} rotation={[0, cadeira.rot, 0]} onClick={(e) => { e.stopPropagation(); if (marca === "✓") { setMarca(null); useEscritorio.getState().setAbaPedida("tarefas"); } selecionar(def.id); }}
       onPointerOver={(e) => { e.stopPropagation(); setHover(def.id); document.body.style.cursor = "pointer"; }}
       onPointerOut={() => { document.body.style.cursor = "auto"; }}>
       {usaGLB ? <BonecoGLB ref={boneco} arquivo={bdef.arquivo!} /> : <BonecoProcedural ref={boneco} def={bdef} camisa={corArea} headset={def.area === "atendimento" || def.area === "vendas"} cracha={nivel.cor} />}
@@ -161,7 +171,9 @@ export function Agente({ def }: { def: AgenteDef }) {
       {/* crachá flutuante (HTML: tamanho fixo na tela, sempre legível) */}
       <Html position={[0, 1.5, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
         <div className="flex flex-col items-center gap-1 select-none" style={{ transform: "translateY(-100%)" }}>
-          {marca && (
+          {marca === "✓" ? (
+            <div className="flex items-center gap-1.5 rounded-full bg-[#22A86B] px-3 py-1 text-[13px] font-bold text-white shadow-md"><span className="text-[15px]">✓</span>Tarefa concluída · clique pra ver</div>
+          ) : marca && (
             <div className="rounded-full px-3 py-0.5 text-[18px] font-black shadow-md" style={{ background: marca === "!" ? "#E53935" : "#FFFFFF", color: marca === "!" ? "#FFF" : "#333" }}>{marca}</div>
           )}
           {fala && !marca && (
