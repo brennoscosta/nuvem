@@ -43,3 +43,5 @@ next-env.d.ts
 # fontes brutas da marca (ficam fora do repo)
 /brand-src/
 public/cenario/
+# modelos 3D baixados no build (scripts/cidade/baixar.mjs)
+public/modelos/

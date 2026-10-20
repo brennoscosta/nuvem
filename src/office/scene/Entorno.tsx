@@ -7,9 +7,22 @@ import { useFrame } from "@react-three/fiber";
 import { caixa, cilindro, esfera, mat, plano, COR } from "./geo";
 import { BonecoProcedural, HIPS, useAnimacao, type BonecoHandle } from "./Boneco";
 import { BONECOS } from "../data/bonecos";
+import { ComFallback, Modelo, ModeloInstanciado } from "./Modelos";
 
 // Prédio ocupa x -18..18, z -9..9. Entorno vai até ±60 x ±45.
 const T = { x: 64, z: 48 };
+
+// posições fixas (memorizadas fora do componente pra instanciar uma vez)
+const ARVORES = [[-30, -8], [-30, 6], [30, -6], [30, 8], [-10, 14.2], [8, 14.2], [20, 14.2], [-6, -14.2], [14, -14.2], [-24, -14.2], [-44, -25], [-50, 10], [48, -20], [52, 14], [-38, 34], [36, 36], [-20, -34], [22, -36], [-55, -36], [56, 34], [0, 40], [-46, 40], [40, -40], [-60, 30], [60, -10], [10, 36]]
+  .map(([x, z], i) => ({ pos: [x, 0, z] as [number, number, number], rot: (i * 1.3) % (Math.PI * 2), altura: 4.2 + ((i * 7) % 5) * 0.45 }));
+// banco: o encosto do modelo fica no -z local; rot vira a frente pra calçada
+const BANCOS = [
+  { pos: [-6, 0, 13.3], rot: Math.PI }, { pos: [4, 0, 13.3], rot: Math.PI }, { pos: [14, 0, 13.3], rot: Math.PI },
+  { pos: [-22.6, 0, 3.5], rot: Math.PI / 2 }, { pos: [22.3, 0, -3], rot: -Math.PI / 2 }, { pos: [2, 0, -13.3], rot: 0 },
+  { pos: [-40, 0, 30], rot: Math.PI }, { pos: [38, 0, -30], rot: 0 },
+].map((b) => ({ ...b, pos: b.pos as [number, number, number], altura: 0.95 }));
+const POSTES = [[-26, 15.2, Math.PI], [-2, 15.2, Math.PI], [22, 15.2, Math.PI], [-14, -15.2, 0], [12, -15.2, 0], [-48, 22.5, Math.PI], [48, 22.5, Math.PI], [-40, -22.5, 0], [40, -22.5, 0]]
+  .map(([x, z, rot]) => ({ pos: [x, 0, z] as [number, number, number], rot, altura: 5 }));
 
 function Arvore({ position, escala = 1 }: { position: [number, number, number]; escala?: number }) {
   return (
@@ -57,9 +70,20 @@ function Canteiro({ position, w, d, cor }: { position: [number, number, number];
 function Carro({ position, cor, sentido }: { position: [number, number, number]; cor: string; sentido: 1 | -1 }) {
   const ref = useRef<THREE.Group>(null);
   const v = useMemo(() => 3 + Math.random() * 2, []);
-  useFrame((_, dt) => { const g = ref.current; if (!g) return; g.position.x += sentido * v * Math.min(dt, 0.1); if (g.position.x > 34) g.position.x = -34; if (g.position.x < -34) g.position.x = 34; });
+  useFrame((_, dt) => { const g = ref.current; if (!g) return; g.position.x += sentido * v * Math.min(dt, 0.1); if (g.position.x > 62) g.position.x = -62; if (g.position.x < -62) g.position.x = 62; });
   return (
     <group ref={ref} position={position} rotation={[0, sentido > 0 ? 0 : Math.PI, 0]}>
+      <ComFallback fallback={<CarroProcedural cor={cor} />}>
+        {/* modelo: comprimento no eixo z → gira 90° pra andar no eixo x */}
+        <Modelo nome="carro" position={[0, 0, 0]} rotation={Math.PI / 2} altura={1.45} cor={cor} />
+      </ComFallback>
+    </group>
+  );
+}
+
+function CarroProcedural({ cor }: { cor: string }) {
+  return (
+    <group>
       <mesh geometry={caixa(2.2, 0.55, 1.1)} material={mat(cor, { rough: 0.4, metal: 0.2 })} position={[0, 0.5, 0]} castShadow />
       <mesh geometry={caixa(1.2, 0.45, 1.0)} material={mat(cor, { rough: 0.4, metal: 0.2 })} position={[-0.1, 0.98, 0]} castShadow />
       <mesh geometry={caixa(1.1, 0.35, 1.02)} material={mat("#A7D3F0", { rough: 0.1, metal: 0.3 })} position={[-0.1, 1.0, 0]} />
@@ -136,19 +160,17 @@ export function Entorno() {
       <Carro position={[25, 0, 20.3]} cor="#FDD835" sentido={-1} />
       <Carro position={[-8, 0, -20.3]} cor="#FFFFFF" sentido={-1} />
       <Carro position={[18, 0, -17.7]} cor="#43A047" sentido={1} />
-      {/* árvores */}
-      {[[-30, -8], [-30, 6], [30, -6], [30, 8], [-10, 14.2], [8, 14.2], [20, 14.2], [-6, -14.2], [14, -14.2], [-24, -14.2], [-44, -25], [-50, 10], [48, -20], [52, 14], [-38, 34], [36, 36], [-20, -34], [22, -36], [-55, -36], [56, 34], [0, 40], [-46, 40]].map(([x, z], i) => (
-        <Arvore key={i} position={[x, 0, z]} escala={0.9 + ((i * 7) % 5) * 0.12} />
-      ))}
+      {/* árvores (modelo Higgsfield instanciado; fallback procedural se o GLB não carregar) */}
+      <ComFallback fallback={<>{ARVORES.map((a, i) => <Arvore key={i} position={a.pos} escala={a.altura / 4.2} />)}</>}>
+        <ModeloInstanciado nome="arvore" itens={ARVORES} />
+      </ComFallback>
       {/* bancos e postes */}
-      <Banco position={[-6, 0, 13.3]} rotation={Math.PI} />
-      <Banco position={[4, 0, 13.3]} rotation={Math.PI} />
-      <Banco position={[14, 0, 13.3]} rotation={Math.PI} />
-      <Banco position={[-22.6, 0, 3.5]} rotation={Math.PI / 2} />
-      <Banco position={[22.3, 0, -3]} rotation={-Math.PI / 2} />
-      <Banco position={[2, 0, -13.3]} rotation={0} />
-      {[-26, -2, 22].map((x) => <Poste key={"f" + x} position={[x, 0, 15.2]} />)}
-      {[-14, 12].map((x) => <Poste key={"t" + x} position={[x, 0, -15.2]} />)}
+      <ComFallback fallback={<>{BANCOS.map((b, i) => <Banco key={i} position={b.pos} rotation={b.rot} />)}</>}>
+        <ModeloInstanciado nome="banco" itens={BANCOS} />
+      </ComFallback>
+      <ComFallback fallback={<>{POSTES.map((p, i) => <Poste key={i} position={p.pos} />)}</>}>
+        <ModeloInstanciado nome="poste" itens={POSTES} />
+      </ComFallback>
       {/* canteiros de flores na frente */}
       <Canteiro position={[-9, 0, 11.2]} w={5} d={0.9} cor="#EC6B8D" />
       <Canteiro position={[9, 0, 11.2]} w={5} d={0.9} cor="#FFD600" />
