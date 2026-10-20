@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { REDES, ehProvedor } from "@/server/redes";
-import { base } from "@/server/conexoes";
+import { raizEscritorio, base } from "@/server/conexoes";
 import { ehAdmin } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ type Ctx = { params: Promise<{ provedor: string }> };
 export async function GET(req: Request, { params }: Ctx) {
   const { provedor } = await params;
   const u = new URL(req.url);
-  const volta = (msg: string, okFlag: boolean) => NextResponse.redirect(`${base(req)}/?conexao=${provedor}&${okFlag ? "ok" : "erro"}=${encodeURIComponent(msg)}`);
+  const volta = (msg: string, okFlag: boolean) => NextResponse.redirect(`${raizEscritorio(req)}/?conexao=${provedor}&${okFlag ? "ok" : "erro"}=${encodeURIComponent(msg)}`);
   if (!ehProvedor(provedor)) return volta("provedor desconhecido", false);
   if (!(await ehAdmin())) return volta("Entre como admin antes de conectar.", false);
   const jar = await cookies();

@@ -63,7 +63,7 @@ export function AbaTarefas({ agenteId, nomeAgente, area, nivel, config, recarreg
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const cx = p.get("conexao");
-    if (cx) { const nome = PLATAFORMAS.find((x) => x.id === cx)?.nome ?? cx; setAviso(p.get("ok") ? `${nome} conectado: ${p.get("ok")}` : `Falhou ao conectar ${nome}: ${p.get("erro")}`); window.history.replaceState(null, "", "/"); }
+    if (cx) { const nome = PLATAFORMAS.find((x) => x.id === cx)?.nome ?? cx; setAviso(p.get("ok") ? `${nome} conectado: ${p.get("ok")}` : `Falhou ao conectar ${nome}: ${p.get("erro")}`); window.history.replaceState(null, "", window.location.pathname); }
   }, []);
   // enquanto houver tarefa em andamento, atualiza a cada 4 s
   useEffect(() => {

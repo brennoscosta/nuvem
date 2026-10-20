@@ -1,0 +1,89 @@
+/* WorkEnd — sistema visual do site e do dashboard (fora do escritório 3D).
+   Paleta: tinta #0F1B33 · gelo #F7F9FC · azul do logo #1D4ED8 · ciano #22D3EE · azul-claro #DCE6F5. */
+.we {
+  --tinta: #0F1B33;
+  --tinta-2: #3B4A66;
+  --gelo: #F7F9FC;
+  --branco: #FFFFFF;
+  --azul: #1D4ED8;
+  --azul-escuro: #1538A8;
+  --ciano: #22D3EE;
+  --claro: #DCE6F5;
+  --linha: #C9D5E8;
+  --grama: #6CC04A;
+  --display: "Sora", "Inter", system-ui, sans-serif;
+  --corpo: "Inter", system-ui, sans-serif;
+  min-height: 100vh;
+  background: var(--gelo);
+  color: var(--tinta);
+  font-family: var(--corpo);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.we h1, .we h2, .we h3, .we .display { font-family: var(--display); letter-spacing: -0.02em; line-height: 1.08; font-weight: 600; }
+.we h1 { font-size: clamp(2.3rem, 5.2vw, 4.1rem); font-weight: 700; }
+.we h2 { font-size: clamp(1.7rem, 3.2vw, 2.5rem); }
+.we h3 { font-size: 1.2rem; }
+.we a { color: inherit; }
+.we .faixa { width: min(1120px, calc(100% - 2.5rem)); margin-inline: auto; }
+.we .secao { padding-block: clamp(3.5rem, 8vw, 6.5rem); }
+
+/* botões */
+.we .btn { white-space: nowrap; display: inline-flex; align-items: center; gap: .5rem; border-radius: 999px; padding: .85rem 1.35rem; font-weight: 600; font-size: 1rem; line-height: 1; border: 1.5px solid transparent; transition: transform .12s ease, background .15s ease, border-color .15s ease; text-decoration: none; cursor: pointer; }
+.we .btn:focus-visible { outline: 3px solid var(--ciano); outline-offset: 2px; }
+.we .btn:active { transform: translateY(1px); }
+.we .btn-azul { background: var(--azul); color: #fff; }
+.we .btn-azul:hover { background: var(--azul-escuro); }
+.we .btn-linha { background: transparent; border-color: var(--linha); color: var(--tinta); }
+.we .btn-linha:hover { border-color: var(--tinta); }
+.we .btn-tinta { background: var(--tinta); color: #fff; }
+.we .btn[disabled], .we .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+
+/* campos */
+.we .campo { display: flex; flex-direction: column; gap: .35rem; font-size: .92rem; font-weight: 500; color: var(--tinta-2); }
+.we .campo input { font: inherit; font-size: 1rem; color: var(--tinta); background: #fff; border: 1.5px solid var(--linha); border-radius: 12px; padding: .8rem .95rem; outline: none; }
+.we .campo input:focus { border-color: var(--azul); box-shadow: 0 0 0 4px rgba(29, 78, 216, .12); }
+
+/* vídeo emoldurado pela grade de vidro da fachada (o elemento marcante da página) */
+.we .vitrine { position: relative; border-radius: 18px; overflow: hidden; background: var(--tinta); box-shadow: 0 30px 60px -30px rgba(15, 27, 51, .55); }
+.we .vitrine video, .we .vitrine img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.we .vitrine::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(to right, rgba(15,27,51,.55) 2px, transparent 2px) 0 0 / 12.5% 100% repeat-x,
+    linear-gradient(to bottom, rgba(15,27,51,.55) 2px, transparent 2px) 0 0 / 100% 33.34% repeat-y;
+  mix-blend-mode: multiply; opacity: .9;
+}
+.we .vitrine .faixa-branca { position: absolute; left: 0; right: 0; height: 10px; background: #F4F1EB; opacity: .95; }
+
+/* plaquinhas de setor (iguais às placas do piso do escritório) */
+.we .placa { display: inline-flex; align-items: center; gap: .55rem; padding: .55rem .9rem .55rem .6rem; border-radius: 6px; background: var(--cor, var(--azul)); color: #fff; font-family: var(--display); font-weight: 600; font-size: .95rem; letter-spacing: .01em; box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); }
+.we .placa b { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: rgba(255,255,255,.85); }
+
+/* crachá de especialista */
+.we .cracha { display: grid; grid-template-columns: 54px 1fr; gap: .9rem; align-items: start; background: #fff; border: 1.5px solid var(--linha); border-radius: 14px; padding: 1rem; position: relative; }
+.we .cracha::before { content: ""; position: absolute; top: -7px; left: 50%; width: 46px; height: 12px; margin-left: -23px; border-radius: 6px; background: var(--claro); border: 1.5px solid var(--linha); }
+.we .cracha .foto { width: 54px; height: 54px; border-radius: 12px; background: var(--cor, var(--azul)); display: grid; place-items: center; color: #fff; font-family: var(--display); font-weight: 700; font-size: 1.25rem; }
+.we .cracha small { color: var(--tinta-2); font-size: .85rem; }
+
+/* relatório (parece uma folha impressa, não um card) */
+.we .folha { background: #fff; border: 1.5px solid var(--linha); border-radius: 10px; padding: 1.25rem 1.4rem; font-size: .95rem; }
+.we .folha table { width: 100%; border-collapse: collapse; }
+.we .folha th { text-align: left; font-weight: 600; color: var(--tinta-2); font-size: .8rem; padding: .35rem 0; border-bottom: 1.5px solid var(--linha); }
+.we .folha td { padding: .5rem 0; border-bottom: 1px solid #E8EEF7; }
+.we .folha td:last-child, .we .folha th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.we .folha .pos { color: #1B8A4C; } .we .folha .neg { color: #C0392B; }
+
+.we details { border-top: 1.5px solid var(--linha); }
+.we details:last-of-type { border-bottom: 1.5px solid var(--linha); }
+.we summary { cursor: pointer; padding: 1rem 0; font-weight: 600; font-family: var(--display); list-style: none; display: flex; justify-content: space-between; align-items: center; }
+.we summary::-webkit-details-marker { display: none; }
+.we summary::after { content: "+"; font-size: 1.4rem; color: var(--azul); }
+.we details[open] summary::after { content: "–"; }
+.we details p { padding-bottom: 1rem; color: var(--tinta-2); max-width: 64ch; }
+
+.we .fundo-tinta { background: var(--tinta); color: #fff; }
+.we .fundo-claro { background: var(--claro); }
+
+@media (prefers-reduced-motion: reduce) { .we * { animation: none !important; transition: none !important; } }

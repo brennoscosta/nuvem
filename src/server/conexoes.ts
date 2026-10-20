@@ -13,6 +13,11 @@ export function base(req: Request) {
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   return `${proto}://${host}`;
 }
+// Onde fica o escritório 3D nesse domínio: na raiz (nuvem.nuvemhost.cloud) ou em /admin (workend.online)
+export function raizEscritorio(req: Request) {
+  const host = (req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "").toLowerCase().split(":")[0];
+  return base(req) + (/(^|\.)workend\.(online|localhost)$/.test(host) ? "/admin" : "");
+}
 export function urlCallback(req: Request, provedor: Provedor) { return `${base(req)}/api/conexoes/${provedor}/callback`; }
 
 export async function salvarConexao(c: { provedor: Provedor; contaNome: string; contaId: string; accessToken: string; refreshToken?: string; expiraEm: Date | null; escopo?: string }) {
