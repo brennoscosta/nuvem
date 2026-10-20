@@ -44,7 +44,7 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
   const posAlvo = useRef<THREE.Vector3 | null>(null);
   const primeira = useRef(true);
   useEffect(() => {
-    if (primeira.current) { primeira.current = false; return; } // não mexe na câmera inicial (?cam das prévias)
+    if (primeira.current || CAM) { primeira.current = false; return; } // não mexe na câmera inicial nem nas prévias (?cam)
     if (vista === "fora") { alvo.current = new THREE.Vector3(0, 2, 2); posAlvo.current = new THREE.Vector3(16, 30, 46); }
     else { alvo.current = new THREE.Vector3(0, 0, 1); posAlvo.current = new THREE.Vector3(10, 30, 34); }
   }, [vista]);
