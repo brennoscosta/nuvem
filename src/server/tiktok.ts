@@ -2,20 +2,20 @@
 // Variáveis: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET. Redirect: <site>/api/conexoes/tiktok/callback
 // Enquanto o app não passa na auditoria do TikTok, os posts saem como "somente eu" (SELF_ONLY): o dono muda pra público no app.
 import fs from "node:fs";
-import { urlCallback as cb, salvarConexao, atualizarTokens, obterConexao, resumoErro, dormir, type Conexao } from "./conexoes";
+import { urlCallback as cb, salvarConexao, atualizarTokens, obterConexao, resumoErro, dormir, type Conexao, env } from "./conexoes";
 
 const ESCOPOS = ["user.info.basic", "video.publish"];
 const API = "https://open.tiktokapis.com/v2";
 
-export function tiktokConfigurado() { return !!(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET); }
+export function tiktokConfigurado() { return !!(env("TIKTOK_CLIENT_KEY") && env("TIKTOK_CLIENT_SECRET")); }
 
 export function urlAutorizacao(req: Request, state: string) {
-  const p = new URLSearchParams({ client_key: process.env.TIKTOK_CLIENT_KEY!, scope: ESCOPOS.join(","), response_type: "code", redirect_uri: cb(req, "tiktok"), state });
+  const p = new URLSearchParams({ client_key: env("TIKTOK_CLIENT_KEY"), scope: ESCOPOS.join(","), response_type: "code", redirect_uri: cb(req, "tiktok"), state });
   return `https://www.tiktok.com/v2/auth/authorize/?${p}`;
 }
 
 async function token(body: Record<string, string>) {
-  const r = await fetch(`${API}/oauth/token/`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_key: process.env.TIKTOK_CLIENT_KEY!, client_secret: process.env.TIKTOK_CLIENT_SECRET!, ...body }) });
+  const r = await fetch(`${API}/oauth/token/`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_key: env("TIKTOK_CLIENT_KEY"), client_secret: env("TIKTOK_CLIENT_SECRET"), ...body }) });
   const j = await r.json();
   if (!r.ok || !j.access_token) throw new Error(`TikTok recusou: ${j.error_description ?? j.error ?? resumoErro(JSON.stringify(j))}`);
   return j as { access_token: string; refresh_token: string; expires_in: number; open_id: string; scope: string };

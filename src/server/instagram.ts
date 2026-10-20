@@ -1,15 +1,15 @@
 // Instagram: "API com Login do Instagram" (conta profissional, sem precisar de Página do Facebook).
 // Variáveis: INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET. Redirect: <site>/api/conexoes/instagram/callback
 // Publicação de Reels: o vídeo precisa estar numa URL pública (servimos em /api/arquivos/<id>/raw).
-import { urlCallback as cb, salvarConexao, atualizarTokens, obterConexao, resumoErro, dormir, type Conexao } from "./conexoes";
+import { urlCallback as cb, salvarConexao, atualizarTokens, obterConexao, resumoErro, dormir, type Conexao, env } from "./conexoes";
 
 const ESCOPOS = ["instagram_business_basic", "instagram_business_content_publish"];
 const G = "https://graph.instagram.com/v22.0";
 
-export function instagramConfigurado() { return !!(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET); }
+export function instagramConfigurado() { return !!(env("INSTAGRAM_APP_ID") && env("INSTAGRAM_APP_SECRET")); }
 
 export function urlAutorizacao(req: Request, state: string) {
-  const p = new URLSearchParams({ client_id: process.env.INSTAGRAM_APP_ID!, redirect_uri: cb(req, "instagram"), response_type: "code", scope: ESCOPOS.join(","), state });
+  const p = new URLSearchParams({ client_id: env("INSTAGRAM_APP_ID"), redirect_uri: cb(req, "instagram"), response_type: "code", scope: ESCOPOS.join(","), state });
   return `https://www.instagram.com/oauth/authorize?${p}`;
 }
 
@@ -17,12 +17,12 @@ export async function conectarComCodigo(req: Request, code: string) {
   // 1) token curto (1 h)
   const r1 = await fetch("https://api.instagram.com/oauth/access_token", {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: process.env.INSTAGRAM_APP_ID!, client_secret: process.env.INSTAGRAM_APP_SECRET!, grant_type: "authorization_code", redirect_uri: cb(req, "instagram"), code }),
+    body: new URLSearchParams({ client_id: env("INSTAGRAM_APP_ID"), client_secret: env("INSTAGRAM_APP_SECRET"), grant_type: "authorization_code", redirect_uri: cb(req, "instagram"), code }),
   });
   const j1 = await r1.json();
   if (!r1.ok || !j1.access_token) throw new Error(`Instagram recusou o código: ${resumoErro(JSON.stringify(j1))}`);
   // 2) token longo (60 dias, renovável)
-  const r2 = await fetch(`https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${process.env.INSTAGRAM_APP_SECRET}&access_token=${j1.access_token}`);
+  const r2 = await fetch(`https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${env("INSTAGRAM_APP_SECRET")}&access_token=${j1.access_token}`);
   const j2 = await r2.json();
   if (!r2.ok || !j2.access_token) throw new Error(`Não consegui o token de longa duração: ${resumoErro(JSON.stringify(j2))}`);
   const expiraEm = new Date(Date.now() + (j2.expires_in ?? 5184000) * 1000);

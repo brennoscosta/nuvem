@@ -42,3 +42,6 @@ export function resumoErro(t: string) {
   try { const j = JSON.parse(t); return j.error?.message ?? j.error?.error_user_msg ?? j.error?.errors?.[0]?.reason ?? j.error_description ?? j.error?.code ?? t.slice(0, 200); } catch { return t.slice(0, 200); }
 }
 export const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// variável de ambiente sem espaços/quebras de linha acidentais (chave colada com Enter no CapRover)
+export function env(nome: string) { return (process.env[nome] ?? "").trim(); }

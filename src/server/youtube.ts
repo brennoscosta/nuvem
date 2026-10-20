@@ -1,19 +1,19 @@
 // YouTube: conexão OAuth da conta do dono + upload de vídeo (resumable). Sem SDK, só fetch.
 // Variáveis: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (CapRover). Redirect: <site>/api/conexoes/youtube/callback
 import fs from "node:fs";
-import { base as baseUrl, urlCallback as cb, salvarConexao, atualizarTokens, obterConexao, resumoErro, type Conexao } from "./conexoes";
+import { base as baseUrl, urlCallback as cb, salvarConexao, atualizarTokens, obterConexao, resumoErro, type Conexao, env } from "./conexoes";
 
 const ESCOPOS = ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"];
 
 
-export function youtubeConfigurado() { return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET); }
+export function youtubeConfigurado() { return !!(env("GOOGLE_CLIENT_ID") && env("GOOGLE_CLIENT_SECRET")); }
 
 export const base = baseUrl;
 export function urlCallback(req: Request) { return cb(req, "youtube"); }
 
 export function urlAutorizacao(req: Request, state: string) {
   const p = new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID!, redirect_uri: urlCallback(req), response_type: "code",
+    client_id: env("GOOGLE_CLIENT_ID"), redirect_uri: urlCallback(req), response_type: "code",
     scope: ESCOPOS.join(" "), access_type: "offline", prompt: "consent", include_granted_scopes: "true", state,
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${p}`;
@@ -22,7 +22,7 @@ export function urlAutorizacao(req: Request, state: string) {
 async function trocarCodigo(req: Request, code: string) {
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ code, client_id: process.env.GOOGLE_CLIENT_ID!, client_secret: process.env.GOOGLE_CLIENT_SECRET!, redirect_uri: urlCallback(req), grant_type: "authorization_code" }),
+    body: new URLSearchParams({ code, client_id: env("GOOGLE_CLIENT_ID"), client_secret: env("GOOGLE_CLIENT_SECRET"), redirect_uri: urlCallback(req), grant_type: "authorization_code" }),
   });
   const j = await r.json();
   if (!r.ok) throw new Error(`Google recusou o código: ${j.error_description ?? j.error ?? r.status}`);
@@ -33,7 +33,7 @@ async function renovar(c: Conexao) {
   if (!c.refreshToken) throw new Error("Conexão sem refresh token — desconecte e conecte o YouTube de novo.");
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ refresh_token: c.refreshToken, client_id: process.env.GOOGLE_CLIENT_ID!, client_secret: process.env.GOOGLE_CLIENT_SECRET!, grant_type: "refresh_token" }),
+    body: new URLSearchParams({ refresh_token: c.refreshToken, client_id: env("GOOGLE_CLIENT_ID"), client_secret: env("GOOGLE_CLIENT_SECRET"), grant_type: "refresh_token" }),
   });
   const j = await r.json();
   if (!r.ok) throw new Error(`Não consegui renovar o acesso ao YouTube (${j.error_description ?? j.error ?? r.status}). Reconecte a conta.`);
