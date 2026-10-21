@@ -81,7 +81,7 @@ export const SALAS: Sala[] = [
 
 export const SALA: Record<string, Sala> = Object.fromEntries(SALAS.map((s) => [s.id, s]));
 
-// Mesas de cada área: 2 fileiras de 3 mesas (open space) + 1 mesa sênior + sala de vidro do gerente no fundo.
+// Mesas de cada área: 2 fileiras de 3 mesas (open space) + mesa do gerente de lado na parede + sala de vidro do sênior no fundo.
 function mesasDaArea(s: Sala): Mesa[] {
   const out: Mesa[] = [];
   const norte = s.z1 <= 0; // sala ao norte do corredor
@@ -97,10 +97,10 @@ function mesasDaArea(s: Sala): Mesa[] {
     const z = fundo + dir * (2.4 + r * 2.3);
     out.push({ id: `${s.id}-m${r * 3 + c + 1}`, sala: s.id, pos: [x, y, z], rot: norte ? 0 : Math.PI, tipo: "comum" });
   }
-  // sênior: mesa maior, junto à parede lateral
-  out.push({ id: `${s.id}-senior`, sala: s.id, pos: [s.x0 + 1.4, y, fundo + dir * 5.5], rot: Math.PI / 2, tipo: "senior" });
-  // gerente: sala de vidro no canto do fundo, do lado oposto
-  out.push({ id: `${s.id}-gerente`, sala: s.id, pos: [s.x1 - 1.7, y, fundo + dir * 1.6], rot: norte ? 0 : Math.PI, tipo: "gerente" });
+  // gerente: a mesa de lado, encostada na parede lateral, de frente pro time (pedido do Brenno, 20/10)
+  out.push({ id: `${s.id}-gerente`, sala: s.id, pos: [s.x0 + 1.4, y, fundo + dir * 5.5], rot: Math.PI / 2, tipo: "gerente" });
+  // sênior: a sala de vidro no canto do fundo, do lado oposto
+  out.push({ id: `${s.id}-senior`, sala: s.id, pos: [s.x1 - 1.7, y, fundo + dir * 1.6], rot: norte ? 0 : Math.PI, tipo: "senior" });
   return out;
 }
 
@@ -119,7 +119,7 @@ export const MESAS: Mesa[] = [
 
 export const MESA: Record<string, Mesa> = Object.fromEntries(MESAS.map((m) => [m.id, m]));
 
-// Sala de vidro do gerente: retângulo dentro da área
+// Sala de vidro no canto do fundo (hoje do sênior): retângulo dentro da área
 export function salaGerente(s: Sala) {
   const norte = s.z1 <= 0;
   const fundo = norte ? s.z0 : s.z1;
@@ -188,6 +188,6 @@ export function mesaDoChefe(area: AreaId, nivel: Nivel): V3 | undefined {
   if (nivel === "gerente") return [-15, 0, 5.3];
   const g = MESA[`${area}-gerente`];
   if (!g) return undefined;
-  const norte = SALA[area].z1 <= 0;
-  return [g.pos[0], g.pos[1], g.pos[2] + (norte ? 1.1 : -1.1)];
+  // a mesa do gerente fica de lado (virada pro leste): o subordinado para na frente dela
+  return [g.pos[0] + 1.1, g.pos[1], g.pos[2]];
 }
