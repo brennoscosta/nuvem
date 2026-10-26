@@ -2,7 +2,7 @@
 // Um agente na cena: recebe eventos, anda pelo escritório, senta, trabalha, comemora...
 import * as THREE from "three";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { BonecoGLB, BonecoProcedural, HIPS, useAnimacao, type BonecoHandle, type Pose } from "./Boneco";
 import { BONECO } from "../data/bonecos";
@@ -22,6 +22,8 @@ export const handlers = new Map<string, (ev: Evento) => void>();
 type Acao = { tipo: "andar"; para: V3; rotFinal?: number; pose?: Pose } | { tipo: "pose"; pose: Pose; rot?: number } | { tipo: "esperar"; s: number } | { tipo: "fn"; fn: () => void };
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+// evento 3D que nasceu em cima de um nome (HTML): não conta como mouse no boneco que está atrás dele
+const sobreRotulo = (e: ThreeEvent<PointerEvent>) => !!(e.nativeEvent.target as Element | null)?.closest?.("[data-rotulo]");
 const assentoReuniao = (i: number): V3 => { const a = (i / 6) * Math.PI * 2; return [PONTOS.mesaReuniao[0] + Math.cos(a) * 2.0, 0, PONTOS.mesaReuniao[2] + Math.sin(a) * 2.0]; };
 const lugarPausa = (): { p: V3; pose: Pose; rot: number } => {
   const r = Math.random();
@@ -53,6 +55,31 @@ export function Agente({ def }: { def: AgenteDef }) {
   const selecionar = useEscritorio((s) => s.selecionar);
   const selecionado = useEscritorio((s) => s.selecionado === def.id);
   const setHover = useEscritorio((s) => s.setHover);
+
+  // Nome pequeno por padrão; cresce com o mouse em cima do boneco ou do próprio nome (e enquanto o agente está selecionado).
+  // A folga de 120 ms evita piscar quando o mouse passa do boneco pro nome.
+  const [emFoco, setEmFoco] = useState(false);
+  const foco = useRef<{ boneco: boolean; rotulo: boolean; timer: ReturnType<typeof setTimeout> | null }>({ boneco: false, rotulo: false, timer: null });
+  const marcarFoco = (fonte: "boneco" | "rotulo", on: boolean) => {
+    const f = foco.current; if (f[fonte] === on) return;
+    f[fonte] = on;
+    if (f.timer) { clearTimeout(f.timer); f.timer = null; }
+    if (f.boneco || f.rotulo) setEmFoco(true);
+    else f.timer = setTimeout(() => { f.timer = null; setEmFoco(false); }, 120);
+  };
+  useEffect(() => { const f = foco.current; return () => { if (f.timer) clearTimeout(f.timer); }; }, []);
+  const grande = emFoco || selecionado;
+  // o nome grande fica por cima dos outros: o drei só recalcula o z-index quando a câmera ou o agente se mexe
+  const htmlRef = useRef<HTMLDivElement>(null);
+  const grandeRef = useRef(false);
+  const zDrei = useRef("");
+  useEffect(() => { grandeRef.current = grande; }, [grande]);
+  useFrame(() => {
+    const el = htmlRef.current?.parentElement; if (!el) return;
+    if (grandeRef.current) { if (el.style.zIndex !== "50") { zDrei.current = el.style.zIndex; el.style.zIndex = "50"; } }
+    else if (el.style.zIndex === "50") el.style.zIndex = zDrei.current;
+  });
+  const toque = useRef<[number, number] | null>(null); // onde o clique no nome começou (arrastar o mapa não abre a ficha)
 
   const irParaMesa = (depois: Pose = "sit"): Acao[] => [{ tipo: "andar", para: cadeira.pos, rotFinal: cadeira.rot, pose: depois }];
 
@@ -158,31 +185,43 @@ export function Agente({ def }: { def: AgenteDef }) {
   const corArea = AREAS[def.area].cor;
   const nivel = NIVEL[def.nivel];
   const fala = def.fala && def.status !== "chegando" ? def.fala : undefined;
+  const abrir = () => { if (marca === "✓") { setMarca(null); useEscritorio.getState().setAbaPedida("tarefas"); } selecionar(def.id); };
+  // mouse no boneco (over e move: o move cobre quem chega vindo de cima de um nome)
+  const mouseNoBoneco = (e: ThreeEvent<PointerEvent>) => {
+    if (sobreRotulo(e)) { marcarFoco("boneco", false); return; }
+    e.stopPropagation();
+    if (!foco.current.boneco) { setHover(def.id); document.body.style.cursor = "pointer"; }
+    marcarFoco("boneco", true);
+  };
 
   return (
-    <group ref={grupo} position={cadeira.pos} rotation={[0, cadeira.rot, 0]} onClick={(e) => { e.stopPropagation(); if (marca === "✓") { setMarca(null); useEscritorio.getState().setAbaPedida("tarefas"); } selecionar(def.id); }}
-      onPointerOver={(e) => { e.stopPropagation(); setHover(def.id); document.body.style.cursor = "pointer"; }}
-      onPointerOut={() => { document.body.style.cursor = "auto"; }}>
+    <group ref={grupo} position={cadeira.pos} rotation={[0, cadeira.rot, 0]} onClick={(e) => { e.stopPropagation(); abrir(); }}
+      onPointerOver={mouseNoBoneco} onPointerMove={mouseNoBoneco}
+      onPointerOut={() => { marcarFoco("boneco", false); document.body.style.cursor = "auto"; }}>
       {usaGLB ? <BonecoGLB ref={boneco} arquivo={bdef.arquivo!} /> : <BonecoProcedural ref={boneco} def={bdef} camisa={corArea} headset={def.area === "atendimento" || def.area === "vendas"} cracha={nivel.cor} />}
       {/* caixa de papelão (demissão) */}
       {carregando && <mesh geometry={caixa(0.36, 0.26, 0.3)} material={mat("#C9A063")} position={[0, 0.72, 0.3]} />}
       {/* anel de seleção */}
       {selecionado && <mesh geometry={new THREE.RingGeometry(0.32, 0.4, 32)} material={mat(corArea, { emissive: corArea, ei: 0.8 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} />}
-      {/* crachá flutuante (HTML: tamanho fixo na tela, sempre legível) */}
-      <Html position={[0, 1.5, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
-        <div className="flex flex-col items-center gap-1 select-none" style={{ transform: "translateY(-100%)" }}>
+      {/* crachá flutuante (HTML, tamanho fixo na tela): nome pequeno; com o mouse em cima (boneco ou nome) cresce e mostra o cargo.
+          A base do crachá fica presa logo acima da cabeça e ele cresce pra cima. Clicar no nome abre a ficha, igual clicar no boneco. */}
+      <Html ref={htmlRef} position={[0, 1.45, 0]} zIndexRange={[5, 0]} style={{ pointerEvents: "none", transform: "translate(-50%, -100%)" }}>
+        <div data-rotulo="" className="flex w-max flex-col items-center gap-1 select-none"
+          onPointerEnter={() => marcarFoco("rotulo", true)} onPointerLeave={() => marcarFoco("rotulo", false)}
+          onPointerDown={(e) => { toque.current = [e.clientX, e.clientY]; }}
+          onClick={(e) => { e.stopPropagation(); const t = toque.current; toque.current = null; if (t && Math.hypot(e.clientX - t[0], e.clientY - t[1]) > 6) return; abrir(); }}>
           {marca === "✓" ? (
-            <div className="flex items-center gap-1.5 rounded-full bg-[#22A86B] px-3 py-1 text-[13px] font-bold text-white shadow-md"><span className="text-[15px]">✓</span>Tarefa concluída · clique pra ver</div>
+            <div className="pointer-events-auto flex cursor-pointer items-center gap-1.5 rounded-full bg-[#22A86B] px-3 py-1 text-[13px] font-bold text-white shadow-md"><span className="text-[15px]">✓</span>Tarefa concluída · clique pra ver</div>
           ) : marca && (
-            <div className="rounded-full px-3 py-0.5 text-[18px] font-black shadow-md" style={{ background: marca === "!" ? "#E53935" : "#FFFFFF", color: marca === "!" ? "#FFF" : "#333" }}>{marca}</div>
+            <div className="pointer-events-auto cursor-pointer rounded-full px-3 py-0.5 text-[18px] font-black shadow-md" style={{ background: marca === "!" ? "#E53935" : "#FFFFFF", color: marca === "!" ? "#FFF" : "#333" }}>{marca}</div>
           )}
           {fala && !marca && (
-            <div className="max-w-[260px] rounded-2xl bg-white px-3 py-1.5 text-center text-[14px] font-medium leading-tight text-[#2B2F36] shadow-lg">{fala.length > 60 ? fala.slice(0, 58) + "…" : fala}</div>
+            <div className="pointer-events-auto max-w-[260px] cursor-pointer rounded-2xl bg-white px-3 py-1.5 text-center text-[14px] font-medium leading-tight text-[#2B2F36] shadow-lg">{fala.length > 60 ? fala.slice(0, 58) + "…" : fala}</div>
           )}
-          <div className="flex items-center gap-2 rounded-full bg-[#111418]/90 py-1 pl-1.5 pr-3 shadow-lg">
-            <span className="h-4 w-4 rounded-full" style={{ background: nivel.cor }} />
-            <span className="text-[15px] font-bold leading-none text-white">{def.nome}</span>
-            <span className="text-[11px] font-semibold uppercase leading-none text-white/60">{nivel.nome}</span>
+          <div className={`pointer-events-auto flex cursor-pointer items-center whitespace-nowrap rounded-full transition-all duration-150 ease-out ${grande ? "bg-[#111418]/95 py-1 pl-1.5 pr-3 shadow-lg" : "bg-[#111418]/80 py-[2px] pl-[3px] pr-[6px] shadow"}`}>
+            <span className={`shrink-0 rounded-full transition-all duration-150 ease-out ${grande ? "mr-2 h-4 w-4" : "mr-1 h-1.5 w-1.5"}`} style={{ background: nivel.cor }} />
+            <span className={`leading-none text-white transition-all duration-150 ease-out ${grande ? "text-[15px] font-bold" : "text-[10px] font-semibold"}`}>{def.nome}</span>
+            <span className={`overflow-hidden text-[11px] font-semibold uppercase leading-none text-white/60 transition-all duration-150 ease-out ${grande ? "ml-2 max-w-[120px] opacity-100" : "ml-0 max-w-0 opacity-0"}`}>{nivel.nome}</span>
           </div>
         </div>
       </Html>
