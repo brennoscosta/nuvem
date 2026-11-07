@@ -1,13 +1,15 @@
-// Painel do admin do WorkEnd: lotes (reservas e chãos pagos), pagamentos e usuários, com liberar/banir/ativar.
+// Painel do admin do WorkEnd: lotes (reservas e chãos pagos), pagamentos e usuários, com liberar/banir/ativar/editar.
+// Entra quem é admin (a conta souzacostabrenno@gmail.com ou quem ela promoveu) — ou quem digita a senha única
+// (ADMIN_SENHA), que abre a sessão da conta do dono.
 import Link from "next/link";
 import Image from "next/image";
-import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
-import { ehAdmin } from "@/server/terrenos";
+import { ehAdmin, ADMIN_EMAIL, PRECO_LOTE, MINUTOS_RESERVA, DIAS_MES, DIAS_TOLERANCIA, precoPara } from "@/server/terrenos";
 import { pagamentoLigado } from "@/server/mercadopago";
+import { temSenhaConfigurada } from "@/server/auth";
 import { Rodape } from "../../_partes";
 import { BotaoSair } from "../../_conta";
-import { PainelAdmin } from "./_painel";
+import { PainelAdmin, EntrarAdmin } from "./_painel";
 import { meta } from "../../seo";
 
 export const metadata = meta({ titulo: "Admin — WorkEnd", caminho: "/app/admin", indexar: false });
@@ -15,19 +17,28 @@ export const dynamic = "force-dynamic";
 
 export default async function Admin() {
   const u = await usuarioAtual().catch(() => null);
-  if (!u) redirect("/entrar");
-  if (!ehAdmin(u)) redirect("/app");
+  const admin = !!u && ehAdmin(u);
   return (
     <>
       <header className="faixa flex items-center justify-between py-5">
         <Link href="/" aria-label="WorkEnd"><Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} priority className="h-9 w-auto" /></Link>
-        <div className="flex items-center gap-3 text-[15px]"><Link href="/app" className="btn btn-linha">Meu painel</Link><Link href="/mundo" className="btn btn-claro">Ver o mapa</Link><BotaoSair /></div>
+        <div className="flex items-center gap-3 text-[15px]">{u && <Link href="/app" className="btn btn-linha">Meu painel</Link>}<Link href="/mundo" className="btn btn-claro">Ver o mapa</Link>{u && <BotaoSair />}</div>
       </header>
-      <section className="faixa pt-4">
-        <h1 className="text-[2rem] lg:text-[2.4rem]">Admin do WorkEnd</h1>
-        <p className="mt-2 max-w-[70ch] text-[var(--tinta-2)]">Tudo que acontece no mundo: lotes reservados e pagos, pagamentos do Mercado Pago e usuários. Banir um imóvel tira a empresa do lote e suspende a conta do dono. Pagamento: <b>{pagamentoLigado() ? "ligado" : "desligado (falta MP_ACCESS_TOKEN)"}</b>.</p>
-      </section>
-      <PainelAdmin />
+      {!admin ? (
+        <section className="faixa pt-4">
+          <h1 className="text-[2rem] lg:text-[2.4rem]">Admin do WorkEnd</h1>
+          <p className="mt-2 max-w-[60ch] text-[var(--tinta-2)]">{u ? <>Você está como <b>{u.email}</b>, que não é admin. </> : null}Entre com a senha do admin: ela abre a conta <b>{ADMIN_EMAIL}</b>.</p>
+          <EntrarAdmin temSenha={temSenhaConfigurada()} />
+        </section>
+      ) : (
+        <>
+          <section className="faixa pt-4">
+            <h1 className="text-[2rem] lg:text-[2.4rem]">Admin do WorkEnd</h1>
+            <p className="mt-2 max-w-[70ch] text-[var(--tinta-2)]">Logado como <b>{u!.email}</b>. Tudo que acontece no mundo: lotes reservados e pagos, pagamentos do Mercado Pago e usuários. Clique no número do lote pra abrir o mapa nele.</p>
+          </section>
+          <PainelAdmin config={{ preco: PRECO_LOTE, precoAdmin: precoPara(u), minutosReserva: MINUTOS_RESERVA, diasMes: DIAS_MES, diasTolerancia: DIAS_TOLERANCIA, pagamento: pagamentoLigado(), adminEmail: ADMIN_EMAIL, eu: u!.email }} />
+        </>
+      )}
       <div className="h-16" />
       <Rodape />
     </>

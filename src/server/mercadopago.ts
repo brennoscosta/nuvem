@@ -2,7 +2,7 @@
 // página do Mercado Pago (Pix, cartão ou boleto) e volta pro mapa. A confirmação vem pelo webhook e também quando
 // ele volta (conferimos na API). Só o Access Token é necessário (MP_ACCESS_TOKEN no CapRover).
 import { sql, id, migrar } from "./db";
-import { PRECO_LOTE, ativarTerreno, estenderReserva, obterTerreno } from "./terrenos";
+import { precoPara, ativarTerreno, estenderReserva, obterTerreno } from "./terrenos";
 import type { Usuario } from "./usuarios";
 
 const API = "https://api.mercadopago.com";
@@ -27,13 +27,14 @@ export async function criarCobranca(u: Usuario, chave: string, numeroLote: numbe
   if (!t || t.usuarioId !== u.id) throw new Error("Reserve o lote antes de pagar.");
   meses = Math.max(1, Math.min(12, meses | 0));
   const pid = id("pag");
-  const valor = PRECO_LOTE * meses;
+  const unit = precoPara(u); // admin paga R$ 0,99 (teste real sem gastar)
+  const valor = Math.round(unit * meses * 100) / 100;
   const volta = (r: string) => `${base}/mundo?lote=${encodeURIComponent(chave)}&pagamento=${r}&ref=${pid}`;
   const pref = await mp<{ id: string; init_point: string; sandbox_init_point?: string }>("/checkout/preferences", {
     method: "POST",
     headers: { "x-idempotency-key": pid },
     body: JSON.stringify({
-      items: [{ id: chave, title: `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"}`, description: `Chão de 20 x 20 m no mundo WorkEnd (${t.empresaNome})`, category_id: "services", quantity: 1, currency_id: "BRL", unit_price: PRECO_LOTE * meses }],
+      items: [{ id: chave, title: `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"}`, description: `Chão de 20 x 20 m no mundo WorkEnd (${t.empresaNome})`, category_id: "services", quantity: 1, currency_id: "BRL", unit_price: valor }],
       payer: { email: u.email, name: u.nome },
       external_reference: pid,
       statement_descriptor: "WORKEND",

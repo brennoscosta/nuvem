@@ -13,13 +13,16 @@ export interface Terreno {
 export interface TerrenoAdmin extends Terreno { email: string; usuarioNome: string; banidoEm: Date | null }
 
 export const PRECO_LOTE = 99; // R$ por lote por mês
+export const ADMIN_EMAIL = "souzacostabrenno@gmail.com"; // dono do WorkEnd: entra no /app/admin com a conta ou com a senha (ADMIN_SENHA)
+// A conta admin paga 1/100 do preço (R$ 0,99) pra testar o pagamento de verdade sem gastar
+export const precoPara = (u: Usuario | null | undefined) => (ehAdmin(u) ? Math.round(PRECO_LOTE) / 100 : PRECO_LOTE);
 export const MINUTOS_RESERVA = 60; // 1 hora pra pagar (pedido do Brenno, 07/11)
 export const DIAS_MES = 30;
 export const DIAS_TOLERANCIA = 5;
 export const COR_PADRAO = "#1D4ED8";
 const MAX_LOGO = 400 * 1024;
 
-export const ehAdmin = (u: Usuario | null | undefined) => !!u && (u.papel === "admin" || (process.env.ADMIN_EMAILS ?? "").toLowerCase().split(",").map((s) => s.trim()).includes(u.email));
+export const ehAdmin = (u: Usuario | null | undefined) => !!u && (u.papel === "admin" || u.email === ADMIN_EMAIL || (process.env.ADMIN_EMAILS ?? "").toLowerCase().split(",").map((s) => s.trim()).includes(u.email));
 
 // Lotes que podem ser comprados: os que estão em quarteirões de lotes (não a Nuvem nem o restaurante)
 export function loteAVenda(chave: string) {
@@ -120,6 +123,28 @@ export async function listarTerrenosAdmin(): Promise<TerrenoAdmin[]> {
 }
 export async function adminLiberar(chave: string) { await migrar(); await sql`DELETE FROM terreno WHERE chave = ${chave}`; }
 export async function adminAtivar(chave: string, meses: number) { await ativarTerreno(chave, Math.max(1, Math.min(12, meses | 0))); }
+// Admin dá (ou tira) dias à mão: dias positivos somam ao pago; negativos encurtam (mínimo: agora)
+export async function adminDias(chave: string, dias: number) {
+  await migrar();
+  const d = Math.max(-3650, Math.min(3650, Math.trunc(dias)));
+  await sql`UPDATE terreno SET status = 'ativo', reservado_ate = NULL, atualizado_em = now(),
+    pago_ate = GREATEST(now(), GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${d})) WHERE chave = ${chave}`;
+}
+// Admin edita a placa de qualquer lote (nome e cor); logo continua a do dono
+export async function adminEditar(chave: string, d: { empresaNome?: string; cor?: string }) {
+  await migrar();
+  const nome = (d.empresaNome ?? "").trim().slice(0, 40);
+  const cor = /^#[0-9a-fA-F]{6}$/.test(d.cor ?? "") ? (d.cor as string) : null;
+  if (!nome && !cor) throw new Error("Nada pra mudar.");
+  await sql`UPDATE terreno SET empresa_nome = COALESCE(NULLIF(${nome}, ''), empresa_nome), cor = COALESCE(${cor}, cor), atualizado_em = now() WHERE chave = ${chave}`;
+}
+// Admin passa o lote pra outro usuário (pelo e-mail) — útil pra corrigir compra feita na conta errada
+export async function adminTransferir(chave: string, email: string) {
+  await migrar();
+  const [u] = await sql<{ id: string }[]>`SELECT id FROM usuario WHERE email = ${email.trim().toLowerCase()}`;
+  if (!u) throw new Error("Não existe usuário com esse e-mail.");
+  await sql`UPDATE terreno SET usuario_id = ${u.id}, atualizado_em = now() WHERE chave = ${chave}`;
+}
 // Banir um imóvel: tira a empresa do lote (o lote volta a ficar à venda) e suspende a conta do dono
 export async function adminBanir(chave: string, motivo: string) {
   await migrar();

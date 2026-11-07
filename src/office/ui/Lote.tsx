@@ -23,6 +23,7 @@ function useContagem(ate: string | null | undefined) {
   const resta = ate ? Math.max(0, new Date(ate).getTime() - (agora + desvio)) : null;
   return { resta, agora: agora + desvio };
 }
+const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
@@ -67,7 +68,7 @@ export function CartaoLote() {
       {livre && (
         <>
           <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm">
-            <div className="flex items-center justify-between"><span className="text-[#5B6472]">Mensalidade</span><span className="font-semibold">R$ {preco}/mês</span></div>
+            <div className="flex items-center justify-between"><span className="text-[#5B6472]">Mensalidade</span><span className="font-semibold">{brl(preco)}/mês</span></div>
             <div className="mt-1 text-xs text-[#5B6472]">Você reserva por {minutos >= 60 ? `${Math.round(minutos / 60)} hora${minutos >= 120 ? "s" : ""}` : `${minutos} minutos`}, coloca o nome e a logo na placa e paga pelo Mercado Pago (Pix ou cartão). Sem pagamento, o lote volta a ficar livre.</div>
           </div>
           {usuario?.banidoEm ? (
@@ -96,7 +97,7 @@ export function CartaoLote() {
             <>
               <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">Garanta o chão pagando o 1º mês agora. Sem pagamento, a reserva some em {resta != null ? mmss(resta) : `${minutos} min`}.</div>
               {pagamentoLigado
-                ? <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Abrindo o Mercado Pago…" : `Pagar R$ ${preco} · 1º mês (Pix ou cartão)`}</button>
+                ? <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Abrindo o Mercado Pago…" : `Pagar ${brl(preco)} · 1º mês (Pix ou cartão)`}</button>
                 : <div className="mt-2 rounded-xl bg-[#F1F3F6] px-3 py-2 text-center text-xs text-[#5B6472]">Pagamento em instantes: estamos ligando o Mercado Pago.</div>}
             </>
           )}
@@ -104,7 +105,7 @@ export function CartaoLote() {
             <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">{diasRestantes > 0 ? `Vence em ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"}.` : "Vencido: você tem 5 dias de tolerância antes de o lote ficar livre."}</div>
           )}
           {ehMeu && ativo && pagamentoLigado && (
-            <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Abrindo o Mercado Pago…" : `Renovar +30 dias · R$ ${preco}`}</button>
+            <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Abrindo o Mercado Pago…" : `Renovar +30 dias · ${brl(preco)}`}</button>
           )}
           {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
           {ehMeu ? (
@@ -189,6 +190,7 @@ async function prepararLogo(f: File): Promise<string> {
 
 export function PainelEmpresa() {
   const aberto = useMundo((s) => s.painelEmpresa);
+  const preco = useMundo((s) => s.preco);
   const chave = useMundo((s) => s.loteSelecionado);
   const rascunho = useMundo((s) => s.rascunho);
   const setRascunho = useMundo((s) => s.setRascunho);
@@ -237,7 +239,7 @@ export function PainelEmpresa() {
         </div>
       </div>
 
-      <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Reservar segura o lote por 1 hora pra você pagar o 1º mês (R$ 99, Pix ou cartão). Ao reservar você concorda com as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros na placa.</div>
+      <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Reservar segura o lote por 1 hora pra você pagar o 1º mês ({brl(preco)}, Pix ou cartão). Ao reservar você concorda com as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros na placa.</div>
       {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
       <div className="mt-3 flex justify-end gap-2">
         <button onClick={fechar} className="rounded-xl px-4 py-2 text-sm text-[#5B6472]">Cancelar</button>

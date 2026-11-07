@@ -65,6 +65,13 @@ export async function usuarioAtual(): Promise<Usuario | null> {
   return u ?? null;
 }
 
+// Garante que a conta do dono tem papel admin e devolve ela (null se não existir)
+export async function garantirAdmin(email: string): Promise<Usuario | null> {
+  await migrar();
+  const [u] = await sql<Usuario[]>`UPDATE usuario SET papel = 'admin', ultimo_acesso = now() WHERE email = ${email.toLowerCase()} RETURNING id, email, nome, empresa_nome, interesse_em, criado_em, ultimo_acesso, papel, banido_em, banido_motivo`;
+  return u ?? null;
+}
+
 export async function marcarInteresse(usuarioId: string) {
   await sql`UPDATE usuario SET interesse_em = COALESCE(interesse_em, now()) WHERE id = ${usuarioId}`;
 }
