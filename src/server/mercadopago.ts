@@ -4,6 +4,8 @@
 import { sql, id, migrar } from "./db";
 import { precoPara, ativarTerreno, estenderReserva, obterTerreno } from "./terrenos";
 import type { Usuario } from "./usuarios";
+import { enviarEmail, brl, dataBR } from "./email";
+import { LOTE_POR_CHAVE } from "@/office/data/mundo";
 
 const API = "https://api.mercadopago.com";
 export const pagamentoLigado = () => !!process.env.MP_ACCESS_TOKEN;
@@ -59,7 +61,11 @@ async function aplicar(p: PagamentoMP) {
   const status = p.status === "approved" ? "aprovado" : p.status === "rejected" ? "rejeitado" : p.status === "refunded" || p.status === "charged_back" ? "estornado" : p.status === "cancelled" ? "cancelado" : "pendente";
   const jaAprovado = reg.status === "aprovado";
   await sql`UPDATE pagamento SET status = ${status}, pagamento_id = ${String(p.id)}, metodo = ${p.payment_method_id ?? p.payment_type_id ?? null}, pago_em = ${p.date_approved ? new Date(p.date_approved) : reg.pagoEm}, bruto = ${sql.json(p as unknown as Parameters<typeof sql.json>[0])} WHERE id = ${ref}`;
-  if (status === "aprovado" && !jaAprovado) await ativarTerreno(reg.terrenoChave, reg.meses);
+  if (status === "aprovado" && !jaAprovado) {
+    await ativarTerreno(reg.terrenoChave, reg.meses);
+    const [d] = await sql<{ email: string; nome: string; empresaNome: string | null; pagoAte: Date | null }[]>`SELECT u.email, u.nome, t.empresa_nome, t.pago_ate FROM usuario u LEFT JOIN terreno t ON t.chave = ${reg.terrenoChave} WHERE u.id = ${reg.usuarioId}`;
+    if (d) void enviarEmail("pagamento", d.email, { nome: d.nome, empresa: d.empresaNome ?? "", lote: `Lote ${LOTE_POR_CHAVE[reg.terrenoChave]?.numero ?? "?"}`, valor: brl(Number(reg.valor)), pago_ate: dataBR(d.pagoAte), link_mapa: `https://workend.online/mundo?lote=${encodeURIComponent(reg.terrenoChave)}`, link_painel: "https://workend.online/app" });
+  }
   return { ...reg, status };
 }
 
