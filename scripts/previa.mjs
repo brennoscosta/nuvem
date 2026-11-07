@@ -2,7 +2,7 @@
 // Uso: node scripts/previa.mjs <url> <saida.jpg> [esperaMs] [largura] [altura]
 import { chromium } from "playwright";
 const [, , url = "http://localhost:3077/", out = "previa.jpg", esperaMs = "9000", W = "1440", H = "900"] = process.argv;
-const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--enable-webgl"] });
+const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--enable-webgl"] });
 const page = await browser.newPage({ viewport: { width: +W, height: +H }, deviceScaleFactor: 1 });
 const erros = [];
 page.on("pageerror", (e) => erros.push("pageerror: " + e.message));

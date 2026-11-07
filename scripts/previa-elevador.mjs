@@ -1,6 +1,6 @@
 // Teste do elevador: gerente do 1º andar é chamada pra reunião no térreo; fotografa antes (1º andar) e depois (térreo).
 import { chromium } from "playwright";
-const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
+const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const erros = []; page.on("pageerror", (e) => erros.push(e.message.slice(0, 160)));
 await page.goto("http://localhost:3077/?cenlocal=1&turbo=6", { waitUntil: "domcontentloaded", timeout: 120000 });

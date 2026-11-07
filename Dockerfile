@@ -9,8 +9,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-# modelos 3D da cidade (GLB gerados no Higgsfield) — baixados no build pra não pesar o repo
-RUN node scripts/cidade/baixar.mjs
+# modelos 3D (GLB gerados no Higgsfield, otimizados) ficam no repo em public/modelos desde 07/11
 RUN npm run build
 
 FROM node:22-alpine AS runner

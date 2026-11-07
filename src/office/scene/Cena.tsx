@@ -1,11 +1,11 @@
 "use client";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { Canvas, advance, useFrame } from "@react-three/fiber";
+import { Canvas, advance, useFrame, useThree } from "@react-three/fiber";
 import { MapControls, PerformanceMonitor } from "@react-three/drei";
 import * as THREE from "three";
 import { Predio } from "./Predio";
-import { Entorno, TERRENO } from "./Entorno";
-import { Horizonte } from "./Horizonte";
+import { Mundo } from "./Mundo";
+import { MUNDO } from "../data/mundo";
 import { Fachada } from "./Fachada";
 import { Agente, handlers } from "./Agente";
 import { qualidade } from "./qualidade";
@@ -41,8 +41,8 @@ const RETRATO = typeof window !== "undefined" && window.innerWidth < window.inne
 const FOV = RETRATO ? Math.min(52, (32 / (window.innerWidth / window.innerHeight)) * 0.7) : 32;
 if (RETRATO) { CAM_DENTRO.pos.multiplyScalar(1.2); CAM_FORA.pos.multiplyScalar(1.15); }
 const CAM_INICIAL = CAM ? { pos: [CAM[0], CAM[1], CAM[2]] as [number, number, number], alvo: [CAM[3], CAM[4], CAM[5]] as [number, number, number] } : { pos: CAM_DENTRO.pos.toArray() as [number, number, number], alvo: CAM_DENTRO.alvo.toArray() as [number, number, number] };
-// até onde o centro da tela pode ir ao arrastar (não deixa a câmera escapar do terreno e ver a borda dos painéis)
-const LIMITE = { x: TERRENO.x - 16, z: TERRENO.z - 14 };
+// até onde o centro da tela pode ir ao arrastar (não deixa a câmera escapar do mundo e ver a borda dos painéis)
+const LIMITE = { x: MUNDO.x - 22, z: MUNDO.z - 22 };
 
 const DESLOCA = new THREE.Vector3();
 // Quando o usuário seleciona um agente, a câmera desliza até a mesa dele; trocar de vista reenquadra
@@ -76,16 +76,26 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
 }
 
 // Sombras "assadas": o mapa de sombras é recalculado só de vez em quando (quem anda não projeta sombra; usa a
-// mancha de contato). Economiza um passe inteiro de desenho por quadro.
-function SombrasFixas() {
+// mancha de contato). Economiza um passe inteiro de desenho por quadro. O mundo é grande, então a câmera de sombra
+// (±26 m) acompanha o ponto que o usuário está olhando: quando ele arrasta pra longe, a luz muda de lugar e refaz.
+const SOL = new THREE.Vector3(12, 22, 10);
+function SombrasFixas({ luz, controles }: { luz: React.RefObject<THREE.DirectionalLight | null>; controles: React.RefObject<any> }) {
   const vista = useEscritorio((s) => s.vista);
   const prox = useRef(0);
   const vistaFeita = useRef<string | null>(null);
+  const centro = useRef(new THREE.Vector3(1e9, 0, 0));
   // modelos e fontes chegam aos poucos: refaz a sombra a cada 1 s nos primeiros 12 s, depois a cada 5 s e quando a vista muda
   useFrame(({ gl, clock }) => {
     gl.shadowMap.autoUpdate = false;
     const t = clock.elapsedTime;
-    if (t >= prox.current || vistaFeita.current !== vista) { gl.shadowMap.needsUpdate = true; prox.current = t + (t < 12 ? 1 : 5); vistaFeita.current = vista; }
+    let refaz = t >= prox.current || vistaFeita.current !== vista;
+    const l = luz.current, alvo = controles.current?.target as THREE.Vector3 | undefined;
+    if (l && alvo && alvo.distanceTo(centro.current) > 6) {
+      centro.current.copy(alvo);
+      l.position.copy(alvo).add(SOL); l.target.position.copy(alvo); l.target.updateMatrixWorld();
+      refaz = true;
+    }
+    if (refaz) { gl.shadowMap.needsUpdate = true; prox.current = t + (t < 12 ? 1 : 5); vistaFeita.current = vista; }
   });
   return null;
 }
@@ -101,14 +111,23 @@ function Limite30() {
   return null;
 }
 
-function Luzes({ sombras }: { sombras: boolean }) {
+// ?medir=1: expõe o renderer em window.__cena pra medir draw calls nas prévias (scripts/medir.mjs)
+function Medidor() {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => { (window as unknown as { __cena?: unknown }).__cena = gl; }, [gl]);
+  return null;
+}
+const MEDIR = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("medir");
+
+function Luzes({ sombras, luz }: { sombras: boolean; luz: React.RefObject<THREE.DirectionalLight | null> }) {
   return (
     <>
       <hemisphereLight args={["#FFFFFF", "#CDD3DB", 0.9]} />
       <directionalLight
+        ref={luz}
         position={[12, 22, 10]} intensity={2.2} color="#FFF6E8" castShadow={sombras}
         shadow-mapSize={[1024, 1024]} shadow-bias={-0.0004} shadow-normalBias={0.02} shadow-radius={4}
-        shadow-camera-left={-24} shadow-camera-right={24} shadow-camera-top={24} shadow-camera-bottom={-24} shadow-camera-near={1} shadow-camera-far={70}
+        shadow-camera-left={-26} shadow-camera-right={26} shadow-camera-top={26} shadow-camera-bottom={-26} shadow-camera-near={1} shadow-camera-far={80}
       />
       <directionalLight position={[-14, 10, -8]} intensity={0.5} color="#DCE8FF" />
     </>
@@ -119,6 +138,7 @@ export function Cena() {
   const agentes = useEscritorio((s) => s.agentes);
   const ordem = useEscritorio((s) => s.ordem);
   const controles = useRef<any>(null);
+  const luz = useRef<THREE.DirectionalLight | null>(null);
   const leve = qualidade() === "leve";
   // alta: resolução até 1,5x, baixa pra 1x se o computador não der conta (PerformanceMonitor); leve: sempre 1x
   const maxDpr = leve ? 1 : Math.min(1.5, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
@@ -129,28 +149,28 @@ export function Cena() {
       dpr={dpr}
       frameloop={leve ? "never" : "always"}
       shadows={leve ? false : { enabled: true, type: THREE.PCFShadowMap }}
-      camera={{ position: cam.pos, fov: FOV, near: 0.5, far: 160 }}
+      camera={{ position: cam.pos, fov: FOV, near: 0.5, far: 420 }}
       gl={{ antialias: true, powerPreference: "high-performance" }}
       onPointerMissed={() => useEscritorio.getState().selecionar(null)}>
       <color attach="background" args={["#CFE3F5"]} />
-      <fog attach="fog" args={["#CFE3F5", 55, 130]} />
+      <fog attach="fog" args={["#CFE3F5", 140, 360]} />
       {leve ? <Limite30 /> : (
         <>
-          <SombrasFixas />
+          <SombrasFixas luz={luz} controles={controles} />
           {/* só reage a queda sustentada (abaixo de 35 fps): os tropeços do carregamento não contam */}
           <PerformanceMonitor bounds={() => [35, 55]} flipflops={4} onDecline={() => setDpr(1)} onIncline={() => setDpr(maxDpr)} onFallback={() => setDpr(1)} />
         </>
       )}
-      <Luzes sombras={!leve} />
+      <Luzes sombras={!leve} luz={luz} />
       <Suspense fallback={null}>
-        <Horizonte />
-        <Entorno />
+        <Mundo />
         <Predio />
         <Fachada />
         {ordem.map((id) => agentes[id] && <Agente key={id} def={agentes[id]} />)}
       </Suspense>
       <Despachante />
-      <MapControls ref={controles} target={cam.alvo} minDistance={4} maxDistance={RETRATO ? 60 : 52} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
+      {MEDIR && <Medidor />}
+      <MapControls ref={controles} target={cam.alvo} minDistance={4} maxDistance={RETRATO ? 110 : 95} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
       <FocoCamera controles={controles} />
     </Canvas>
   );

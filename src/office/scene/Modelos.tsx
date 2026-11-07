@@ -14,13 +14,21 @@ export class ComFallback extends Component<{ fallback: ReactNode; children: Reac
 }
 
 export const MODELO = {
-  predioEscritorio: "/modelos/predio-escritorio.glb",
-  predioResidencial: "/modelos/predio-residencial.glb",
-  carro: "/modelos/carro.glb",
+  // cidade (20/10)
   arvore: "/modelos/arvore.glb",
   palmeira: "/modelos/palmeira.glb",
   banco: "/modelos/banco.glb",
   poste: "/modelos/poste.glb",
+  // mundo WorkEnd (07/11): restaurante, casas à venda e carros (Tripo H3.1 via Higgsfield)
+  restaurante: "/modelos/restaurante.glb",
+  casaVelha: "/modelos/casa-velha.glb",
+  casaTerrea: "/modelos/casa-terrea.glb",
+  casaSobrado: "/modelos/casa-sobrado.glb",
+  casaColonial: "/modelos/casa-colonial.glb",
+  casaModerna: "/modelos/casa-moderna.glb",
+  carroSuv: "/modelos/carro-suv.glb",
+  carroHatch: "/modelos/carro-hatch.glb",
+  carroSedan: "/modelos/carro-sedan.glb",
 } as const;
 export type NomeModelo = keyof typeof MODELO;
 
@@ -47,9 +55,11 @@ export function Modelo({ nome, position, rotation = 0, altura = 1, cor, escalaXZ
 export type ItemInstancia = { pos: [number, number, number]; rot?: number; altura?: number; escalaXZ?: number };
 export function ModeloInstanciado({ nome, itens, sombra = true }: { nome: NomeModelo; itens: ItemInstancia[]; sombra?: boolean }) {
   const gltf = useGLTF(MODELO[nome]);
+  // cada malha guarda a matriz do nó dentro do GLB (os modelos quantizados têm translação/escala no nó)
   const partes = useMemo(() => {
-    const out: { geo: THREE.BufferGeometry; mat: THREE.Material }[] = [];
-    gltf.scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) out.push({ geo: m.geometry, mat: m.material as THREE.Material }); });
+    const out: { geo: THREE.BufferGeometry; mat: THREE.Material; no: THREE.Matrix4 }[] = [];
+    gltf.scene.updateMatrixWorld(true);
+    gltf.scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) out.push({ geo: m.geometry, mat: m.material as THREE.Material, no: m.matrixWorld.clone() }); });
     return out;
   }, [gltf.scene]);
   const matrizes = useMemo(() => {
@@ -59,7 +69,7 @@ export function ModeloInstanciado({ nome, itens, sombra = true }: { nome: NomeMo
   return (
     <group>
       {partes.map((p, i) => (
-        <instancedMesh key={i} args={[p.geo, p.mat, itens.length]} castShadow={sombra} ref={(im) => { if (!im) return; matrizes.forEach((m, k) => im.setMatrixAt(k, m)); im.instanceMatrix.needsUpdate = true; }} />
+        <instancedMesh key={i} args={[p.geo, p.mat, itens.length]} castShadow={sombra} ref={(im) => { if (!im) return; const t = new THREE.Matrix4(); matrizes.forEach((m, k) => im.setMatrixAt(k, t.multiplyMatrices(m, p.no))); im.instanceMatrix.needsUpdate = true; }} />
       ))}
     </group>
   );

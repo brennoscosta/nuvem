@@ -43,9 +43,9 @@ next-env.d.ts
 # fontes brutas da marca (ficam fora do repo)
 /brand-src/
 public/cenario/
-# modelos 3D baixados no build (scripts/cidade/baixar.mjs)
-public/modelos/
+# modelos 3D otimizados ficam no repo (public/modelos) desde 07/11; o download do CDN (baixar.mjs) é só histórico
 # screenshots das prévias
 /previa*.jpg
 # vídeos enviados pelo dono (ficam no disco do servidor)
 /uploads/
+.higgs/
