@@ -1,5 +1,5 @@
 // Pagamento do chão no Mercado Pago (Checkout Pro): criamos uma preferência de R$ 99 x meses, o comprador paga na
-// página do Mercado Pago (Pix, cartão ou boleto) e volta pro mapa. A confirmação vem pelo webhook e também quando
+// página do Mercado Pago (Pix ou saldo da conta Mercado Pago) e volta pro mapa. A confirmação vem pelo webhook e também quando
 // ele volta (conferimos na API). Só o Access Token é necessário (MP_ACCESS_TOKEN no CapRover).
 import { sql, id, migrar } from "./db";
 import { precoPara, ativarTerreno, estenderReserva, obterTerreno } from "./terrenos";
@@ -40,6 +40,8 @@ export async function criarCobranca(u: Usuario, chave: string, numeroLote: numbe
       payer: { email: u.email, name: u.nome },
       external_reference: pid,
       statement_descriptor: "WORKEND",
+      // Só Pix e saldo da conta Mercado Pago (decisão do Brenno, 07/11): tira cartão, boleto, débito, pré-pago e caixa eletrônico
+      payment_methods: { excluded_payment_types: [{ id: "credit_card" }, { id: "debit_card" }, { id: "prepaid_card" }, { id: "ticket" }, { id: "atm" }], installments: 1 },
       back_urls: { success: volta("ok"), pending: volta("pendente"), failure: volta("falhou") },
       auto_return: "approved",
       notification_url: `${base}/api/mercadopago/webhook`,

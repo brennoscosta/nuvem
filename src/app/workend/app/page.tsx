@@ -43,7 +43,7 @@ export default async function App() {
             </>
           ) : (
             <>
-              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">O WorkEnd é um mundo com lotes à venda: R$ 99 por lote, por mês. Escolha o seu no mapa, coloque o nome e a logomarca na placa, reserve por 1 hora e pague pelo Mercado Pago (Pix ou cartão).</p>
+              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">O WorkEnd é um mundo com lotes à venda: R$ 99 por lote, por mês. Escolha o seu no mapa, coloque o nome e a logomarca na placa, reserve por 1 hora e pague pelo Mercado Pago (Pix ou saldo do Mercado Pago).</p>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Link href="/mundo" className="btn btn-azul">Escolher meu chão no mapa</Link>
                 <BotaoAvisar marcado={!!u.interesseEm} />
