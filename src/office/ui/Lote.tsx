@@ -68,7 +68,7 @@ export function CartaoLote() {
         <>
           <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm">
             <div className="flex items-center justify-between"><span className="text-[#5B6472]">Mensalidade</span><span className="font-semibold">R$ {preco}/mês</span></div>
-            <div className="mt-1 text-xs text-[#5B6472]">Você reserva por {minutos} minutos, coloca o nome e a logo na placa e paga pelo Mercado Pago (Pix ou cartão). Sem pagamento, o lote volta a ficar livre.</div>
+            <div className="mt-1 text-xs text-[#5B6472]">Você reserva por {minutos >= 60 ? `${Math.round(minutos / 60)} hora${minutos >= 120 ? "s" : ""}` : `${minutos} minutos`}, coloca o nome e a logo na placa e paga pelo Mercado Pago (Pix ou cartão). Sem pagamento, o lote volta a ficar livre.</div>
           </div>
           {usuario?.banidoEm ? (
             <div className="mt-3 rounded-xl bg-[#FDE8E8] px-3 py-2 text-xs text-[#8A2A2A]">Sua conta está suspensa por descumprir as políticas de uso. Fale com contato@workend.online.</div>
@@ -237,11 +237,11 @@ export function PainelEmpresa() {
         </div>
       </div>
 
-      <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Reservar segura o lote por 10 minutos pra você pagar o 1º mês (R$ 99, Pix ou cartão). Ao reservar você concorda com as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros na placa.</div>
+      <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Reservar segura o lote por 1 hora pra você pagar o 1º mês (R$ 99, Pix ou cartão). Ao reservar você concorda com as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros na placa.</div>
       {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
       <div className="mt-3 flex justify-end gap-2">
         <button onClick={fechar} className="rounded-xl px-4 py-2 text-sm text-[#5B6472]">Cancelar</button>
-        <button onClick={enviar} disabled={enviando || rascunho.empresaNome.trim().length < 2} className="rounded-xl bg-[#1D4ED8] px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{enviando ? "Salvando…" : editando ? "Salvar placa" : "Reservar por 10 min e pagar"}</button>
+        <button onClick={enviar} disabled={enviando || rascunho.empresaNome.trim().length < 2} className="rounded-xl bg-[#1D4ED8] px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{enviando ? "Salvando…" : editando ? "Salvar placa" : "Reservar por 1 hora e pagar"}</button>
       </div>
     </div>
   );

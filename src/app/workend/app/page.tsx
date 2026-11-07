@@ -35,7 +35,7 @@ export default async function App() {
           <h2 className="text-[1.5rem]">Seu chão no mundo</h2>
           {chao ? (
             <>
-              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">{chao.status === "ativo" ? <>Seu lote de 20 × 20 m está <b>ativo até {chao.pagoAte ? new Date(chao.pagoAte).toLocaleDateString("pt-BR") : "—"}</b>, com a placa <b>{chao.empresaNome}</b> no mapa. Renove pelo mapa quando quiser.</> : <>Você reservou um lote de 20 × 20 m com a placa <b>{chao.empresaNome}</b>. A reserva vale 10 minutos: pague o 1º mês (R$ 99) no mapa pra garantir.</>}</p>
+              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">{chao.status === "ativo" ? <>Seu lote de 20 × 20 m está <b>ativo até {chao.pagoAte ? new Date(chao.pagoAte).toLocaleDateString("pt-BR") : "—"}</b>, com a placa <b>{chao.empresaNome}</b> no mapa. Renove pelo mapa quando quiser.</> : <>Você reservou um lote de 20 × 20 m com a placa <b>{chao.empresaNome}</b>. A reserva vale 1 hora: pague o 1º mês (R$ 99) no mapa pra garantir.</>}</p>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Link href={`/mundo?lote=${encodeURIComponent(chao.chave)}`} className="btn btn-azul">Ver meu chão no mapa</Link>
                 <BotaoAvisar marcado={!!u.interesseEm} />
@@ -43,7 +43,7 @@ export default async function App() {
             </>
           ) : (
             <>
-              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">O WorkEnd é um mundo com lotes à venda: R$ 99 por lote, por mês. Escolha o seu no mapa, coloque o nome e a logomarca na placa, reserve por 10 minutos e pague pelo Mercado Pago (Pix ou cartão).</p>
+              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">O WorkEnd é um mundo com lotes à venda: R$ 99 por lote, por mês. Escolha o seu no mapa, coloque o nome e a logomarca na placa, reserve por 1 hora e pague pelo Mercado Pago (Pix ou cartão).</p>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Link href="/mundo" className="btn btn-azul">Escolher meu chão no mapa</Link>
                 <BotaoAvisar marcado={!!u.interesseEm} />

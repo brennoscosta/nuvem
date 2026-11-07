@@ -1,5 +1,5 @@
 // Lotes do mundo WorkEnd (tabela terreno). A planta (quais lotes existem) vem do código; aqui ficam as reservas,
-// os chãos pagos e as ações do admin. Regras: a reserva vale 10 minutos sem pagamento; pagar (R$ 99 por lote
+// os chãos pagos e as ações do admin. Regras: a reserva vale 1 hora sem pagamento; pagar (R$ 99 por lote
 // por mês) deixa o chão ativo por 30 dias, com 5 dias de tolerância depois do vencimento; um chão por conta
 // (o admin não tem essa trava); usuário banido não reserva.
 import { sql, migrar } from "./db";
@@ -13,7 +13,7 @@ export interface Terreno {
 export interface TerrenoAdmin extends Terreno { email: string; usuarioNome: string; banidoEm: Date | null }
 
 export const PRECO_LOTE = 99; // R$ por lote por mês
-export const MINUTOS_RESERVA = 10;
+export const MINUTOS_RESERVA = 60; // 1 hora pra pagar (pedido do Brenno, 07/11)
 export const DIAS_MES = 30;
 export const DIAS_TOLERANCIA = 5;
 export const COR_PADRAO = "#1D4ED8";
@@ -31,7 +31,7 @@ export function loteAVenda(chave: string) {
 // trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
 const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate`;
 
-// Apaga o que venceu: reserva sem pagamento depois de 10 min; chão pago depois do vencimento + tolerância
+// Apaga o que venceu: reserva sem pagamento depois de 1 h; chão pago depois do vencimento + tolerância
 async function limparVencidos() {
   await sql`DELETE FROM terreno WHERE status = 'reservado' AND reservado_ate IS NOT NULL AND reservado_ate < now()`;
   await sql`DELETE FROM terreno WHERE status = 'ativo' AND pago_ate IS NOT NULL AND pago_ate + make_interval(days => ${DIAS_TOLERANCIA}) < now()`;
