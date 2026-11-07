@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { sql, id, migrar } from "./db";
 
-export interface Usuario { id: string; email: string; nome: string; empresaNome: string; interesseEm: Date | null; criadoEm: Date; ultimoAcesso: Date | null }
+export interface Usuario { id: string; email: string; nome: string; empresaNome: string; interesseEm: Date | null; criadoEm: Date; ultimoAcesso: Date | null; papel: "dono" | "admin"; banidoEm: Date | null; banidoMotivo: string | null }
 
 const COOKIE = "workend_sessao";
 const DIAS = 30;
@@ -32,13 +32,13 @@ export async function criarUsuario(d: { email: string; senha: string; nome: stri
   if (!d.nome.trim()) throw new Error("Diga seu nome.");
   const [existe] = await sql`SELECT 1 FROM usuario WHERE email = ${email}`;
   if (existe) throw new Error("Já existe uma conta com esse e-mail. Entre com ela.");
-  const [u] = await sql<Usuario[]>`INSERT INTO usuario (id, email, nome, empresa_nome, senha_hash) VALUES (${id("usr")}, ${email}, ${d.nome.trim().slice(0, 80)}, ${(d.empresaNome ?? "").trim().slice(0, 80)}, ${hashSenha(d.senha)}) RETURNING id, email, nome, empresa_nome, interesse_em, criado_em, ultimo_acesso`;
+  const [u] = await sql<Usuario[]>`INSERT INTO usuario (id, email, nome, empresa_nome, senha_hash) VALUES (${id("usr")}, ${email}, ${d.nome.trim().slice(0, 80)}, ${(d.empresaNome ?? "").trim().slice(0, 80)}, ${hashSenha(d.senha)}) RETURNING id, email, nome, empresa_nome, interesse_em, criado_em, ultimo_acesso, papel, banido_em, banido_motivo`;
   return u;
 }
 
 export async function autenticar(email: string, senha: string) {
   await migrar();
-  const [r] = await sql<(Usuario & { senhaHash: string })[]>`SELECT id, email, nome, empresa_nome, interesse_em, criado_em, ultimo_acesso, senha_hash FROM usuario WHERE email = ${email.trim().toLowerCase()}`;
+  const [r] = await sql<(Usuario & { senhaHash: string })[]>`SELECT id, email, nome, empresa_nome, interesse_em, criado_em, ultimo_acesso, papel, banido_em, banido_motivo, senha_hash FROM usuario WHERE email = ${email.trim().toLowerCase()}`;
   if (!r || !senhaOk(senha, r.senhaHash)) return null;
   await sql`UPDATE usuario SET ultimo_acesso = now() WHERE id = ${r.id}`;
   const { senhaHash: _s, ...u } = r; void _s;
@@ -61,10 +61,18 @@ export async function usuarioAtual(): Promise<Usuario | null> {
   const [uid, exp] = payload.split(".");
   if (!uid || Number(exp) < Date.now()) return null;
   await migrar();
-  const [u] = await sql<Usuario[]>`SELECT id, email, nome, empresa_nome, interesse_em, criado_em, ultimo_acesso FROM usuario WHERE id = ${uid}`;
+  const [u] = await sql<Usuario[]>`SELECT id, email, nome, empresa_nome, interesse_em, criado_em, ultimo_acesso, papel, banido_em, banido_motivo FROM usuario WHERE id = ${uid}`;
   return u ?? null;
 }
 
 export async function marcarInteresse(usuarioId: string) {
   await sql`UPDATE usuario SET interesse_em = COALESCE(interesse_em, now()) WHERE id = ${usuarioId}`;
+}
+
+// ---------- admin ----------
+export interface UsuarioAdmin extends Usuario { lote: string | null; loteStatus: string | null }
+export async function listarUsuarios(): Promise<UsuarioAdmin[]> {
+  await migrar();
+  return sql<UsuarioAdmin[]>`SELECT u.id, u.email, u.nome, u.empresa_nome, u.interesse_em, u.criado_em, u.ultimo_acesso, u.papel, u.banido_em, u.banido_motivo, t.chave AS lote, t.status AS lote_status
+    FROM usuario u LEFT JOIN terreno t ON t.usuario_id = u.id ORDER BY u.criado_em DESC`;
 }

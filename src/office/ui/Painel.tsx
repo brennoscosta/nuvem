@@ -10,7 +10,7 @@ import { PainelAgente, STATUS } from "./PainelAgente";
 import { MenuAgente } from "./MenuAgente";
 import { Mural } from "./Mural";
 import { ModalLogin, CartaoPublico } from "./Login";
-import { CartaoLote, PainelEmpresa, ContaWorkend } from "./Lote";
+import { CartaoLote, PainelEmpresa, ContaWorkend, AvisoPagamento } from "./Lote";
 import { useMundo, modoMundo } from "../mundoStore";
 
 // Estamos no mapa do WorkEnd (workend.online/mundo)? Só dá pra saber no navegador (sem erro de hidratação).
@@ -241,6 +241,7 @@ export function Painel() {
       <PainelOuCartao />
       <CartaoLote />
       <PainelEmpresa />
+      <AvisoPagamento />
       <ModalLogin />
       <ModalContratar />
       <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2">

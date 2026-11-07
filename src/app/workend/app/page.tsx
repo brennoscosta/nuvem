@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
-import { terrenoDoUsuario } from "@/server/terrenos";
+import { terrenoDoUsuario, ehAdmin } from "@/server/terrenos";
 import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
 import { BotaoSair, BotaoAvisar } from "../_conta";
 
@@ -21,7 +21,7 @@ export default async function App() {
     <>
       <header className="faixa flex items-center justify-between py-5">
         <Link href="/" aria-label="WorkEnd"><Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} priority className="h-9 w-auto" /></Link>
-        <div className="flex items-center gap-3 text-[15px]"><span className="hidden text-[var(--tinta-2)] sm:inline">{u.email}</span><BotaoSair /></div>
+        <div className="flex items-center gap-3 text-[15px]">{ehAdmin(u) && <Link href="/app/admin" className="btn btn-claro">Admin</Link>}<span className="hidden text-[var(--tinta-2)] sm:inline">{u.email}</span><BotaoSair /></div>
       </header>
 
       <section className="faixa pt-4">
@@ -35,7 +35,7 @@ export default async function App() {
           <h2 className="text-[1.5rem]">Seu chão no mundo</h2>
           {chao ? (
             <>
-              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">Você reservou um lote de 20 × 20 m no mapa do WorkEnd. A placa já está lá com o nome <b>{chao.empresaNome}</b>. Quando a compra abrir, você confirma e o escritório começa a subir.</p>
+              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">{chao.status === "ativo" ? <>Seu lote de 20 × 20 m está <b>ativo até {chao.pagoAte ? new Date(chao.pagoAte).toLocaleDateString("pt-BR") : "—"}</b>, com a placa <b>{chao.empresaNome}</b> no mapa. Renove pelo mapa quando quiser.</> : <>Você reservou um lote de 20 × 20 m com a placa <b>{chao.empresaNome}</b>. A reserva vale 10 minutos: pague o 1º mês (R$ 99) no mapa pra garantir.</>}</p>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Link href={`/mundo?lote=${encodeURIComponent(chao.chave)}`} className="btn btn-azul">Ver meu chão no mapa</Link>
                 <BotaoAvisar marcado={!!u.interesseEm} />
@@ -43,7 +43,7 @@ export default async function App() {
             </>
           ) : (
             <>
-              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">O WorkEnd é um mundo com lotes à venda. Escolha o seu no mapa, coloque o nome e a logomarca na placa e reserve. Sem cobrança nesta fase: quem reserva agora entra com condição de fundador.</p>
+              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">O WorkEnd é um mundo com lotes à venda: R$ 99 por lote, por mês. Escolha o seu no mapa, coloque o nome e a logomarca na placa, reserve por 10 minutos e pague pelo Mercado Pago (Pix ou cartão).</p>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Link href="/mundo" className="btn btn-azul">Escolher meu chão no mapa</Link>
                 <BotaoAvisar marcado={!!u.interesseEm} />

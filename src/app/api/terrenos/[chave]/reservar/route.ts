@@ -12,8 +12,8 @@ export async function POST(req: Request, { params }: Ctx) {
     if (!u) return erro("Entre na sua conta do WorkEnd pra reservar um chão.", 401);
     const { chave } = await params;
     const d = await corpo<{ empresaNome: string; cor?: string; logoBase64?: string | null; logoTipo?: string | null; manterLogo?: boolean }>(req);
-    return ok(await reservarTerreno(u.id, decodeURIComponent(chave), d));
-  } catch (e) { return erro(e, e instanceof Error && /não está à venda|outra empresa|nome|Logo/.test(e.message) ? 400 : 500); }
+    return ok(await reservarTerreno(u, decodeURIComponent(chave), d));
+  } catch (e) { return erro(e, e instanceof Error && /não está à venda|outra empresa|nome|Logo|suspensa|já tem um chão/.test(e.message) ? 400 : 500); }
 }
 
 export async function DELETE(_req: Request, { params }: Ctx) {

@@ -13,7 +13,7 @@ export function proxy(req: NextRequest) {
   if (p === "/admin" || p === "/admin/") { url.pathname = "/"; return noindex(NextResponse.rewrite(url)); }
   if (p === "/mundo" || p === "/mundo/") { url.pathname = "/"; return NextResponse.rewrite(url); }
   if (p === "/app" || p.startsWith("/app/")) { url.pathname = "/workend" + p; return noindex(NextResponse.rewrite(url)); }
-  if (p === "/" || p === "/cadastro" || p === "/entrar") { url.pathname = "/workend" + (p === "/" ? "" : p); return NextResponse.rewrite(url); }
+  if (p === "/" || p === "/cadastro" || p === "/entrar" || p === "/politicas") { url.pathname = "/workend" + (p === "/" ? "" : p); return NextResponse.rewrite(url); }
   return NextResponse.next();
 }
 

@@ -23,7 +23,7 @@ console.log("link cadastro:", linkCadastro);
 
 // 2) cadastro com ?lote= → volta pro mundo com o painel aberto
 const email = `teste${Date.now()}@exemplo.com`;
-await page.goto(`${base}${linkCadastro}`, { waitUntil: "domcontentloaded" });
+await page.goto(`${base}${linkCadastro}`, { waitUntil: "networkidle" }); await page.waitForTimeout(1200);
 await page.fill("input[autocomplete=name]", "Maria Teste");
 await page.fill("input[autocomplete=organization]", "Padaria da Maria");
 await page.fill("input[type=email]", email);

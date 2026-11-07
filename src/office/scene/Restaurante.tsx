@@ -3,10 +3,13 @@
 // o lote coloca o nome. Prédio = modelo do Higgsfield (por fora); estacionamento, faixa do drive-thru, totem,
 // mesinhas e jardim em código. Por dentro (balcão, cozinha, mesas pros funcionários) entra quando tiver equipe.
 import { useMemo } from "react";
-import { caixa, cilindro, esfera, mat, plano, anel } from "./geo";
+import { caixa, cilindro, esfera, mat, plano, anel, COR } from "./geo";
 import { ComFallback, Modelo, ModeloInstanciado } from "./Modelos";
 import { Estatico } from "./Estatico";
+import { Cadeira, Planta, Sofa } from "./Moveis";
+import { useEscritorio } from "../store";
 import { centroQuarteirao, MEIO_Q } from "../data/mundo";
+import { LANCH, BALCAO_X, COZINHA_X0, FAIXA_SUL_Z, DRIVE_X1, PORTA, JANELA_DRIVE, LUGARES_LANCHONETE } from "../data/lanchonete";
 
 const [CX, CZ] = centroQuarteirao(1, 0);
 // prédio: 17,4 m de frente (olhando pro oeste, pra Nuvem) x 14,3 m de fundo; altura 8,5 m
@@ -110,7 +113,123 @@ function RestauranteFixo() {
   );
 }
 
+// ---------- por dentro ----------
+const ALT = 1.15; // paredes baixas (corte), igual ao escritório da Nuvem
+const VERMELHO = "#C62828", AMARELO = "#FDD835";
+function ParedeL({ de, ate, altura = ALT, cor = "#F4F1EB" }: { de: [number, number]; ate: [number, number]; altura?: number; cor?: string }) {
+  const dx = ate[0] - de[0], dz = ate[1] - de[1]; const len = Math.hypot(dx, dz), ang = Math.atan2(dx, dz);
+  return <mesh geometry={caixa(0.14, altura, len)} material={mat(cor, { rough: 0.9 })} position={[(de[0] + ate[0]) / 2, altura / 2, (de[1] + ate[1]) / 2]} rotation={[0, ang, 0]} castShadow receiveShadow />;
+}
+function MesaSalao({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0, z]}>
+      <mesh geometry={caixa(0.9, 0.05, 0.9)} material={mat("#E8D9B8", { rough: 0.6 })} position={[0, 0.74, 0]} castShadow />
+      <mesh geometry={cilindro(0.05, 0.14, 0.72, 10)} material={mat(COR.grafite)} position={[0, 0.36, 0]} />
+      {[[0.75, 0], [-0.75, 0], [0, 0.75], [0, -0.75]].map(([dx, dz], i) => (
+        <group key={i}>
+          <mesh geometry={cilindro(0.2, 0.2, 0.05, 12)} material={mat(VERMELHO, { rough: 0.7 })} position={[dx, 0.46, dz]} castShadow />
+          <mesh geometry={cilindro(0.03, 0.03, 0.44, 8)} material={mat(COR.metal, { metal: 0.3 })} position={[dx, 0.22, dz]} />
+        </group>
+      ))}
+    </group>
+  );
+}
+function Inox({ x, z, w, d, h = 0.9, rot = 0 }: { x: number; z: number; w: number; d: number; h?: number; rot?: number }) {
+  return (
+    <group position={[x, 0, z]} rotation={[0, rot, 0]}>
+      <mesh geometry={caixa(w, h, d)} material={mat("#B9C0C8", { metal: 0.5, rough: 0.35 })} position={[0, h / 2, 0]} castShadow />
+      <mesh geometry={caixa(w + 0.04, 0.04, d + 0.04)} material={mat("#D9DEE3", { metal: 0.6, rough: 0.25 })} position={[0, h + 0.02, 0]} />
+    </group>
+  );
+}
+function LanchoneteFixa() {
+  const { x0, x1, z0, z1 } = LANCH;
+  const zs = FAIXA_SUL_Z;
+  return (
+    <group>
+      {/* pisos: salão (ladrilho claro), cozinha (cinza), faixa sul */}
+      <mesh geometry={plano(BALCAO_X - x0, zs - z0)} material={mat("#EDE4D3", { rough: 0.95 })} rotation={[-Math.PI / 2, 0, 0]} position={[(x0 + BALCAO_X) / 2, 0.001, (z0 + zs) / 2]} receiveShadow />
+      <mesh geometry={plano(x1 - BALCAO_X, zs - z0)} material={mat("#D3D7DC", { rough: 0.95 })} rotation={[-Math.PI / 2, 0, 0]} position={[(BALCAO_X + x1) / 2, 0.001, (z0 + zs) / 2]} receiveShadow />
+      <mesh geometry={plano(x1 - x0, z1 - zs)} material={mat("#E3E6EA", { rough: 0.95 })} rotation={[-Math.PI / 2, 0, 0]} position={[(x0 + x1) / 2, 0.001, (zs + z1) / 2]} receiveShadow />
+      {/* tapete vermelho da entrada */}
+      <mesh geometry={plano(2.2, 1.4)} material={mat(VERMELHO, { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[x0 + 1.3, 0.004, PORTA.z]} />
+
+      {/* paredes externas (com a porta a oeste e a janela do drive-thru ao sul) */}
+      <ParedeL de={[x0, z0]} ate={[x1, z0]} />
+      <ParedeL de={[x1, z0]} ate={[x1, z1]} />
+      <ParedeL de={[x0, z0]} ate={[x0, PORTA.z - PORTA.largura / 2]} />
+      <ParedeL de={[x0, PORTA.z + PORTA.largura / 2]} ate={[x0, z1]} />
+      <ParedeL de={[x0, z1]} ate={[JANELA_DRIVE.x - JANELA_DRIVE.largura / 2, z1]} />
+      <ParedeL de={[JANELA_DRIVE.x + JANELA_DRIVE.largura / 2, z1]} ate={[x1, z1]} />
+      {/* porta dupla de vidro */}
+      <mesh geometry={caixa(0.06, 2.2, PORTA.largura)} material={mat(COR.vidro, { rough: 0.1, opacity: 0.35 })} position={[x0, 1.1, PORTA.z]} />
+      <mesh geometry={caixa(0.1, 2.3, 0.06)} material={mat(COR.preto)} position={[x0, 1.15, PORTA.z]} />
+      {/* janela do drive-thru (balcão de entrega + vidro) */}
+      <mesh geometry={caixa(JANELA_DRIVE.largura, 0.08, 0.5)} material={mat("#D9DEE3", { metal: 0.5, rough: 0.3 })} position={[JANELA_DRIVE.x, 0.95, z1 + 0.05]} />
+      <mesh geometry={caixa(JANELA_DRIVE.largura, 0.9, 0.05)} material={mat(COR.vidro, { rough: 0.1, opacity: 0.35 })} position={[JANELA_DRIVE.x, 1.45, z1]} />
+
+      {/* divisórias: faixa sul (drive + escritório) e entre o posto do drive e o escritório */}
+      <ParedeL de={[x0, zs]} ate={[JANELA_DRIVE.x - 2.2, zs]} />
+      <ParedeL de={[JANELA_DRIVE.x - 0.4, zs]} ate={[x1, zs]} />
+      <ParedeL de={[DRIVE_X1, zs]} ate={[DRIVE_X1, z1 - 1.0]} />
+      {/* balcão de atendimento: frente vermelha, tampo branco, dois caixas */}
+      <mesh geometry={caixa(0.7, 1.0, zs - z0 - 1.6)} material={mat(VERMELHO, { rough: 0.6 })} position={[BALCAO_X, 0.5, (z0 + zs) / 2 - 0.3]} castShadow />
+      <mesh geometry={caixa(0.9, 0.06, zs - z0 - 1.5)} material={mat("#F7F7F5", { rough: 0.4 })} position={[BALCAO_X, 1.03, (z0 + zs) / 2 - 0.3]} />
+      {LUGARES_LANCHONETE.filter((l) => l.id.startsWith("caixa")).map((l) => (
+        <group key={l.id} position={[BALCAO_X - 0.05, 1.06, l.pos[2]]}>
+          <mesh geometry={caixa(0.3, 0.3, 0.04)} material={mat(COR.grafite)} position={[0, 0.2, 0]} rotation={[0, Math.PI / 2, 0]} />
+          <mesh geometry={caixa(0.26, 0.26, 0.01)} material={mat("#DCEBFF", { emissive: "#7FB4FF", ei: 0.6 })} position={[-0.025, 0.2, 0]} rotation={[0, Math.PI / 2, 0]} />
+        </group>
+      ))}
+      {/* parede baixa atrás do balcão com o painel do cardápio (amarelo/branco/amarelo) e passagem pra cozinha */}
+      <ParedeL de={[COZINHA_X0, z0]} ate={[COZINHA_X0, zs - 2.2]} cor="#2A2E35" />
+      {[0, 1, 2].map((i) => <mesh key={i} geometry={plano(1.5, 0.55)} material={mat(i === 1 ? "#FFFFFF" : AMARELO, { emissive: i === 1 ? "#FFFFFF" : AMARELO, ei: 0.25 })} position={[COZINHA_X0 - 0.08, 0.78, z0 + 1.0 + i * 1.7]} rotation={[0, -Math.PI / 2, 0]} />)}
+
+      {/* cozinha: chapa e fritadeira na parede leste, bancada de montagem no meio, geladeira e pia no fundo */}
+      <Inox x={x1 - 0.55} z={z0 + 2.4} w={1.0} d={2.0} />
+      <mesh geometry={caixa(0.8, 0.04, 1.7)} material={mat("#2A2E35", { metal: 0.6, rough: 0.3 })} position={[x1 - 0.55, 0.94, z0 + 2.4]} />
+      <Inox x={x1 - 0.55} z={z0 + 4.4} w={1.0} d={1.2} />
+      {[-0.25, 0.25].map((d) => <mesh key={d} geometry={caixa(0.5, 0.25, 0.45)} material={mat("#3A3F47", { metal: 0.4 })} position={[x1 - 0.55, 1.05, z0 + 4.4 + d]} />)}
+      <Inox x={COZINHA_X0 + 2.2} z={z0 + 5.4} w={2.6} d={0.9} />
+      {[0, 1, 2, 3].map((i) => <mesh key={i} geometry={caixa(0.4, 0.12, 0.3)} material={mat(["#FDD835", "#4CAF50", "#C62828", "#F5DEB3"][i])} position={[COZINHA_X0 + 1.3 + i * 0.6, 0.98, z0 + 5.3]} />)}
+      <mesh geometry={caixa(1.2, ALT, 0.7)} material={mat("#E6E9ED", { metal: 0.3, rough: 0.4 })} position={[x1 - 0.75, ALT / 2, z0 + 7.2]} castShadow />
+      <Inox x={COZINHA_X0 + 1.0} z={z0 + 0.6} w={1.6} d={0.7} />
+      <mesh geometry={caixa(0.6, 0.12, 0.4)} material={mat("#9AA3AD", { metal: 0.6 })} position={[COZINHA_X0 + 1.0, 0.86, z0 + 0.6]} />
+
+      {/* salão: sofás vermelhos na vitrine oeste com mesinhas, e mesas de quatro lugares no meio */}
+      {[z0 + 1.6, z0 + 4.2, z0 + 6.8].map((z) => (
+        <group key={z}>
+          <Sofa position={[x0 + 1.0, 0, z]} rotation={Math.PI / 2} cor={VERMELHO} largura={1.8} />
+          <mesh geometry={caixa(0.8, 0.05, 1.3)} material={mat("#E8D9B8", { rough: 0.6 })} position={[x0 + 2.0, 0.74, z]} castShadow />
+          <mesh geometry={caixa(0.08, 0.72, 0.08)} material={mat(COR.grafite)} position={[x0 + 2.0, 0.36, z]} />
+          <Sofa position={[x0 + 3.0, 0, z]} rotation={-Math.PI / 2} cor={VERMELHO} largura={1.8} />
+        </group>
+      ))}
+      {[[x0 + 5.6, z0 + 2.0], [x0 + 7.6, z0 + 2.0], [x0 + 5.6, z0 + 5.0], [x0 + 7.6, z0 + 5.0], [x0 + 5.6, z0 + 8.0], [x0 + 7.6, z0 + 8.0]].map(([x, z], i) => <MesaSalao key={i} x={x} z={z} />)}
+      <Planta position={[x0 + 0.6, 0, z0 + 0.6]} />
+      <Planta position={[x0 + 0.6, 0, zs - 0.6]} />
+      <mesh geometry={cilindro(0.3, 0.26, 0.9, 10)} material={mat("#3A3F47")} position={[BALCAO_X - 1.0, 0.45, zs - 1.0]} castShadow />
+      {/* totem de autoatendimento perto da porta */}
+      <mesh geometry={caixa(0.5, 1.15, 0.3)} material={mat(VERMELHO, { rough: 0.5 })} position={[x0 + 1.6, ALT / 2, PORTA.z + 2.2]} castShadow />
+      <mesh geometry={plano(0.4, 0.5)} material={mat("#DCEBFF", { emissive: "#7FB4FF", ei: 0.6 })} position={[x0 + 1.6, 0.8, PORTA.z + 2.36]} />
+
+      {/* posto do drive-thru: bancada sob a janela, bandejas; escritório do gerente: mesa, computador, armário */}
+      <Inox x={JANELA_DRIVE.x} z={z1 - 0.5} w={3.2} d={0.7} />
+      <mesh geometry={caixa(0.45, 0.06, 0.35)} material={mat(VERMELHO)} position={[JANELA_DRIVE.x - 1.0, 0.95, z1 - 0.5]} />
+      <mesh geometry={caixa(0.45, 0.06, 0.35)} material={mat(AMARELO)} position={[JANELA_DRIVE.x + 1.0, 0.95, z1 - 0.5]} />
+      <mesh geometry={caixa(1.6, 0.05, 0.8)} material={mat(COR.madeiraEscura, { rough: 0.6 })} position={[DRIVE_X1 + 1.9, 0.72, zs + 0.9]} castShadow />
+      {[-0.7, 0.7].map((dx) => <mesh key={dx} geometry={caixa(0.06, 0.7, 0.7)} material={mat(COR.metal, { metal: 0.3 })} position={[DRIVE_X1 + 1.9 + dx, 0.35, zs + 0.9]} />)}
+      <mesh geometry={caixa(0.55, 0.34, 0.03)} material={mat(COR.grafite)} position={[DRIVE_X1 + 1.9, 1.0, zs + 1.05]} />
+      <mesh geometry={caixa(0.9, ALT, 0.45)} material={mat("#CDD3D9", { rough: 0.7 })} position={[x1 - 0.6, ALT / 2, z1 - 0.4]} castShadow />
+      <Planta pequena position={[DRIVE_X1 + 0.4, 0, z1 - 0.5]} />
+      {/* cadeiras nos lugares da equipe (vazias até ela existir) */}
+      {LUGARES_LANCHONETE.map((l) => <group key={l.id} position={l.pos} rotation={[0, l.rot, 0]}><Cadeira position={[0, 0, 0]} cor={l.id === "gerente" ? "#2B2E35" : VERMELHO} /></group>)}
+    </group>
+  );
+}
+
 export function Restaurante() {
+  const fora = useEscritorio((s) => s.vista === "fora");
   // carros estacionados (modelos do Higgsfield): dois nas vagas e um na janela do drive-thru
   const estacionados = useMemo(() => ({
     sedan: [{ pos: [CX - 15.2, 0, CZ - 9] as [number, number, number], rot: 0, altura: 1.45 }, { pos: [CX + 9, 0, CZ + 15.2] as [number, number, number], rot: Math.PI / 2, altura: 1.45 }],
@@ -120,9 +239,13 @@ export function Restaurante() {
   return (
     <group>
       <Estatico><RestauranteFixo /></Estatico>
-      <ComFallback fallback={<PredioProcedural />}>
-        <Modelo nome="restaurante" position={[PREDIO.x, 0, PREDIO.z]} rotation={PREDIO.frente} altura={PREDIO.altura} />
-      </ComFallback>
+      {/* por fora: o prédio do Higgsfield; por dentro: a planta aberta (balcão, cozinha, salão, drive-thru, escritório) */}
+      <group visible={fora}>
+        <ComFallback fallback={<PredioProcedural />}>
+          <Modelo nome="restaurante" position={[PREDIO.x, 0, PREDIO.z]} rotation={PREDIO.frente} altura={PREDIO.altura} />
+        </ComFallback>
+      </group>
+      <Estatico visivel={!fora}><LanchoneteFixa /></Estatico>
       <ComFallback fallback={null}>
         <ModeloInstanciado nome="carroSedan" itens={estacionados.sedan} />
         <ModeloInstanciado nome="carroHatch" itens={estacionados.hatch} />

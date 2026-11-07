@@ -58,3 +58,14 @@ export const QUARTEIROES: Quarteirao[] = [
 export const EIXOS_RUA: number[] = [];
 for (let n = -N; n <= N + 1; n++) EIXOS_RUA.push(n * PASSO - EIXO_RUA);
 export const COMPRIMENTO_RUA = 2 * (N * PASSO + EIXO_RUA) + RUA;
+
+// Lotes à venda, numerados de forma estável (Lote 1, 2, 3…) na ordem da planta
+export interface LoteInfo { chave: string; numero: number; i: number; j: number; k: number; lote: Lote; centro: [number, number] }
+export const LOTES: LoteInfo[] = [];
+for (const q of QUARTEIROES) q.lotes?.forEach((lote, k) => LOTES.push({ chave: `${q.i},${q.j},${k}`, numero: LOTES.length + 1, i: q.i, j: q.j, k, lote, centro: centroLote(q.i, q.j, k) }));
+export const LOTE_POR_CHAVE: Record<string, LoteInfo> = Object.fromEntries(LOTES.map((l) => [l.chave, l]));
+
+export const NOME_CONSTRUCAO: Record<string, string> = {
+  vazio: "terreno vazio", casaVelha: "casinha antiga pra reformar", casaTerrea: "casinha térrea", casaSobrado: "sobrado moderno", casaColonial: "sobrado colonial", casaModerna: "casa moderna",
+};
+export const descricaoLote = (l: LoteInfo) => (l.lote.tipo === "vazio" ? (l.lote.arvore ? "terreno vazio com uma árvore" : "terreno vazio") : NOME_CONSTRUCAO[l.lote.modelo]);

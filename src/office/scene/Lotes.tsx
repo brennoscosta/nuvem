@@ -126,7 +126,7 @@ export function Lotes() {
         const t = reservados[l.chave];
         const r: Rascunho | null = l.chave === emRascunho ? rascunho : null;
         if (!t && !r) return null;
-        return <LoteReservado key={l.chave} chave={l.chave} nome={r?.empresaNome ?? t?.empresaNome ?? ""} cor={r?.cor ?? t?.cor ?? "#1D4ED8"} logo={r ? r.logoDataUrl : t?.temLogo ? `/api/terrenos/${encodeURIComponent(l.chave)}/logo` : null} />;
+        return <LoteReservado key={l.chave} chave={l.chave} nome={r?.empresaNome ?? t?.empresaNome ?? ""} cor={r?.cor ?? t?.cor ?? "#1D4ED8"} logo={r ? r.logoDataUrl : t?.temLogo ? `/api/terrenos/${encodeURIComponent(l.chave)}/logo` : null} ativo={t?.status === "ativo"} />;
       })}
       {/* caixas de clique + contorno do lote sob o mouse / selecionado */}
       {LOTES.map((l) => <AlvoLote key={l.chave} chave={l.chave} centro={l.centro} estado={selecionado === l.chave ? "sel" : hover === l.chave ? "hover" : null} />)}
@@ -159,8 +159,8 @@ function AlvoLote({ chave, centro, estado }: { chave: string; centro: [number, n
 
 // Textura da placa da empresa: faixa na cor, nome grande, logo (quando carregar) e "Reservado · WorkEnd"
 const cachePlacas = new Map<string, THREE.CanvasTexture>();
-function texturaEmpresa(nome: string, cor: string, logo: string | null) {
-  const k = `${nome}|${cor}|${logo ?? ""}`;
+function texturaEmpresa(nome: string, cor: string, logo: string | null, ativo = false) {
+  const k = `${nome}|${cor}|${logo ?? ""}|${ativo ? 1 : 0}`;
   const pronta = cachePlacas.get(k); if (pronta) return pronta;
   const c = document.createElement("canvas"); c.width = 512; c.height = 300;
   const g = c.getContext("2d")!;
@@ -177,7 +177,7 @@ function texturaEmpresa(nome: string, cor: string, logo: string | null) {
     const texto = nome.trim() || "Sua empresa";
     while (g.measureText(texto).width > larg && tam > 22) { tam -= 4; g.font = `bold ${tam}px Inter, Arial, sans-serif`; }
     g.fillText(texto, img ? x0 : 256, 165, larg);
-    g.fillStyle = "#64748B"; g.font = "24px Inter, Arial, sans-serif"; g.fillText("Reservado · escritório em breve", img ? x0 : 256, 215, larg);
+    g.fillStyle = "#64748B"; g.font = "24px Inter, Arial, sans-serif"; g.fillText(ativo ? "Empresa ativa · escritório em obras" : "Reservado · aguardando pagamento", img ? x0 : 256, 215, larg);
     g.fillStyle = cor; g.fillRect(0, 288, 512, 12);
     tex.needsUpdate = true;
   };
@@ -189,9 +189,9 @@ function texturaEmpresa(nome: string, cor: string, logo: string | null) {
 }
 
 // Lote reservado: tapume baixo em volta (branco com faixa na cor da empresa) e placa grande na frente
-function LoteReservado({ chave, nome, cor, logo }: { chave: string; nome: string; cor: string; logo: string | null }) {
+function LoteReservado({ chave, nome, cor, logo, ativo = false }: { chave: string; nome: string; cor: string; logo: string | null; ativo?: boolean }) {
   const l = LOTE_POR_CHAVE[chave];
-  const tex = useMemo(() => texturaEmpresa(nome, cor, logo), [nome, cor, logo]);
+  const tex = useMemo(() => texturaEmpresa(nome, cor, logo, ativo), [nome, cor, logo, ativo]);
   if (!l) return null;
   const [x, z] = l.centro; const rot = frenteDoLote(l.k); const frente = l.k >= 2 ? 1 : -1;
   const m = LOTE / 2 - 0.6, comp = LOTE - 1.2;
