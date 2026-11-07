@@ -1,5 +1,6 @@
 "use client";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { useRodaNoCanvas } from "./roda";
 import { Canvas, advance, useFrame, useThree } from "@react-three/fiber";
 import { MapControls, PerformanceMonitor } from "@react-three/drei";
 import * as THREE from "three";
@@ -72,9 +73,12 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
   }, [alvoLote, camera, controles]);
   useEffect(() => {
     if (primeira.current || CAM) { primeira.current = false; return; } // não mexe na câmera inicial nem nas prévias (?cam)
+    // só reenquadra se o usuário estiver olhando a Nuvem; longe dela (num lote, na lanchonete) a câmera fica onde está
+    const t = controles.current?.target as THREE.Vector3 | undefined;
+    if (t && (Math.abs(t.x) > 24 || Math.abs(t.z) > 24)) return;
     const c = vista === "fora" ? CAM_FORA : CAM_DENTRO;
     alvo.current = c.alvo.clone(); posAlvo.current = c.pos.clone();
-  }, [vista]);
+  }, [vista, controles]);
   useFrame(({ camera }, dt) => {
     const c = controles.current; if (!c) return;
     if (posAlvo.current) { camera.position.lerp(posAlvo.current, Math.min(1, dt * 3)); if (camera.position.distanceTo(posAlvo.current) < 0.1) posAlvo.current = null; }
@@ -156,6 +160,7 @@ export function Cena() {
   // alta: resolução até 1,5x, baixa pra 1x se o computador não der conta (PerformanceMonitor); leve: sempre 1x
   const maxDpr = leve ? 1 : Math.min(1.5, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
   const [dpr, setDpr] = useState(maxDpr);
+  useRodaNoCanvas(); // zoom com a roda em qualquer lugar da tela (barra, botões, crachás, balões)
   const cam = CAM_INICIAL;
   return (
     <Canvas
@@ -183,7 +188,7 @@ export function Cena() {
       </Suspense>
       <Despachante />
       {MEDIR && <Medidor />}
-      <MapControls ref={controles} target={cam.alvo} minDistance={4} maxDistance={RETRATO ? 110 : 95} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
+      <MapControls ref={controles} target={cam.alvo} minDistance={4} maxDistance={RETRATO ? 138 : 119} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
       <FocoCamera controles={controles} />
     </Canvas>
   );

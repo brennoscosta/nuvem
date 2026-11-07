@@ -3,6 +3,8 @@
 // o lote coloca o nome. Prédio = modelo do Higgsfield (por fora); estacionamento, faixa do drive-thru, totem,
 // mesinhas e jardim em código. Por dentro (balcão, cozinha, mesas pros funcionários) entra quando tiver equipe.
 import { useMemo } from "react";
+import * as THREE from "three";
+import { useLoader } from "@react-three/fiber";
 import { caixa, cilindro, esfera, mat, plano, anel, COR } from "./geo";
 import { ComFallback, Modelo, ModeloInstanciado } from "./Modelos";
 import { Estatico } from "./Estatico";
@@ -228,6 +230,33 @@ function LanchoneteFixa() {
   );
 }
 
+// Letreiros com a logo "Burgers" (public/lanchonete/logo.png, fundo transparente): um em cima do prédio, de pé na
+// beira da frente, e outro chapado na parte de cima da fachada. A frente olha pro oeste (pra Nuvem).
+function Letreiros() {
+  const logo = useLoader(THREE.TextureLoader, "/lanchonete/logo.png");
+  const [, cz] = LANCH.centro;
+  const prop = 309 / 512; // altura / largura da imagem
+  const wTopo = 7.2, hTopo = wTopo * prop, yTopo = LANCH.altura + 0.6 + hTopo / 2;
+  const wFrente = 4.2, hFrente = wFrente * prop;
+  const placa = (w: number, h: number) => (
+    <>
+      <planeGeometry args={[w, h]} />
+      <meshBasicMaterial map={logo} map-colorSpace={THREE.SRGBColorSpace} map-anisotropy={4} transparent alphaTest={0.1} side={THREE.DoubleSide} toneMapped={false} />
+    </>
+  );
+  return (
+    <group>
+      {/* em cima: chapa de pé virada pra rua, com duas hastes */}
+      <group position={[LANCH.x0 + 1.6, 0, cz]} rotation={[0, -Math.PI / 2, 0]}>
+        <mesh position={[0, yTopo, 0]} castShadow>{placa(wTopo, hTopo)}</mesh>
+        {[-wTopo / 2 + 0.9, wTopo / 2 - 0.9].map((dx) => <mesh key={dx} geometry={caixa(0.14, 0.9, 0.14)} material={mat("#3A3F47", { metal: 0.4, rough: 0.5 })} position={[dx, LANCH.altura + 0.3, -0.1]} />)}
+      </group>
+      {/* na fachada: parte de cima da frente, logo acima da vitrine */}
+      <mesh position={[LANCH.x0 - 0.22, 6.2, cz]} rotation={[0, -Math.PI / 2, 0]}>{placa(wFrente, hFrente)}</mesh>
+    </group>
+  );
+}
+
 export function Restaurante() {
   const fora = useEscritorio((s) => s.vista === "fora");
   // carros estacionados (modelos do Higgsfield): dois nas vagas e um na janela do drive-thru
@@ -244,6 +273,7 @@ export function Restaurante() {
         <ComFallback fallback={<PredioProcedural />}>
           <Modelo nome="restaurante" position={[PREDIO.x, 0, PREDIO.z]} rotation={PREDIO.frente} altura={PREDIO.altura} />
         </ComFallback>
+        <ComFallback fallback={null}><Letreiros /></ComFallback>
       </group>
       <Estatico visivel={!fora}><LanchoneteFixa /></Estatico>
       <ComFallback fallback={null}>
