@@ -4,6 +4,7 @@
 import * as THREE from "three";
 import { useMemo } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
 import { caixa, cilindro, esfera, mat, plano } from "./geo";
 import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
 import { Estatico } from "./Estatico";
@@ -204,6 +205,19 @@ function LoteReservado({ chave, nome, cor, logo, ativo = false }: { chave: strin
           <mesh geometry={caixa(w + (w > d ? 0 : 0.02), 0.3, d + (w > d ? 0.02 : 0))} material={mat(cor, { rough: 0.7 })} position={[lx, 1.45, lz]} />
         </group>
       ))}
+      {/* balão com o nome da empresa flutuando sobre o lote (tamanho fixo na tela, grande e legível) */}
+      <Html position={[0, 7.5, 0]} zIndexRange={[4, 0]} style={{ pointerEvents: "none", transform: "translate(-50%, -100%)" }}>
+        <div className="flex w-max select-none flex-col items-center">
+          <div className="pointer-events-auto flex cursor-pointer items-center gap-2.5 rounded-2xl px-4 py-2 shadow-xl" style={{ background: cor }} onClick={(e) => { e.stopPropagation(); useMundo.getState().selecionarLote(chave); }}>
+            {logo && <img src={logo} alt="" className="h-9 w-9 rounded-lg bg-white/95 object-contain p-0.5" />}
+            <div className="leading-tight">
+              <div className="text-[20px] font-black tracking-tight text-white drop-shadow">{nome.trim() || "Sua empresa"}</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-white/80">{ativo ? "Empresa ativa" : "Reservado · em obras"}</div>
+            </div>
+          </div>
+          <div className="h-0 w-0 border-x-[9px] border-t-[10px] border-x-transparent" style={{ borderTopColor: cor }} />
+        </div>
+      </Html>
       {/* placa da empresa na frente, virada pra rua */}
       <group position={[l.k % 2 ? -3.5 : 3.5, 0, frente * (m - 0.2)]} rotation={[0, rot, 0]}>
         {[-1.3, 1.3].map((px) => <mesh key={px} geometry={caixa(0.12, 2.6, 0.12)} material={mat("#3A3F47")} position={[px, 1.3, 0]} castShadow />)}
