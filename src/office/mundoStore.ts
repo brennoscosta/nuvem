@@ -7,6 +7,7 @@ import { create } from "zustand";
 export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null }
 export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
 export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null }
+export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado" }
 
 export const CORES_EMPRESA = ["#1D4ED8", "#0EA5A4", "#16A34A", "#D97706", "#DC2626", "#DB2777", "#7C3AED", "#1F2937"];
 
@@ -31,6 +32,7 @@ interface Estado {
   minutosReserva: number;
   desvioRelogio: number; // servidor - navegador (ms), pra contagem regressiva certa
   pagando: boolean;
+  pix: Pix | null; // cobrança Pix aberta (QR no cartão do lote)
   carregado: boolean;
   loteSelecionado: string | null;
   loteHover: string | null;
@@ -47,12 +49,13 @@ interface Estado {
   desistir: () => Promise<void>;
   pagar: (meses?: number) => Promise<string | null>;
   conferirPagamento: (ref: string) => Promise<string>;
+  fecharPix: () => void;
   sairWorkend: () => Promise<void>;
   limparAlvo: () => void;
 }
 
 export const useMundo = create<Estado>((set, get) => ({
-  terrenos: {}, meu: null, usuario: null, admin: false, pagamentoLigado: false, preco: 99, minutosReserva: 10, desvioRelogio: 0, pagando: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
+  terrenos: {}, meu: null, usuario: null, admin: false, pagamentoLigado: false, preco: 99, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
 
   carregar: async () => {
     try {
@@ -105,7 +108,7 @@ export const useMundo = create<Estado>((set, get) => ({
     await get().carregar();
   },
 
-  // Abre o checkout do Mercado Pago (na mesma aba; ele volta pra /mundo?lote=…&pagamento=ok)
+  // Gera o Pix (QR Code + copia e cola) e mostra no cartão do lote; o mapa confere o pagamento a cada poucos segundos
   pagar: async (meses = 1) => {
     const { loteSelecionado } = get(); if (!loteSelecionado) return "Escolha um lote.";
     set({ pagando: true });
@@ -113,17 +116,24 @@ export const useMundo = create<Estado>((set, get) => ({
       const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/pagar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ meses }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return j.erro ?? `Erro ${r.status}`;
-      window.location.href = j.url;
+      set({ pix: { id: j.id, lote: loteSelecionado, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: "pendente" } });
       return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },
-  // Voltou do checkout: confere na API do Mercado Pago e recarrega
+  // Confere na API do Mercado Pago (pelo botão "já paguei", pelo relógio do cartão ou ao voltar com ?ref=) e recarrega
   conferirPagamento: async (ref) => {
     const r = await fetch(`/api/pagamentos/${encodeURIComponent(ref)}`, { method: "POST" });
     const j = await r.json().catch(() => ({}));
-    await get().carregar();
-    return r.ok ? (j.status as string) : "erro";
+    const status = r.ok ? (j.status as string) : "erro";
+    const { pix } = get();
+    if (pix && pix.id === ref) {
+      if (status === "aprovado") { set({ pix: { ...pix, status: "aprovado" } }); await get().carregar(); }
+      else if (status === "rejeitado" || status === "cancelado" || status === "estornado") set({ pix: { ...pix, status: "rejeitado" } });
+      else if (new Date(pix.expiraEm).getTime() < Date.now()) set({ pix: { ...pix, status: "expirado" } });
+    } else await get().carregar();
+    return status;
   },
+  fecharPix: () => set({ pix: null }),
 
   sairWorkend: async () => { await fetch("/api/workend/sair", { method: "POST" }); set({ usuario: null, meu: null, painelEmpresa: false, rascunho: null }); await get().carregar(); },
   limparAlvo: () => set({ alvoCamera: null }),

@@ -1,6 +1,6 @@
-// Pagamento do chão no Mercado Pago (Checkout Pro): criamos uma preferência de R$ 99 x meses, o comprador paga na
-// página do Mercado Pago (Pix ou saldo da conta Mercado Pago) e volta pro mapa. A confirmação vem pelo webhook e também quando
-// ele volta (conferimos na API). Só o Access Token é necessário (MP_ACCESS_TOKEN no CapRover).
+// Pagamento do chão no Mercado Pago por Pix direto: criamos o pagamento na API, mostramos o QR Code no cartão do
+// lote e o comprador paga pelo app do banco dele — sem login no Mercado Pago. A confirmação vem pelo webhook e pela
+// conferência que o mapa faz a cada poucos segundos. Só o Access Token é necessário (MP_ACCESS_TOKEN no CapRover).
 import { sql, id, migrar } from "./db";
 import { precoPara, ativarTerreno, estenderReserva, obterTerreno } from "./terrenos";
 import type { Usuario } from "./usuarios";
@@ -21,8 +21,13 @@ async function mp<T>(caminho: string, init: RequestInit = {}): Promise<T> {
   return j as T;
 }
 
-// Cria a cobrança e devolve o link do checkout. `base` = https://workend.online (de onde o usuário veio)
-export async function criarCobranca(u: Usuario, chave: string, numeroLote: number, base: string, meses = 1) {
+// Cria a cobrança Pix direto (API de pagamentos, sem Checkout Pro): devolve o QR Code e o copia-e-cola pra mostrar
+// no próprio cartão do lote. Ninguém precisa de conta no Mercado Pago: paga pelo app de qualquer banco. A conta que
+// recebe precisa ter uma chave Pix cadastrada no Mercado Pago (senão a API recusa: "Collector user without key").
+export interface CobrancaPix { id: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; pagamentoId: string }
+const PAGADOR_RESERVA = (uid: string) => `pagador-${uid.replace(/[^a-z0-9]/gi, "").toLowerCase()}@workend.online`;
+
+export async function criarCobranca(u: Usuario, chave: string, numeroLote: number, base: string, meses = 1): Promise<CobrancaPix> {
   await migrar();
   if (u.banidoEm) throw new Error("Conta suspensa.");
   const t = await obterTerreno(chave);
@@ -31,29 +36,36 @@ export async function criarCobranca(u: Usuario, chave: string, numeroLote: numbe
   const pid = id("pag");
   const unit = precoPara(u); // admin paga R$ 0,99 (teste real sem gastar)
   const valor = Math.round(unit * meses * 100) / 100;
-  const volta = (r: string) => `${base}/mundo?lote=${encodeURIComponent(chave)}&pagamento=${r}&ref=${pid}`;
-  const pref = await mp<{ id: string; init_point: string; sandbox_init_point?: string }>("/checkout/preferences", {
-    method: "POST",
-    headers: { "x-idempotency-key": pid },
-    body: JSON.stringify({
-      items: [{ id: chave, title: `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"}`, description: `Chão de 20 x 20 m no mundo WorkEnd (${t.empresaNome})`, category_id: "services", quantity: 1, currency_id: "BRL", unit_price: valor }],
-      payer: { email: u.email, name: u.nome },
-      external_reference: pid,
-      statement_descriptor: "WORKEND",
-      // Só Pix e saldo da conta Mercado Pago (decisão do Brenno, 07/11): tira cartão, boleto, débito, pré-pago e caixa eletrônico
-      payment_methods: { excluded_payment_types: [{ id: "credit_card" }, { id: "debit_card" }, { id: "prepaid_card" }, { id: "ticket" }, { id: "atm" }], installments: 1 },
-      back_urls: { success: volta("ok"), pending: volta("pendente"), failure: volta("falhou") },
-      auto_return: "approved",
-      notification_url: `${base}/api/mercadopago/webhook`,
-      metadata: { terreno: chave, usuario: u.id, meses },
-    }),
+  const expira = new Date(Date.now() + 60 * 60 * 1000); // o QR vale 1 hora (mesmo prazo da reserva)
+  const expiraMP = expira.toISOString().replace("Z", "-00:00"); // formato que o MP exige: yyyy-MM-ddTHH:mm:ss.SSS-00:00
+  const corpo = (email: string) => ({
+    transaction_amount: valor,
+    description: `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"} (${t.empresaNome})`,
+    payment_method_id: "pix",
+    payer: { email, first_name: u.nome.split(" ")[0] || "Cliente", last_name: u.nome.split(" ").slice(1).join(" ") || "WorkEnd" },
+    external_reference: pid,
+    statement_descriptor: "WORKEND",
+    date_of_expiration: expiraMP,
+    notification_url: `${base}/api/mercadopago/webhook`,
+    metadata: { terreno: chave, usuario: u.id, meses },
   });
-  await sql`INSERT INTO pagamento (id, terreno_chave, usuario_id, preferencia_id, valor, meses) VALUES (${pid}, ${chave}, ${u.id}, ${pref.id}, ${valor}, ${meses})`;
-  await estenderReserva(chave, 30); // ele está pagando: a reserva não some embaixo dele
-  return { id: pid, url: pref.init_point, valor };
+  let p: PagamentoMP;
+  try {
+    p = await mp<PagamentoMP>("/v1/payments", { method: "POST", headers: { "x-idempotency-key": pid }, body: JSON.stringify(corpo(u.email)) });
+  } catch (e) {
+    // o dono da conta Mercado Pago não pode pagar pra si mesmo: usa um e-mail de pagador neutro (o Pix é pago de qualquer banco)
+    const msg = (e as Error).message.toLowerCase();
+    if (!/collector|payer|mesmo|same/.test(msg)) throw e;
+    p = await mp<PagamentoMP>("/v1/payments", { method: "POST", headers: { "x-idempotency-key": pid + "b" }, body: JSON.stringify(corpo(PAGADOR_RESERVA(u.id))) });
+  }
+  const dados = p.point_of_interaction?.transaction_data;
+  if (!dados?.qr_code) throw new Error("O Mercado Pago não devolveu o QR Code do Pix. Confira se a conta tem chave Pix cadastrada.");
+  await sql`INSERT INTO pagamento (id, terreno_chave, usuario_id, pagamento_id, valor, meses, metodo, status, bruto) VALUES (${pid}, ${chave}, ${u.id}, ${String(p.id)}, ${valor}, ${meses}, 'pix', 'pendente', ${sql.json(p as unknown as Parameters<typeof sql.json>[0])})`;
+  await estenderReserva(chave, 60); // ele está pagando: a reserva não some embaixo dele
+  return { id: pid, valor, codigo: dados.qr_code, qrBase64: dados.qr_code_base64 ?? "", expiraEm: expira.toISOString(), pagamentoId: String(p.id) };
 }
 
-interface PagamentoMP { id: number; status: string; status_detail?: string; external_reference?: string; payment_method_id?: string; payment_type_id?: string; transaction_amount?: number; date_approved?: string; metadata?: Record<string, unknown> }
+interface PagamentoMP { id: number; status: string; status_detail?: string; external_reference?: string; payment_method_id?: string; payment_type_id?: string; transaction_amount?: number; date_approved?: string; metadata?: Record<string, unknown>; point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } } }
 
 // Aplica um pagamento vindo da API do Mercado Pago (webhook ou conferência): grava e, se aprovado, ativa o chão
 async function aplicar(p: PagamentoMP) {
@@ -81,9 +93,16 @@ export async function tratarWebhook(tipo: string | null, idPagamento: string | n
 // Quando o usuário volta do checkout (ou o admin pede): procura pagamentos daquela referência e aplica
 export async function conferirPagamento(ref: string) {
   await migrar();
-  const r = await mp<{ results: PagamentoMP[] }>(`/v1/payments/search?external_reference=${encodeURIComponent(ref)}&sort=date_created&criteria=desc`);
   let ultimo = null;
-  for (const p of r.results ?? []) { ultimo = (await aplicar(p)) ?? ultimo; if (p.status === "approved") break; }
+  const [reg0] = await sql<Pagamento[]>`SELECT id, terreno_chave, usuario_id, status, valor, meses, metodo, preferencia_id, pagamento_id, criado_em, pago_em FROM pagamento WHERE id = ${ref}`;
+  if (reg0?.pagamentoId) {
+    // Pix direto: já sabemos o id do pagamento no MP
+    const p = await mp<PagamentoMP>(`/v1/payments/${reg0.pagamentoId}`);
+    ultimo = await aplicar(p);
+  } else {
+    const r = await mp<{ results: PagamentoMP[] }>(`/v1/payments/search?external_reference=${encodeURIComponent(ref)}&sort=date_created&criteria=desc`);
+    for (const p of r.results ?? []) { ultimo = (await aplicar(p)) ?? ultimo; if (p.status === "approved") break; }
+  }
   if (!ultimo) { const [reg] = await sql<Pagamento[]>`SELECT id, terreno_chave, usuario_id, status, valor, meses, metodo, preferencia_id, pagamento_id, criado_em, pago_em FROM pagamento WHERE id = ${ref}`; ultimo = reg ?? null; }
   return ultimo;
 }

@@ -27,6 +27,43 @@ const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
+// Pix aberto no cartão: QR Code, copia e cola, relógio e conferência automática a cada 4 s
+function PixAberto({ chave }: { chave: string }) {
+  const pix = useMundo((s) => s.pix);
+  const conferir = useMundo((s) => s.conferirPagamento);
+  const fechar = useMundo((s) => s.fecharPix);
+  const [copiado, setCopiado] = useState(false);
+  const [conferindo, setConferindo] = useState(false);
+  const { resta } = useContagem(pix && pix.status === "pendente" ? pix.expiraEm : null);
+  const pendente = !!pix && pix.status === "pendente" && pix.lote === chave;
+  useEffect(() => {
+    if (!pendente || !pix) return;
+    const t = setInterval(() => { void conferir(pix.id); }, 4000);
+    return () => clearInterval(t);
+  }, [pendente, pix, conferir]);
+  if (!pix || pix.lote !== chave) return null;
+  const copiar = async () => { try { await navigator.clipboard.writeText(pix.codigo); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { window.prompt("Copie o código Pix:", pix.codigo); } };
+  if (pix.status === "aprovado") return (
+    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]"><div className="font-bold">Pagamento confirmado! 🎉</div><div className="mt-1 text-xs">O chão é seu por 30 dias. Em breve você monta o escritório aqui.</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white">Fechar</button></div>
+  );
+  if (pix.status !== "pendente") return (
+    <div className="mt-3 rounded-2xl bg-[#FDE8E8] px-3 py-3 text-sm text-[#8A2A2A]"><div className="font-bold">{pix.status === "expirado" ? "Este Pix expirou." : "Pagamento não aprovado."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-bold text-white">Gerar outro Pix</button></div>
+  );
+  return (
+    <div className="mt-3 rounded-2xl border border-[#16A34A]/30 bg-[#F3FBF5] p-3 text-sm">
+      <div className="flex items-center justify-between"><div className="font-bold text-[#166534]">Pague {brl(pix.valor)} no Pix</div>{resta != null && <div className="text-xs text-[#5B6472]">vale {mmss(resta)}</div>}</div>
+      {pix.qrBase64 && <img src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code Pix" className="mx-auto mt-2 h-44 w-44 rounded-xl bg-white p-1" />}
+      <div className="mt-1 text-center text-[11px] text-[#5B6472]">Abra o app do seu banco, escolha Pix → ler QR Code, ou copie o código:</div>
+      <button onClick={copiar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">{copiado ? "Código copiado ✓" : "Copiar código Pix (copia e cola)"}</button>
+      <div className="mt-2 flex gap-2">
+        <button onClick={async () => { setConferindo(true); await conferir(pix.id); setConferindo(false); }} disabled={conferindo} className="flex-1 rounded-xl bg-[#F1F3F6] px-3 py-2 text-xs font-semibold text-[#1D4ED8] disabled:opacity-50">{conferindo ? "Conferindo…" : "Já paguei"}</button>
+        <button onClick={fechar} className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-xs font-semibold text-[#5B6472]">Fechar</button>
+      </div>
+      <div className="mt-1 text-center text-[10px] text-[#5B6472]">Confirmamos sozinhos assim que o banco avisar (segundos).</div>
+    </div>
+  );
+}
+
 export function CartaoLote() {
   const chave = useMundo((s) => s.loteSelecionado);
   const terreno = useMundo((s) => (chave ? s.terrenos[chave] : undefined));
@@ -42,6 +79,7 @@ export function CartaoLote() {
   const abrirPainel = useMundo((s) => s.abrirPainel);
   const desistir = useMundo((s) => s.desistir);
   const pagar = useMundo((s) => s.pagar);
+  const pixAberto = useMundo((s) => !!s.pix && s.pix.lote === s.loteSelecionado && s.pix.status === "pendente");
   const agenteSelecionado = useEscritorio((s) => s.selecionado);
   const [confirma, setConfirma] = useState<string | null>(null); // lote cujo "Desistir" está aguardando confirmação
   const [erro, setErro] = useState<string | null>(null);
@@ -69,7 +107,7 @@ export function CartaoLote() {
         <>
           <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm">
             <div className="flex items-center justify-between"><span className="text-[#5B6472]">Mensalidade</span><span className="font-semibold">{brl(preco)}/mês</span></div>
-            <div className="mt-1 text-xs text-[#5B6472]">Você reserva por {minutos >= 60 ? `${Math.round(minutos / 60)} hora${minutos >= 120 ? "s" : ""}` : `${minutos} minutos`}, coloca o nome e a logo na placa e paga pelo Mercado Pago (Pix ou saldo do Mercado Pago). Sem pagamento, o lote volta a ficar livre.</div>
+            <div className="mt-1 text-xs text-[#5B6472]">Você reserva por {minutos >= 60 ? `${Math.round(minutos / 60)} hora${minutos >= 120 ? "s" : ""}` : `${minutos} minutos`}, coloca o nome e a logo na placa e paga no Pix, direto aqui no mapa (QR Code, sem cadastro no Mercado Pago). Sem pagamento, o lote volta a ficar livre.</div>
           </div>
           {usuario?.banidoEm ? (
             <div className="mt-3 rounded-xl bg-[#FDE8E8] px-3 py-2 text-xs text-[#8A2A2A]">Sua conta está suspensa por descumprir as políticas de uso. Fale com contato@workend.online.</div>
@@ -93,19 +131,20 @@ export function CartaoLote() {
             </div>
           </div>
 
-          {ehMeu && !ativo && (
+          {ehMeu && <PixAberto chave={chave} />}
+          {ehMeu && !ativo && !pixAberto && (
             <>
               <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">Garanta o chão pagando o 1º mês agora. Sem pagamento, a reserva some em {resta != null ? mmss(resta) : `${minutos} min`}.</div>
               {pagamentoLigado
-                ? <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Abrindo o Mercado Pago…" : `Pagar ${brl(preco)} · 1º mês (Pix ou saldo do Mercado Pago)`}</button>
+                ? <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Pagar ${brl(preco)} no Pix · 1º mês`}</button>
                 : <div className="mt-2 rounded-xl bg-[#F1F3F6] px-3 py-2 text-center text-xs text-[#5B6472]">Pagamento em instantes: estamos ligando o Mercado Pago.</div>}
             </>
           )}
           {ehMeu && ativo && diasRestantes != null && diasRestantes <= 7 && (
             <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">{diasRestantes > 0 ? `Vence em ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"}.` : "Vencido: você tem 5 dias de tolerância antes de o lote ficar livre."}</div>
           )}
-          {ehMeu && ativo && pagamentoLigado && (
-            <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Abrindo o Mercado Pago…" : `Renovar +30 dias · ${brl(preco)}`}</button>
+          {ehMeu && ativo && pagamentoLigado && !pixAberto && (
+            <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Renovar +30 dias · ${brl(preco)} no Pix`}</button>
           )}
           {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
           {ehMeu ? (
@@ -239,7 +278,7 @@ export function PainelEmpresa() {
         </div>
       </div>
 
-      <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Reservar segura o lote por 1 hora pra você pagar o 1º mês ({brl(preco)}, Pix ou saldo do Mercado Pago). Ao reservar você concorda com as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros na placa.</div>
+      <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Reservar segura o lote por 1 hora pra você pagar o 1º mês ({brl(preco)}, Pix, direto no mapa). Ao reservar você concorda com as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros na placa.</div>
       {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
       <div className="mt-3 flex justify-end gap-2">
         <button onClick={fechar} className="rounded-xl px-4 py-2 text-sm text-[#5B6472]">Cancelar</button>
