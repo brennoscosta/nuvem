@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import type { AreaId, Nivel } from "./data/org";
 import { NIVEL, AREAS } from "./data/org";
-import { MESAS, MESA, mesaParaNivel, salaDoNivel } from "./data/layout";
+import { MESAS, MESA, SETORES_ESCRITORIO, mesaParaNivel, salaDoNivel } from "./data/layout";
 import type { Evento, TipoEvento } from "./data/eventos";
 
 export type Status = "chegando" | "disponivel" | "trabalhando" | "planejando" | "em_revisao" | "bloqueado" | "reuniao" | "pausa" | "fora" | "comemorando";
@@ -81,8 +81,8 @@ interface AgenteServidor { id: string; nome: string; area: AreaId; nivel: Nivel;
 
 function doServidor(a: AgenteServidor, ocupadas: Set<string>): Agente | null {
   let mesaId = a.mesaId;
-  // mesa inexistente (planta mudou), ocupada ou de outra área: realoca. Área desconhecida (setor antigo): cai na diretoria/planejamento.
-  const area: AreaId = AREAS[a.area] ? a.area : (a.nivel === "diretor" || a.nivel === "ceo" ? "diretoria" : "planejamento");
+  // mesa inexistente (planta mudou), ocupada ou de outra área: realoca. Área desconhecida: cai na diretoria (diretor/CEO) ou no 1º setor.
+  const area: AreaId = AREAS[a.area] ? a.area : (a.nivel === "diretor" || a.nivel === "ceo" ? "diretoria" : SETORES_ESCRITORIO[0]);
   const sala = salaDoNivel(area, a.nivel);
   if (!mesaId || !MESA[mesaId] || MESA[mesaId].sala !== sala || ocupadas.has(mesaId)) { const m = mesaParaNivel(area, a.nivel, ocupadas); if (!m) return null; mesaId = m.id; }
   ocupadas.add(mesaId);

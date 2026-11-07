@@ -5,10 +5,10 @@ import { useEscritorio, type Status } from "../store";
 import type { AreaId } from "../data/org";
 
 const FALAS = {
-  suporte: ["Respondendo um cliente", "Analisando um ticket", "Buscando na base de conhecimento", "Fechando o chamado #4821"],
-  vendas: ["Qualificando um lead", "Montando uma proposta", "Follow-up com o cliente", "Atualizando o CRM"],
-  marketing: ["Escrevendo um post", "Roteiro do próximo short", "Pesquisa de palavras-chave", "Revisando o criativo"],
-  engenharia: ["Corrigindo um bug", "Revisando um PR", "Escrevendo testes", "Fazendo deploy"],
+  trafego: ["Ajustando o orçamento da campanha", "Olhando o custo por lead de ontem", "Subindo um criativo novo", "Testando um público novo"],
+  criativos: ["Editando um vídeo curto", "Desenhando o post do dia", "Escrevendo o roteiro do reels", "Revisando a arte"],
+  consultoria: ["Montando o diagnóstico do cliente", "Revisando o funil de vendas", "Preparando a reunião", "Escrevendo o plano de ação"],
+  recepcao: ["Atendendo um visitante", "Respondendo um contato", "Organizando a agenda"],
   diretoria: ["Revisando o plano da área", "Aprovando orçamento", "Lendo o relatório diário"],
 };
 

@@ -1,10 +1,14 @@
 "use client";
 // Aba Tarefas do painel do agente. O que aparece depende do cargo/setor:
 // - CEO: contas conectadas + "Publicar vídeo" (YouTube/Instagram/TikTok).
-// - Gerente de Design gráfico: "Criar arte" (briefing + referências → prompt → aprovação → gpt-image-2) e a ação "ao concluir".
+// - Gerente de Criativos (antes Design gráfico): "Criar arte" (briefing + referências → prompt → aprovação → gpt-image-2) e a ação "ao concluir".
 // - Outros: só a lista (tarefas recebidas de outros setores etc.). As tarefas de um setor chegam sempre pelo gerente.
 import { useCallback, useEffect, useState } from "react";
-import { AREAS, AREAS_OPERACIONAIS, type AreaId, type Nivel } from "../data/org";
+import { AREAS, type AreaId, type Nivel } from "../data/org";
+import { SETORES_ESCRITORIO } from "../data/layout";
+
+// Setor que faz as artes (gpt-image-2). Era "Design gráfico"; no escritório compacto é o setor Criativos.
+const SETOR_ARTE = (a: AreaId) => a === "criativos" || a === "designgrafico";
 
 interface Conexao { provedor: string; contaNome: string; contaId: string; criadoEm: string }
 interface Plano { titulo: string; descricao: string; tags: string[]; resumo: string; plataformas: string[]; privacidade: "public" | "unlisted" | "private"; prompt?: string; formato?: string }
@@ -54,7 +58,7 @@ export function AbaTarefas({ agenteId, nomeAgente, area, nivel, config, recarreg
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const ehCEO = nivel === "ceo";
-  const ehGerenteDesign = area === "designgrafico" && nivel === "gerente";
+  const ehGerenteDesign = SETOR_ARTE(area) && nivel === "gerente";
   const carregar = useCallback(async () => {
     try { if (ehCEO) setConexoes(await api("/api/conexoes")); setTarefas(await api(`/api/tarefas?agente=${agenteId}`)); setErro(null); } catch (e) { setErro((e as Error).message); }
   }, [agenteId, ehCEO]);
@@ -101,10 +105,10 @@ export function AbaTarefas({ agenteId, nomeAgente, area, nivel, config, recarreg
           <AcaoAoConcluir agenteId={agenteId} nomeAgente={nomeAgente} area={area} atual={config?.aoConcluir?.encaminharPara ?? null} aoSalvar={recarregarFicha} />
         </>
       )}
-      {area === "designgrafico" && nivel !== "gerente" && (
-        <div className="rounded-2xl bg-[#FFF8E6] px-3 py-2 text-xs text-[#7A5A00]">As tarefas de arte chegam pelo <b>gerente de Design gráfico</b>, que é o especialista do setor. {nivel === "senior" || nivel === "pleno" || nivel === "junior" || nivel === "estagiario" ? "Contrate um gerente de Design gráfico (botão “Contratar agente”) pra entregar briefings." : ""}</div>
+      {SETOR_ARTE(area) && nivel !== "gerente" && (
+        <div className="rounded-2xl bg-[#FFF8E6] px-3 py-2 text-xs text-[#7A5A00]">As tarefas de arte chegam pelo <b>gerente de {AREAS[area].nome}</b>, que é o especialista do setor. {nivel === "senior" || nivel === "pleno" || nivel === "junior" || nivel === "estagiario" ? `Contrate um gerente de ${AREAS[area].nome} (botão “Contratar agente”) pra entregar briefings.` : ""}</div>
       )}
-      {!ehCEO && area !== "designgrafico" && (
+      {!ehCEO && !SETOR_ARTE(area) && (
         <div className="rounded-2xl bg-black/[0.04] px-3 py-2 text-xs text-[#5B6472]">O setor <b>{AREAS[area].nome}</b> ainda não tem uma função real própria. Aqui aparecem as tarefas que chegam de outros setores (artes encaminhadas, por exemplo).</div>
       )}
 
@@ -171,7 +175,7 @@ function NovaPublicacao({ agenteId, nomeAgente, aoCriar, conectadas }: { agenteI
   );
 }
 
-// ---------------- Design gráfico: criar arte ----------------
+// ---------------- Criativos (antes Design gráfico): criar arte ----------------
 function NovaArte({ agenteId, nomeAgente, aoCriar }: { agenteId: string; nomeAgente: string; aoCriar: () => Promise<void> }) {
   const [briefing, setBriefing] = useState("");
   const [titulo, setTitulo] = useState("");
@@ -238,7 +242,7 @@ function AcaoAoConcluir({ agenteId, nomeAgente, area, atual, aoSalvar }: { agent
       <div className="flex items-center gap-2">
         <select value={valor} onChange={(e) => setValor(e.target.value)} className={inp + " min-w-0 flex-1"}>
           <option value="">Só me avisar (nada automático)</option>
-          {AREAS_OPERACIONAIS.filter((a) => a !== area).map((a) => <option key={a} value={a}>Encaminhar pro gerente de {AREAS[a].nome}</option>)}
+          {SETORES_ESCRITORIO.filter((a) => a !== area).map((a) => <option key={a} value={a}>Encaminhar pro gerente de {AREAS[a].nome}</option>)}
         </select>
         <button onClick={salvar} className="shrink-0 rounded-xl bg-[#1D2128] px-3 py-2 text-xs font-bold text-white">Salvar</button>
       </div>
@@ -319,7 +323,7 @@ function CartaoTarefa({ t, nomeAgente, recarregar }: { t: Tarefa; nomeAgente: st
               <span className="ml-auto flex items-center gap-1">
                 <select value={destino} onChange={(e) => setDestino(e.target.value)} className="rounded-full border border-black/10 px-2 py-1 text-xs">
                   <option value="">Enviar para setor…</option>
-                  {AREAS_OPERACIONAIS.map((a) => <option key={a} value={a}>{AREAS[a].nome}</option>)}
+                  {SETORES_ESCRITORIO.map((a) => <option key={a} value={a}>{AREAS[a].nome}</option>)}
                 </select>
                 <button onClick={encaminhar} disabled={!destino || ocupado} className="rounded-full bg-[#4F7DF3] px-3 py-1.5 font-bold text-white disabled:opacity-40">Enviar</button>
               </span>

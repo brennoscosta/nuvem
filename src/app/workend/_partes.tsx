@@ -73,6 +73,8 @@ export const ENTREGA: Record<AreaId, string> = {
   juridico: "contratos, compliance e LGPD",
   diretoria: "direção da empresa",
   recepcao: "quem chega é bem recebido",
+  criativos: "imagens e vídeos prontos pra campanha",
+  consultoria: "diagnóstico e plano de ação pro seu negócio",
 };
 
 export const SETORES = AREAS_OPERACIONAIS.map((id) => ({ id, nome: AREAS[id].nome, cor: AREAS[id].cor, entrega: ENTREGA[id], funcoes: FUNCOES[id] }));

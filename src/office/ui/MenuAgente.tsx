@@ -1,7 +1,8 @@
 "use client";
 // Menu rápido ao passar o mouse num agente: convocar reunião por setor (só o gerente de cada setor vai), abrir ficha, falar.
 import { useEffect, useState } from "react";
-import { AREAS, AREAS_OPERACIONAIS, NIVEL, type AreaId } from "../data/org";
+import { AREAS, NIVEL, type AreaId } from "../data/org";
+import { SETORES_ESCRITORIO } from "../data/layout";
 import { useEscritorio } from "../store";
 
 export function MenuAgente() {
@@ -53,7 +54,7 @@ export function MenuAgente() {
         <div className="mt-1 px-1">
           <div className="px-2 text-[11px] text-white/60">Setores na reunião (vai só o gerente de cada um):</div>
           <div className="mt-1 flex flex-col gap-1">
-            {AREAS_OPERACIONAIS.map((area) => {
+            {SETORES_ESCRITORIO.map((area) => {
               const ger = gerentes.find((g) => g.area === area && g.nivel === "gerente") ?? gerentes.find((g) => g.area === area);
               const on = setores.includes(area);
               return (
@@ -66,7 +67,7 @@ export function MenuAgente() {
             })}
           </div>
           <div className="mt-2 flex gap-2 px-1">
-            <button disabled={!setores.length} onClick={() => { convocar(a.id, setores); setFixo(null); setHover(null); }} className="flex-1 rounded-xl bg-[#D9A23A] px-3 py-1.5 text-xs font-bold text-[#111] disabled:opacity-40">Chamar pra sala de reunião</button>
+            <button disabled={!setores.length} onClick={() => { convocar(a.id, setores); setFixo(null); setHover(null); }} className="flex-1 rounded-xl bg-[#D9A23A] px-3 py-1.5 text-xs font-bold text-[#111] disabled:opacity-40">Chamar pra reunião na sala do CEO</button>
             <button onClick={() => { setMenuReuniao(null); setFixo(null); setHover(null); }} className="rounded-xl px-3 py-1.5 text-xs text-white/60">Cancelar</button>
           </div>
         </div>

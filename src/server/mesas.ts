@@ -3,20 +3,21 @@
 // demais → sala da própria área) e não estar ocupada por outro. O que não cumprir isso é realocado e gravado.
 import { sql } from "./db";
 import type { AgenteDB } from "./agentes";
-import { MESA, MESAS, mesaParaNivel, salaDoNivel } from "@/office/data/layout";
+import { MESA, MESAS, SETORES_ESCRITORIO, mesaParaNivel, salaDoNivel } from "@/office/data/layout";
 import { AREAS, FUNCOES, type AreaId, type Nivel } from "@/office/data/org";
 
-// Área coerente com o cargo e com a função. Se a função é de outro setor (ex.: "Social media" cadastrado em Criação
-// por herança dos setores antigos), o agente vai pro setor da função.
+// Área coerente com o cargo e com a planta do escritório (Recepção, Gestão de tráfego, Criativos, Consultoria, Diretoria).
+// Área que tem sala aqui: fica. Área sem sala (setor antigo): vai pro setor da função, se a função for de um setor
+// daqui; senão fica como está e o agente não ganha mesa (não aparece na cena). Diretor senta na diretoria, qualquer área.
 export function areaCorreta(a: Pick<AgenteDB, "area" | "nivel" | "funcao">): AreaId {
   if (a.nivel === "ceo") return "diretoria";
+  const area = a.area as AreaId;
+  if (a.nivel === "diretor") return AREAS[area] ? area : "diretoria";
+  if (area === "recepcao" || SETORES_ESCRITORIO.includes(area)) return area;
   const funcao = (a.funcao ?? "").trim().toLowerCase();
-  if (funcao && a.nivel !== "diretor") {
-    const daFuncao = (Object.keys(FUNCOES) as AreaId[]).find((ar) => FUNCOES[ar].some((f) => f.toLowerCase() === funcao));
-    if (daFuncao) return daFuncao;
-  }
-  if (AREAS[a.area as AreaId] && (a.area !== "diretoria" || a.nivel === "diretor")) return a.area as AreaId;
-  return "planejamento";
+  const daFuncao = funcao ? SETORES_ESCRITORIO.find((ar) => FUNCOES[ar].some((f) => f.toLowerCase() === funcao)) : undefined;
+  if (daFuncao) return daFuncao;
+  return AREAS[area] && area !== "diretoria" ? area : SETORES_ESCRITORIO[0];
 }
 
 // Mesa certa: existe, está livre, fica na sala do agente e é do tipo do cargo (sênior na mesa de sênior, gerente na

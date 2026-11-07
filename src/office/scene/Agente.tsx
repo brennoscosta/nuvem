@@ -7,10 +7,11 @@ import { Html } from "@react-three/drei";
 import { BonecoGLB, BonecoProcedural, HIPS, useAnimacao, type BonecoHandle, type Pose } from "./Boneco";
 import { BONECO } from "../data/bonecos";
 import { AREAS, NIVEL } from "../data/org";
-import { MESA, PONTOS, caminho, mesaDoChefe, pontoCadeira, andarDeY, elevadorNoAndar, esperaNoAndar, type V3 } from "../data/layout";
+import { MESA, PONTOS, RAIO_REUNIAO, caminho, mesaDoChefe, pontoCadeira, type V3 } from "../data/layout";
 import { useEscritorio, removerAgente, type Agente as AgenteDef } from "../store";
 import type { Evento } from "../data/eventos";
-import { caixa, mat } from "./geo";
+import { anel, caixa, mat } from "./geo";
+import { SombraContato } from "./SombraContato";
 
 // Velocidade de caminhada (m/s). ?turbo=N acelera a cena (útil pra testes em máquina lenta).
 const TURBO = typeof window !== "undefined" ? Number(new URLSearchParams(window.location.search).get("turbo") || 1) : 1;
@@ -24,14 +25,16 @@ type Acao = { tipo: "andar"; para: V3; rotFinal?: number; pose?: Pose } | { tipo
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 // evento 3D que nasceu em cima de um nome (HTML): não conta como mouse no boneco que está atrás dele
 const sobreRotulo = (e: ThreeEvent<PointerEvent>) => !!(e.nativeEvent.target as Element | null)?.closest?.("[data-rotulo]");
-const assentoReuniao = (i: number): V3 => { const a = (i / 6) * Math.PI * 2; return [PONTOS.mesaReuniao[0] + Math.cos(a) * 2.0, 0, PONTOS.mesaReuniao[2] + Math.sin(a) * 2.0]; };
+// cadeiras da mesa redonda da sala do CEO (6 lugares)
+const assentoReuniao = (i: number): V3 => { const a = (i / 6) * Math.PI * 2; return [PONTOS.mesaReuniao[0] + Math.cos(a) * RAIO_REUNIAO, 0, PONTOS.mesaReuniao[2] + Math.sin(a) * RAIO_REUNIAO]; };
+// pausa: um café no fim do corredor ou o sofá da recepção
 const lugarPausa = (): { p: V3; pose: Pose; rot: number } => {
-  const r = Math.random();
-  if (r < 0.4) { const i = Math.floor(rnd(0, 4)); const a = (i / 4) * Math.PI * 2; return { p: [PONTOS.copaBalcao[0] + Math.cos(a) * 0.9, 0, PONTOS.copaBalcao[2] + Math.sin(a) * 0.9], pose: "idle", rot: a + Math.PI / 2 }; }
-  if (r < 0.7) return { p: [PONTOS.loungeSofa[0] + rnd(-0.7, 0.7), 0, PONTOS.loungeSofa[2] + 0.9], pose: "sit", rot: Math.PI };
-  if (r < 0.85) return { p: [PONTOS.loungeSinuca[0] - 0.4, 0, PONTOS.loungeSinuca[2] + 1.2], pose: "idle", rot: Math.PI };
-  return { p: [PONTOS.loungeFliperama[0], 0, PONTOS.loungeFliperama[2] - 0.9], pose: "type", rot: 0 };
+  if (Math.random() < 0.6) return { p: [PONTOS.cafe[0], 0, PONTOS.cafe[2] + rnd(-0.6, 0.6)], pose: "idle", rot: Math.PI / 2 };
+  return { p: [PONTOS.sofaRecepcao[0], 0, PONTOS.sofaRecepcao[2] + rnd(-0.45, 0.45)], pose: "sit", rot: Math.PI / 2 };
 };
+
+// Caixa invisível pra pegar o mouse: só ela entra no raycast (o boneco em si não é testado peça por peça)
+const CAIXA_MOUSE = caixa(0.62, 1.35, 0.62);
 
 export function Agente({ def }: { def: AgenteDef }) {
   const grupo = useRef<THREE.Group>(null);
@@ -49,8 +52,6 @@ export function Agente({ def }: { def: AgenteDef }) {
   const hips = usaGLB ? HIPS.glb : HIPS.procedural;
   const cadeira = useMemo(() => pontoCadeira(MESA[def.mesaId]), [def.mesaId]);
   const rotAlvo = useRef(cadeira.rot);
-  const andarDaMesa = andarDeY(cadeira.pos[1]);
-  const elevador = elevadorNoAndar(andarDaMesa);
   const setStatus = useEscritorio((s) => s.setStatus);
   const selecionar = useEscritorio((s) => s.selecionar);
   const selecionado = useEscritorio((s) => s.selecionado === def.id);
@@ -90,10 +91,10 @@ export function Agente({ def }: { def: AgenteDef }) {
       const limpar = () => { fila.current.length = 0; atual.current = null; setMarca(null); };
       switch (ev.tipo) {
         case "contratado": {
-          if (grupo.current) grupo.current.position.set(...elevador);
+          if (grupo.current) grupo.current.position.set(...PONTOS.porta); // entra pela porta de vidro
           limpar();
           const chefe = mesaDoChefe(def.area, def.nivel);
-          f.push({ tipo: "esperar", s: 0.6 }, { tipo: "andar", para: esperaNoAndar(andarDaMesa) });
+          f.push({ tipo: "esperar", s: 0.6 }, { tipo: "andar", para: PONTOS.recepcaoEspera });
           if (chefe) f.push({ tipo: "andar", para: chefe, pose: "idle" }, { tipo: "esperar", s: 1.5 });
           f.push(...irParaMesa("sit"), { tipo: "fn", fn: () => setStatus(def.id, "disponivel", "Pronto pra começar") });
           break;
@@ -131,8 +132,8 @@ export function Agente({ def }: { def: AgenteDef }) {
           } });
           break;
         }
-        case "expediente_encerrado": limpar(); f.push({ tipo: "andar", para: elevadorNoAndar(andarDeY(grupo.current?.position.y ?? 0)), pose: "idle" }, { tipo: "fn", fn: () => removerAgente(def.id) }); break;
-        case "demitido": limpar(); caixaRef.current = true; setCarregando(true); f.push({ tipo: "pose", pose: "carry" }, { tipo: "esperar", s: 1.2 }, { tipo: "andar", para: elevadorNoAndar(andarDeY(grupo.current?.position.y ?? 0)), pose: "carry" }, { tipo: "fn", fn: () => removerAgente(def.id) }); break;
+        case "expediente_encerrado": limpar(); f.push({ tipo: "andar", para: PONTOS.porta, pose: "idle" }, { tipo: "fn", fn: () => removerAgente(def.id) }); break;
+        case "demitido": limpar(); caixaRef.current = true; setCarregando(true); f.push({ tipo: "pose", pose: "carry" }, { tipo: "esperar", s: 1.2 }, { tipo: "andar", para: PONTOS.porta, pose: "carry" }, { tipo: "fn", fn: () => removerAgente(def.id) }); break;
       }
     };
     handlers.set(def.id, h);
@@ -182,7 +183,7 @@ export function Agente({ def }: { def: AgenteDef }) {
   });
   useAnimacao(boneco, () => pose.current, fase, hips.base, hips.escala);
 
-  const corArea = AREAS[def.area].cor;
+  const corArea = (AREAS[def.area] ?? AREAS.recepcao).cor;
   const nivel = NIVEL[def.nivel];
   const fala = def.fala && def.status !== "chegando" ? def.fala : undefined;
   const abrir = () => { if (marca === "✓") { setMarca(null); useEscritorio.getState().setAbaPedida("tarefas"); } selecionar(def.id); };
@@ -195,14 +196,16 @@ export function Agente({ def }: { def: AgenteDef }) {
   };
 
   return (
-    <group ref={grupo} position={cadeira.pos} rotation={[0, cadeira.rot, 0]} onClick={(e) => { e.stopPropagation(); abrir(); }}
-      onPointerOver={mouseNoBoneco} onPointerMove={mouseNoBoneco}
-      onPointerOut={() => { marcarFoco("boneco", false); document.body.style.cursor = "auto"; }}>
+    <group ref={grupo} position={cadeira.pos} rotation={[0, cadeira.rot, 0]}>
+      <mesh geometry={CAIXA_MOUSE} visible={false} position={[0, 0.66, 0]} onClick={(e) => { e.stopPropagation(); abrir(); }}
+        onPointerOver={mouseNoBoneco} onPointerMove={mouseNoBoneco}
+        onPointerOut={() => { marcarFoco("boneco", false); document.body.style.cursor = "auto"; }} />
+      <SombraContato />
       {usaGLB ? <BonecoGLB ref={boneco} arquivo={bdef.arquivo!} /> : <BonecoProcedural ref={boneco} def={bdef} camisa={corArea} headset={def.area === "atendimento" || def.area === "vendas"} cracha={nivel.cor} />}
       {/* caixa de papelão (demissão) */}
       {carregando && <mesh geometry={caixa(0.36, 0.26, 0.3)} material={mat("#C9A063")} position={[0, 0.72, 0.3]} />}
       {/* anel de seleção */}
-      {selecionado && <mesh geometry={new THREE.RingGeometry(0.32, 0.4, 32)} material={mat(corArea, { emissive: corArea, ei: 0.8 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} />}
+      {selecionado && <mesh geometry={anel(0.32, 0.4)} material={mat(corArea, { emissive: corArea, ei: 0.8 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} raycast={() => null} />}
       {/* crachá flutuante (HTML, tamanho fixo na tela): nome pequeno; com o mouse em cima (boneco ou nome) cresce e mostra o cargo.
           A base do crachá fica presa logo acima da cabeça e ele cresce pra cima. Clicar no nome abre a ficha, igual clicar no boneco. */}
       <Html ref={htmlRef} position={[0, 1.45, 0]} zIndexRange={[5, 0]} style={{ pointerEvents: "none", transform: "translate(-50%, -100%)" }}>

@@ -1,6 +1,6 @@
 // Tarefas reais dos agentes.
 // - "publicar_video" (CEO): dono envia vídeo + legenda → agente planeja (título, descrição, tags) → dono aprova → publica no YouTube/Instagram/TikTok.
-// - "criar_arte" (gerente de Design gráfico): dono envia briefing (+ referências) → agente escreve o prompt → dono aprova → gpt-image-2 gera a arte.
+// - "criar_arte" (gerente de Criativos, antes Design gráfico): dono envia briefing (+ referências) → agente escreve o prompt → dono aprova → gpt-image-2 gera a arte.
 // - "arquivo_recebido": uma arte encaminhada de outro setor (manual ou pela ação automática "ao concluir").
 // Fluxo comum: a tarefa chega sempre pelo gerente do setor (ou CEO); cada agente pode ter várias tarefas em paralelo.
 import fs from "node:fs";
@@ -146,9 +146,9 @@ export async function executarPublicacao(tid: string, baseUrl: string, ajustes?:
   return atualizar(tid, { status: okPlat.length ? "concluida" : "falhou", resultado: { ...resultado, pendentes: erros }, erro: okPlat.length ? null : erros.join("; ") });
 }
 
-// ======================== Criar arte (Design gráfico, gpt-image-2) ========================
+// ======================== Criar arte (Criativos, gpt-image-2) ========================
 
-// 1) Dono entrega o briefing ao gerente de Design gráfico (+ imagens de referência opcionais).
+// 1) Dono entrega o briefing ao gerente de Criativos (+ imagens de referência opcionais).
 export async function criarArte(agenteId: string, d: { briefing: string; formato: Formato; referenciaIds?: string[]; titulo?: string }) {
   await migrar();
   const f = await fichaCompleta(agenteId); if (!f) throw new Error("Agente não encontrado");

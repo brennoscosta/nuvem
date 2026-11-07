@@ -1,54 +1,65 @@
 "use client";
-// Móveis e equipamentos desenhados em código: mesa com computador, impressora, fax, smartphone, sofás, puffs,
-// sinuca, fliperama, copa, elevador... Tudo leve e reaproveitando geometria/material.
+// Móveis e equipamentos desenhados em código: mesa com computador, impressora, fax, smartphone, sofá, puffs,
+// mesa de reunião, café... As partes fixas vão pro <Estatico> (viram poucas malhas); as que mudam (tela acesa,
+// papel saindo da impressora, sirene) ficam separadas e leves.
 import * as THREE from "three";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { caixa, cilindro, esfera, mat, plano, COR } from "./geo";
 import type { Mesa as MesaDef } from "../data/layout";
 
-export function Mesa({ def, ligada, cor }: { def: MesaDef; ligada: boolean; cor: string }) {
+// ---------- mesa de trabalho ----------
+// Parte fixa: tampo, pés, monitor (com a tela apagada), teclado, mouse, celular, caneca e cadeira.
+export function Mesa({ def, cor }: { def: MesaDef; cor: string }) {
   const grande = def.tipo !== "comum";
   const w = grande ? 1.9 : 1.5, d = grande ? 0.9 : 0.75;
   const tampo = def.tipo === "ceo" || def.tipo === "diretor" ? COR.madeiraEscura : COR.branco;
   return (
     <group position={def.pos} rotation={[0, def.rot, 0]}>
-      {/* tampo e pés */}
       <mesh geometry={caixa(w, 0.05, d)} material={mat(tampo, { rough: 0.6 })} position={[0, 0.72, 0]} castShadow receiveShadow />
       {[-1, 1].map((s) => (
-        <mesh key={s} geometry={caixa(0.06, 0.7, d - 0.1)} material={mat(COR.metal, { metal: 0.3, rough: 0.5 })} position={[s * (w / 2 - 0.08), 0.35, 0]} />
+        <mesh key={s} geometry={caixa(0.06, 0.7, d - 0.1)} material={mat(COR.metal, { metal: 0.3, rough: 0.5 })} position={[s * (w / 2 - 0.08), 0.35, 0]} castShadow />
       ))}
       {/* monitor: olha pra cadeira (-z local) */}
       <group position={[0, 0.745, 0.08]}>
         <mesh geometry={caixa(0.3, 0.02, 0.18)} material={mat(COR.grafite)} position={[0, 0.01, 0]} />
         <mesh geometry={cilindro(0.025, 0.025, 0.14, 8)} material={mat(COR.grafite)} position={[0, 0.08, 0]} />
         <mesh geometry={caixa(0.62, 0.38, 0.03)} material={mat(COR.grafite)} position={[0, 0.33, 0]} castShadow />
-        <mesh geometry={caixa(0.58, 0.34, 0.005)} material={ligada ? mat("#DCEBFF", { emissive: "#7FB4FF", ei: 1.2 }) : mat(COR.tela)} position={[0, 0.33, -0.018]} />
-        {ligada && <Codigo />}
+        <mesh geometry={caixa(0.58, 0.34, 0.005)} material={mat(COR.tela)} position={[0, 0.33, -0.018]} />
       </group>
-      {/* teclado e mouse */}
       <mesh geometry={caixa(0.42, 0.02, 0.14)} material={mat("#E8EAED")} position={[0, 0.755, -0.2]} />
       <mesh geometry={caixa(0.06, 0.025, 0.09)} material={mat("#E8EAED")} position={[0.32, 0.755, -0.2]} />
-      {/* smartphone */}
       <mesh geometry={caixa(0.07, 0.01, 0.14)} material={mat(COR.preto, { rough: 0.3 })} position={[-0.45, 0.75, -0.12]} rotation={[0, 0.3, 0]} />
-      <mesh geometry={caixa(0.06, 0.004, 0.125)} material={ligada ? mat("#2E86F2", { emissive: "#2E86F2", ei: 0.8 }) : mat("#0B0F17")} position={[-0.45, 0.757, -0.12]} rotation={[0, 0.3, 0]} />
-      {/* caneca e planta */}
       <mesh geometry={cilindro(0.04, 0.035, 0.09, 12)} material={mat(cor, { rough: 0.5 })} position={[0.55, 0.79, 0.05]} />
       {grande && <Planta pequena position={[-0.75, 0.745, 0.2]} />}
-      {/* cadeira */}
       <Cadeira position={[0, 0, -0.62]} cor={def.tipo === "ceo" ? "#2B2E35" : def.tipo === "comum" ? cor : "#4A4F58"} />
     </group>
   );
 }
 
-// "código" rolando na tela
-function Codigo() {
-  const ref = useRef<THREE.Group>(null);
-  useFrame((st) => { if (ref.current) ref.current.position.y = 0.2 + ((st.clock.elapsedTime * 0.08) % 0.16); });
+// Tela acesa (agente trabalhando): um retângulo com "código" rolando. Todas as telas acesas dividem o mesmo
+// material e a mesma textura, que rola num único useFrame (custo zero por tela além do próprio retângulo).
+let materialTelaAcesa: THREE.MeshBasicMaterial | null = null;
+function telaAcesa() {
+  if (materialTelaAcesa) return materialTelaAcesa;
+  const c = document.createElement("canvas"); c.width = 64; c.height = 64;
+  const x = c.getContext("2d")!;
+  x.fillStyle = "#DCEBFF"; x.fillRect(0, 0, 64, 64);
+  x.fillStyle = "#4C7BD9";
+  for (let i = 0; i < 8; i++) x.fillRect(6 + ((i * 5) % 4) * 4, 4 + i * 8, 14 + ((i * 7) % 3) * 12, 3);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 0.55);
+  materialTelaAcesa = new THREE.MeshBasicMaterial({ map: t, toneMapped: false });
+  return materialTelaAcesa;
+}
+export function TelasAcesas({ mesas }: { mesas: MesaDef[] }) {
+  const material = telaAcesa();
+  useFrame((st) => { const m = telaAcesa(); if (m.map) m.map.offset.y = (st.clock.elapsedTime * 0.35) % 1; });
   return (
-    <group ref={ref} position={[0, 0.2, -0.022]}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <mesh key={i} geometry={caixa(0.12 + ((i * 7) % 3) * 0.08, 0.012, 0.002)} material={mat("#4C7BD9", { emissive: "#4C7BD9", ei: 0.6 })} position={[-0.2 + ((i * 5) % 4) * 0.04, i * 0.04, 0]} />
+    <group>
+      {mesas.map((m) => (
+        <group key={m.id} position={m.pos} rotation={[0, m.rot, 0]}>
+          <mesh geometry={plano(0.58, 0.34)} material={material} position={[0, 1.075, 0.058]} rotation={[0, Math.PI, 0]} />
+        </group>
       ))}
     </group>
   );
@@ -65,15 +76,24 @@ export function Cadeira({ position, cor }: { position: [number, number, number];
   );
 }
 
-export function Impressora({ position, rotation = 0, ativa }: { position: [number, number, number]; rotation?: number; ativa: boolean }) {
-  const papel = useRef<THREE.Mesh>(null);
-  useFrame((st) => { if (papel.current) papel.current.position.z = 0.22 + (ativa ? ((st.clock.elapsedTime * 0.35) % 0.3) : 0); });
+// ---------- impressora ----------
+export function Impressora({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
   return (
     <group position={position} rotation={[0, rotation, 0]}>
       <mesh geometry={caixa(0.6, 0.72, 0.5)} material={mat("#EDEDED")} position={[0, 0.36, 0]} castShadow />
       <mesh geometry={caixa(0.55, 0.3, 0.45)} material={mat("#D4D6DA")} position={[0, 0.87, 0]} castShadow />
       <mesh geometry={caixa(0.4, 0.02, 0.3)} material={mat(COR.grafite)} position={[0, 1.03, 0]} />
-      <mesh geometry={caixa(0.14, 0.04, 0.1)} material={mat(ativa ? "#4CAF50" : "#777", { emissive: ativa ? "#4CAF50" : "#000", ei: ativa ? 1 : 0 })} position={[0.15, 1.03, 0.14]} />
+      <mesh geometry={caixa(0.14, 0.04, 0.1)} material={mat("#777")} position={[0.15, 1.03, 0.14]} />
+    </group>
+  );
+}
+// Impressora imprimindo (setor com alguém trabalhando): luz verde + folha saindo
+export function ImpressoraAtiva({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+  const papel = useRef<THREE.Mesh>(null);
+  useFrame((st) => { if (papel.current) papel.current.position.z = 0.22 + ((st.clock.elapsedTime * 0.35) % 0.3); });
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh geometry={caixa(0.145, 0.045, 0.105)} material={mat("#4CAF50", { emissive: "#4CAF50", ei: 1 })} position={[0.15, 1.032, 0.14]} />
       <mesh ref={papel} geometry={caixa(0.3, 0.004, 0.3)} material={mat("#FFFFFF")} position={[0, 0.74, 0.22]} />
     </group>
   );
@@ -86,9 +106,6 @@ export function Fax({ position, rotation = 0 }: { position: [number, number, num
       <mesh geometry={caixa(0.3, 0.1, 0.1)} material={mat("#C9CBCF")} position={[0, 0.15, -0.08]} />
       <mesh geometry={caixa(0.09, 0.04, 0.2)} material={mat(COR.grafite)} position={[-0.16, 0.13, 0.03]} />
       <mesh geometry={caixa(0.3, 0.003, 0.24)} material={mat("#FFFFFF")} position={[0.03, 0.125, 0.16]} rotation={[-0.35, 0, 0]} />
-      {Array.from({ length: 12 }).map((_, i) => (
-        <mesh key={i} geometry={caixa(0.03, 0.01, 0.03)} material={mat("#9BA0A8")} position={[-0.05 + (i % 3) * 0.045, 0.125, -0.02 + Math.floor(i / 3) * 0.04]} />
-      ))}
     </group>
   );
 }
@@ -137,120 +154,68 @@ export function MesaBaixa({ position }: { position: [number, number, number] }) 
   );
 }
 
-export function Sinuca({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      <mesh geometry={caixa(2.3, 0.2, 1.3)} material={mat(COR.madeiraEscura, { rough: 0.6 })} position={[0, 0.78, 0]} castShadow />
-      <mesh geometry={caixa(2.05, 0.03, 1.05)} material={mat("#1E8E4E", { rough: 1 })} position={[0, 0.89, 0]} />
-      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z], i) => (
-        <mesh key={i} geometry={caixa(0.16, 0.76, 0.16)} material={mat(COR.madeiraEscura)} position={[x * 1.0, 0.38, z * 0.5]} />
-      ))}
-      {["#FFFFFF", "#E53935", "#FDD835", "#1E88E5", "#8E24AA", "#FB8C00", "#111111"].map((c, i) => (
-        <mesh key={c} geometry={esfera(0.045, 10)} material={mat(c, { rough: 0.3 })} position={[-0.6 + i * 0.18 + (i % 2) * 0.05, 0.95, (i % 3) * 0.15 - 0.15]} />
-      ))}
-      <mesh geometry={cilindro(0.012, 0.02, 1.4, 6)} material={mat("#C9A063")} position={[0.4, 0.93, 0.3]} rotation={[0, 0.4, Math.PI / 2]} />
-    </group>
-  );
-}
-
-export function Fliperama({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
-  const tela = useRef<THREE.Mesh>(null);
-  useFrame((st) => { if (tela.current) (tela.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.8 + Math.sin(st.clock.elapsedTime * 6) * 0.25; });
-  return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      <mesh geometry={caixa(0.8, 1.9, 0.8)} material={mat("#2962FF", { rough: 0.5 })} position={[0, 0.95, 0]} castShadow />
-      <mesh geometry={caixa(0.82, 0.35, 0.5)} material={mat("#E91E63", { rough: 0.5 })} position={[0, 1.7, 0.2]} />
-      <mesh ref={tela} geometry={caixa(0.6, 0.45, 0.02)} material={new THREE.MeshStandardMaterial({ color: "#1B1B1B", emissive: "#2BD2FF", emissiveIntensity: 1 })} position={[0, 1.3, 0.41]} rotation={[-0.25, 0, 0]} />
-      <mesh geometry={caixa(0.78, 0.08, 0.5)} material={mat("#111")} position={[0, 1.02, 0.35]} />
-      <mesh geometry={esfera(0.03, 8)} material={mat("#F44336", { rough: 0.3 })} position={[-0.2, 1.1, 0.5]} />
-      <mesh geometry={esfera(0.03, 8)} material={mat("#FFEB3B", { rough: 0.3 })} position={[0.1, 1.08, 0.5]} />
-      <mesh geometry={esfera(0.03, 8)} material={mat("#4CAF50", { rough: 0.3 })} position={[0.22, 1.08, 0.5]} />
-    </group>
-  );
-}
-
-export function Copa() {
-  // balcão verde em L, geladeira, máquina de café, mesa com banquetas
-  return (
-    <group>
-      <mesh geometry={caixa(3.6, 0.9, 0.7)} material={mat("#3CB371", { rough: 0.6 })} position={[8.5, 0.45, 8.5]} castShadow />
-      <mesh geometry={caixa(3.7, 0.06, 0.8)} material={mat("#F2F2EE", { rough: 0.4 })} position={[8.5, 0.93, 8.5]} />
-      <mesh geometry={caixa(0.9, 1.9, 0.8)} material={mat("#E8E8E8", { rough: 0.4, metal: 0.1 })} position={[6.7, 0.95, 8.4]} castShadow />
-      <mesh geometry={caixa(0.85, 0.02, 0.02)} material={mat(COR.metal)} position={[6.7, 1.2, 8.0]} />
-      {/* máquina de café */}
-      <mesh geometry={caixa(0.4, 0.5, 0.4)} material={mat("#2E3238", { rough: 0.4 })} position={[9.6, 1.21, 8.5]} />
-      <mesh geometry={cilindro(0.05, 0.04, 0.08, 10)} material={mat("#FFFFFF")} position={[9.6, 1.0, 8.3]} />
-      {/* frutas */}
-      <mesh geometry={esfera(0.08, 10)} material={mat("#FF7043")} position={[7.6, 1.03, 8.5]} />
-      <mesh geometry={esfera(0.07, 10)} material={mat("#8BC34A")} position={[7.75, 1.02, 8.4]} />
-      {/* mesa alta e banquetas */}
-      <mesh geometry={cilindro(0.5, 0.5, 0.05, 20)} material={mat(COR.branco, { rough: 0.5 })} position={[8.5, 1.05, 5.2]} castShadow />
-      <mesh geometry={cilindro(0.05, 0.05, 1.0, 8)} material={mat(COR.metal, { metal: 0.3 })} position={[8.5, 0.5, 5.2]} />
-      {[0, 1, 2, 3].map((i) => {
-        const a = (i / 4) * Math.PI * 2;
-        return <mesh key={i} geometry={cilindro(0.18, 0.18, 0.08, 12)} material={mat(["#FF5252", "#FFD600", "#40C4FF", "#69F0AE"][i], { rough: 0.6 })} position={[8.5 + Math.cos(a) * 0.9, 0.7, 5.2 + Math.sin(a) * 0.9]} />;
-      })}
-      <Planta position={[10.5, 0, 8.3]} />
-    </group>
-  );
-}
-
-export function MesaReuniao() {
+// Mesa redonda de reunião (fica na sala do CEO) com 6 cadeiras coloridas
+export function MesaReuniao({ position, raio = 1.1, raioCadeiras = 1.55 }: { position: [number, number, number]; raio?: number; raioCadeiras?: number }) {
   const cores = ["#FF5252", "#FFD600", "#40C4FF", "#69F0AE", "#B388FF", "#FFAB40"];
   return (
-    <group position={[9.5, 0, -5.2]}>
-      <mesh geometry={cilindro(1.4, 1.4, 0.06, 28)} material={mat(COR.madeira, { rough: 0.5 })} position={[0, 0.74, 0]} castShadow />
+    <group position={position}>
+      <mesh geometry={cilindro(raio, raio, 0.06, 28)} material={mat(COR.madeira, { rough: 0.5 })} position={[0, 0.74, 0]} castShadow receiveShadow />
       <mesh geometry={cilindro(0.12, 0.3, 0.72, 12)} material={mat(COR.grafite)} position={[0, 0.36, 0]} />
       {cores.map((c, i) => {
         const a = (i / cores.length) * Math.PI * 2;
-        return <Cadeira key={i} position={[Math.cos(a) * 2.0, 0, Math.sin(a) * 2.0]} cor={c} />;
+        // a cadeira olha pro centro da mesa
+        return <group key={i} position={[Math.cos(a) * raioCadeiras, 0, Math.sin(a) * raioCadeiras]} rotation={[0, Math.atan2(-Math.cos(a), -Math.sin(a)), 0]}><Cadeira position={[0, 0, 0]} cor={c} /></group>;
       })}
-      {/* TV na parede do fundo */}
-      <mesh geometry={caixa(2.2, 1.25, 0.06)} material={mat(COR.preto, { rough: 0.3 })} position={[0, 1.9, -3.7]} />
-      <mesh geometry={caixa(2.1, 1.15, 0.01)} material={mat("#CFE6FF", { emissive: "#7FB4FF", ei: 0.7 })} position={[0, 1.9, -3.66]} />
     </group>
   );
 }
 
-export function Elevador() {
+// Cantinho do café: balcão baixo, máquina, xícaras e frutas
+export function Cafe({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
   return (
-    <group position={[-17.98, 0, -5.5]}>
-      <mesh geometry={caixa(0.1, 2.4, 1.9)} material={mat("#B7BDC6", { metal: 0.6, rough: 0.3 })} position={[0, 1.2, 0]} />
-      <mesh geometry={caixa(0.04, 2.2, 0.8)} material={mat("#9AA3AD", { metal: 0.7, rough: 0.25 })} position={[0.08, 1.1, -0.42]} />
-      <mesh geometry={caixa(0.04, 2.2, 0.8)} material={mat("#9AA3AD", { metal: 0.7, rough: 0.25 })} position={[0.08, 1.1, 0.42]} />
-      <mesh geometry={caixa(0.03, 0.12, 0.5)} material={mat("#F44336", { emissive: "#F44336", ei: 1 })} position={[0.12, 2.55, 0]} />
+    <group position={position} rotation={[0, rotation, 0]}>
+      <mesh geometry={caixa(1.6, 0.9, 0.55)} material={mat("#3CB371", { rough: 0.6 })} position={[0, 0.45, 0]} castShadow />
+      <mesh geometry={caixa(1.7, 0.06, 0.62)} material={mat("#F2F2EE", { rough: 0.4 })} position={[0, 0.93, 0]} />
+      <mesh geometry={caixa(0.38, 0.48, 0.36)} material={mat("#2E3238", { rough: 0.4 })} position={[-0.4, 1.2, -0.04]} />
+      <mesh geometry={cilindro(0.05, 0.04, 0.08, 10)} material={mat("#FFFFFF")} position={[-0.4, 1.0, 0.1]} />
+      <mesh geometry={cilindro(0.05, 0.04, 0.08, 10)} material={mat("#FFFFFF")} position={[0.1, 1.0, 0.08]} />
+      <mesh geometry={esfera(0.08, 10)} material={mat("#FF7043")} position={[0.45, 1.03, 0]} />
+      <mesh geometry={esfera(0.07, 10)} material={mat("#8BC34A")} position={[0.6, 1.02, -0.06]} />
     </group>
   );
 }
 
-export function Balcao() {
+// Balcão da recepção (a cadeira da recepcionista fica atrás, 0,62 m, igual às mesas)
+export function Balcao({ position }: { position: [number, number, number] }) {
   return (
-    <group position={[-13.5, 0, -7.2]}>
-      {/* cadeira da recepcionista (atrás do balcão, mesma convenção da mesa: 0,62 m atrás) */}
+    <group position={position}>
       <Cadeira position={[0, 0, -0.62]} cor="#4A4F58" />
-      <mesh geometry={caixa(3.2, 1.05, 0.7)} material={mat(COR.madeira, { rough: 0.5 })} position={[0, 0.52, 0]} castShadow />
-      <mesh geometry={caixa(3.3, 0.06, 0.8)} material={mat(COR.branco, { rough: 0.4 })} position={[0, 1.08, 0]} />
-      <Fax position={[-1.1, 1.11, 0]} rotation={0.2} />
+      <mesh geometry={caixa(3.0, 1.05, 0.7)} material={mat(COR.madeira, { rough: 0.5 })} position={[0, 0.52, 0]} castShadow />
+      <mesh geometry={caixa(3.1, 0.06, 0.8)} material={mat(COR.branco, { rough: 0.4 })} position={[0, 1.08, 0]} />
+      <Fax position={[-1.0, 1.11, 0]} rotation={0.2} />
       <Telefone position={[0.3, 1.11, 0.05]} />
-      <mesh geometry={caixa(0.5, 0.35, 0.03)} material={mat(COR.grafite)} position={[1.1, 1.3, -0.1]} />
-      <mesh geometry={caixa(0.46, 0.31, 0.01)} material={mat("#DCEBFF", { emissive: "#7FB4FF", ei: 0.8 })} position={[1.1, 1.3, -0.08]} />
+      <mesh geometry={caixa(0.5, 0.35, 0.03)} material={mat(COR.grafite)} position={[1.0, 1.3, -0.1]} />
+      <mesh geometry={caixa(0.46, 0.31, 0.01)} material={mat("#DCEBFF", { emissive: "#7FB4FF", ei: 0.8 })} position={[1.0, 1.3, -0.08]} />
     </group>
   );
 }
 
+// Sirene de aprovação do dono: só brilho (sem luz pontual, que pesa em todos os materiais da cena)
 export function Sirene({ ligada, position }: { ligada: boolean; position: [number, number, number] }) {
-  const ref = useRef<THREE.Mesh>(null);
-  const luz = useRef<THREE.PointLight>(null);
+  const ref = useRef<THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>>(null);
+  const halo = useRef<THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>>(null);
+  const matLuz = useMemo(() => new THREE.MeshStandardMaterial({ color: "#E53935", emissive: "#FF1744", emissiveIntensity: 0, transparent: true, opacity: 0.9 }), []);
+  const matHalo = useMemo(() => new THREE.MeshBasicMaterial({ color: "#FF1744", transparent: true, opacity: 0, depthWrite: false, toneMapped: false }), []);
   useFrame((st) => {
     const on = ligada ? 0.5 + Math.abs(Math.sin(st.clock.elapsedTime * 8)) : 0;
-    if (ref.current) (ref.current.material as THREE.MeshStandardMaterial).emissiveIntensity = on * 2;
-    if (luz.current) luz.current.intensity = on * 20;
+    if (ref.current) ref.current.material.emissiveIntensity = on * 2;
+    if (halo.current) { halo.current.material.opacity = on * 0.35; halo.current.visible = ligada; }
   });
   return (
     <group position={position}>
       <mesh geometry={cilindro(0.22, 0.26, 0.1, 16)} material={mat(COR.grafite)} position={[0, 0.05, 0]} />
-      <mesh ref={ref} geometry={cilindro(0.12, 0.17, 0.3, 16)} material={new THREE.MeshStandardMaterial({ color: "#E53935", emissive: "#FF1744", emissiveIntensity: 0, transparent: true, opacity: 0.9 })} position={[0, 0.25, 0]} />
-      <pointLight ref={luz} color="#FF1744" intensity={0} distance={9} position={[0, 0.4, 0]} />
+      <mesh ref={ref} geometry={cilindro(0.12, 0.17, 0.3, 16)} material={matLuz} position={[0, 0.25, 0]} />
+      <mesh ref={halo} geometry={esfera(0.5, 12)} material={matHalo} position={[0, 0.3, 0]} visible={false} />
     </group>
   );
 }

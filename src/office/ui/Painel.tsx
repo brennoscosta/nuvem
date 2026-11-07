@@ -1,6 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
-import { AREAS, AREAS_OPERACIONAIS, AREAS_APOIO, FUNCOES, NIVEIS, NIVEL, PERSONALIDADES, type AreaId, type Nivel } from "../data/org";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { AREAS, AREAS_APOIO, FUNCOES, NIVEIS, NIVEL, PERSONALIDADES, type AreaId, type Nivel } from "../data/org";
+import { SETORES_ESCRITORIO } from "../data/layout";
+import { qualidade, escolherQualidade } from "../scene/qualidade";
 import { BONECOS } from "../data/bonecos";
 import { useEscritorio } from "../store";
 import { useSimulador } from "../sim/simulador";
@@ -67,10 +69,10 @@ export function ModalContratar() {
   const setModal = useEscritorio((s) => s.setModal);
   const contratar = useEscritorio((s) => s.contratar);
   const agentes = useEscritorio((s) => s.agentes);
-  const [area, setArea] = useState<AreaId>("planejamento");
+  const [area, setArea] = useState<AreaId>(SETORES_ESCRITORIO[0]);
   const [nivel, setNivel] = useState<Nivel>("junior");
   const [nome, setNome] = useState(NOMES[Math.floor(Math.random() * NOMES.length)]);
-  const [funcao, setFuncao] = useState(FUNCOES.planejamento[0]);
+  const [funcao, setFuncao] = useState(FUNCOES[SETORES_ESCRITORIO[0]][0]);
   const [personalidade, setPersonalidade] = useState(PERSONALIDADES[0]);
   const [boneco, setBoneco] = useState(BONECOS[0].id);
   const [erro, setErro] = useState<string | null>(null);
@@ -91,12 +93,12 @@ export function ModalContratar() {
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 p-4" onClick={() => setModal(false)}>
       <div className="w-full max-w-xl rounded-3xl bg-white p-6 text-[#1D2128] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="text-xl font-bold">Contratar agente</div>
-        <div className="text-xs text-[#5B6472]">Ele entra pelo elevador, passa na sala do chefe e senta na mesa dele. Depois, clique nele pra treinar: perfil, conhecimento, skills e conversa.</div>
+        <div className="text-xs text-[#5B6472]">Ele entra pela porta da recepção, passa na sala do chefe e senta na mesa dele. Depois, clique nele pra treinar: perfil, conhecimento, skills e conversa.</div>
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <label className="flex flex-col gap-1"><span className="text-xs font-semibold text-[#5B6472]">Nome</span><input value={nome} onChange={(e) => setNome(e.target.value)} className="rounded-xl border border-black/10 px-3 py-2" /></label>
           <label className="flex flex-col gap-1"><span className="text-xs font-semibold text-[#5B6472]">Área</span>
             <select value={area} onChange={(e) => setArea(e.target.value as AreaId)} className="rounded-xl border border-black/10 px-3 py-2" disabled={nivel === "ceo"}>
-              {[...AREAS_OPERACIONAIS, ...AREAS_APOIO].map((id) => <option key={id} value={id}>{AREAS[id].nome}</option>)}
+              {[...SETORES_ESCRITORIO, ...AREAS_APOIO].map((id) => <option key={id} value={id}>{AREAS[id].nome}</option>)}
             </select></label>
           <label className="flex flex-col gap-1 col-span-2"><span className="text-xs font-semibold text-[#5B6472]">Cargo</span>
             <div className="flex flex-wrap gap-1.5">
@@ -140,17 +142,15 @@ export function useTimeInicial() {
     if (s.ordem.length) return;
     if (!new URLSearchParams(window.location.search).has("demo")) return;
     const time: Array<[string, AreaId, Nivel, string, string]> = [
-      ["Helena", "atendimento", "ceo", "Gestão", "Focado"],
-      ["Rafael", "atendimento", "gerente", "Atendente N2", "Comunicativo"],
-      ["Ana", "atendimento", "junior", "Atendente N1", "Animado"],
-      ["Bruno", "atendimento", "estagiario", "Atendente N1", "Calmo"],
-      ["Marina", "vendas", "gerente", "Closer", "Comunicativo"],
-      ["Diego", "vendas", "pleno", "SDR", "Animado"],
-      ["Gabi", "criacao", "senior", "Social media", "Criativo"],
-      ["Léo", "criacao", "junior", "Editor(a) de vídeo", "Criativo"],
-      ["Sofia", "desenvolvimento", "gerente", "Dev back-end", "Detalhista"],
-      ["Tiago", "desenvolvimento", "pleno", "Dev front-end", "Focado"],
-      ["Iara", "desenvolvimento", "diretor", "Gestão", "Detalhista"],
+      ["Helena", "diretoria", "ceo", "Gestão", "Focado"],
+      ["Aurora", "recepcao", "pleno", "Recepcionista", "Comunicativo"],
+      ["Rafael", "trafego", "gerente", "Gestor(a) de tráfego", "Focado"],
+      ["Ana", "trafego", "junior", "Analista de campanhas", "Animado"],
+      ["Marina", "criativos", "gerente", "Diretor(a) de arte", "Criativo"],
+      ["Léo", "criativos", "pleno", "Editor(a) de vídeo", "Criativo"],
+      ["Gabi", "criativos", "junior", "Designer de imagens", "Detalhista"],
+      ["Diego", "consultoria", "gerente", "Consultor(a) de marketing", "Comunicativo"],
+      ["Iara", "consultoria", "diretor", "Gestão", "Detalhista"],
     ];
     useEscritorio.setState({ simulando: true, online: false });
     const timers = time.map(([nome, area, nivel, funcao, personalidade], i) => setTimeout(() => {
@@ -191,6 +191,21 @@ function PainelOuCartao() {
   return admin || !online ? <PainelAgente /> : <CartaoPublico />;
 }
 
+// Gráficos leves (celular/máquina fraca) ou completos. A escolha fica salva no aparelho.
+const semAssinatura = () => () => {};
+function BotaoGraficos() {
+  // no servidor não existe aparelho pra detectar: o botão só aparece no navegador (sem erro de hidratação)
+  const q = useSyncExternalStore(semAssinatura, qualidade, () => null);
+  if (!q) return null;
+  const leve = q === "leve";
+  return (
+    <button onClick={() => escolherQualidade(leve ? "alta" : "leve")} title={leve ? "Gráficos leves: sem sombras, resolução menor e 30 quadros/s. Clique pra usar os completos." : "Gráficos completos. Clique pra usar os leves (melhor em celular e computador fraco)."}
+      className="pointer-events-auto shrink-0 rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur hover:bg-[#111418]/85">
+      {leve ? "⚡ Gráficos leves" : "✨ Gráficos completos"}
+    </button>
+  );
+}
+
 export function Painel() {
   useSimulador();
   // ?vista=fora abre já na vista externa (prévias e links)
@@ -213,7 +228,10 @@ export function Painel() {
       <PainelOuCartao />
       <ModalLogin />
       <ModalContratar />
-      <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur">Arraste pra mover · roda do mouse pra zoom · botão direito pra girar · clique no boneco pra ver a ficha · passe o mouse pra chamar reunião</div>
+      <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2">
+        <div className="hidden rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur sm:block">Arraste pra mover · roda do mouse pra zoom · botão direito pra girar · clique no boneco pra ver a ficha · passe o mouse pra chamar reunião</div>
+        <BotaoGraficos />
+      </div>
     </>
   );
 }

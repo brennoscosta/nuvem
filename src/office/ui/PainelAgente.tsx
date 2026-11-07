@@ -1,7 +1,8 @@
 "use client";
 // Painel completo do agente: Perfil · Conhecimento · Skills · Regras · Conversar (treinar).
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AREAS, AREAS_OPERACIONAIS, AREAS_APOIO, FUNCOES, NIVEIS, NIVEL, PERSONALIDADES, type AreaId, type Nivel } from "../data/org";
+import { AREAS, AREAS_APOIO, FUNCOES, NIVEIS, NIVEL, PERSONALIDADES, type AreaId, type Nivel } from "../data/org";
+import { SETORES_ESCRITORIO } from "../data/layout";
 import { BONECOS } from "../data/bonecos";
 import { SALA } from "../data/layout";
 import { useEscritorio, type Status } from "../store";
@@ -113,8 +114,8 @@ function AbaPerfil({ ficha, recarregar }: { ficha: Ficha; recarregar: () => Prom
       <div className="grid grid-cols-2 gap-3">
         <Campo label="Nome"><input className={inp} value={f.nome} onChange={(e) => set("nome", e.target.value)} /></Campo>
         <Campo label="Função"><input className={inp} value={f.funcao} onChange={(e) => set("funcao", e.target.value)} list="funcoes" /><datalist id="funcoes">{(FUNCOES[f.area] ?? []).map((x) => <option key={x} value={x} />)}</datalist></Campo>
-        <Campo label="Área"><select className={inp} value={f.area} disabled={f.nivel === "ceo"} onChange={(e) => set("area", e.target.value as AreaId)}>{(f.nivel === "ceo" ? (["diretoria"] as AreaId[]) : [...AREAS_OPERACIONAIS, ...AREAS_APOIO]).map((x) => <option key={x} value={x}>{AREAS[x].nome}</option>)}</select></Campo>
-        <Campo label="Cargo"><select className={inp} value={f.nivel} onChange={(e) => { const n = e.target.value as Nivel; setF((x) => ({ ...x, nivel: n, area: n === "ceo" ? "diretoria" : x.area === "diretoria" ? "planejamento" : x.area })); }}>{NIVEIS.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}</select></Campo>
+        <Campo label="Área"><select className={inp} value={f.area} disabled={f.nivel === "ceo"} onChange={(e) => set("area", e.target.value as AreaId)}>{(f.nivel === "ceo" ? (["diretoria"] as AreaId[]) : [...SETORES_ESCRITORIO, ...AREAS_APOIO]).map((x) => <option key={x} value={x}>{AREAS[x].nome}</option>)}</select></Campo>
+        <Campo label="Cargo"><select className={inp} value={f.nivel} onChange={(e) => { const n = e.target.value as Nivel; setF((x) => ({ ...x, nivel: n, area: n === "ceo" ? "diretoria" : x.area === "diretoria" ? SETORES_ESCRITORIO[0] : x.area })); }}>{NIVEIS.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}</select></Campo>
         <Campo label="Modelo de IA"><select className={inp} value={f.modelo} onChange={(e) => set("modelo", e.target.value)}>{MODELOS.map((m) => <option key={m}>{m}</option>)}</select></Campo>
         <Campo label="Teto de gasto por dia (R$)"><input type="number" min={1} step={1} className={inp} value={f.tetoDiarioBrl} onChange={(e) => set("tetoDiarioBrl", Number(e.target.value))} /></Campo>
       </div>

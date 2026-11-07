@@ -1,10 +1,10 @@
 // Estrutura da empresa: áreas, níveis (cargos), funções e personalidades.
-
-// Setores com time de IA: planejamento, criacao, social, trafego, desenvolvimento, analise, atendimento, vendas.
-// Diretoria (pessoas reais) e apoio (financeiro, rh, juridico) completam o prédio.
+//
+// AREAS é o catálogo completo de setores (usado também pela vitrine do WorkEnd). O escritório da Nuvem usa só parte dele:
+// Recepção, Gestão de tráfego, Criativos (imagens e vídeo), Consultoria, Diretoria e a sala do CEO (planta em layout.ts).
 export type AreaId =
   | "recepcao" | "planejamento" | "criacao" | "social" | "trafego" | "webdesign" | "designgrafico" | "desenvolvimento" | "analise" | "atendimento" | "vendas"
-  | "diretoria" | "financeiro" | "rh" | "juridico";
+  | "diretoria" | "financeiro" | "rh" | "juridico" | "criativos" | "consultoria";
 
 export interface Area {
   id: AreaId;
@@ -29,6 +29,8 @@ export const AREAS: Record<AreaId, Area> = {
   rh: { id: "rh", nome: "RH & Cultura", cor: "#EC407A", piso: "#FBE4EC" },
   juridico: { id: "juridico", nome: "Jurídico", cor: "#6D4C41", piso: "#EFE7E3" },
   recepcao: { id: "recepcao", nome: "Recepção", cor: "#90A4AE", piso: "#EFEAE2" },
+  criativos: { id: "criativos", nome: "Criativos", cor: "#EC6B8D", piso: "#FBE6EC" },
+  consultoria: { id: "consultoria", nome: "Consultoria", cor: "#7E57C2", piso: "#EDE7F6" },
 };
 // Áreas de apoio: têm lugar no prédio mas não são "setores" vendidos (não entram na landing nem no catálogo)
 export const AREAS_APOIO: AreaId[] = ["recepcao"];
@@ -74,6 +76,8 @@ export const FUNCOES: Record<AreaId, string[]> = {
   rh: ["Recrutador(a)", "Onboarding", "Cultura e comunicação interna"],
   juridico: ["Contratos", "Compliance", "Privacidade (LGPD)"],
   recepcao: ["Recepcionista"],
+  criativos: ["Designer de imagens", "Editor(a) de vídeo", "Motion designer", "Diretor(a) de arte", "Roteirista", "Redator(a) / copy"],
+  consultoria: ["Consultor(a) de marketing", "Consultor(a) de negócios", "Diagnóstico e plano de ação", "Especialista em vendas e funil"],
 };
 
 export const PERSONALIDADES = ["Animado", "Focado", "Calmo", "Detalhista", "Comunicativo", "Criativo"];
