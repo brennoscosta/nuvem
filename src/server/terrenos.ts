@@ -14,15 +14,16 @@ export function loteAVenda(chave: string) {
   return !!q?.lotes;
 }
 
-const SELECT = sql`SELECT chave, usuario_id, status, empresa_nome, cor, (logo IS NOT NULL) AS tem_logo, reservado_em FROM terreno`;
+// trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
+const SELECT = () => sql`SELECT chave, usuario_id, status, empresa_nome, cor, (logo IS NOT NULL) AS tem_logo, reservado_em FROM terreno`;
 
 export async function listarTerrenos(): Promise<Terreno[]> {
   await migrar();
-  return sql<Terreno[]>`${SELECT} ORDER BY reservado_em`;
+  return sql<Terreno[]>`${SELECT()} ORDER BY reservado_em`;
 }
 export async function terrenoDoUsuario(usuarioId: string): Promise<Terreno | null> {
   await migrar();
-  const [t] = await sql<Terreno[]>`${SELECT} WHERE usuario_id = ${usuarioId}`;
+  const [t] = await sql<Terreno[]>`${SELECT()} WHERE usuario_id = ${usuarioId}`;
   return t ?? null;
 }
 
@@ -53,7 +54,7 @@ export async function reservarTerreno(usuarioId: string, chave: string, d: { emp
     } else {
       await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, logo, logo_tipo) VALUES (${chave}, ${usuarioId}, ${nome}, ${cor}, ${logo}, ${logoTipo})`;
     }
-    const [t] = await tx<Terreno[]>`${SELECT} WHERE chave = ${chave}`;
+    const [t] = await tx<Terreno[]>`${SELECT()} WHERE chave = ${chave}`;
     return t;
   });
 }
