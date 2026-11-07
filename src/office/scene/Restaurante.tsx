@@ -230,29 +230,44 @@ function LanchoneteFixa() {
   );
 }
 
-// Letreiros com a logo "Burgers" (public/lanchonete/logo.png, fundo transparente): um em cima do prédio, de pé na
-// beira da frente, e outro chapado na parte de cima da fachada. A frente olha pro oeste (pra Nuvem).
-function Letreiros() {
+// Letreiros com a logo "Burgers" (public/lanchonete/logo.png, fundo transparente). A frente olha pro oeste (pra Nuvem).
+const PROP_LOGO = 309 / 512; // altura / largura da imagem
+function useMaterialLogo() {
   const logo = useLoader(THREE.TextureLoader, "/lanchonete/logo.png");
-  const [, cz] = LANCH.centro;
-  const prop = 309 / 512; // altura / largura da imagem
-  const wTopo = 7.2, hTopo = wTopo * prop, yTopo = LANCH.altura + 0.6 + hTopo / 2;
-  const wFrente = 4.2, hFrente = wFrente * prop;
-  const placa = (w: number, h: number) => (
-    <>
-      <planeGeometry args={[w, h]} />
-      <meshBasicMaterial map={logo} map-colorSpace={THREE.SRGBColorSpace} map-anisotropy={4} transparent alphaTest={0.1} side={THREE.DoubleSide} toneMapped={false} />
-    </>
-  );
+  // devolve geometria + material pra pôr dentro de um <mesh> (não é componente, é só um pedaço de JSX)
+  const placa = (w: number, h: number) => [
+    <planeGeometry key="g" args={[w, h]} />,
+    <meshBasicMaterial key="m" map={logo} map-colorSpace={THREE.SRGBColorSpace} map-anisotropy={4} transparent alphaTest={0.1} side={THREE.DoubleSide} toneMapped={false} />,
+  ];
+  return placa;
+}
+// No prédio (só na vista por fora): placa de pé em cima, na beira da frente; e chapadas na parte de cima das paredes
+// oeste (frente), sul (em cima da marquise do drive-thru) e norte.
+function LetreirosPredio() {
+  const placa = useMaterialLogo();
+  const [cx, cz] = LANCH.centro;
+  const wTopo = 7.2, hTopo = wTopo * PROP_LOGO, yTopo = LANCH.altura + 0.6 + hTopo / 2;
+  const w = 4.2, h = w * PROP_LOGO, y = 6.2;
   return (
     <group>
-      {/* em cima: chapa de pé virada pra rua, com duas hastes */}
       <group position={[LANCH.x0 + 1.6, 0, cz]} rotation={[0, -Math.PI / 2, 0]}>
         <mesh position={[0, yTopo, 0]} castShadow>{placa(wTopo, hTopo)}</mesh>
         {[-wTopo / 2 + 0.9, wTopo / 2 - 0.9].map((dx) => <mesh key={dx} geometry={caixa(0.14, 0.9, 0.14)} material={mat("#3A3F47", { metal: 0.4, rough: 0.5 })} position={[dx, LANCH.altura + 0.3, -0.1]} />)}
       </group>
-      {/* na fachada: parte de cima da frente, logo acima da vitrine */}
-      <mesh position={[LANCH.x0 - 0.22, 6.2, cz]} rotation={[0, -Math.PI / 2, 0]}>{placa(wFrente, hFrente)}</mesh>
+      <mesh position={[LANCH.x0 - 0.22, y, cz]} rotation={[0, -Math.PI / 2, 0]}>{placa(w, h)}</mesh>
+      <mesh position={[JANELA_DRIVE.x - 0.6, y + 0.2, LANCH.z1 + 0.22]}>{placa(w, h)}</mesh>
+      <mesh position={[cx, y + 0.2, LANCH.z0 - 0.22]} rotation={[0, Math.PI, 0]}>{placa(w, h)}</mesh>
+    </group>
+  );
+}
+// No totem da entrada (sempre visível): a logo nos dois painéis brancos
+function LetreiroTotem({ x, z }: { x: number; z: number }) {
+  const placa = useMaterialLogo();
+  const w = 2.1, h = w * PROP_LOGO;
+  return (
+    <group position={[x, 7.1, z]}>
+      <mesh position={[0, 0, 0.2]}>{placa(w, h)}</mesh>
+      <mesh position={[0, 0, -0.2]} rotation={[0, Math.PI, 0]}>{placa(w, h)}</mesh>
     </group>
   );
 }
@@ -273,8 +288,9 @@ export function Restaurante() {
         <ComFallback fallback={<PredioProcedural />}>
           <Modelo nome="restaurante" position={[PREDIO.x, 0, PREDIO.z]} rotation={PREDIO.frente} altura={PREDIO.altura} />
         </ComFallback>
-        <ComFallback fallback={null}><Letreiros /></ComFallback>
+        <ComFallback fallback={null}><LetreirosPredio /></ComFallback>
       </group>
+      <ComFallback fallback={null}><LetreiroTotem x={CX - 17} z={CZ + 17.5} /></ComFallback>
       <Estatico visivel={!fora}><LanchoneteFixa /></Estatico>
       <ComFallback fallback={null}>
         <ModeloInstanciado nome="carroSedan" itens={estacionados.sedan} />
