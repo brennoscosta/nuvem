@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usuarioAtual } from "@/server/usuarios";
-import { Topo, Rodape, SETORES, DEMO } from "./_partes";
+import { Topo, Rodape, SETORES } from "./_partes";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,7 @@ export default async function Landing() {
         <p className="mt-6 max-w-[52ch] text-lg text-[var(--tinta-2)] lg:text-xl">Monte os setores da sua empresa, contrate especialistas já treinados e receba os relatórios. Você é o CEO.</p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link href={cta.href} className="btn btn-azul btn-grande">{cta.texto}</Link>
-          <a href={DEMO} target="_blank" rel="noreferrer" className="btn btn-claro btn-grande">Ver um escritório funcionando</a>
+          <Link href="/mundo" className="btn btn-claro btn-grande">Escolher meu chão no mapa</Link>
         </div>
         <div className="janela mt-14 w-full max-w-[1000px]">
           <div className="barra" aria-hidden="true"><i /><i /><i /></div>
@@ -86,7 +86,7 @@ export default async function Landing() {
           <h2>Comece hoje mesmo.</h2>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link href={cta.href} className="btn btn-azul btn-grande">{cta.texto}</Link>
-            <a href={DEMO} target="_blank" rel="noreferrer" className="btn btn-claro btn-grande">Ver um escritório funcionando</a>
+            <Link href="/mundo" className="btn btn-claro btn-grande">Escolher meu chão no mapa</Link>
           </div>
         </div>
       </section>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
+import { terrenoDoUsuario } from "@/server/terrenos";
 import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
 import { BotaoSair, BotaoAvisar } from "../_conta";
 
@@ -14,7 +15,8 @@ export const dynamic = "force-dynamic";
 export default async function App() {
   const u = await usuarioAtual().catch(() => null);
   if (!u) redirect("/entrar");
-  const empresa = u.empresaNome || `Empresa de ${u.nome.split(" ")[0]}`;
+  const chao = await terrenoDoUsuario(u.id).catch(() => null);
+  const empresa = chao?.empresaNome || u.empresaNome || `Empresa de ${u.nome.split(" ")[0]}`;
   return (
     <>
       <header className="faixa flex items-center justify-between py-5">
@@ -30,12 +32,24 @@ export default async function App() {
       {/* seu escritório: estado vazio com direção */}
       <section className="faixa mt-10 grid gap-8 lg:grid-cols-[1.1fr_1fr]">
         <div className="rounded-2xl bg-[var(--cinza)] p-7">
-          <h2 className="text-[1.5rem]">Seu escritório</h2>
-          <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">Ainda não tem prédio no seu terreno. A compra de escritório abre em breve: quem já tem conta entra primeiro, com condição de fundador.</p>
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <span className="btn btn-azul" aria-disabled="true">Comprar escritório · em breve</span>
-            <BotaoAvisar marcado={!!u.interesseEm} />
-          </div>
+          <h2 className="text-[1.5rem]">Seu chão no mundo</h2>
+          {chao ? (
+            <>
+              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">Você reservou um lote de 20 × 20 m no mapa do WorkEnd. A placa já está lá com o nome <b>{chao.empresaNome}</b>. Quando a compra abrir, você confirma e o escritório começa a subir.</p>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Link href={`/mundo?lote=${encodeURIComponent(chao.chave)}`} className="btn btn-azul">Ver meu chão no mapa</Link>
+                <BotaoAvisar marcado={!!u.interesseEm} />
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">O WorkEnd é um mundo com lotes à venda. Escolha o seu no mapa, coloque o nome e a logomarca na placa e reserve. Sem cobrança nesta fase: quem reserva agora entra com condição de fundador.</p>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Link href="/mundo" className="btn btn-azul">Escolher meu chão no mapa</Link>
+                <BotaoAvisar marcado={!!u.interesseEm} />
+              </div>
+            </>
+          )}
         </div>
         <div className="vitrine">
           <div className="janela">

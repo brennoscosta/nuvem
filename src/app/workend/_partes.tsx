@@ -41,6 +41,7 @@ export function Rodape() {
           <ul className="space-y-2">
             <li><Link href="/cadastro">Criar conta</Link></li>
             <li><Link href="/entrar">Entrar</Link></li>
+            <li><Link href="/mundo">Ver o mapa dos lotes</Link></li>
             <li><a href={DEMO} target="_blank" rel="noreferrer">Ver um escritório funcionando</a></li>
           </ul>
         </div>

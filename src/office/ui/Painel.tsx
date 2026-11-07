@@ -10,6 +10,12 @@ import { PainelAgente, STATUS } from "./PainelAgente";
 import { MenuAgente } from "./MenuAgente";
 import { Mural } from "./Mural";
 import { ModalLogin, CartaoPublico } from "./Login";
+import { CartaoLote, PainelEmpresa, ContaWorkend } from "./Lote";
+import { useMundo, modoMundo } from "../mundoStore";
+
+// Estamos no mapa do WorkEnd (workend.online/mundo)? Só dá pra saber no navegador (sem erro de hidratação).
+const semAssinatura = () => () => {};
+const useModoMundo = () => useSyncExternalStore(semAssinatura, modoMundo, () => false);
 
 export function BarraTopo() {
   const agentes = useEscritorio((s) => s.agentes);
@@ -28,6 +34,7 @@ export function BarraTopo() {
   const statusServidor = useEscritorio((s) => s.statusServidor);
   const vista = useEscritorio((s) => s.vista);
   const setVista = useEscritorio((s) => s.setVista);
+  const mundo = useModoMundo();
   const temSimulados = ordem.some((id) => agentes[id] && !agentes[id].real);
   const total = ordem.length;
   const trabalhando = ordem.filter((id) => agentes[id]?.status === "trabalhando").length;
@@ -37,7 +44,7 @@ export function BarraTopo() {
       <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-[#111418]/85 px-4 py-2 text-white shadow-xl backdrop-blur">
         <div className="flex items-center gap-2 pr-3 border-r border-white/10">
           <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-[#4F7DF3] to-[#8B6CF0]" />
-          <div className="leading-tight"><div className="text-sm font-bold tracking-wide">Escritório Nuvem</div><div className="text-[10px] text-white/50">{total} agentes · {trabalhando} trabalhando · R$ {gasto.toFixed(2)} hoje</div></div>
+          <div className="leading-tight"><div className="text-sm font-bold tracking-wide">{mundo ? "WorkEnd · Mundo" : "Escritório Nuvem"}</div><div className="text-[10px] text-white/50">{mundo ? "Clique num lote à venda pra reservar o seu" : `${total} agentes · ${trabalhando} trabalhando · R$ ${gasto.toFixed(2)} hoje`}</div></div>
         </div>
         <div className="flex flex-1 items-center gap-1.5 overflow-x-auto">
           {ordem.map((id) => { const a = agentes[id]; if (!a) return null; const st = STATUS[a.status]; return (
@@ -53,8 +60,8 @@ export function BarraTopo() {
         <span title={statusServidor ? `banco: ${statusServidor.banco} · IA: ${statusServidor.ia}${statusServidor.detalhe ? " · " + statusServidor.detalhe : ""}` : "conectando"} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${online && statusServidor?.ia === "ok" ? "bg-[#22A86B]/20 text-[#7EE2B0]" : online ? "bg-[#F2913D]/20 text-[#FFC48A]" : "bg-white/5 text-white/50"}`}><span className={`h-1.5 w-1.5 rounded-full ${online ? (statusServidor?.ia === "ok" ? "bg-[#22A86B]" : "bg-[#F2913D]") : "bg-white/30"}`} />{!checado ? "Conectando…" : online ? (statusServidor?.ia === "ok" ? "Agentes reais" : "Banco ok · sem IA") : "Offline"}</span>
         <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório" : "Ver o prédio por fora"} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">{vista === "fora" ? "🏢 Ver por dentro" : "🌆 Ver por fora"}</button>
         {temSimulados && <button onClick={() => setSimulando(!simulando)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${simulando ? "bg-white/10 text-white" : "bg-white/5 text-white/50"}`}>{simulando ? "Simulação: ligada" : "Simulação: pausada"}</button>}
-        {(admin || !online) && <button onClick={() => setModal(true)} className="rounded-full bg-[#4F7DF3] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#3f6ae0]">+ Contratar agente</button>}
-        {online && (admin
+        {!mundo && (admin || !online) && <button onClick={() => setModal(true)} className="rounded-full bg-[#4F7DF3] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#3f6ae0]">+ Contratar agente</button>}
+        {mundo ? <ContaWorkend /> : online && (admin
           ? <button onClick={logout} title="Sair do modo admin" className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">Admin · sair</button>
           : <button onClick={() => setModalLogin(true)} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">Entrar</button>)}
       </div>
@@ -185,6 +192,12 @@ function useServidor() {
   }, [carregar]);
 }
 
+// Lotes reservados e a sessão do WorkEnd (atualiza de vez em quando: outra pessoa pode reservar enquanto você olha)
+function useMundoServidor() {
+  const carregar = useMundo((s) => s.carregar);
+  useEffect(() => { carregar(); const t = setInterval(carregar, 30000); return () => clearInterval(t); }, [carregar]);
+}
+
 function PainelOuCartao() {
   const admin = useEscritorio((s) => s.admin);
   const online = useEscritorio((s) => s.online);
@@ -192,7 +205,6 @@ function PainelOuCartao() {
 }
 
 // Gráficos leves (celular/máquina fraca) ou completos. A escolha fica salva no aparelho.
-const semAssinatura = () => () => {};
 function BotaoGraficos() {
   // no servidor não existe aparelho pra detectar: o botão só aparece no navegador (sem erro de hidratação)
   const q = useSyncExternalStore(semAssinatura, qualidade, () => null);
@@ -220,16 +232,19 @@ export function Painel() {
   }, []);
   useTimeInicial();
   useServidor();
+  useMundoServidor();
   return (
     <>
       <BarraTopo />
       <MenuAgente />
       <Mural />
       <PainelOuCartao />
+      <CartaoLote />
+      <PainelEmpresa />
       <ModalLogin />
       <ModalContratar />
       <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2">
-        <div className="hidden rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur sm:block">Arraste pra mover · roda do mouse pra zoom · botão direito pra girar · clique no boneco pra ver a ficha · passe o mouse pra chamar reunião</div>
+        <div className="hidden rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur sm:block">Arraste pra mover · roda do mouse pra zoom · botão direito pra girar · clique no boneco pra ver a ficha · clique num lote “À venda” pra reservar</div>
         <BotaoGraficos />
       </div>
     </>

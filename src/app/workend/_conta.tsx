@@ -1,7 +1,14 @@
 "use client";
 // Formulários de conta do WorkEnd (cadastro e entrada). Depois de entrar, vai pro dashboard.
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+
+// Veio do mapa querendo um lote (?lote=…)? Depois de entrar volta pro mundo, direto no lote escolhido.
+const destino = () => { const l = new URLSearchParams(window.location.search).get("lote"); return l ? `/mundo?lote=${encodeURIComponent(l)}` : "/app"; };
+
+// query atual (?lote=…) só no navegador, sem erro de hidratação
+const semAssinatura = () => () => {};
+const useBusca = () => useSyncExternalStore(semAssinatura, () => window.location.search, () => "");
 
 const api = async (url: string, body: unknown) => {
   const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -11,13 +18,14 @@ const api = async (url: string, body: unknown) => {
 };
 
 export function FormCadastro() {
+  const busca = useBusca();
   const [f, setF] = useState({ nome: "", empresaNome: "", email: "", senha: "" });
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault(); setErro(null); setOcupado(true);
-    try { await api("/api/workend/cadastro", f); window.location.href = "/app"; } catch (x) { setErro((x as Error).message); setOcupado(false); }
+    try { await api("/api/workend/cadastro", f); window.location.href = destino(); } catch (x) { setErro((x as Error).message); setOcupado(false); }
   };
   return (
     <form onSubmit={enviar} className="flex flex-col gap-4">
@@ -27,18 +35,19 @@ export function FormCadastro() {
       <label className="campo">Senha<input type="password" value={f.senha} onChange={set("senha")} autoComplete="new-password" minLength={8} required placeholder="pelo menos 8 caracteres" /></label>
       {erro && <div className="rounded-xl bg-[#FDE8E8] px-3 py-2 text-sm text-[#8A2A2A]">{erro}</div>}
       <button type="submit" disabled={ocupado} className="btn btn-azul mt-2 justify-center text-[1.05rem]">{ocupado ? "Criando sua conta…" : "Criar conta"}</button>
-      <p className="text-sm text-[var(--tinta-2)]">Já tem conta? <Link href="/entrar" className="font-semibold text-[var(--azul)]">Entrar</Link></p>
+      <p className="text-sm text-[var(--tinta-2)]">Já tem conta? <Link href={"/entrar" + busca} className="font-semibold text-[var(--azul)]">Entrar</Link></p>
     </form>
   );
 }
 
 export function FormEntrar() {
+  const busca = useBusca();
   const [f, setF] = useState({ email: "", senha: "" });
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault(); setErro(null); setOcupado(true);
-    try { await api("/api/workend/entrar", f); window.location.href = "/app"; } catch (x) { setErro((x as Error).message); setOcupado(false); }
+    try { await api("/api/workend/entrar", f); window.location.href = destino(); } catch (x) { setErro((x as Error).message); setOcupado(false); }
   };
   return (
     <form onSubmit={enviar} className="flex flex-col gap-4">
@@ -46,7 +55,7 @@ export function FormEntrar() {
       <label className="campo">Senha<input type="password" value={f.senha} onChange={(e) => setF({ ...f, senha: e.target.value })} autoComplete="current-password" required /></label>
       {erro && <div className="rounded-xl bg-[#FDE8E8] px-3 py-2 text-sm text-[#8A2A2A]">{erro}</div>}
       <button type="submit" disabled={ocupado} className="btn btn-azul mt-2 justify-center text-[1.05rem]">{ocupado ? "Entrando…" : "Entrar"}</button>
-      <p className="text-sm text-[var(--tinta-2)]">Ainda não tem conta? <Link href="/cadastro" className="font-semibold text-[var(--azul)]">Criar conta</Link></p>
+      <p className="text-sm text-[var(--tinta-2)]">Ainda não tem conta? <Link href={"/cadastro" + busca} className="font-semibold text-[var(--azul)]">Criar conta</Link></p>
     </form>
   );
 }

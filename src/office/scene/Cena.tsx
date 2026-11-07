@@ -10,6 +10,7 @@ import { Fachada } from "./Fachada";
 import { Agente, handlers } from "./Agente";
 import { qualidade } from "./qualidade";
 import { useEscritorio } from "../store";
+import { useMundo } from "../mundoStore";
 import { MESA } from "../data/layout";
 import type { Evento } from "../data/eventos";
 
@@ -57,6 +58,18 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
   const vista = useEscritorio((s) => s.vista);
   const posAlvo = useRef<THREE.Vector3 | null>(null);
   const primeira = useRef(true);
+  // lote clicado no mapa: a câmera desliza (arrasta) até ele, mantendo a altura e o ângulo
+  const alvoLote = useMundo((s) => s.alvoCamera);
+  const { camera } = useThree();
+  useEffect(() => {
+    if (!alvoLote) return;
+    const c = controles.current; if (!c) return;
+    const t = c.target as THREE.Vector3;
+    const novo = new THREE.Vector3(...alvoLote);
+    const d = novo.clone().sub(t);
+    alvo.current = novo; posAlvo.current = camera.position.clone().add(d);
+    useMundo.getState().limparAlvo();
+  }, [alvoLote, camera, controles]);
   useEffect(() => {
     if (primeira.current || CAM) { primeira.current = false; return; } // não mexe na câmera inicial nem nas prévias (?cam)
     const c = vista === "fora" ? CAM_FORA : CAM_DENTRO;
@@ -151,7 +164,7 @@ export function Cena() {
       shadows={leve ? false : { enabled: true, type: THREE.PCFShadowMap }}
       camera={{ position: cam.pos, fov: FOV, near: 0.5, far: 420 }}
       gl={{ antialias: true, powerPreference: "high-performance" }}
-      onPointerMissed={() => useEscritorio.getState().selecionar(null)}>
+      onPointerMissed={() => { useEscritorio.getState().selecionar(null); if (!useMundo.getState().painelEmpresa) useMundo.getState().selecionarLote(null); }}>
       <color attach="background" args={["#CFE3F5"]} />
       <fog attach="fog" args={["#CFE3F5", 140, 360]} />
       {leve ? <Limite30 /> : (

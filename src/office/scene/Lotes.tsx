@@ -3,10 +3,12 @@
 // "À VENDA" na frente. As placas são juntadas num <Estatico> (uma textura compartilhada → um draw call).
 import * as THREE from "three";
 import { useMemo } from "react";
+import type { ThreeEvent } from "@react-three/fiber";
 import { caixa, cilindro, esfera, mat, plano } from "./geo";
 import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
 import { Estatico } from "./Estatico";
 import { QUARTEIROES, centroLote, frenteDoLote, LOTE, type ModeloCasa } from "../data/mundo";
+import { useMundo, LOTES, LOTE_POR_CHAVE, type Rascunho } from "../mundoStore";
 
 // Altura real (m) e pra onde o modelo olha (rotação que leva a frente do GLB pro +z)
 const CASA: Record<ModeloCasa, { altura: number; frente: number }> = {
@@ -21,7 +23,7 @@ type Casa = { modelo: ModeloCasa; pos: [number, number, number]; rot: number; es
 type Terreno = { pos: [number, number, number]; rot: number; arvore: boolean };
 
 function listar() {
-  const casas: Casa[] = [], terrenos: Terreno[] = [], placas: { pos: [number, number, number]; rot: number }[] = [];
+  const casas: Casa[] = [], terrenos: Terreno[] = [], placas: { chave: string; pos: [number, number, number]; rot: number }[] = [];
   for (const q of QUARTEIROES) {
     if (!q.lotes) continue;
     q.lotes.forEach((l, k) => {
@@ -29,7 +31,7 @@ function listar() {
       const rot = frenteDoLote(k);
       const frente = k >= 2 ? 1 : -1; // lado da rua
       // placa perto da calçada, num canto do lote
-      placas.push({ pos: [x + (k % 2 ? 6.5 : -6.5), 0, z + frente * (LOTE / 2 - 1.6)], rot });
+      placas.push({ chave: `${q.i},${q.j},${k}`, pos: [x + (k % 2 ? 6.5 : -6.5), 0, z + frente * (LOTE / 2 - 1.6)], rot });
       if (l.tipo === "casa") casas.push({ modelo: l.modelo, pos: [x, 0, z - frente * 1.2], rot, escala: l.escala ?? 1 });
       else terrenos.push({ pos: [x, 0, z], rot, arvore: !!l.arvore });
     });
@@ -99,18 +101,117 @@ export function Lotes() {
     }
     return { ...r, porModelo: [...m.entries()] };
   }, []);
+  const reservados = useMundo((s) => s.terrenos);
+  const selecionado = useMundo((s) => s.loteSelecionado);
+  const hover = useMundo((s) => s.loteHover);
+  const rascunho = useMundo((s) => s.rascunho);
+  const chavesReservadas = Object.keys(reservados).sort().join("|");
+  // placas "À venda" só nos lotes livres (o lote reservado ganha a placa da empresa). O lote em rascunho também perde a placa.
+  const emRascunho = rascunho && selecionado ? selecionado : null;
+  const livres = placas.filter((p) => !reservados[p.chave] && p.chave !== emRascunho);
   return (
     <group>
-      <Estatico>
+      <Estatico key={chavesReservadas + "|" + (emRascunho ?? "")}>
         {terrenos.map((t, i) => <Terreno key={i} pos={t.pos} />)}
         {casas.map((c, i) => <Jardim key={i} pos={c.pos} rot={c.rot} />)}
-        {placas.map((p, i) => <Placa key={i} pos={p.pos} rot={p.rot} />)}
+        {livres.map((p) => <Placa key={p.chave} pos={p.pos} rot={p.rot} />)}
       </Estatico>
       {porModelo.map(([modelo, itens]) => (
         <ComFallback key={modelo} fallback={<Estatico>{itens.map((it, i) => <CasaProcedural key={i} pos={it.pos} rot={it.rot ?? 0} altura={it.altura ?? 5} />)}</Estatico>}>
           <ModeloInstanciado nome={modelo} itens={itens} />
         </ComFallback>
       ))}
+      {/* lotes reservados: tapume e placa da empresa; o rascunho do painel aparece ao vivo */}
+      {LOTES.map((l) => {
+        const t = reservados[l.chave];
+        const r: Rascunho | null = l.chave === emRascunho ? rascunho : null;
+        if (!t && !r) return null;
+        return <LoteReservado key={l.chave} chave={l.chave} nome={r?.empresaNome ?? t?.empresaNome ?? ""} cor={r?.cor ?? t?.cor ?? "#1D4ED8"} logo={r ? r.logoDataUrl : t?.temLogo ? `/api/terrenos/${encodeURIComponent(l.chave)}/logo` : null} />;
+      })}
+      {/* caixas de clique + contorno do lote sob o mouse / selecionado */}
+      {LOTES.map((l) => <AlvoLote key={l.chave} chave={l.chave} centro={l.centro} estado={selecionado === l.chave ? "sel" : hover === l.chave ? "hover" : null} />)}
+    </group>
+  );
+}
+
+// Plano invisível que recebe o clique do lote + moldura quando está sob o mouse ou selecionado
+function AlvoLote({ chave, centro, estado }: { chave: string; centro: [number, number]; estado: "sel" | "hover" | null }) {
+  const selecionarLote = useMundo((s) => s.selecionarLote);
+  const setLoteHover = useMundo((s) => s.setLoteHover);
+  const meio = LOTE / 2 - 0.4;
+  const cor = estado === "sel" ? "#1D4ED8" : "#FFFFFF";
+  return (
+    <group position={[centro[0], 0, centro[1]]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]} geometry={plano(LOTE - 0.8, LOTE - 0.8)} visible={false}
+        onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); selecionarLote(chave); }}
+        onPointerOver={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setLoteHover(chave); document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { setLoteHover(null); document.body.style.cursor = ""; }} />
+      {estado && (
+        <group>
+          {[[0, -meio, LOTE - 0.8, 0.25], [0, meio, LOTE - 0.8, 0.25], [-meio, 0, 0.25, LOTE - 0.8], [meio, 0, 0.25, LOTE - 0.8]].map(([x, z, w, d], i) => (
+            <mesh key={i} geometry={caixa(w, 0.08, d)} material={mat(cor, { emissive: cor, ei: estado === "sel" ? 0.6 : 0.3 })} position={[x, 0.08, z]} />
+          ))}
+        </group>
+      )}
+    </group>
+  );
+}
+
+// Textura da placa da empresa: faixa na cor, nome grande, logo (quando carregar) e "Reservado · WorkEnd"
+const cachePlacas = new Map<string, THREE.CanvasTexture>();
+function texturaEmpresa(nome: string, cor: string, logo: string | null) {
+  const k = `${nome}|${cor}|${logo ?? ""}`;
+  const pronta = cachePlacas.get(k); if (pronta) return pronta;
+  const c = document.createElement("canvas"); c.width = 512; c.height = 300;
+  const g = c.getContext("2d")!;
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const desenhar = (img: HTMLImageElement | null) => {
+    g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 512, 300);
+    g.fillStyle = cor; g.fillRect(0, 0, 512, 46);
+    g.fillStyle = "#FFFFFF"; g.font = "bold 22px Inter, Arial, sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText("EM OBRAS", 18, 24);
+    g.textAlign = "right"; g.fillText("WORKEND", 494, 24);
+    const x0 = img ? 170 : 24, larg = 512 - x0 - 24;
+    if (img) { const s = 120, r = Math.min(s / img.width, s / img.height), w = img.width * r, h = img.height * r; g.drawImage(img, 24 + (s - w) / 2, 95 + (s - h) / 2, w, h); }
+    g.fillStyle = "#0F172A"; g.textAlign = img ? "left" : "center"; g.textBaseline = "alphabetic";
+    let tam = 56; g.font = `bold ${tam}px Inter, Arial, sans-serif`;
+    const texto = nome.trim() || "Sua empresa";
+    while (g.measureText(texto).width > larg && tam > 22) { tam -= 4; g.font = `bold ${tam}px Inter, Arial, sans-serif`; }
+    g.fillText(texto, img ? x0 : 256, 165, larg);
+    g.fillStyle = "#64748B"; g.font = "24px Inter, Arial, sans-serif"; g.fillText("Reservado · escritório em breve", img ? x0 : 256, 215, larg);
+    g.fillStyle = cor; g.fillRect(0, 288, 512, 12);
+    tex.needsUpdate = true;
+  };
+  desenhar(null);
+  if (logo) { const img = new Image(); img.onload = () => desenhar(img); img.src = logo; }
+  cachePlacas.set(k, tex);
+  if (cachePlacas.size > 60) { const primeira = cachePlacas.keys().next().value; if (primeira) { cachePlacas.get(primeira)?.dispose(); cachePlacas.delete(primeira); } }
+  return tex;
+}
+
+// Lote reservado: tapume baixo em volta (branco com faixa na cor da empresa) e placa grande na frente
+function LoteReservado({ chave, nome, cor, logo }: { chave: string; nome: string; cor: string; logo: string | null }) {
+  const l = LOTE_POR_CHAVE[chave];
+  const tex = useMemo(() => texturaEmpresa(nome, cor, logo), [nome, cor, logo]);
+  if (!l) return null;
+  const [x, z] = l.centro; const rot = frenteDoLote(l.k); const frente = l.k >= 2 ? 1 : -1;
+  const m = LOTE / 2 - 0.6, comp = LOTE - 1.2;
+  const lados: [number, number, number, number][] = [[0, -m, comp, 0.12], [0, m, comp, 0.12], [-m, 0, 0.12, comp], [m, 0, 0.12, comp]];
+  return (
+    <group position={[x, 0, z]}>
+      {lados.map(([lx, lz, w, d], i) => (
+        <group key={i}>
+          <mesh geometry={caixa(w, 1.1, d)} material={mat("#F4F4F2", { rough: 0.9 })} position={[lx, 0.75, lz]} castShadow />
+          <mesh geometry={caixa(w + (w > d ? 0 : 0.02), 0.3, d + (w > d ? 0.02 : 0))} material={mat(cor, { rough: 0.7 })} position={[lx, 1.45, lz]} />
+        </group>
+      ))}
+      {/* placa da empresa na frente, virada pra rua */}
+      <group position={[l.k % 2 ? -3.5 : 3.5, 0, frente * (m - 0.2)]} rotation={[0, rot, 0]}>
+        {[-1.3, 1.3].map((px) => <mesh key={px} geometry={caixa(0.12, 2.6, 0.12)} material={mat("#3A3F47")} position={[px, 1.3, 0]} castShadow />)}
+        <mesh geometry={caixa(3.0, 1.75, 0.08)} material={mat("#F7F7F5")} position={[0, 2.1, 0]} castShadow />
+        <mesh geometry={plano(2.9, 1.7)} position={[0, 2.1, 0.045]}>
+          <meshBasicMaterial key={tex.uuid} map={tex} toneMapped={false} />
+        </mesh>
+      </group>
     </group>
   );
 }
