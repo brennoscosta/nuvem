@@ -11,10 +11,10 @@ export const PRECO_PERSONAGEM_CHEIO = 19.9;
 export const SEGUNDOS_ONLINE = 25;
 
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
-export interface Personagem { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: Date | null; x: number; z: number; rot: number; vistoEm: Date | null; criadoEm: Date }
-export interface PersonagemPublico { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; redes?: Redes; online: boolean }
+export interface Personagem { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: Date | null; x: number; z: number; rot: number; destX: number | null; destZ: number | null; vel: number; vistoEm: Date | null; criadoEm: Date }
+export interface PersonagemPublico { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino: [number, number] | null; vel: number; redes?: Redes; online: boolean }
 
-const CAMPOS = () => sql`usuario_id, nome, tipo, boneco, roupa, bio, redes, mostrar_redes, pago_ate, x, z, rot, visto_em, criado_em`;
+const CAMPOS = () => sql`usuario_id, nome, tipo, boneco, roupa, bio, redes, mostrar_redes, pago_ate, x, z, rot, dest_x, dest_z, vel, visto_em, criado_em`;
 const texto = (t: unknown, max: number, padrao = "") => (typeof t === "string" ? t.trim().slice(0, max) : padrao) || padrao;
 const limparRedes = (r: unknown): Redes => { const o = (r && typeof r === "object" ? r : {}) as Record<string, unknown>; const s = (k: string) => texto(o[k], 120); return { instagram: s("instagram").replace(/^@/, ""), linkedin: s("linkedin"), whatsapp: s("whatsapp").replace(/\D/g, "").slice(0, 15), site: s("site") }; };
 
@@ -48,16 +48,19 @@ export async function ativarPersonagem(usuarioId: string, dias = 30) {
   await sql`UPDATE personagem SET pago_ate = GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${dias}), atualizado_em = now() WHERE usuario_id = ${usuarioId}`;
 }
 // Batida de presença: grava posição e devolve quem mais está online (sem o próprio)
-export async function presenca(usuarioId: string, pos: { x: number; z: number; rot: number }): Promise<PersonagemPublico[]> {
+export async function presenca(usuarioId: string, pos: { x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number }): Promise<PersonagemPublico[]> {
   await migrar();
-  const x = Math.max(-100, Math.min(100, Number(pos.x) || 0)), z = Math.max(-100, Math.min(100, Number(pos.z) || 0)), rot = Number(pos.rot) || 0;
-  await sql`UPDATE personagem SET x = ${x}, z = ${z}, rot = ${rot}, visto_em = now() WHERE usuario_id = ${usuarioId}`;
+  const lim = (n: unknown) => Math.max(-100, Math.min(100, Number(n) || 0));
+  const x = lim(pos.x), z = lim(pos.z), rot = Number(pos.rot) || 0;
+  const d = Array.isArray(pos.destino) && pos.destino.length === 2 ? [lim(pos.destino[0]), lim(pos.destino[1])] : null;
+  const vel = Math.max(0, Math.min(5, Number(pos.vel) || 0));
+  await sql`UPDATE personagem SET x = ${x}, z = ${z}, rot = ${rot}, dest_x = ${d ? d[0] : null}, dest_z = ${d ? d[1] : null}, vel = ${vel}, visto_em = now() WHERE usuario_id = ${usuarioId}`;
   return outrosOnline(usuarioId);
 }
 export async function outrosOnline(excetoId: string | null): Promise<PersonagemPublico[]> {
   await migrar();
   const lista = await sql<(Personagem & { usuarioNome: string })[]>`SELECT ${CAMPOS()} FROM personagem WHERE visto_em > now() - make_interval(secs => ${SEGUNDOS_ONLINE}) AND (pago_ate > now() OR usuario_id IN (SELECT id FROM usuario WHERE papel = 'admin')) AND usuario_id <> ${excetoId ?? ""} ORDER BY visto_em DESC LIMIT 200`;
-  return lista.map((p) => ({ usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, redes: p.mostrarRedes ? p.redes : undefined, online: true }));
+  return lista.map((p) => ({ usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, destino: p.destX != null && p.destZ != null ? [p.destX, p.destZ] as [number, number] : null, vel: p.vel ?? 0, redes: p.mostrarRedes ? p.redes : undefined, online: true }));
 }
 export async function personagemPublico(usuarioId: string, paraId: string | null): Promise<PersonagemPublico | null> {
   await migrar();
@@ -66,7 +69,7 @@ export async function personagemPublico(usuarioId: string, paraId: string | null
   // redes aparecem se ele mostra pra todos ou se os dois são amigos
   let redes: Redes | undefined = p.mostrarRedes ? p.redes : undefined;
   if (!redes && paraId) { const [am] = await sql<{ id: string }[]>`SELECT id FROM amizade WHERE status = 'aceita' AND LEAST(de_id, para_id) = LEAST(${usuarioId}, ${paraId}) AND GREATEST(de_id, para_id) = GREATEST(${usuarioId}, ${paraId}) LIMIT 1`; if (am) redes = p.redes; }
-  return { usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, redes, online: !!p.vistoEm && Date.now() - new Date(p.vistoEm).getTime() < SEGUNDOS_ONLINE * 1000 };
+  return { usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, destino: null, vel: 0, redes, online: !!p.vistoEm && Date.now() - new Date(p.vistoEm).getTime() < SEGUNDOS_ONLINE * 1000 };
 }
 
 // ---- mensagens (conversa / chat ao vivo / negócios / redes) ----

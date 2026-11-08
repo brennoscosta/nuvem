@@ -10,7 +10,7 @@ import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle } from "./Boneco
 import { SombraContato } from "./SombraContato";
 import { TODOS_BONECOS, BONECOS } from "../data/bonecos";
 import { MUNDO, passeioNaCalcada, pontoNaCalcada } from "../data/mundo";
-import { usePersonagem, type Outro } from "../personagemStore";
+import { usePersonagem, minhaPos, type Outro } from "../personagemStore";
 import { modoMundo } from "../mundoStore";
 
 const VEL = 2.2; // m/s (um pouco mais rápido que os pedestres)
@@ -31,38 +31,49 @@ function Nome({ nome, cor, eu = false, online = true, onClick }: { nome: string;
   );
 }
 
-// Meu boneco: anda até o destino clicado; a câmera não segue (o mapa é livre), mas o botão "ir até mim" centraliza
+// Meu boneco: anda até o destino clicado com arranque e freada suaves; a posição viva fica em `minhaPos` (sem
+// re-render por quadro); a câmera não segue (o mapa é livre), mas o botão com meu nome na barra centraliza em mim.
 function Meu() {
   const meu = usePersonagem((s) => s.meu);
   const ativo = usePersonagem((s) => s.ativo);
   const destino = usePersonagem((s) => s.destino);
   const g = useRef<THREE.Group>(null);
   const h = useRef<BonecoHandle>(null);
-  const andando = useRef(false);
-  const paradoDesde = useRef(0); // 0 = marca na primeira frame; desde quando está sem destino (passeia sozinho depois de um tempo)
+  const vel = useRef(0); // velocidade atual (m/s), acelera e freia
+  const paradoDesde = useRef(0); // 0 = marca na primeira frame; passeia sozinho depois de um tempo parado
   const fase = useMemo(() => 1.3, []);
-  useAnimacao(h, () => (andando.current ? "walk" : "idle"), fase, HIPS.procedural.base);
+  useAnimacao(h, () => (vel.current > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base);
   // posição inicial: a salva no servidor (encostada na calçada, nunca no meio da rua)
-  useEffect(() => { if (g.current && meu) { const [x, z] = pontoNaCalcada(meu.x, meu.z); g.current.position.set(x, 0, z); g.current.rotation.y = meu.rot; usePersonagem.getState().setPosicao(x, z, meu.rot); } }, [meu?.usuarioId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (g.current && meu) { const [x, z] = pontoNaCalcada(meu.x, meu.z); g.current.position.set(x, 0, z); g.current.rotation.y = meu.rot; usePersonagem.getState().setPosicao(x, z, meu.rot); } }, [meu?.usuarioId, ativo]); // eslint-disable-line react-hooks/exhaustive-deps
   useFrame((_, dt) => {
     const o = g.current; if (!o) return; dt = Math.min(dt, 0.1);
+    const st = usePersonagem.getState();
     if (!destino) {
-      andando.current = false; if (!paradoDesde.current) paradoDesde.current = performance.now();
+      vel.current = Math.max(0, vel.current - 8 * dt);
+      if (!paradoDesde.current) paradoDesde.current = performance.now();
       // como um pedestre comum: depois de um tempo parado, dá uma volta pela calçada (um clique no chão interrompe)
-      if (performance.now() - paradoDesde.current > PAUSA_PASSEIO * 1000 && usePersonagem.getState().painel !== "chat") { paradoDesde.current = performance.now(); usePersonagem.setState({ destino: passeioNaCalcada(o.position.x, o.position.z), passeio: true }); }
-      return;
+      if (performance.now() - paradoDesde.current > PAUSA_PASSEIO * 1000 && st.painel !== "chat") { paradoDesde.current = performance.now(); usePersonagem.setState({ destino: passeioNaCalcada(o.position.x, o.position.z), passeio: true }); st.avisarMovimento(); }
+      minhaPos.vel = 0; return;
     }
     const dx = destino[0] - o.position.x, dz = destino[1] - o.position.z; const dist = Math.hypot(dx, dz);
-    if (dist < 0.08) { andando.current = false; paradoDesde.current = performance.now() - (usePersonagem.getState().passeio ? PAUSA_PASSEIO * 400 : 0); usePersonagem.setState({ destino: null, passeio: false }); usePersonagem.getState().setPosicao(o.position.x, o.position.z, o.rotation.y); return; }
-    andando.current = true;
-    const p = Math.min(dist, (usePersonagem.getState().passeio ? VEL_PASSEIO : VEL) * dt); o.position.x += (dx / dist) * p; o.position.z += (dz / dist) * p;
-    const r = Math.atan2(dx, dz); let d = r - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.rotation.y += d * Math.min(1, dt * 10);
-    usePersonagem.getState().setPosicao(o.position.x, o.position.z, o.rotation.y);
+    const velMax = st.passeio ? VEL_PASSEIO : VEL;
+    // freia nos últimos 60 cm, acelera no resto
+    const alvo = dist < 0.6 ? Math.max(0.5, velMax * (dist / 0.6)) : velMax;
+    vel.current = vel.current < alvo ? Math.min(alvo, vel.current + 6 * dt) : Math.max(alvo, vel.current - 8 * dt);
+    if (dist < 0.06) {
+      o.position.set(destino[0], 0, destino[1]); vel.current = 0; minhaPos.vel = 0;
+      paradoDesde.current = performance.now() - (st.passeio ? PAUSA_PASSEIO * 400 : 0);
+      usePersonagem.setState({ destino: null, passeio: false }); st.setPosicao(o.position.x, o.position.z, o.rotation.y); st.avisarMovimento();
+      return;
+    }
+    const p = Math.min(dist, vel.current * dt); o.position.x += (dx / dist) * p; o.position.z += (dz / dist) * p;
+    const r = Math.atan2(dx, dz); let d = r - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.rotation.y += d * Math.min(1, dt * 12);
+    minhaPos.x = o.position.x; minhaPos.z = o.position.z; minhaPos.rot = o.rotation.y; minhaPos.vel = vel.current;
   });
   if (!meu || !ativo) return null;
   const b = def(meu.boneco);
   return (
-    <group ref={g} position={[meu.x, 0, meu.z]}>
+    <group ref={g}>{/* posição só via ref: passar position= aqui faria o boneco pular de volta a cada re-render */}
       <BonecoProcedural ref={h} def={b} camisa={meu.roupa} cracha="#FFD166" />
       <SombraContato r={0.36} />
       <Nome nome={meu.nome} cor={meu.roupa} eu />
@@ -70,27 +81,40 @@ function Meu() {
   );
 }
 
-// Outro personagem online: desliza até a posição que veio do servidor
+// Outro personagem online: anda sozinho rumo ao destino que veio na batida, na velocidade dele (não fica parado
+// esperando a próxima atualização); se a posição do servidor divergir muito, corrige suavemente.
 function OutroBoneco({ o }: { o: Outro }) {
   const g = useRef<THREE.Group>(null);
   const h = useRef<BonecoHandle>(null);
-  const alvo = useRef(new THREE.Vector3(o.x, 0, o.z));
-  const rotAlvo = useRef(o.rot);
-  const andando = useRef(false);
+  const srv = useRef({ x: o.x, z: o.z, rot: o.rot, destino: o.destino ?? null, vel: o.vel ?? 0 });
+  const vel = useRef(0);
   const fase = useMemo(() => (o.usuarioId.charCodeAt(o.usuarioId.length - 1) % 10) / 3, [o.usuarioId]);
-  useEffect(() => { alvo.current.set(o.x, 0, o.z); rotAlvo.current = o.rot; }, [o.x, o.z, o.rot]);
-  useAnimacao(h, () => (andando.current ? "walk" : "idle"), fase, HIPS.procedural.base);
+  useEffect(() => { const g0 = g.current; if (g0) { g0.position.set(o.x, 0, o.z); g0.rotation.y = o.rot; } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    srv.current = { x: o.x, z: o.z, rot: o.rot, destino: o.destino ?? null, vel: o.vel ?? 0 };
+    // divergiu demais (teleporte, aba que ficou parada): pula pra posição do servidor
+    const g0 = g.current; if (g0 && Math.hypot(o.x - g0.position.x, o.z - g0.position.z) > 6) { g0.position.set(o.x, 0, o.z); g0.rotation.y = o.rot; }
+  }, [o.x, o.z, o.rot, o.destino, o.vel]);
+  useAnimacao(h, () => (vel.current > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base);
   useFrame((_, dt) => {
     const g0 = g.current; if (!g0) return; dt = Math.min(dt, 0.1);
-    const dx = alvo.current.x - g0.position.x, dz = alvo.current.z - g0.position.z; const dist = Math.hypot(dx, dz);
+    const s = srv.current;
+    // alvo: o destino dele (se está andando) ou a posição que o servidor conhece
+    const alvoX = s.destino ? s.destino[0] : s.x, alvoZ = s.destino ? s.destino[1] : s.z;
+    const dx = alvoX - g0.position.x, dz = alvoZ - g0.position.z; const dist = Math.hypot(dx, dz);
+    const velMax = s.destino ? Math.max(0.6, s.vel || VEL) : Math.min(VEL, Math.max(0.8, dist / 1.5)); // sem destino: só corrige a diferença
+    const alvoV = dist < 0.05 ? 0 : dist < 0.6 ? Math.max(0.4, velMax * (dist / 0.6)) : velMax;
+    vel.current = vel.current < alvoV ? Math.min(alvoV, vel.current + 6 * dt) : Math.max(alvoV, vel.current - 8 * dt);
     if (dist > 0.05) {
-      const p = Math.min(dist, Math.max(VEL, dist / 2.5) * dt); g0.position.x += (dx / dist) * p; g0.position.z += (dz / dist) * p; andando.current = true;
-      const r = Math.atan2(dx, dz); let d = r - g0.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g0.rotation.y += d * Math.min(1, dt * 10);
-    } else { andando.current = false; let d = rotAlvo.current - g0.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g0.rotation.y += d * Math.min(1, dt * 6); }
+      const p = Math.min(dist, vel.current * dt); g0.position.x += (dx / dist) * p; g0.position.z += (dz / dist) * p;
+      const r = Math.atan2(dx, dz); let d = r - g0.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g0.rotation.y += d * Math.min(1, dt * 12);
+    } else { vel.current = 0; let d = s.rot - g0.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g0.rotation.y += d * Math.min(1, dt * 6); }
   });
   const selecionar = () => usePersonagem.getState().selecionarOutro(o);
+  // posição viva dos outros (só pra testes/prévias)
+  useEffect(() => { const w = window as unknown as { __outros?: () => number[] }; w.__outros = () => (g.current ? [g.current.position.x, g.current.position.z] : []); }, []);
   return (
-    <group ref={g} position={[o.x, 0, o.z]} rotation={[0, o.rot, 0]}>
+    <group ref={g}>{/* posição só via ref (ver Meu) */}
       <BonecoProcedural ref={h} def={def(o.boneco)} camisa={o.roupa} cracha="#B8C0CC" />
       <SombraContato r={0.36} />
       {/* área de clique (invisível) em volta do boneco */}

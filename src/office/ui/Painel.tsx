@@ -52,7 +52,7 @@ export function BarraTopo() {
         </div>
         <div className="sem-barra min-w-0 flex-1 overflow-x-auto">
           <div className="ml-auto flex w-max items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0">
-            <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório" : "Ver o prédio por fora"} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">{vista === "fora" ? "🏢 Por dentro" : "🌆 Por fora"}</button>
+            <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório" : "Ver o prédio por fora"} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">{vista === "fora" ? "🏢 Ver por dentro" : "🌆 Ver por fora"}</button>
             <ContaWorkend />
           </div>
         </div>
@@ -218,9 +218,14 @@ function useMundoServidor() {
   useEffect(() => { carregar(); const t = setInterval(carregar, 30000); return () => clearInterval(t); }, [carregar]);
 }
 
+// O mural da fachada é da Nuvem (recados pro CEO); no mundo do WorkEnd ele não aparece pros visitantes
+function MuralSeNuvem() { const mundo = useModoMundo(); const admin = useEscritorio((s) => s.admin); if (mundo && !admin) return null; return <Mural />; }
 function PainelOuCartao() {
   const admin = useEscritorio((s) => s.admin);
   const online = useEscritorio((s) => s.online);
+  const mundo = useModoMundo();
+  // No mundo do WorkEnd a Nuvem é só mais uma loja: ninguém vê o painel interno dos agentes, a não ser o admin da Nuvem
+  if (mundo && !admin) return <CartaoPublico />;
   return admin || !online ? <PainelAgente /> : <CartaoPublico />;
 }
 
@@ -240,8 +245,9 @@ function BotaoGraficos() {
 
 export function Painel() {
   useSimulador();
-  // ?vista=fora abre já na vista externa (prévias e links)
-  useEffect(() => { const q = new URLSearchParams(window.location.search); if (q.get("vista") === "fora") useEscritorio.getState().setVista("fora"); }, []);
+  // ?vista=fora abre já na vista externa (prévias e links). No mundo do WorkEnd a entrada é sempre por fora (o mapa),
+  // nunca dentro do escritório da Nuvem — a Nuvem é só uma das lojas.
+  useEffect(() => { const q = new URLSearchParams(window.location.search); if (q.get("vista") === "fora" || (modoMundo() && q.get("vista") !== "dentro")) useEscritorio.getState().setVista("fora"); }, []);
   // voltou do Google (?conexao=youtube): abre o painel do CEO na aba Tarefas assim que os agentes carregarem
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has("conexao")) return;
@@ -257,7 +263,7 @@ export function Painel() {
     <>
       <BarraTopo />
       <MenuAgente />
-      <Mural />
+      <MuralSeNuvem />
       <PainelOuCartao />
       <CartaoLote />
       <PainelEmpresa />

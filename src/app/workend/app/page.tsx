@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
 import { terrenoDoUsuario, ehAdmin } from "@/server/terrenos";
 import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
-import { BotaoSair, BotaoAvisar } from "../_conta";
+import { BotaoAvisar } from "../_conta";
+import { CabecalhoApp } from "../_cabecalho";
 
 import { meta } from "../seo";
 
@@ -19,10 +20,7 @@ export default async function App() {
   const empresa = chao?.empresaNome || u.empresaNome || `Empresa de ${u.nome.split(" ")[0]}`;
   return (
     <>
-      <header className="faixa flex items-center justify-between py-5">
-        <Link href="/" aria-label="WorkEnd"><Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} priority className="h-9 w-auto" /></Link>
-        <div className="flex items-center gap-3 text-[15px]"><Link href="/app/rede" className="btn btn-claro">Minha rede</Link>{ehAdmin(u) && <Link href="/app/admin" className="btn btn-claro">Admin</Link>}<span className="hidden text-[var(--tinta-2)] sm:inline">{u.email}</span><BotaoSair /></div>
-      </header>
+      <CabecalhoApp atual="app" email={u.email} admin={ehAdmin(u)} />
 
       <section className="faixa pt-4">
         <h1 className="text-[2rem] lg:text-[2.6rem]">Olá, {u.nome.split(" ")[0]}. Este é o painel da {empresa}.</h1>

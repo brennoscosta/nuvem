@@ -11,7 +11,7 @@ import { Fachada } from "./Fachada";
 import { Agente, handlers } from "./Agente";
 import { qualidade } from "./qualidade";
 import { useEscritorio } from "../store";
-import { useMundo } from "../mundoStore";
+import { useMundo, modoMundo } from "../mundoStore";
 import { MESA } from "../data/layout";
 import type { Evento } from "../data/eventos";
 
@@ -36,13 +36,16 @@ function Despachante() {
 // Enquadramentos (prédio de 18 x 18 m): por dentro, de cima e um pouco de lado; por fora, mais baixo e afastado
 const CAM_DENTRO = { pos: new THREE.Vector3(8, 23, 28), alvo: new THREE.Vector3(0, 0, 0.5) };
 const CAM_FORA = { pos: new THREE.Vector3(12, 15, 32), alvo: new THREE.Vector3(0, 2, 1) };
+// No mundo do WorkEnd a entrada é uma vista aérea do bairro (a Nuvem é só uma das lojas)
+const CAM_MUNDO = { pos: new THREE.Vector3(34, 42, 74), alvo: new THREE.Vector3(2, 0, 12) };
 // ?cam=x,y,z,tx,ty,tz posiciona a câmera (usado nas prévias)
 const CAM = (() => { if (typeof window === "undefined") return null; const v = new URLSearchParams(window.location.search).get("cam"); if (!v) return null; const n = v.split(",").map(Number); return n.length === 6 ? n : null; })();
 // Celular em pé: a tela é estreita, então abre o ângulo e afasta um pouco pra o prédio inteiro caber na largura
 const RETRATO = typeof window !== "undefined" && window.innerWidth < window.innerHeight;
 const FOV = RETRATO ? Math.min(52, (32 / (window.innerWidth / window.innerHeight)) * 0.7) : 32;
-if (RETRATO) { CAM_DENTRO.pos.multiplyScalar(1.2); CAM_FORA.pos.multiplyScalar(1.15); }
-const CAM_INICIAL = CAM ? { pos: [CAM[0], CAM[1], CAM[2]] as [number, number, number], alvo: [CAM[3], CAM[4], CAM[5]] as [number, number, number] } : { pos: CAM_DENTRO.pos.toArray() as [number, number, number], alvo: CAM_DENTRO.alvo.toArray() as [number, number, number] };
+if (RETRATO) { CAM_DENTRO.pos.multiplyScalar(1.2); CAM_FORA.pos.multiplyScalar(1.15); CAM_MUNDO.pos.multiplyScalar(1.2); }
+const CAM_PADRAO = typeof window !== "undefined" && modoMundo() ? CAM_MUNDO : CAM_DENTRO;
+const CAM_INICIAL = CAM ? { pos: [CAM[0], CAM[1], CAM[2]] as [number, number, number], alvo: [CAM[3], CAM[4], CAM[5]] as [number, number, number] } : { pos: CAM_PADRAO.pos.toArray() as [number, number, number], alvo: CAM_PADRAO.alvo.toArray() as [number, number, number] };
 // até onde o centro da tela pode ir ao arrastar (não deixa a câmera escapar do mundo e ver a borda dos painéis)
 const LIMITE = { x: MUNDO.x - 22, z: MUNDO.z - 22 };
 
@@ -76,7 +79,7 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
     // só reenquadra se o usuário estiver olhando a Nuvem; longe dela (num lote, na lanchonete) a câmera fica onde está
     const t = controles.current?.target as THREE.Vector3 | undefined;
     if (t && (Math.abs(t.x) > 24 || Math.abs(t.z) > 24)) return;
-    const c = vista === "fora" ? CAM_FORA : CAM_DENTRO;
+    const c = vista === "fora" ? (modoMundo() ? CAM_MUNDO : CAM_FORA) : CAM_DENTRO;
     alvo.current = c.alvo.clone(); posAlvo.current = c.pos.clone();
   }, [vista, controles]);
   useFrame(({ camera }, dt) => {

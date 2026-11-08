@@ -10,7 +10,7 @@ import { useChamada, type ChamadaInfo } from "./chamadaStore";
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
 export interface MeuPersonagem { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: string | null; x: number; z: number; rot: number }
 export type StatusRelacao = "nenhuma" | "pedi" | "pediram" | "amigos" | "recusada";
-export interface Outro { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; redes?: Redes; online: boolean; relacao?: { status: StatusRelacao; id: string | null } }
+export interface Outro { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number; redes?: Redes; online: boolean; relacao?: { status: StatusRelacao; id: string | null } }
 export interface Amigo { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; redes: Redes; online: boolean; desde: string }
 export interface Pedido { id: string; usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; criadoEm: string; direcao: "recebido" | "enviado" }
 export interface Negociacao { id: string; deId: string; paraId: string; titulo: string; texto: string; valor: number | null; status: string; criadoEm: string; respondidoEm: string | null; outroId: string; outroNome: string; outroBoneco: string; outroRoupa: string }
@@ -41,6 +41,7 @@ interface Estado {
   fechar: () => void;
   irPara: (x: number, z: number) => void;
   setPosicao: (x: number, z: number, rot: number) => void;
+  avisarMovimento: () => void;
   batida: () => Promise<void>;
   selecionarOutro: (o: Outro | null) => void;
   abrirChat: (o: Outro) => Promise<void>;
@@ -56,6 +57,10 @@ interface Estado {
   ligar: (o: Outro | { usuarioId: string; nome: string; boneco: string; roupa: string }, video: boolean) => Promise<string | null>;
 }
 
+// Posição viva do meu boneco, escrita pela cena a cada quadro (fora do estado reativo pra não re-renderizar nada)
+export const minhaPos = { x: 0, z: 21.3, rot: 0, vel: 0 };
+let batidaPendente: ReturnType<typeof setTimeout> | null = null;
+
 export const usePersonagem = create<Estado>((set, get) => ({
   carregado: false, meu: null, ativo: false, preco: 5.9, precoCheio: 19.9, pagamentoLigado: false, outros: [], naoLidas: 0, pedidos: 0, amigos: [], listaPedidos: [], negociacoes: [], destino: null, passeio: false, posicao: [0, 21.3, 0], painel: null, outroSelecionado: null, mensagens: [], conversas: [], erro: null,
 
@@ -63,7 +68,9 @@ export const usePersonagem = create<Estado>((set, get) => ({
     try {
       const j = await fetch("/api/personagem").then((r) => r.json());
       const meu: MeuPersonagem | null = j.personagem ?? null;
-      set({ meu, ativo: !!j.ativo, preco: j.preco ?? 5.9, precoCheio: j.precoCheio ?? 19.9, pagamentoLigado: !!j.pagamento, carregado: true, posicao: meu ? [...pontoNaCalcada(meu.x, meu.z), meu.rot] : get().posicao });
+      const pos: [number, number, number] = meu ? [...pontoNaCalcada(meu.x, meu.z), meu.rot] : get().posicao;
+      if (meu && !get().meu) { minhaPos.x = pos[0]; minhaPos.z = pos[1]; minhaPos.rot = pos[2]; }
+      set({ meu, ativo: !!j.ativo, preco: j.preco ?? 5.9, precoCheio: j.precoCheio ?? 19.9, pagamentoLigado: !!j.pagamento, carregado: true, posicao: pos });
     } catch { set({ carregado: true }); }
   },
   salvar: async (d) => {
@@ -83,12 +90,14 @@ export const usePersonagem = create<Estado>((set, get) => ({
   },
   abrir: (painel) => set({ painel }),
   fechar: () => set({ painel: null, outroSelecionado: null }),
-  irPara: (x, z) => { if (get().ativo) set({ destino: [x, z], passeio: false }); },
-  setPosicao: (x, z, rot) => { set({ posicao: [x, z, rot] }); },
+  irPara: (x, z) => { if (!get().ativo) return; set({ destino: [x, z], passeio: false }); get().avisarMovimento(); },
+  setPosicao: (x, z, rot) => { minhaPos.x = x; minhaPos.z = z; minhaPos.rot = rot; set({ posicao: [x, z, rot] }); },
+  // mudou o destino (clique, passeio ou chegada): manda a batida logo, pra quem olha de fora acompanhar sem atraso
+  avisarMovimento: () => { if (batidaPendente) clearTimeout(batidaPendente); batidaPendente = setTimeout(() => { batidaPendente = null; void get().batida(); }, 120); },
   batida: async () => {
     try {
-      const [x, z, rot] = get().posicao;
-      const j = await fetch("/api/personagem/presenca", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ x, z, rot }) }).then((r) => r.json());
+      const { x, z, rot, vel } = minhaPos; const destino = get().destino;
+      const j = await fetch("/api/personagem/presenca", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ x, z, rot, destino, vel: destino ? vel : 0 }) }).then((r) => r.json());
       const outros: Outro[] = j.outros ?? [];
       const sel = get().outroSelecionado;
       set({ outros, naoLidas: j.naoLidas ?? 0, pedidos: j.pedidos ?? 0, outroSelecionado: sel ? { ...sel, ...(outros.find((o) => o.usuarioId === sel.usuarioId) ?? { online: false }), relacao: sel.relacao } : null });

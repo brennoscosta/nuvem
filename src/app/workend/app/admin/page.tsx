@@ -1,14 +1,12 @@
 // Painel do admin do WorkEnd: lotes (reservas e chãos pagos), pagamentos e usuários, com liberar/banir/ativar/editar.
 // Entra quem é admin (a conta souzacostabrenno@gmail.com ou quem ela promoveu) — ou quem digita a senha única
 // (ADMIN_SENHA), que abre a sessão da conta do dono.
-import Link from "next/link";
-import Image from "next/image";
 import { usuarioAtual } from "@/server/usuarios";
 import { ehAdmin, ADMIN_EMAIL, PRECO_LOTE, MINUTOS_RESERVA, DIAS_MES, DIAS_TOLERANCIA, precoPara } from "@/server/terrenos";
 import { pagamentoLigado } from "@/server/mercadopago";
 import { temSenhaConfigurada } from "@/server/auth";
 import { Rodape } from "../../_partes";
-import { BotaoSair } from "../../_conta";
+import { CabecalhoApp } from "../../_cabecalho";
 import { PainelAdmin, EntrarAdmin } from "./_painel";
 import { EmailsAdmin } from "./_emails";
 import { CatalogoAdmin, AtividadeAdmin } from "./_catalogo";
@@ -23,10 +21,7 @@ export default async function Admin() {
   const admin = !!u && ehAdmin(u);
   return (
     <>
-      <header className="faixa flex items-center justify-between py-5">
-        <Link href="/" aria-label="WorkEnd"><Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} priority className="h-9 w-auto" /></Link>
-        <div className="flex items-center gap-3 text-[15px]">{u && <Link href="/app" className="btn btn-linha">Meu painel</Link>}<Link href="/mundo" className="btn btn-claro">Ver o mapa</Link>{u && <BotaoSair />}</div>
-      </header>
+      <CabecalhoApp atual="admin" email={u?.email} admin={admin} />
       {!admin ? (
         <section className="faixa pt-4">
           <h1 className="text-[2rem] lg:text-[2.4rem]">Admin do WorkEnd</h1>

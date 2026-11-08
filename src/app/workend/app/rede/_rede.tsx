@@ -67,8 +67,8 @@ export function RedeDashboard({ nome }: { nome: string }) {
   return (
     <section className="faixa pt-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex items-center gap-4">{meu && <MiniAvatar boneco={meu.boneco} roupa={meu.roupa} tamanho={64} />}<div><h1 className="text-[2rem] leading-tight lg:text-[2.4rem]">Minha rede</h1><p className="text-[var(--tinta-2)]">{meu?.nome ?? nome} · {amigos.length} amigo{amigos.length === 1 ? "" : "s"}{online > 0 && <span className="text-[#16A34A]"> · {online} online</span>} · ativo até {dataBR(meu?.pagoAte)}</p></div></div>
-        <div className="flex gap-2"><a href="/mundo" className="btn btn-azul">Entrar no mapa</a><a href="/mundo?personagem=1" className="btn btn-linha">Editar personagem</a></div>
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">{meu && <MiniAvatar boneco={meu.boneco} roupa={meu.roupa} tamanho={56} />}<div className="min-w-0"><h1 className="text-[1.7rem] leading-tight sm:text-[2rem] lg:text-[2.4rem]">Minha rede</h1><p className="text-sm text-[var(--tinta-2)] sm:text-base">{meu?.nome ?? nome} · {amigos.length} amigo{amigos.length === 1 ? "" : "s"}{online > 0 && <span className="text-[#16A34A]"> · {online} online</span>}{meu?.pagoAte && <> · ativo até {dataBR(meu.pagoAte)}</>}</p></div></div>
+        <div className="flex w-full gap-2 sm:w-auto"><a href="/mundo" className="btn btn-azul flex-1 text-center sm:flex-none">Entrar no mapa</a><a href="/mundo?personagem=1" className="btn btn-linha flex-1 text-center sm:flex-none">Editar personagem</a></div>
       </div>
       {aviso && <div className="mt-3 rounded-xl bg-[var(--cinza)] px-3 py-2 text-sm">{aviso} <button onClick={() => setAviso(null)} className="ml-2 underline">fechar</button></div>}
 
@@ -83,8 +83,8 @@ export function RedeDashboard({ nome }: { nome: string }) {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_380px]">
         <div>
-          <div className="flex gap-1 border-b border-[var(--linha)]">
-            {([["amigos", `Amigos · ${amigos.length}`], ["conversas", `Conversas · ${conversas.length}`], ["negociacoes", `Negociações${abertas.length ? ` · ${abertas.length} aberta${abertas.length > 1 ? "s" : ""}` : ""}`]] as [Aba, string][]).map(([id, t]) => <button key={id} onClick={() => setAba(id)} className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold ${aba === id ? "border-[var(--azul)] text-[var(--azul)]" : "border-transparent text-[var(--tinta-2)]"}`}>{t}</button>)}
+          <div className="sem-barra flex gap-1 overflow-x-auto border-b border-[var(--linha)] whitespace-nowrap">
+            {([["amigos", `Amigos · ${amigos.length}`], ["conversas", `Conversas · ${conversas.length}`], ["negociacoes", `Negociações${abertas.length ? ` · ${abertas.length} aberta${abertas.length > 1 ? "s" : ""}` : ""}`]] as [Aba, string][]).map(([id, t]) => <button key={id} onClick={() => setAba(id)} className={`-mb-px shrink-0 border-b-2 px-3 py-2.5 text-sm font-semibold sm:px-4 ${aba === id ? "border-[var(--azul)] text-[var(--azul)]" : "border-transparent text-[var(--tinta-2)]"}`}>{t}</button>)}
           </div>
           {aba === "amigos" && (
             <ul className="mt-4 grid gap-3">
@@ -93,7 +93,7 @@ export function RedeDashboard({ nome }: { nome: string }) {
                 <li key={a.usuarioId} className="rounded-2xl border border-[var(--linha)] p-4">
                   <div className="flex flex-wrap items-center gap-3">
                     <MiniAvatar boneco={a.boneco} roupa={a.roupa} tamanho={48} />
-                    <div className="min-w-0 flex-1"><div className="flex items-center gap-2 font-semibold">{a.nome}{a.online ? <span className="rounded-full bg-[#E3F6EA] px-1.5 py-0.5 text-[10px] font-bold text-[#166534]">online</span> : <span className="text-[10px] text-[var(--tinta-2)]">offline</span>}</div><div className="truncate text-sm text-[var(--tinta-2)]">{a.bio || `amigos desde ${dataBR(a.desde)}`}</div></div>
+                    <div className="min-w-0 flex-1 basis-40"><div className="flex items-center gap-2 font-semibold">{a.nome}{a.online ? <span className="rounded-full bg-[#E3F6EA] px-1.5 py-0.5 text-[10px] font-bold text-[#166534]">online</span> : <span className="text-[10px] text-[var(--tinta-2)]">offline</span>}</div><div className="truncate text-sm text-[var(--tinta-2)]">{a.bio || `amigos desde ${dataBR(a.desde)}`}</div></div>
                     <div className="flex gap-1.5 text-xs font-bold">
                       <button onClick={() => void abrirChat(comoOutro(a))} className="rounded-lg bg-[#EEF3FF] px-3 py-2 text-[#1D4ED8]">💬 Conversar</button>
                       <button onClick={() => { void abrirChat(comoOutro(a)); setAviso(`Use o botão 🤝 Negociar dentro da conversa com ${a.nome}.`); }} className="rounded-lg bg-[#FFF4D6] px-3 py-2 text-[#7A5A00]">🤝 Negociar</button>
@@ -135,12 +135,12 @@ export function RedeDashboard({ nome }: { nome: string }) {
         </div>
         <aside className="lg:sticky lg:top-4 lg:self-start">
           {painel === "chat" && outro ? (
-            <div className="flex h-[min(70vh,600px)] flex-col overflow-hidden rounded-2xl border border-[var(--linha)] bg-white">
+            <div className="painel-entra fixed inset-x-0 bottom-0 z-40 flex h-[78vh] flex-col overflow-hidden rounded-t-2xl border border-[var(--linha)] bg-white shadow-2xl lg:static lg:h-[min(70vh,600px)] lg:rounded-2xl lg:shadow-none">
               <div className="flex items-center justify-between border-b border-[var(--linha)] p-3"><div className="flex items-center gap-2"><MiniAvatar boneco={outro.boneco} roupa={outro.roupa} tamanho={36} /><div><div className="text-sm font-bold leading-tight">{outro.nome}</div><div className="text-[11px] text-[var(--tinta-2)]">{outro.online ? <span className="text-[#16A34A]">● online · ao vivo</span> : "offline · recebe quando entrar"}</div></div></div><button onClick={() => usePersonagem.getState().fechar()} className="rounded-full px-2 text-[var(--tinta-2)] hover:bg-[var(--cinza)]">✕</button></div>
               <CorpoChat o={outro} altura="flex-1" />
             </div>
           ) : (
-            <div className="rounded-2xl bg-[var(--cinza)] p-6 text-sm text-[var(--tinta-2)]"><div className="text-2xl">💬</div><div className="mt-2 font-semibold text-[var(--tinta)]">Escolha alguém pra conversar</div>Clique em Conversar num amigo ou numa conversa. Propostas e calls saem daqui também.</div>
+            <div className="hidden rounded-2xl bg-[var(--cinza)] p-6 text-sm text-[var(--tinta-2)] lg:block"><div className="text-2xl">💬</div><div className="mt-2 font-semibold text-[var(--tinta)]">Escolha alguém pra conversar</div>Clique em Conversar num amigo ou numa conversa. Propostas e calls saem daqui também.</div>
           )}
         </aside>
       </div>

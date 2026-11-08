@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     if (!u) return ok({ outros: await outrosOnline(null), naoLidas: 0, pedidos: 0, chamada: null }); // visitante só vê
     const p = await meuPersonagem(u.id);
     if (!personagemAtivo(p, u)) return ok({ outros: await outrosOnline(u.id), naoLidas: await naoLidas(u.id), pedidos: 0, chamada: null });
-    const d = await corpo<{ x: number; z: number; rot: number; parado?: boolean }>(req);
+    const d = await corpo<{ x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number }>(req);
     const [outros, nl, pedidos, chamada] = await Promise.all([presenca(u.id, d), naoLidas(u.id), pedidosRecebidos(u.id), minhaChamada(u.id)]);
     return ok({ outros, naoLidas: nl, pedidos, chamada });
   } catch (e) { return erro(e); }
