@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { PainelEscritorio } from "./Escritorio";
+import { PainelPersonagem, FichaPersonagem, ChatPersonagem, CaixaPersonagem } from "./Personagem";
 import { AREAS, AREAS_APOIO, FUNCOES, NIVEIS, NIVEL, PERSONALIDADES, type AreaId, type Nivel } from "../data/org";
 import { SETORES_ESCRITORIO } from "../data/layout";
 import { qualidade, escolherQualidade } from "../scene/qualidade";
@@ -242,7 +243,11 @@ export function Painel() {
       <PainelOuCartao />
       <CartaoLote />
       <PainelEmpresa />
-          <PainelEscritorio />
+      <PainelEscritorio />
+      <PainelPersonagem />
+      <FichaPersonagem />
+      <ChatPersonagem />
+      <CaixaPersonagem />
       <AvisoPagamento />
       <ModalLogin />
       <ModalContratar />

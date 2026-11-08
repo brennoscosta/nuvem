@@ -80,3 +80,25 @@ export const NICHOS: { id: string; nome: string }[] = [
 ];
 export const nomeNicho = (id: string | null | undefined) => NICHOS.find((n) => n.id === id)?.nome ?? "Negócios";
 export const nichoValido = (id: unknown) => (typeof id === "string" && NICHOS.some((n) => n.id === id) ? id : "negocios");
+
+// Calçadas: pra um personagem "andar como pedestre", projetamos um ponto no meio da calçada mais próxima
+// (as calçadas contornam cada quarteirão a BORDA_CALCADA - 1,2 do centro) e sorteamos um destino ao longo dela.
+export const MEIO_CALCADA = BORDA_CALCADA - 1.2; // 21,3
+export function pontoNaCalcada(x: number, z: number): [number, number] {
+  const i = Math.round(x / PASSO), j = Math.round(z / PASSO);
+  const cx = i * PASSO, cz = j * PASSO, dx = x - cx, dz = z - cz;
+  const B = MEIO_CALCADA;
+  // encosta na borda do quarteirão mais perto (norte/sul ou leste/oeste)
+  if (Math.abs(dx) > Math.abs(dz)) return [cx + Math.sign(dx || 1) * B, cz + Math.max(-B, Math.min(B, dz))];
+  return [cx + Math.max(-B, Math.min(B, dx)), cz + Math.sign(dz || 1) * B];
+}
+// próximo passeio: anda uns metros pela mesma calçada (vira a esquina quando chega no fim)
+export function passeioNaCalcada(x: number, z: number, sorte = Math.random()): [number, number] {
+  const [px, pz] = pontoNaCalcada(x, z);
+  const i = Math.round(px / PASSO), j = Math.round(pz / PASSO);
+  const cx = i * PASSO, cz = j * PASSO, B = MEIO_CALCADA;
+  const naVertical = Math.abs(Math.abs(px - cx) - B) < 0.01; // estou numa calçada leste/oeste (anda em z)
+  const passo = 6 + sorte * 10, sentido = sorte > 0.5 ? 1 : -1;
+  if (naVertical) { const nz = Math.max(cz - B, Math.min(cz + B, pz + sentido * passo)); return [px, nz]; }
+  const nx = Math.max(cx - B, Math.min(cx + B, px + sentido * passo)); return [nx, pz];
+}

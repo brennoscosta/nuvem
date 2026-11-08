@@ -2,7 +2,8 @@
 // lote e o comprador paga pelo app do banco dele — sem login no Mercado Pago. A confirmação vem pelo webhook e pela
 // conferência que o mapa faz a cada poucos segundos. Só o Access Token é necessário (MP_ACCESS_TOKEN no CapRover).
 import { sql, id, migrar } from "./db";
-import { precoPara, ativarTerreno, estenderReserva, obterTerreno, creditarTrocaLayout } from "./terrenos";
+import { precoPara, ativarTerreno, estenderReserva, obterTerreno, creditarTrocaLayout, ehAdmin } from "./terrenos";
+import { ativarPersonagem, PRECO_PERSONAGEM } from "./personagens";
 import { registrar } from "./eventos";
 import { PRECO_TROCA_LAYOUT } from "@/office/data/escritorio";
 import type { Usuario } from "./usuarios";
@@ -29,42 +30,49 @@ async function mp<T>(caminho: string, init: RequestInit = {}): Promise<T> {
 export interface CobrancaPix { id: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; pagamentoId: string }
 const PAGADOR_RESERVA = (uid: string) => `pagador-${uid.replace(/[^a-z0-9]/gi, "").toLowerCase()}@workend.online`;
 
-export async function criarCobranca(u: Usuario, chave: string, numeroLote: number, base: string, meses = 1, tipo: "lote" | "layout" = "lote"): Promise<CobrancaPix> {
-  await migrar();
-  if (u.banidoEm) throw new Error("Conta suspensa.");
-  const t = await obterTerreno(chave);
-  if (!t || t.usuarioId !== u.id) throw new Error("Reserve o lote antes de pagar.");
-  meses = Math.max(1, Math.min(12, meses | 0));
+async function criarPix(u: Usuario, base: string, o: { valor: number; descricao: string; tipo: "lote" | "layout" | "personagem"; chave: string; meses: number; metadata: Record<string, unknown> }): Promise<CobrancaPix> {
   const pid = id("pag");
-  const unit = precoPara(u); // admin paga R$ 0,99 (teste real sem gastar)
-  const valor = tipo === "layout" ? PRECO_TROCA_LAYOUT : Math.round(unit * meses * 100) / 100;
-  const expira = new Date(Date.now() + 60 * 60 * 1000); // o QR vale 1 hora (mesmo prazo da reserva)
-  const expiraMP = expira.toISOString().replace("Z", "-00:00"); // formato que o MP exige: yyyy-MM-ddTHH:mm:ss.SSS-00:00
+  const expira = new Date(Date.now() + 60 * 60 * 1000); // o QR vale 1 hora
+  const expiraMP = expira.toISOString().replace("Z", "-00:00");
   const corpo = (email: string) => ({
-    transaction_amount: valor,
-    description: tipo === "layout" ? `WorkEnd · troca de prédio · Lote ${numeroLote} (${t.empresaNome})` : `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"} (${t.empresaNome})`,
-    payment_method_id: "pix",
+    transaction_amount: o.valor, description: o.descricao, payment_method_id: "pix",
     payer: { email, first_name: u.nome.split(" ")[0] || "Cliente", last_name: u.nome.split(" ").slice(1).join(" ") || "WorkEnd" },
-    external_reference: pid,
-    statement_descriptor: "WORKEND",
-    date_of_expiration: expiraMP,
-    notification_url: `${base}/api/mercadopago/webhook`,
-    metadata: { terreno: chave, usuario: u.id, meses, tipo },
+    external_reference: pid, statement_descriptor: "WORKEND", date_of_expiration: expiraMP, notification_url: `${base}/api/mercadopago/webhook`, metadata: { ...o.metadata, usuario: u.id, tipo: o.tipo },
   });
   let p: PagamentoMP;
-  try {
-    p = await mp<PagamentoMP>("/v1/payments", { method: "POST", headers: { "x-idempotency-key": pid }, body: JSON.stringify(corpo(u.email)) });
-  } catch (e) {
-    // o dono da conta Mercado Pago não pode pagar pra si mesmo: usa um e-mail de pagador neutro (o Pix é pago de qualquer banco)
+  try { p = await mp<PagamentoMP>("/v1/payments", { method: "POST", headers: { "x-idempotency-key": pid }, body: JSON.stringify(corpo(u.email)) }); }
+  catch (e) {
     const msg = (e as Error).message.toLowerCase();
     if (!/collector|payer|mesmo|same/.test(msg)) throw e;
     p = await mp<PagamentoMP>("/v1/payments", { method: "POST", headers: { "x-idempotency-key": pid + "b" }, body: JSON.stringify(corpo(PAGADOR_RESERVA(u.id))) });
   }
   const dados = p.point_of_interaction?.transaction_data;
   if (!dados?.qr_code) throw new Error("O Mercado Pago não devolveu o QR Code do Pix. Confira se a conta tem chave Pix cadastrada.");
-  await sql`INSERT INTO pagamento (id, terreno_chave, usuario_id, pagamento_id, valor, meses, metodo, status, bruto, tipo) VALUES (${pid}, ${chave}, ${u.id}, ${String(p.id)}, ${valor}, ${meses}, 'pix', 'pendente', ${sql.json(p as unknown as Parameters<typeof sql.json>[0])}, ${tipo})`;
+  await sql`INSERT INTO pagamento (id, terreno_chave, usuario_id, pagamento_id, valor, meses, metodo, status, bruto, tipo) VALUES (${pid}, ${o.chave}, ${u.id}, ${String(p.id)}, ${o.valor}, ${o.meses}, 'pix', 'pendente', ${sql.json(p as unknown as Parameters<typeof sql.json>[0])}, ${o.tipo})`;
+  return { id: pid, valor: o.valor, codigo: dados.qr_code, qrBase64: dados.qr_code_base64 ?? "", expiraEm: expira.toISOString(), pagamentoId: String(p.id) };
+}
+
+// Chão: 1º mês ou renovação; ou troca de prédio (R$ 9,90)
+export async function criarCobranca(u: Usuario, chave: string, numeroLote: number, base: string, meses = 1, tipo: "lote" | "layout" = "lote"): Promise<CobrancaPix> {
+  await migrar();
+  if (u.banidoEm) throw new Error("Conta suspensa.");
+  const t = await obterTerreno(chave);
+  if (!t || t.usuarioId !== u.id) throw new Error("Reserve o lote antes de pagar.");
+  meses = Math.max(1, Math.min(12, meses | 0));
+  const unit = precoPara(u); // admin paga R$ 0,99 (teste real sem gastar)
+  const valor = tipo === "layout" ? PRECO_TROCA_LAYOUT : Math.round(unit * meses * 100) / 100;
+  const r = await criarPix(u, base, { valor, tipo, chave, meses, metadata: { terreno: chave, meses }, descricao: tipo === "layout" ? `WorkEnd · troca de prédio · Lote ${numeroLote} (${t.empresaNome})` : `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"} (${t.empresaNome})` });
   if (tipo === "lote") await estenderReserva(chave, 60); // ele está pagando: a reserva não some embaixo dele
-  return { id: pid, valor, codigo: dados.qr_code, qrBase64: dados.qr_code_base64 ?? "", expiraEm: expira.toISOString(), pagamentoId: String(p.id) };
+  return r;
+}
+// Personagem do visitante: R$ 5,90/mês (admin paga 1/100)
+export async function criarCobrancaPersonagem(u: Usuario, base: string, meses = 1): Promise<CobrancaPix> {
+  await migrar();
+  if (u.banidoEm) throw new Error("Conta suspensa.");
+  meses = Math.max(1, Math.min(12, meses | 0));
+  const unit = ehAdmin(u) ? Math.round(PRECO_PERSONAGEM * 100) / 10000 : PRECO_PERSONAGEM;
+  const valor = Math.round(unit * meses * 100) / 100;
+  return criarPix(u, base, { valor, tipo: "personagem", chave: "personagem", meses, metadata: { meses }, descricao: `WorkEnd · personagem · ${meses} ${meses === 1 ? "mês" : "meses"}` });
 }
 
 interface PagamentoMP { id: number; status: string; status_detail?: string; external_reference?: string; payment_method_id?: string; payment_type_id?: string; transaction_amount?: number; date_approved?: string; metadata?: Record<string, unknown>; point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } } }
@@ -77,7 +85,10 @@ async function aplicar(p: PagamentoMP) {
   const status = p.status === "approved" ? "aprovado" : p.status === "rejected" ? "rejeitado" : p.status === "refunded" || p.status === "charged_back" ? "estornado" : p.status === "cancelled" ? "cancelado" : "pendente";
   const jaAprovado = reg.status === "aprovado";
   await sql`UPDATE pagamento SET status = ${status}, pagamento_id = ${String(p.id)}, metodo = ${p.payment_method_id ?? p.payment_type_id ?? null}, pago_em = ${p.date_approved ? new Date(p.date_approved) : reg.pagoEm}, bruto = ${sql.json(p as unknown as Parameters<typeof sql.json>[0])} WHERE id = ${ref}`;
-  if (status === "aprovado" && !jaAprovado && reg.tipo === "layout") {
+  if (status === "aprovado" && !jaAprovado && reg.tipo === "personagem") {
+    await ativarPersonagem(reg.usuarioId, 30 * reg.meses);
+    void registrar("pagamento", `Personagem pago (${brl(Number(reg.valor))})`, { usuarioId: reg.usuarioId, dados: { detalhes: `Personagem ativo por ${30 * reg.meses} dias.` } });
+  } else if (status === "aprovado" && !jaAprovado && reg.tipo === "layout") {
     await creditarTrocaLayout(reg.terrenoChave);
     void registrar("pagamento", `Troca de prédio paga (${brl(Number(reg.valor))})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: "Crédito de 1 troca de prédio liberado." }, avisarDono: true });
   } else if (status === "aprovado" && !jaAprovado) {

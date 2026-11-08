@@ -9,7 +9,7 @@ export interface Terreno { chave: string; usuarioId: string; status: "reservado"
 export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
 export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null; ceoNome: string; atendenteNome: string; nicho: string }
 export type AbaEscritorio = "predio" | "setores" | "equipe" | "contratar" | "treinar";
-export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" }
+export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" | "personagem" }
 
 export const CORES_EMPRESA = ["#1D4ED8", "#0EA5A4", "#16A34A", "#D97706", "#DC2626", "#DB2777", "#7C3AED", "#1F2937"];
 
@@ -53,7 +53,7 @@ interface Estado {
   setRascunho: (r: Partial<Rascunho>) => void;
   reservar: () => Promise<string | null>;
   desistir: () => Promise<void>;
-  pagar: (meses?: number, tipo?: "lote" | "layout") => Promise<string | null>;
+  pagar: (meses?: number, tipo?: "lote" | "layout" | "personagem") => Promise<string | null>;
   conferirPagamento: (ref: string) => Promise<string>;
   fecharPix: () => void;
   abrirEscritorio: (aba?: AbaEscritorio) => void;
@@ -142,6 +142,7 @@ export const useMundo = create<Estado>((set, get) => ({
     if (pix && pix.id === ref) {
       if (status === "aprovado") {
         set({ pix: { ...pix, status: "aprovado" } }); await get().carregar();
+        if (pix.tipo === "personagem") { const { usePersonagem } = await import("./personagemStore"); await usePersonagem.getState().carregar(); }
         // crédito de troca de prédio comprado com o painel aberto: atualiza os contadores do rascunho
         const t = get().terrenos[pix.lote]; const r = get().rascunhoEscritorio;
         if (pix.tipo === "layout" && t?.escritorio && r) set({ rascunhoEscritorio: { ...r, trocasLayout: t.escritorio.trocasLayout, creditosLayout: t.escritorio.creditosLayout } });

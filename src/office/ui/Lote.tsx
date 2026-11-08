@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES_EMPRESA } from "../mundoStore";
 import { NICHOS } from "../data/mundo";
 import { useEscritorio } from "../store";
+import { BotoesPersonagem } from "./BotoesPersonagem";
 
 // Contagem regressiva da reserva (usa o relógio do servidor); quando zera, recarrega (o lote volta a ficar livre)
 function useContagem(ate: string | null | undefined) {
@@ -47,7 +48,7 @@ export function PixAberto({ chave }: { chave: string }) {
   if (pix.tipo === "layout" && !painelEsc) return null; // o Pix da troca de prédio aparece dentro do painel do escritório
   const copiar = async () => { try { await navigator.clipboard.writeText(pix.codigo); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { window.prompt("Copie o código Pix:", pix.codigo); } };
   if (pix.status === "aprovado") return (
-    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]"><div className="font-bold">Pagamento confirmado! 🎉</div><div className="mt-1 text-xs">{pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : "O chão é seu por 30 dias. Monte seu escritório pelos botões de edição."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white">Fechar</button></div>
+    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]"><div className="font-bold">Pagamento confirmado! 🎉</div><div className="mt-1 text-xs">{pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : pix.tipo === "personagem" ? "Seu personagem está ativo por 30 dias. Clique no chão pra andar e nos outros pra conversar." : "O chão é seu por 30 dias. Monte seu escritório pelos botões de edição."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white">Fechar</button></div>
   );
   if (pix.status !== "pendente") return (
     <div className="mt-3 rounded-2xl bg-[#FDE8E8] px-3 py-3 text-sm text-[#8A2A2A]"><div className="font-bold">{pix.status === "expirado" ? "Este Pix expirou." : "Pagamento não aprovado."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-bold text-white">Gerar outro Pix</button></div>
@@ -329,9 +330,10 @@ export function ContaWorkend() {
   const sair = useMundo((s) => s.sairWorkend);
   const selecionarLote = useMundo((s) => s.selecionarLote);
   if (!modoMundo()) return null;
-  if (!usuario) return <a href="/entrar" className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">Entrar</a>;
+  if (!usuario) return <div className="flex items-center gap-1.5"><BotoesPersonagem /><a href="/entrar" className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">Entrar</a></div>;
   return (
     <div className="flex items-center gap-1.5">
+      <BotoesPersonagem />
       {meu && <button onClick={() => selecionarLote(meu)} className="rounded-full bg-[#1D4ED8] px-3 py-1.5 text-xs font-bold text-white">Meu chão · Lote {LOTE_POR_CHAVE[meu]?.numero}</button>}
       <a href="/app" className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80" title={usuario.email}>{usuario.nome.split(" ")[0]}</a>
       <button onClick={sair} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/60">Sair</button>
