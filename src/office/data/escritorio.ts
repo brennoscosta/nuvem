@@ -15,7 +15,8 @@ export const LAYOUT: Record<LayoutId, LayoutInfo> = Object.fromEntries(LAYOUTS.m
 
 export interface Setor { id: string; nome: string; cor: string; mesas: number } // mesas: 1..4
 export type PapelMembro = "atendente" | "ceo" | "profissional";
-export interface Membro { id: string; nome: string; cargo: string; papel: PapelMembro; setorId: string | null; boneco: string; camisa: string }
+export interface Treino { descricao: string; saudacao: string } // o que a pessoa sabe/faz e como cumprimenta (base do atendimento)
+export interface Membro { id: string; nome: string; cargo: string; papel: PapelMembro; setorId: string | null; boneco: string; camisa: string; treino?: Treino }
 export interface Escritorio { layout: LayoutId; setores: Setor[]; equipe: Membro[] }
 
 export const MAX_SETORES = 4; // cabe num lote de 20 × 20 (prédio de 16 × 14)
@@ -24,15 +25,25 @@ export const CORES_SETOR = ["#DFF3F6", "#FBE6EC", "#EDE7F6", "#F6EEDF", "#E3F6EA
 export const CARGOS_SUGERIDOS = ["Atendimento", "Vendas", "Marketing", "Financeiro", "Suporte", "Design", "Jurídico", "Logística", "Orçamentos", "Agendamentos"];
 
 const novoId = (p: string) => `${p}_${Math.random().toString(36).slice(2, 8)}`;
+// Nomes neutros quando o dono ainda não escolheu (variam por empresa, pra não ser todo mundo igual)
+const NOMES_CEO = ["Marcos", "Júlia", "Rafael", "Camila", "Lucas", "Beatriz", "Felipe", "Larissa"];
+const NOMES_ATENDENTE = ["Ana", "Paula", "Bruno", "Carla", "Diego", "Lívia"];
+const BONECOS_CEO = ["classico", "oculos", "careca", "ruivo"];
+const BONECOS_ATENDENTE = ["coque", "longo", "suporte-1", "classico"];
+const hash = (s: string) => Math.abs([...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7));
 
-// O que todo escritório tem ao nascer: 1 setor de atendimento, a atendente e o CEO (com o nome do dono)
-export function escritorioPadrao(empresaNome: string, donoNome: string, cor: string): Escritorio {
+// O que todo escritório tem ao nascer: 1 setor de atendimento, a atendente e o CEO. Os nomes vêm do que o dono
+// escolheu ao montar a empresa; se não escolheu, entram nomes neutros que ele troca no painel.
+export function escritorioPadrao(empresaNome: string, cor: string, nomes: { ceo?: string | null; atendente?: string | null } = {}): Escritorio {
+  const h = hash(empresaNome + cor);
+  const ceo = (nomes.ceo ?? "").trim().slice(0, 24) || NOMES_CEO[h % NOMES_CEO.length];
+  const atendente = (nomes.atendente ?? "").trim().slice(0, 24) || NOMES_ATENDENTE[(h >> 3) % NOMES_ATENDENTE.length];
   return {
     layout: "moderno",
     setores: [{ id: "atendimento", nome: "Atendimento", cor: CORES_SETOR[0], mesas: 2 }],
     equipe: [
-      { id: "atendente", nome: "Ana", cargo: "Atendente", papel: "atendente", setorId: null, boneco: "coque", camisa: cor },
-      { id: "ceo", nome: (donoNome || "CEO").split(" ")[0], cargo: `CEO da ${empresaNome}`.slice(0, 40), papel: "ceo", setorId: null, boneco: "classico", camisa: "#1F2630" },
+      { id: "atendente", nome: atendente, cargo: "Atendente", papel: "atendente", setorId: null, boneco: BONECOS_ATENDENTE[(h >> 5) % BONECOS_ATENDENTE.length], camisa: cor, treino: { descricao: `Atende quem chega na ${empresaNome}: explica o que a empresa faz, tira dúvidas e anota o contato de quem quer orçamento.`, saudacao: `Olá! Bem-vindo à ${empresaNome}. Em que posso ajudar?` } },
+      { id: "ceo", nome: ceo, cargo: `CEO da ${empresaNome}`.slice(0, 40), papel: "ceo", setorId: null, boneco: BONECOS_CEO[(h >> 7) % BONECOS_CEO.length], camisa: "#1F2630", treino: { descricao: `Comanda a ${empresaNome}: decide prioridades, fecha negócios maiores e cuida da equipe.`, saudacao: "" } },
     ],
   };
 }
@@ -70,10 +81,11 @@ export function normalizarEscritorio(x: unknown, base: Escritorio): Escritorio {
     }
     const id = texto(r.id, 24, papel === "profissional" ? novoId("mem") : papel).replace(/[^a-zA-Z0-9_-]/g, "") || novoId("mem");
     if (equipe.some((e) => e.id === id)) continue;
-    equipe.push({ id, nome: texto(r.nome, 24, papel === "ceo" ? "CEO" : papel === "atendente" ? "Ana" : "Novo"), cargo: texto(r.cargo, 40, papel === "ceo" ? "CEO" : papel === "atendente" ? "Atendente" : "Profissional"), papel, setorId, boneco: bonecoOk(r.boneco), camisa: corOk(r.camisa, papel === "ceo" ? "#1F2630" : "#1D4ED8") });
+    const tr = (r.treino && typeof r.treino === "object" ? r.treino : {}) as Partial<Record<keyof Treino, unknown>>;
+    equipe.push({ id, nome: texto(r.nome, 24, papel === "ceo" ? "CEO" : papel === "atendente" ? "Ana" : "Novo"), cargo: texto(r.cargo, 40, papel === "ceo" ? "CEO" : papel === "atendente" ? "Atendente" : "Profissional"), papel, setorId, boneco: bonecoOk(r.boneco), camisa: corOk(r.camisa, papel === "ceo" ? "#1F2630" : "#1D4ED8"), treino: { descricao: texto(tr.descricao, 600), saudacao: texto(tr.saudacao, 160) } });
   }
   // a atendente e o CEO são obrigatórios: se sumiram, voltam os do padrão
-  for (const p of ["atendente", "ceo"] as const) if (!equipe.some((e) => e.papel === p)) equipe.unshift(base.equipe.find((e) => e.papel === p) ?? escritorioPadrao("", "", "#1D4ED8").equipe.find((e) => e.papel === p)!);
+  for (const p of ["atendente", "ceo"] as const) if (!equipe.some((e) => e.papel === p)) equipe.unshift(base.equipe.find((e) => e.papel === p) ?? escritorioPadrao("Empresa", "#1D4ED8").equipe.find((e) => e.papel === p)!);
   equipe.sort((a, b) => ordem(a.papel) - ordem(b.papel));
   return { layout, setores, equipe };
 }

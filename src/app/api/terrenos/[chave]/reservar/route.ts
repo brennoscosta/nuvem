@@ -13,7 +13,7 @@ export async function POST(req: Request, { params }: Ctx) {
     const u = await usuarioAtual();
     if (!u) return erro("Entre na sua conta do WorkEnd pra reservar um chão.", 401);
     const { chave } = await params;
-    const d = await corpo<{ empresaNome: string; cor?: string; logoBase64?: string | null; logoTipo?: string | null; manterLogo?: boolean }>(req);
+    const d = await corpo<{ empresaNome: string; cor?: string; logoBase64?: string | null; logoTipo?: string | null; manterLogo?: boolean; ceoNome?: string | null; atendenteNome?: string | null }>(req);
     const ch = decodeURIComponent(chave);
     const jaTinha = await obterTerreno(ch).then((t) => !!t && t.usuarioId === u.id).catch(() => false);
     const t = await reservarTerreno(u, ch, d);

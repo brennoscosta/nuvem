@@ -63,7 +63,7 @@ export async function obterTerreno(chave: string): Promise<Terreno | null> {
 function corValida(c: string) { return /^#[0-9a-fA-F]{6}$/.test(c); }
 
 // Reserva (ou atualiza a placa de) um lote. Um lote por usuário; se ele já tinha outro reservado, o antigo é liberado.
-export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNome: string; cor?: string; logoBase64?: string | null; logoTipo?: string | null; manterLogo?: boolean }) {
+export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNome: string; cor?: string; logoBase64?: string | null; logoTipo?: string | null; manterLogo?: boolean; ceoNome?: string | null; atendenteNome?: string | null }) {
   await migrar(); await limparVencidos();
   if (u.banidoEm) throw new Error("Sua conta foi suspensa por descumprir as políticas de uso. Fale com contato@workend.online.");
   if (!loteAVenda(chave)) throw new Error("Esse lote não está à venda.");
@@ -78,8 +78,11 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
     if (logo.length > MAX_LOGO) throw new Error("Logo muito grande (máximo 400 KB).");
   }
   const admin = ehAdmin(u);
+  // o escritório já nasce na reserva, com os nomes que o dono deu ao CEO e à atendente (editáveis depois)
+  const esc = escritorioPadrao(nome, cor, { ceo: d.ceoNome, atendente: d.atendenteNome });
+  const escJson = sql.json(esc as unknown as Parameters<typeof sql.json>[0]);
   return sql.begin(async (tx) => {
-    const [dono] = await tx<{ usuarioId: string; status: string }[]>`SELECT usuario_id, status FROM terreno WHERE chave = ${chave} FOR UPDATE`;
+    const [dono] = await tx<{ usuarioId: string; status: string; escritorio: Escritorio | null }[]>`SELECT usuario_id, status, escritorio FROM terreno WHERE chave = ${chave} FOR UPDATE`;
     if (dono && dono.usuarioId !== u.id) throw new Error("Esse lote acabou de ser reservado por outra empresa.");
     if (!admin) {
       const [ativo] = await tx<{ chave: string }[]>`SELECT chave FROM terreno WHERE usuario_id = ${u.id} AND status = 'ativo' AND chave <> ${chave}`;
@@ -90,8 +93,14 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
     if (dono) {
       if (d.manterLogo && !logo) await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, atualizado_em = now() WHERE chave = ${chave}`;
       else await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, logo = ${logo}, logo_tipo = ${logoTipo}, atualizado_em = now() WHERE chave = ${chave}`;
+      // editar a placa: só renomeia CEO/atendente se o dono preencheu os campos (não apaga o que ele já montou)
+      if (dono.escritorio && (d.ceoNome || d.atendenteNome)) {
+        const e = dono.escritorio;
+        e.equipe = e.equipe.map((m) => (m.papel === "ceo" && d.ceoNome ? { ...m, nome: d.ceoNome.trim().slice(0, 24) } : m.papel === "atendente" && d.atendenteNome ? { ...m, nome: d.atendenteNome.trim().slice(0, 24) } : m));
+        await tx`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
+      } else if (!dono.escritorio) await tx`UPDATE terreno SET escritorio = ${escJson} WHERE chave = ${chave}`;
     } else {
-      await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, logo, logo_tipo, status, reservado_ate) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${logo}, ${logoTipo}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}))`;
+      await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, logo, logo_tipo, status, reservado_ate, escritorio) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${logo}, ${logoTipo}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${escJson})`;
     }
     const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${chave}`;
     return t;
@@ -113,9 +122,9 @@ export async function ativarTerreno(chave: string, meses = 1) {
 }
 // Todo escritório nasce com atendente + CEO (nome do dono) e um setor de atendimento; só cria se ainda não tem
 export async function garantirEscritorio(chave: string) {
-  const [t] = await sql<{ empresaNome: string; cor: string; escritorio: Escritorio | null; nome: string }[]>`SELECT t.empresa_nome, t.cor, t.escritorio, u.nome FROM terreno t JOIN usuario u ON u.id = t.usuario_id WHERE t.chave = ${chave}`;
+  const [t] = await sql<{ empresaNome: string; cor: string; escritorio: Escritorio | null }[]>`SELECT t.empresa_nome, t.cor, t.escritorio FROM terreno t WHERE t.chave = ${chave}`;
   if (!t || t.escritorio) return t?.escritorio ?? null;
-  const e = escritorioPadrao(t.empresaNome, t.nome, t.cor);
+  const e = escritorioPadrao(t.empresaNome, t.cor);
   await sql`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
   return e;
 }
@@ -126,7 +135,7 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
   if (!t) throw new Error("Lote sem dono.");
   if (t.usuarioId !== u.id && !ehAdmin(u)) throw new Error("Esse chão não é seu.");
   if (t.status !== "ativo") throw new Error("Pague o 1º mês pra montar o escritório.");
-  const base = t.escritorio ?? (await garantirEscritorio(chave)) ?? escritorioPadrao(t.empresaNome, u.nome, t.cor);
+  const base = t.escritorio ?? (await garantirEscritorio(chave)) ?? escritorioPadrao(t.empresaNome, t.cor);
   const e = normalizarEscritorio(dados, base);
   await sql`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])}, atualizado_em = now() WHERE chave = ${chave}`;
   return e;

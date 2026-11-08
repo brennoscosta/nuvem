@@ -40,12 +40,21 @@ function CartaoMembro({ m, e, set, podeRemover }: { m: Membro; e: Escritorio; se
           <input value={m.nome} onChange={(ev) => mudar({ nome: ev.target.value.slice(0, 24) })} className="w-full rounded-md border border-black/10 px-2 py-1 text-sm font-semibold" placeholder="Nome" />
           <div className="mt-1 flex items-center gap-1 text-[11px] text-[#5B6472]"><span className="rounded-full px-1.5 py-0.5 font-bold uppercase text-white" style={{ background: m.papel === "ceo" ? "#D4A017" : m.papel === "atendente" ? "#16A34A" : "#1D4ED8" }}>{rotulo}</span><input value={m.cargo} onChange={(ev) => mudar({ cargo: ev.target.value.slice(0, 40) })} className="min-w-0 flex-1 rounded-md border border-black/10 px-2 py-0.5" placeholder="Cargo" /></div>
         </div>
-        <button type="button" onClick={() => setAbrir((v) => !v)} className="rounded-lg bg-[#F1F3F6] px-2 py-1 text-xs">{abrir ? "▲" : "Aparência"}</button>
+        <button type="button" onClick={() => setAbrir((v) => !v)} className="rounded-lg bg-[#F1F3F6] px-2 py-1 text-xs">{abrir ? "▲" : "Aparência e treino"}</button>
       </div>
       {abrir && (
         <div className="mt-2 space-y-2 border-t border-black/5 pt-2">
           <div className="flex flex-wrap gap-1.5">{BONECOS.map((b) => <Avatar key={b.id} id={b.id} camisa={m.camisa} ativo={m.boneco === b.id} onClick={() => mudar({ boneco: b.id })} />)}</div>
           <div className="flex items-center gap-1.5"><span className="text-[11px] text-[#5B6472]">Camisa</span>{[...CORES_EMPRESA, "#FFFFFF", "#111827"].map((c) => <button key={c} type="button" onClick={() => mudar({ camisa: c })} className={`h-5 w-5 rounded-full border ${m.camisa === c ? "border-black" : "border-black/10"}`} style={{ background: c }} />)}</div>
+          <div className="rounded-lg bg-[#F1F3F6] p-2">
+            <div className="text-[11px] font-bold text-[#1D2128]">Treinar {m.papel === "ceo" ? "o CEO" : m.papel === "atendente" ? "a atendente" : m.nome}</div>
+            <label className="mt-1 block text-[11px] text-[#5B6472]">O que {m.papel === "ceo" ? "ele" : "essa pessoa"} sabe e faz (a base de como vai atender)
+              <textarea value={m.treino?.descricao ?? ""} onChange={(ev) => mudar({ treino: { descricao: ev.target.value.slice(0, 600), saudacao: m.treino?.saudacao ?? "" } })} rows={3} className="mt-0.5 w-full rounded-md border border-black/10 bg-white px-2 py-1 text-xs text-[#1D2128]" placeholder={`Ex.: Conhece todos os produtos da ${"empresa"}, dá orçamento e agenda visitas.`} />
+            </label>
+            <label className="mt-1 block text-[11px] text-[#5B6472]">Frase de boas-vindas
+              <input value={m.treino?.saudacao ?? ""} onChange={(ev) => mudar({ treino: { descricao: m.treino?.descricao ?? "", saudacao: ev.target.value.slice(0, 160) } })} className="mt-0.5 w-full rounded-md border border-black/10 bg-white px-2 py-1 text-xs text-[#1D2128]" placeholder="Ex.: Oi! Seja bem-vindo. Em que posso ajudar?" />
+            </label>
+          </div>
           {m.papel === "profissional" && <div className="flex items-center gap-1.5 text-[11px] text-[#5B6472]">Setor <select value={m.setorId ?? ""} onChange={(ev) => mudar({ setorId: ev.target.value })} className="rounded-md border border-black/10 px-2 py-0.5 text-xs">{e.setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}</select></div>}
           {podeRemover && <button type="button" onClick={remover} className="text-[11px] font-semibold text-[#E2575B]">Remover da equipe</button>}
         </div>
@@ -113,7 +122,7 @@ export function PainelEscritorio() {
           <div className="space-y-2">
             {e.equipe.map((m) => <CartaoMembro key={m.id} m={m} e={e} set={set} podeRemover={m.papel === "profissional"} />)}
             {vagas > 0 ? <button type="button" onClick={addMembro} className="w-full rounded-xl border-2 border-dashed border-[#1D4ED8]/40 px-3 py-2 text-sm font-semibold text-[#1D4ED8]">+ Contratar profissional ({vagas} {vagas === 1 ? "mesa livre" : "mesas livres"})</button> : <div className="text-center text-[11px] text-[#5B6472]">Todas as mesas estão ocupadas. Adicione mesas nos setores pra contratar mais.</div>}
-            <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A atendente e o CEO fazem parte de todo escritório. Em breve você treina cada um (o que falam, o que sabem da sua empresa).</div>
+            <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A atendente e o CEO fazem parte de todo escritório. Clique em “Aparência” pra trocar o boneco e <b>treinar</b> cada um (o que sabe e como cumprimenta) — é isso que eles vão usar pra atender os visitantes.</div>
           </div>
         )}
       </div>

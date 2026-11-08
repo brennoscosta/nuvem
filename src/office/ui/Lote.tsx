@@ -271,6 +271,16 @@ export function PainelEmpresa() {
         </label>
       </div>
 
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <label className="block text-xs font-semibold text-[#5B6472]">Quem é o CEO?
+          <input value={rascunho.ceoNome} onChange={(e) => setRascunho({ ceoNome: e.target.value.slice(0, 24) })} placeholder="Ex.: Maria" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
+        </label>
+        <label className="block text-xs font-semibold text-[#5B6472]">Nome da atendente
+          <input value={rascunho.atendenteNome} onChange={(e) => setRascunho({ atendenteNome: e.target.value.slice(0, 24) })} placeholder="Ex.: Ana" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
+        </label>
+      </div>
+      <div className="mt-1 text-[11px] text-[#5B6472]">Todo escritório nasce com um CEO e uma atendente; depois você edita, treina e contrata mais gente em “Montar escritório”.</div>
+
       <div className="mt-3 text-xs font-semibold text-[#5B6472]">Logomarca (opcional)</div>
       <div className="mt-1 flex items-center gap-3">
         <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-black/10 bg-[#F1F3F6]">
