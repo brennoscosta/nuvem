@@ -28,7 +28,7 @@ export function EntrarAdmin({ temSenha }: { temSenha: boolean }) {
 export interface ConfigAdmin { preco: number; precoAdmin: number; minutosReserva: number; diasMes: number; diasTolerancia: number; pagamento: boolean; adminEmail: string; eu: string }
 
 interface Terreno { chave: string; usuarioId: string; status: string; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null; email: string; usuarioNome: string; banidoEm: string | null }
-interface Pagamento { id: string; terrenoChave: string; usuarioId: string; status: string; valor: string; meses: number; metodo: string | null; pagamentoId: string | null; criadoEm: string; pagoEm: string | null; email: string; empresaNome: string | null }
+interface Pagamento { id: string; terrenoChave: string; usuarioId: string; status: string; valor: string; meses: number; metodo: string | null; pagamentoId: string | null; criadoEm: string; pagoEm: string | null; tipo?: string; email: string; empresaNome: string | null }
 interface Usuario { id: string; email: string; nome: string; empresaNome: string; papel: string; banidoEm: string | null; banidoMotivo: string | null; criadoEm: string; ultimoAcesso: string | null; lote: string | null; loteStatus: string | null }
 
 const dt = (s: string | null) => (s ? new Date(s).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
@@ -127,7 +127,7 @@ export function PainelAdmin({ config }: { config: ConfigAdmin }) {
               {pagamentos.map((p) => (
                 <tr key={p.id} className="border-t border-[var(--linha)]">
                   <td className="p-3">{dt(p.criadoEm)}</td><td className="p-3"><LinkLote chave={p.terrenoChave} /></td><td className="p-3">{p.email}<br /><span className="text-xs text-[var(--tinta-2)]">{p.empresaNome ?? ""}</span></td>
-                  <td className="p-3">{brl(Number(p.valor))} · {p.meses} mês{p.meses > 1 ? "es" : ""}</td>
+                  <td className="p-3">{brl(Number(p.valor))} · {p.tipo === "layout" ? "troca de prédio" : `${p.meses} mês${p.meses > 1 ? "es" : ""}`}</td>
                   <td className="p-3"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${p.status === "aprovado" ? "bg-[#E3F6EA] text-[#1B8A4C]" : p.status === "pendente" ? "bg-[#FFF4D6] text-[#7A5A00]" : "bg-[#FDE8E8] text-[#8A2A2A]"}`}>{p.status}</span>{p.status === "pendente" && <button onClick={() => fetch(`/api/pagamentos/${p.id}`, { method: "POST" }).then(carregar)} className="ml-2 text-xs underline">conferir</button>}</td>
                   <td className="p-3">{p.metodo ?? "—"}</td><td className="p-3 text-xs">{p.pagamentoId ?? "—"}</td>
                 </tr>

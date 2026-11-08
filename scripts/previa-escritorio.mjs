@@ -17,14 +17,15 @@ await p.goto(`${base}/mundo?lote=${encodeURIComponent(LOTE)}&qualidade=alta&${ca
 await p.waitForSelector("canvas"); await p.waitForTimeout(12000);
 await p.getByText(/Ver por fora/).click(); await p.waitForTimeout(4000);
 await foto("1-fora-moderno");
-await p.getByRole("button", { name: /Montar escritório/ }).click(); await p.waitForTimeout(800);
+await foto("1b-cartao-edicao");
+await p.getByRole("button", { name: /Prédio/ }).click(); await p.waitForTimeout(800);
 await p.getByRole("button", { name: /Sobrado comercial/ }).click(); await p.waitForTimeout(2500);
 await foto("2-painel-sobrado");
 await p.getByRole("button", { name: /Setores/ }).click(); await p.waitForTimeout(300);
 await p.getByRole("button", { name: "+ Adicionar setor" }).click(); await p.getByRole("button", { name: "+ Adicionar setor" }).click(); await p.waitForTimeout(400);
 const inputs = p.locator("input[list=cargos-sugeridos]"); await inputs.nth(1).fill("Vendas"); await inputs.nth(2).fill("Marketing");
 await p.getByRole("button", { name: /Equipe/ }).click(); await p.waitForTimeout(300);
-await p.getByRole("button", { name: /Contratar profissional/ }).click(); await p.getByRole("button", { name: /Contratar profissional/ }).click(); await p.waitForTimeout(400);
+await p.getByRole("button", { name: "Contratar profissional" }).click(); await p.waitForTimeout(1500); await foto("2b-catalogo"); await p.getByRole("button", { name: /^Vendedor/ }).click(); await p.waitForTimeout(300); await p.getByRole("button", { name: "Criar do zero" }).click(); await p.waitForTimeout(400);
 await p.locator("input[placeholder=Nome]").nth(0).fill("Carla"); await p.locator("input[placeholder=Nome]").nth(1).fill("Maria");
 await p.getByRole("button", { name: "Salvar escritório" }).click(); await p.waitForTimeout(3000);
 const esc2 = await p.evaluate(async (l) => (await fetch(`/api/terrenos/${encodeURIComponent(l)}/escritorio`)).json(), LOTE);

@@ -35,7 +35,10 @@ export interface Setor { id: string; nome: string; cor: string; mesas: number } 
 export type PapelMembro = "atendente" | "ceo" | "profissional";
 export interface Treino { descricao: string; saudacao: string } // o que a pessoa sabe/faz e como cumprimenta (base do atendimento)
 export interface Membro { id: string; nome: string; cargo: string; papel: PapelMembro; setorId: string | null; boneco: string; camisa: string; treino?: Treino }
-export interface Escritorio { layout: LayoutId; setores: Setor[]; equipe: Membro[] }
+export interface Escritorio { layout: LayoutId; setores: Setor[]; equipe: Membro[]; trocasLayout?: number; creditosLayout?: number }
+export const TROCAS_LAYOUT_GRATIS = 3;
+export const PRECO_TROCA_LAYOUT = 9.9;
+export const trocasRestantes = (e: Escritorio) => Math.max(0, TROCAS_LAYOUT_GRATIS - (e.trocasLayout ?? 0)) + (e.creditosLayout ?? 0);
 
 export const MAX_SETORES = 4; // cabe num lote de 20 × 20 (prédio de 16 × 14)
 export const MAX_MESAS_SETOR = 4;
@@ -105,7 +108,8 @@ export function normalizarEscritorio(x: unknown, base: Escritorio): Escritorio {
   // a atendente e o CEO são obrigatórios: se sumiram, voltam os do padrão
   for (const p of ["atendente", "ceo"] as const) if (!equipe.some((e) => e.papel === p)) equipe.unshift(base.equipe.find((e) => e.papel === p) ?? escritorioPadrao("Empresa", "#1D4ED8").equipe.find((e) => e.papel === p)!);
   equipe.sort((a, b) => ordem(a.papel) - ordem(b.papel));
-  return { layout, setores, equipe };
+  // contadores de troca de layout são do servidor: o cliente não mexe neles
+  return { layout, setores, equipe, trocasLayout: base.trocasLayout ?? 0, creditosLayout: base.creditosLayout ?? 0 };
 }
 const ordem = (p: PapelMembro) => (p === "atendente" ? 0 : p === "ceo" ? 1 : 2);
 

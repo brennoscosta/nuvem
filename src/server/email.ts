@@ -7,7 +7,7 @@ export const emailLigado = () => !!process.env.SENDGRID_API_KEY && !!process.env
 export const REMETENTE = () => process.env.EMAIL_REMETENTE ?? "contato@workend.online";
 const SITE = "https://workend.online";
 
-export type ChaveEmail = "cadastro" | "reserva" | "pagamento" | "vencimento" | "contato";
+export type ChaveEmail = "cadastro" | "reserva" | "pagamento" | "vencimento" | "contato" | "atividade";
 export interface ModeloEmail { chave: ChaveEmail; nome: string; quando: string; variaveis: string[]; assunto: string; html: string }
 
 const btn = (texto: string, href: string) => `<p style="margin:24px 0"><a href="${href}" style="display:inline-block;background:#0A6CFF;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px">${texto}</a></p>`;
@@ -26,6 +26,9 @@ export const MODELOS_PADRAO: ModeloEmail[] = [
   { chave: "vencimento", nome: "Aviso de vencimento", quando: "Alguns dias antes do lote vencer (e na tolerância).", variaveis: ["nome", "empresa", "lote", "valor", "pago_ate", "link_pagar"],
     assunto: "O {{lote}} da {{empresa}} vence em {{pago_ate}}",
     html: `<h1 style="margin:0 0 12px;font-size:24px">Renove seu chão, {{nome}}</h1><p>O <b>{{lote}}</b> ({{empresa}}) vence em <b>{{pago_ate}}</b>. Depois disso há 5 dias de tolerância; sem renovação, o lote volta a ficar à venda e a placa sai do mapa.</p>${btn("Renovar +30 dias · {{valor}}", "{{link_pagar}}")}` },
+  { chave: "atividade", nome: "Atividade na sua loja", quando: "Toda vez que algo acontece na loja do dono (escritório montado, contratação, troca de prédio, pagamento…).", variaveis: ["nome", "empresa", "lote", "titulo", "detalhes", "link_mapa", "link_painel"],
+    assunto: "{{empresa}}: {{titulo}}",
+    html: `<h1 style="margin:0 0 12px;font-size:22px">{{titulo}}</h1><p>Olá, {{nome}}! Aconteceu na <b>{{empresa}}</b> ({{lote}}):</p><blockquote style="margin:16px 0;padding:12px 16px;background:#F5F6F8;border-left:4px solid #0A6CFF;border-radius:8px">{{detalhes}}</blockquote>${btn("Ver minha loja no mapa", "{{link_mapa}}")}<p style="color:#5B6472;font-size:14px">Painel: <a href="{{link_painel}}">{{link_painel}}</a></p>` },
   { chave: "contato", nome: "Alguém falou com a sua loja", quando: "Quando um visitante fala com o atendimento da loja e deixa contato.", variaveis: ["nome", "empresa", "contato_nome", "contato_email", "contato_telefone", "mensagem", "link_painel"],
     assunto: "{{contato_nome}} falou com a {{empresa}} no WorkEnd",
     html: `<h1 style="margin:0 0 12px;font-size:24px">Novo contato na {{empresa}}</h1><p><b>{{contato_nome}}</b> falou com o atendimento da sua loja.</p><table style="border-collapse:collapse;font-size:15px"><tr><td style="padding:4px 12px 4px 0;color:#5B6472">E-mail</td><td>{{contato_email}}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#5B6472">Telefone</td><td>{{contato_telefone}}</td></tr></table><blockquote style="margin:16px 0;padding:12px 16px;background:#F5F6F8;border-left:4px solid #0A6CFF;border-radius:8px">{{mensagem}}</blockquote>${btn("Responder no painel", "{{link_painel}}")}` },
@@ -71,6 +74,7 @@ export async function restaurarModelo(chave: ChaveEmail) { await migrar(); await
 export const EXEMPLO: Record<string, string> = {
   nome: "Brenno", email: "voce@exemplo.com", empresa: "Padaria da Maria", lote: "Lote 7", descricao: "casinha térrea", valor: "R$ 99,00", prazo: "1 hora", pago_ate: "07/12/2026",
   link_mapa: `${SITE}/mundo`, link_pagar: `${SITE}/mundo?lote=0%2C-1%2C2`, link_painel: `${SITE}/app`,
+  titulo: "Novo profissional contratado", detalhes: "Rodrigo (Vendedor) entrou no setor Vendas.",
   contato_nome: "João Silva", contato_email: "joao@exemplo.com", contato_telefone: "(79) 99999-0000", mensagem: "Quero um orçamento de 200 salgados pra sexta-feira.",
 };
 

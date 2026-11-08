@@ -173,7 +173,7 @@ function texturaEmpresa(nome: string, cor: string, logo: string | null, ativo = 
   const desenhar = (img: HTMLImageElement | null) => {
     g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 512, 300);
     g.fillStyle = cor; g.fillRect(0, 0, 512, 46);
-    g.fillStyle = "#FFFFFF"; g.font = "bold 22px Inter, Arial, sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText("EM OBRAS", 18, 24);
+    g.fillStyle = "#FFFFFF"; g.font = "bold 22px Inter, Arial, sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText(ativo ? "ABERTA" : "EM OBRAS", 18, 24);
     g.textAlign = "right"; g.fillText("WORKEND", 494, 24);
     const x0 = img ? 170 : 24, larg = 512 - x0 - 24;
     if (img) { const s = 120, r = Math.min(s / img.width, s / img.height), w = img.width * r, h = img.height * r; g.drawImage(img, 24 + (s - w) / 2, 95 + (s - h) / 2, w, h); }
@@ -182,7 +182,7 @@ function texturaEmpresa(nome: string, cor: string, logo: string | null, ativo = 
     const texto = nome.trim() || "Sua empresa";
     while (g.measureText(texto).width > larg && tam > 22) { tam -= 4; g.font = `bold ${tam}px Inter, Arial, sans-serif`; }
     g.fillText(texto, img ? x0 : 256, 165, larg);
-    g.fillStyle = "#64748B"; g.font = "24px Inter, Arial, sans-serif"; g.fillText(ativo ? "Empresa ativa · escritório em obras" : "Reservado · aguardando pagamento", img ? x0 : 256, 215, larg);
+    g.fillStyle = "#64748B"; g.font = "24px Inter, Arial, sans-serif"; g.fillText(ativo ? "Empresa ativa · visite por dentro" : "Reservado · aguardando pagamento", img ? x0 : 256, 215, larg);
     g.fillStyle = cor; g.fillRect(0, 288, 512, 12);
     tex.needsUpdate = true;
   };

@@ -14,9 +14,9 @@ export async function POST(req: Request, { params }: Ctx) {
     if (!pagamentoLigado()) return erro("O pagamento ainda não está ligado. Tente mais tarde.", 503);
     const { chave } = await params; const ch = decodeURIComponent(chave);
     const lote = LOTE_POR_CHAVE[ch]; if (!lote) return erro("Lote inválido.", 400);
-    const { meses } = await corpo<{ meses?: number }>(req);
+    const { meses, tipo } = await corpo<{ meses?: number; tipo?: "lote" | "layout" }>(req);
     const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "workend.online";
     const proto = req.headers.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
-    return ok(await criarCobranca(u, ch, lote.numero, `${proto}://${host}`, meses ?? 1));
+    return ok(await criarCobranca(u, ch, lote.numero, `${proto}://${host}`, meses ?? 1, tipo === "layout" ? "layout" : "lote"));
   } catch (e) { return erro(e, e instanceof Error && /Reserve|suspensa/.test(e.message) ? 400 : 500); }
 }

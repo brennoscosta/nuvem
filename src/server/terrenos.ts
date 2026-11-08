@@ -5,7 +5,8 @@
 import { sql, migrar } from "./db";
 import { QUARTEIROES } from "@/office/data/mundo";
 import type { Usuario } from "./usuarios";
-import { escritorioPadrao, normalizarEscritorio, type Escritorio } from "@/office/data/escritorio";
+import { escritorioPadrao, normalizarEscritorio, trocasRestantes, TROCAS_LAYOUT_GRATIS, PRECO_TROCA_LAYOUT, LAYOUT, type Escritorio } from "@/office/data/escritorio";
+import { registrar } from "./eventos";
 
 export interface Terreno {
   chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean;
@@ -103,6 +104,7 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
       await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, logo, logo_tipo, status, reservado_ate, escritorio) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${logo}, ${logoTipo}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${escJson})`;
     }
     const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${chave}`;
+    if (!dono) void registrar("reserva", `${nome} reservou um lote`, { usuarioId: u.id, terrenoChave: chave, dados: { detalhes: `Reserva de 1 hora pra pagar.` } });
     return t;
   });
 }
@@ -137,8 +139,33 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
   if (t.status !== "ativo") throw new Error("Pague o 1º mês pra montar o escritório.");
   const base = t.escritorio ?? (await garantirEscritorio(chave)) ?? escritorioPadrao(t.empresaNome, t.cor);
   const e = normalizarEscritorio(dados, base);
+  const detalhes: string[] = [];
+  // troca de prédio: 3 grátis, depois cada uma custa R$ 9,90 (crédito comprado no Pix); admin não paga
+  if (e.layout !== base.layout) {
+    if (!ehAdmin(u)) {
+      if (trocasRestantes(base) <= 0) throw new Error(`Você já usou as ${TROCAS_LAYOUT_GRATIS} trocas de prédio grátis. Cada troca agora custa R$ ${PRECO_TROCA_LAYOUT.toFixed(2).replace(".", ",")}.`);
+      if ((base.trocasLayout ?? 0) < TROCAS_LAYOUT_GRATIS) e.trocasLayout = (base.trocasLayout ?? 0) + 1;
+      else e.creditosLayout = Math.max(0, (base.creditosLayout ?? 0) - 1);
+    }
+    detalhes.push(`Prédio trocado para "${LAYOUT[e.layout].nome}".`);
+  }
+  const antes = new Set(base.equipe.map((m) => m.id));
+  const novos = e.equipe.filter((m) => !antes.has(m.id));
+  const saidas = base.equipe.filter((m) => !e.equipe.some((x) => x.id === m.id));
+  for (const m of novos) detalhes.push(`${m.nome} (${m.cargo}) entrou na equipe.`);
+  for (const m of saidas) detalhes.push(`${m.nome} (${m.cargo}) saiu da equipe.`);
+  if (e.setores.length !== base.setores.length) detalhes.push(`Setores: ${e.setores.map((s) => s.nome).join(", ")}.`);
   await sql`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])}, atualizado_em = now() WHERE chave = ${chave}`;
+  if (detalhes.length) void registrar(novos.length ? "contratacao" : e.layout !== base.layout ? "layout" : "escritorio", novos.length ? `Equipe atualizada (${novos.length} contratação${novos.length > 1 ? "ões" : ""})` : e.layout !== base.layout ? "Prédio trocado" : "Escritório atualizado", { usuarioId: u.id, terrenoChave: chave, dados: { detalhes: detalhes.join(" ") }, avisarDono: true });
+  else void registrar("escritorio", "Escritório editado", { usuarioId: u.id, terrenoChave: chave, dados: { detalhes: "Nomes, cargos, aparência ou treino da equipe." } });
   return e;
+}
+// Crédito de troca de prédio comprado (R$ 9,90 no Pix)
+export async function creditarTrocaLayout(chave: string) {
+  await migrar();
+  const t = await obterTerreno(chave); if (!t?.escritorio) return;
+  const e = { ...t.escritorio, creditosLayout: (t.escritorio.creditosLayout ?? 0) + 1 };
+  await sql`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
 }
 // Enquanto o usuário está pagando, a reserva não pode expirar embaixo dele: estende por mais 30 min
 export async function estenderReserva(chave: string, minutos = 30) {

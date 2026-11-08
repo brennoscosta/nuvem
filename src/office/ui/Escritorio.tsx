@@ -1,9 +1,13 @@
 "use client";
 // Painel "Montar escritório": o dono do lote escolhe o layout do prédio, os setores (nome, cor, mesas) e a equipe
 // (atendente e CEO obrigatórios; profissionais por setor). A cena desenha o rascunho ao vivo; Salvar grava no servidor.
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { PixAberto } from "./Lote";
 import { useMundo } from "../mundoStore";
-import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, vagasLivres, type Escritorio, type Setor, type Membro, type Pronto } from "../data/escritorio";
+import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, vagasLivres, type Escritorio, type Setor, type Membro, type Pronto } from "../data/escritorio";
+
+interface AgenteVenda { id: string; nome: string; cargo: string; setor: string; descricao: string; saudacao: string; skills: string[]; apis: string[]; preco: number; boneco: string; camisa: string }
+const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 import { BONECOS } from "../data/bonecos";
 import { CORES_EMPRESA } from "../mundoStore";
 
@@ -25,8 +29,8 @@ function Avatar({ id, camisa, ativo, onClick }: { id: string; camisa: string; at
   );
 }
 
-function CartaoMembro({ m, e, set, podeRemover }: { m: Membro; e: Escritorio; set: (e: Escritorio) => void; podeRemover: boolean }) {
-  const [abrir, setAbrir] = useState(false);
+function CartaoMembro({ m, e, set, podeRemover, abrirTreino = false }: { m: Membro; e: Escritorio; set: (e: Escritorio) => void; podeRemover: boolean; abrirTreino?: boolean }) {
+  const [abrir, setAbrir] = useState(abrirTreino);
   const mudar = (p: Partial<Membro>) => set({ ...e, equipe: e.equipe.map((x) => (x.id === m.id ? { ...x, ...p } : x)) });
   const remover = () => set({ ...e, equipe: e.equipe.filter((x) => x.id !== m.id) });
   const rotulo = m.papel === "ceo" ? "CEO" : m.papel === "atendente" ? "Atendente" : e.setores.find((s) => s.id === m.setorId)?.nome ?? "Setor";
@@ -70,8 +74,19 @@ export function PainelEscritorio() {
   const salvando = useMundo((s) => s.salvandoEscritorio);
   const vista = useMundo((s) => s.loteSelecionado);
   const [erro, setErro] = useState<string | null>(null);
-  const [aba, setAba] = useState<"predio" | "setores" | "equipe">("predio");
-  const [catalogo, setCatalogo] = useState(false);
+  const [erroPix, setErroPix] = useState<string | null>(null);
+  const abaPedida = useMundo((s) => s.abaEscritorio);
+  const setAbaPedida = useMundo((s) => s.setAbaEscritorio);
+  // "contratar" e "treinar" são atalhos pra aba Equipe (com o catálogo aberto / com os treinos abertos)
+  const aba = abaPedida === "contratar" || abaPedida === "treinar" ? "equipe" : abaPedida;
+  const setAba = (a: "predio" | "setores" | "equipe") => setAbaPedida(a);
+  const [catalogoLocal, setCatalogo] = useState<boolean | null>(null);
+  const catalogo = catalogoLocal ?? abaPedida === "contratar";
+  const [aVenda, setAVenda] = useState<AgenteVenda[] | null>(null);
+  useEffect(() => { if (!aberto || aVenda) return; const c = new AbortController(); fetch("/api/catalogo", { signal: c.signal }).then((r) => r.json()).then((j) => setAVenda(j.agentes ?? [])).catch(() => setAVenda(CATALOGO_PROFISSIONAIS.map((p) => ({ ...p, descricao: p.treino.descricao, saudacao: p.treino.saudacao, skills: [], apis: [], preco: 0 })))); return () => c.abort(); }, [aberto, aVenda]);
+  const pagar = useMundo((s) => s.pagar);
+  const pix = useMundo((s) => s.pix);
+  const terrenoAtual = useMundo((s) => (s.loteSelecionado ? s.terrenos[s.loteSelecionado] : undefined));
   if (!aberto || !e || !vista) return null;
   const vagas = vagasLivres(e);
   const addSetor = () => { if (e.setores.length >= MAX_SETORES) return; set({ ...e, setores: [...e.setores, { id: novoId("set"), nome: CARGOS_SUGERIDOS[e.setores.length % CARGOS_SUGERIDOS.length], cor: CORES_SETOR[e.setores.length % CORES_SETOR.length], mesas: 2 }] }); };
@@ -81,7 +96,10 @@ export function PainelEscritorio() {
   // criar do zero: pessoa em branco pro dono nomear e treinar
   const addMembro = () => { const setor = setorComVaga(); if (!setor) return; set({ ...e, equipe: [...e.equipe, { id: novoId("mem"), nome: "Novo", cargo: setor.nome, papel: "profissional", setorId: setor.id, boneco: BONECOS[(e.equipe.length + 2) % BONECOS.length].id, camisa: "#1D4ED8", treino: { descricao: "", saudacao: "" } }] }); };
   // contratar do catálogo: já vem com cargo, aparência e treino (vai pro setor de mesmo nome se tiver vaga)
-  const contratar = (p: Pronto) => { const setor = setorComVaga(p.setor); if (!setor) return; set({ ...e, equipe: [...e.equipe, { id: novoId("mem"), nome: p.nome, cargo: p.cargo, papel: "profissional", setorId: setor.id, boneco: p.boneco, camisa: p.camisa, treino: { ...p.treino } }] }); setCatalogo(false); };
+  const contratar = (p: Pronto | AgenteVenda) => { const setor = setorComVaga(p.setor); if (!setor) return; const treino = "treino" in p ? { ...p.treino } : { descricao: p.descricao, saudacao: p.saudacao }; set({ ...e, equipe: [...e.equipe, { id: novoId("mem"), nome: p.nome, cargo: p.cargo, papel: "profissional", setorId: setor.id, boneco: p.boneco, camisa: p.camisa, treino }] }); setCatalogo(false); };
+  const restantes = trocasRestantes(e);
+  const trocou = terrenoAtual?.escritorio && terrenoAtual.escritorio.layout !== e.layout;
+  const comprarTroca = async () => { setErroPix(null); const r = await pagar(1, "layout"); if (r) setErroPix(r); };
   const clicarSalvar = async () => { setErro(null); const r = await salvar(); if (r) setErro(r); };
   return (
     <div className="absolute right-3 top-20 z-10 flex max-h-[calc(100vh-7rem)] w-[22rem] flex-col rounded-2xl bg-white/97 text-[#1D2128] shadow-2xl backdrop-blur">
@@ -101,7 +119,15 @@ export function PainelEscritorio() {
                 <div className="min-w-0"><div className="text-sm font-bold">{L.nome}</div><div className="text-[11px] leading-snug text-[#5B6472]">{L.descricao}</div></div>
               </button>
             ))}
-            <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">O letreiro usa o nome, a cor e a logo da placa (botão “Editar placa” no cartão do lote). Por dentro a planta é a mesma em todos: recepção, sala do CEO e até {MAX_SETORES} setores.</div>
+            <div className={`rounded-xl px-3 py-2 text-[11px] ${restantes > 0 ? "bg-[#F1F3F6] text-[#5B6472]" : "bg-[#FFF4D6] text-[#7A5A00]"}`}>
+              {restantes > 0
+                ? <>Você pode trocar de prédio mais <b>{restantes}</b> {restantes === 1 ? "vez" : "vezes"} {(e.trocasLayout ?? 0) < TROCAS_LAYOUT_GRATIS ? `(${TROCAS_LAYOUT_GRATIS} grátis no total)` : "(crédito comprado)"}; depois cada troca custa {brl(PRECO_TROCA_LAYOUT)}.</>
+                : <>Suas {TROCAS_LAYOUT_GRATIS} trocas grátis acabaram. Cada troca de prédio custa <b>{brl(PRECO_TROCA_LAYOUT)}</b> (Pix).</>}
+            </div>
+            {restantes <= 0 && trocou && pix?.tipo !== "layout" && <button type="button" onClick={comprarTroca} className="w-full rounded-xl bg-[#16A34A] px-3 py-2 text-sm font-bold text-white">Pagar {brl(PRECO_TROCA_LAYOUT)} no Pix pra trocar</button>}
+            {erroPix && <div className="text-xs font-semibold text-[#E2575B]">{erroPix}</div>}
+            {pix?.tipo === "layout" && vista && <PixAberto chave={vista} />}
+            <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">O letreiro usa o nome, a cor e a logo da sua marca (botão “Marca e logo” no cartão do lote). Por dentro a planta é a mesma em todos: recepção, sala do CEO e até {MAX_SETORES} setores.</div>
           </div>
         )}
         {aba === "setores" && (
@@ -123,25 +149,31 @@ export function PainelEscritorio() {
         )}
         {aba === "equipe" && (
           <div className="space-y-2">
-            {e.equipe.map((m) => <CartaoMembro key={m.id} m={m} e={e} set={set} podeRemover={m.papel === "profissional"} />)}
+            {e.equipe.map((m) => <CartaoMembro key={m.id} m={m} e={e} set={set} podeRemover={m.papel === "profissional"} abrirTreino={abaPedida === "treinar"} />)}
             {vagas > 0 ? (
               <div className="flex gap-2">
                 <button type="button" onClick={() => setCatalogo((v) => !v)} className="flex-1 rounded-xl bg-[#1D4ED8] px-3 py-2 text-sm font-bold text-white">Contratar profissional</button>
                 <button type="button" onClick={addMembro} className="flex-1 rounded-xl border-2 border-dashed border-[#1D4ED8]/40 px-3 py-2 text-sm font-semibold text-[#1D4ED8]">Criar do zero</button>
               </div>
             ) : <div className="text-center text-[11px] text-[#5B6472]">Todas as mesas estão ocupadas. Adicione mesas nos setores pra contratar mais.</div>}
-            {vagas > 0 && <div className="text-center text-[11px] text-[#5B6472]">{vagas} {vagas === 1 ? "mesa livre" : "mesas livres"} · incluso no seu plano nesta fase</div>}
+            {vagas > 0 && <div className="text-center text-[11px] text-[#5B6472]">{vagas} {vagas === 1 ? "mesa livre" : "mesas livres"}</div>}
             {catalogo && vagas > 0 && (
               <div className="rounded-xl border border-black/10 bg-white p-2">
-                <div className="mb-1 text-[11px] font-bold text-[#1D2128]">Profissionais prontos (já vêm treinados)</div>
+                <div className="mb-1 text-[11px] font-bold text-[#1D2128]">Agentes prontos do WorkEnd (já vêm treinados)</div>
                 <div className="space-y-1">
-                  {CATALOGO_PROFISSIONAIS.map((p) => (
-                    <button key={p.id} type="button" onClick={() => contratar(p)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#F1F3F6]">
-                      <span className="h-6 w-6 shrink-0 rounded-full" style={{ background: p.camisa }} />
-                      <span className="min-w-0 flex-1"><span className="text-sm font-semibold">{p.cargo}</span><span className="block truncate text-[11px] text-[#5B6472]">{p.treino.descricao}</span></span>
-                      <span className="text-[11px] font-bold text-[#1D4ED8]">Contratar</span>
+                  {(aVenda ?? []).map((p) => (
+                    <button key={p.id} type="button" onClick={() => contratar(p)} className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#F1F3F6]">
+                      <span className="mt-0.5 h-6 w-6 shrink-0 rounded-full" style={{ background: p.camisa }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="text-sm font-semibold">{p.cargo} <span className="font-normal text-[#5B6472]">· {p.nome}</span></span>
+                        <span className="block text-[11px] leading-snug text-[#5B6472]">{p.descricao}</span>
+                        {(p.skills.length > 0 || p.apis.length > 0) && <span className="mt-0.5 flex flex-wrap gap-1">{p.skills.slice(0, 4).map((k) => <span key={k} className="rounded bg-[#EEF3FF] px-1.5 py-0.5 text-[10px] text-[#1D4ED8]">{k}</span>)}{p.apis.map((a) => <span key={a} className="rounded bg-[#E3F6EA] px-1.5 py-0.5 text-[10px] text-[#166534]">{a.replace("_", " ")}</span>)}</span>}
+                      </span>
+                      <span className="text-right text-[11px] font-bold text-[#1D4ED8]">{p.preco > 0 ? `${brl(p.preco)}/mês` : "Incluso"}<span className="block font-semibold">Contratar</span></span>
                     </button>
                   ))}
+                  {aVenda && aVenda.length === 0 && <div className="px-2 py-1 text-[11px] text-[#5B6472]">Nenhum agente à venda ainda.</div>}
+                  {!aVenda && <div className="px-2 py-1 text-[11px] text-[#5B6472]">Carregando…</div>}
                 </div>
               </div>
             )}

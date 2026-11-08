@@ -28,7 +28,7 @@ const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms 
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 // Pix aberto no cartão: QR Code, copia e cola, relógio e conferência automática a cada 4 s
-function PixAberto({ chave }: { chave: string }) {
+export function PixAberto({ chave }: { chave: string }) {
   const pix = useMundo((s) => s.pix);
   const conferir = useMundo((s) => s.conferirPagamento);
   const fechar = useMundo((s) => s.fecharPix);
@@ -36,15 +36,17 @@ function PixAberto({ chave }: { chave: string }) {
   const [conferindo, setConferindo] = useState(false);
   const { resta } = useContagem(pix && pix.status === "pendente" ? pix.expiraEm : null);
   const pendente = !!pix && pix.status === "pendente" && pix.lote === chave;
+  const painelEsc = useMundo((s) => s.painelEscritorio);
   useEffect(() => {
     if (!pendente || !pix) return;
     const t = setInterval(() => { void conferir(pix.id); }, 4000);
     return () => clearInterval(t);
   }, [pendente, pix, conferir]);
   if (!pix || pix.lote !== chave) return null;
+  if (pix.tipo === "layout" && !painelEsc) return null; // o Pix da troca de prédio aparece dentro do painel do escritório
   const copiar = async () => { try { await navigator.clipboard.writeText(pix.codigo); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { window.prompt("Copie o código Pix:", pix.codigo); } };
   if (pix.status === "aprovado") return (
-    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]"><div className="font-bold">Pagamento confirmado! 🎉</div><div className="mt-1 text-xs">O chão é seu por 30 dias. Em breve você monta o escritório aqui.</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white">Fechar</button></div>
+    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]"><div className="font-bold">Pagamento confirmado! 🎉</div><div className="mt-1 text-xs">{pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : "O chão é seu por 30 dias. Monte seu escritório pelos botões de edição."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white">Fechar</button></div>
   );
   if (pix.status !== "pendente") return (
     <div className="mt-3 rounded-2xl bg-[#FDE8E8] px-3 py-3 text-sm text-[#8A2A2A]"><div className="font-bold">{pix.status === "expirado" ? "Este Pix expirou." : "Pagamento não aprovado."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-bold text-white">Gerar outro Pix</button></div>
@@ -150,16 +152,27 @@ export function CartaoLote() {
           )}
           {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
           {ehMeu && ativo && terreno.escritorio && (
-            <button onClick={abrirEscritorio} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#1a44c2]">Montar escritório · {terreno.escritorio.setores.length} {terreno.escritorio.setores.length === 1 ? "setor" : "setores"} · {terreno.escritorio.equipe.length} pessoas</button>
+            // chão comprado: só opções de edição (prédio, setores, equipe, marca, treino, contratação)
+            <div className="mt-3">
+              <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">Editar minha empresa</div>
+              <div className="grid grid-cols-3 gap-1.5 text-center text-[11px] font-semibold">
+                <button onClick={() => abrirEscritorio("predio")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="text-base">🏢</div>Prédio</button>
+                <button onClick={() => abrirEscritorio("setores")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="text-base">🗂️</div>Setores · {terreno.escritorio.setores.length}</button>
+                <button onClick={() => abrirEscritorio("equipe")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="text-base">👥</div>Equipe · {terreno.escritorio.equipe.length}</button>
+                <button onClick={() => abrirEscritorio("contratar")} className="rounded-xl bg-[#E3F6EA] px-2 py-2 text-[#166534] hover:bg-[#d2efdc]"><div className="text-base">🛒</div>Contratar agentes</button>
+                <button onClick={() => abrirEscritorio("treinar")} className="rounded-xl bg-[#FFF4D6] px-2 py-2 text-[#7A5A00] hover:bg-[#ffeab8]"><div className="text-base">🎓</div>Treinar</button>
+                <button onClick={abrirPainel} className="rounded-xl bg-[#F1F3F6] px-2 py-2 text-[#1D2128] hover:bg-[#e6e9ee]"><div className="text-base">🎨</div>Marca e logo</button>
+              </div>
+            </div>
           )}
-          {ehMeu ? (
+          {ehMeu && !ativo ? (
             <div className="mt-2 flex gap-2">
               <button onClick={abrirPainel} className="flex-1 rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm font-semibold text-[#1D4ED8]">Editar placa</button>
               {confirmaDesistir
                 ? <button onClick={() => { desistir(); setConfirma(null); }} className="rounded-xl bg-[#E2575B] px-3 py-2 text-sm font-bold text-white">Confirmar</button>
-                : <button onClick={() => setConfirma(chave)} className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm font-semibold text-[#5B6472]">{ativo ? "Encerrar" : "Desistir"}</button>}
+                : <button onClick={() => setConfirma(chave)} className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm font-semibold text-[#5B6472]">Desistir</button>}
             </div>
-          ) : admin ? (
+          ) : ehMeu ? (admin ? <AcoesAdminLote chave={chave} /> : null) : admin ? (
             <AcoesAdminLote chave={chave} />
           ) : (
             <div className="mt-3 text-xs text-[#5B6472]">Este chão já tem dono. Clique num lote com placa “À venda” pra escolher o seu.</div>

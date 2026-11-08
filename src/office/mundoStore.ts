@@ -8,7 +8,8 @@ import type { Escritorio } from "./data/escritorio";
 export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null; escritorio: Escritorio | null }
 export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
 export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null; ceoNome: string; atendenteNome: string }
-export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado" }
+export type AbaEscritorio = "predio" | "setores" | "equipe" | "contratar" | "treinar";
+export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" }
 
 export const CORES_EMPRESA = ["#1D4ED8", "#0EA5A4", "#16A34A", "#D97706", "#DC2626", "#DB2777", "#7C3AED", "#1F2937"];
 
@@ -35,6 +36,7 @@ interface Estado {
   pagando: boolean;
   pix: Pix | null; // cobrança Pix aberta (QR no cartão do lote)
   painelEscritorio: boolean; // painel "Montar escritório" aberto
+  abaEscritorio: AbaEscritorio; // aba inicial do painel (cada botão de edição do cartão abre numa aba)
   rascunhoEscritorio: Escritorio | null; // o que está sendo editado (a cena desenha ao vivo)
   salvandoEscritorio: boolean;
   carregado: boolean;
@@ -51,10 +53,11 @@ interface Estado {
   setRascunho: (r: Partial<Rascunho>) => void;
   reservar: () => Promise<string | null>;
   desistir: () => Promise<void>;
-  pagar: (meses?: number) => Promise<string | null>;
+  pagar: (meses?: number, tipo?: "lote" | "layout") => Promise<string | null>;
   conferirPagamento: (ref: string) => Promise<string>;
   fecharPix: () => void;
-  abrirEscritorio: () => void;
+  abrirEscritorio: (aba?: AbaEscritorio) => void;
+  setAbaEscritorio: (aba: AbaEscritorio) => void;
   fecharEscritorio: () => void;
   setEscritorio: (e: Escritorio) => void;
   salvarEscritorio: () => Promise<string | null>;
@@ -63,7 +66,7 @@ interface Estado {
 }
 
 export const useMundo = create<Estado>((set, get) => ({
-  terrenos: {}, meu: null, usuario: null, admin: false, pagamentoLigado: false, preco: 99, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
+  terrenos: {}, meu: null, usuario: null, admin: false, pagamentoLigado: false, preco: 99, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
 
   carregar: async () => {
     try {
@@ -119,14 +122,14 @@ export const useMundo = create<Estado>((set, get) => ({
   },
 
   // Gera o Pix (QR Code + copia e cola) e mostra no cartão do lote; o mapa confere o pagamento a cada poucos segundos
-  pagar: async (meses = 1) => {
+  pagar: async (meses = 1, tipo = "lote") => {
     const { loteSelecionado } = get(); if (!loteSelecionado) return "Escolha um lote.";
     set({ pagando: true });
     try {
-      const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/pagar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ meses }) });
+      const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/pagar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ meses, tipo }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return j.erro ?? `Erro ${r.status}`;
-      set({ pix: { id: j.id, lote: loteSelecionado, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: "pendente" } });
+      set({ pix: { id: j.id, lote: loteSelecionado, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: "pendente", tipo } });
       return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },
@@ -137,7 +140,12 @@ export const useMundo = create<Estado>((set, get) => ({
     const status = r.ok ? (j.status as string) : "erro";
     const { pix } = get();
     if (pix && pix.id === ref) {
-      if (status === "aprovado") { set({ pix: { ...pix, status: "aprovado" } }); await get().carregar(); }
+      if (status === "aprovado") {
+        set({ pix: { ...pix, status: "aprovado" } }); await get().carregar();
+        // crédito de troca de prédio comprado com o painel aberto: atualiza os contadores do rascunho
+        const t = get().terrenos[pix.lote]; const r = get().rascunhoEscritorio;
+        if (pix.tipo === "layout" && t?.escritorio && r) set({ rascunhoEscritorio: { ...r, trocasLayout: t.escritorio.trocasLayout, creditosLayout: t.escritorio.creditosLayout } });
+      }
       else if (status === "rejeitado" || status === "cancelado" || status === "estornado") set({ pix: { ...pix, status: "rejeitado" } });
       else if (new Date(pix.expiraEm).getTime() < Date.now()) set({ pix: { ...pix, status: "expirado" } });
     } else await get().carregar();
@@ -146,11 +154,12 @@ export const useMundo = create<Estado>((set, get) => ({
   fecharPix: () => set({ pix: null }),
 
   // Painel "Montar escritório": edita uma cópia; a cena mostra a cópia enquanto o painel está aberto
-  abrirEscritorio: () => {
+  abrirEscritorio: (aba = "predio") => {
     const { loteSelecionado, terrenos } = get(); if (!loteSelecionado) return;
     const t = terrenos[loteSelecionado]; if (!t?.escritorio) return;
-    set({ painelEscritorio: true, painelEmpresa: false, rascunhoEscritorio: JSON.parse(JSON.stringify(t.escritorio)) as Escritorio });
+    set({ painelEscritorio: true, painelEmpresa: false, abaEscritorio: aba, rascunhoEscritorio: JSON.parse(JSON.stringify(t.escritorio)) as Escritorio });
   },
+  setAbaEscritorio: (aba) => set({ abaEscritorio: aba }),
   fecharEscritorio: () => set({ painelEscritorio: false, rascunhoEscritorio: null }),
   setEscritorio: (e) => set({ rascunhoEscritorio: e }),
   salvarEscritorio: async () => {

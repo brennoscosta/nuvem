@@ -2,7 +2,9 @@
 // lote e o comprador paga pelo app do banco dele — sem login no Mercado Pago. A confirmação vem pelo webhook e pela
 // conferência que o mapa faz a cada poucos segundos. Só o Access Token é necessário (MP_ACCESS_TOKEN no CapRover).
 import { sql, id, migrar } from "./db";
-import { precoPara, ativarTerreno, estenderReserva, obterTerreno } from "./terrenos";
+import { precoPara, ativarTerreno, estenderReserva, obterTerreno, creditarTrocaLayout } from "./terrenos";
+import { registrar } from "./eventos";
+import { PRECO_TROCA_LAYOUT } from "@/office/data/escritorio";
 import type { Usuario } from "./usuarios";
 import { enviarEmail, brl, dataBR } from "./email";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
@@ -11,7 +13,7 @@ const API = "https://api.mercadopago.com";
 export const pagamentoLigado = () => !!process.env.MP_ACCESS_TOKEN;
 const token = () => { const t = process.env.MP_ACCESS_TOKEN?.trim(); if (!t) throw new Error("Pagamento ainda não está ligado (MP_ACCESS_TOKEN)."); return t; };
 
-export interface Pagamento { id: string; terrenoChave: string; usuarioId: string; status: string; valor: string; meses: number; metodo: string | null; preferenciaId: string | null; pagamentoId: string | null; criadoEm: Date; pagoEm: Date | null }
+export interface Pagamento { id: string; terrenoChave: string; usuarioId: string; status: string; valor: string; meses: number; metodo: string | null; preferenciaId: string | null; pagamentoId: string | null; criadoEm: Date; pagoEm: Date | null; tipo?: string }
 export interface PagamentoAdmin extends Pagamento { email: string; empresaNome: string | null }
 
 async function mp<T>(caminho: string, init: RequestInit = {}): Promise<T> {
@@ -27,7 +29,7 @@ async function mp<T>(caminho: string, init: RequestInit = {}): Promise<T> {
 export interface CobrancaPix { id: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; pagamentoId: string }
 const PAGADOR_RESERVA = (uid: string) => `pagador-${uid.replace(/[^a-z0-9]/gi, "").toLowerCase()}@workend.online`;
 
-export async function criarCobranca(u: Usuario, chave: string, numeroLote: number, base: string, meses = 1): Promise<CobrancaPix> {
+export async function criarCobranca(u: Usuario, chave: string, numeroLote: number, base: string, meses = 1, tipo: "lote" | "layout" = "lote"): Promise<CobrancaPix> {
   await migrar();
   if (u.banidoEm) throw new Error("Conta suspensa.");
   const t = await obterTerreno(chave);
@@ -35,19 +37,19 @@ export async function criarCobranca(u: Usuario, chave: string, numeroLote: numbe
   meses = Math.max(1, Math.min(12, meses | 0));
   const pid = id("pag");
   const unit = precoPara(u); // admin paga R$ 0,99 (teste real sem gastar)
-  const valor = Math.round(unit * meses * 100) / 100;
+  const valor = tipo === "layout" ? PRECO_TROCA_LAYOUT : Math.round(unit * meses * 100) / 100;
   const expira = new Date(Date.now() + 60 * 60 * 1000); // o QR vale 1 hora (mesmo prazo da reserva)
   const expiraMP = expira.toISOString().replace("Z", "-00:00"); // formato que o MP exige: yyyy-MM-ddTHH:mm:ss.SSS-00:00
   const corpo = (email: string) => ({
     transaction_amount: valor,
-    description: `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"} (${t.empresaNome})`,
+    description: tipo === "layout" ? `WorkEnd · troca de prédio · Lote ${numeroLote} (${t.empresaNome})` : `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"} (${t.empresaNome})`,
     payment_method_id: "pix",
     payer: { email, first_name: u.nome.split(" ")[0] || "Cliente", last_name: u.nome.split(" ").slice(1).join(" ") || "WorkEnd" },
     external_reference: pid,
     statement_descriptor: "WORKEND",
     date_of_expiration: expiraMP,
     notification_url: `${base}/api/mercadopago/webhook`,
-    metadata: { terreno: chave, usuario: u.id, meses },
+    metadata: { terreno: chave, usuario: u.id, meses, tipo },
   });
   let p: PagamentoMP;
   try {
@@ -60,8 +62,8 @@ export async function criarCobranca(u: Usuario, chave: string, numeroLote: numbe
   }
   const dados = p.point_of_interaction?.transaction_data;
   if (!dados?.qr_code) throw new Error("O Mercado Pago não devolveu o QR Code do Pix. Confira se a conta tem chave Pix cadastrada.");
-  await sql`INSERT INTO pagamento (id, terreno_chave, usuario_id, pagamento_id, valor, meses, metodo, status, bruto) VALUES (${pid}, ${chave}, ${u.id}, ${String(p.id)}, ${valor}, ${meses}, 'pix', 'pendente', ${sql.json(p as unknown as Parameters<typeof sql.json>[0])})`;
-  await estenderReserva(chave, 60); // ele está pagando: a reserva não some embaixo dele
+  await sql`INSERT INTO pagamento (id, terreno_chave, usuario_id, pagamento_id, valor, meses, metodo, status, bruto, tipo) VALUES (${pid}, ${chave}, ${u.id}, ${String(p.id)}, ${valor}, ${meses}, 'pix', 'pendente', ${sql.json(p as unknown as Parameters<typeof sql.json>[0])}, ${tipo})`;
+  if (tipo === "lote") await estenderReserva(chave, 60); // ele está pagando: a reserva não some embaixo dele
   return { id: pid, valor, codigo: dados.qr_code, qrBase64: dados.qr_code_base64 ?? "", expiraEm: expira.toISOString(), pagamentoId: String(p.id) };
 }
 
@@ -70,13 +72,17 @@ interface PagamentoMP { id: number; status: string; status_detail?: string; exte
 // Aplica um pagamento vindo da API do Mercado Pago (webhook ou conferência): grava e, se aprovado, ativa o chão
 async function aplicar(p: PagamentoMP) {
   const ref = p.external_reference; if (!ref) return null;
-  const [reg] = await sql<Pagamento[]>`SELECT id, terreno_chave, usuario_id, status, valor, meses, metodo, preferencia_id, pagamento_id, criado_em, pago_em FROM pagamento WHERE id = ${ref}`;
+  const [reg] = await sql<Pagamento[]>`SELECT id, terreno_chave, usuario_id, status, valor, meses, metodo, preferencia_id, pagamento_id, criado_em, pago_em, tipo FROM pagamento WHERE id = ${ref}`;
   if (!reg) return null;
   const status = p.status === "approved" ? "aprovado" : p.status === "rejected" ? "rejeitado" : p.status === "refunded" || p.status === "charged_back" ? "estornado" : p.status === "cancelled" ? "cancelado" : "pendente";
   const jaAprovado = reg.status === "aprovado";
   await sql`UPDATE pagamento SET status = ${status}, pagamento_id = ${String(p.id)}, metodo = ${p.payment_method_id ?? p.payment_type_id ?? null}, pago_em = ${p.date_approved ? new Date(p.date_approved) : reg.pagoEm}, bruto = ${sql.json(p as unknown as Parameters<typeof sql.json>[0])} WHERE id = ${ref}`;
-  if (status === "aprovado" && !jaAprovado) {
+  if (status === "aprovado" && !jaAprovado && reg.tipo === "layout") {
+    await creditarTrocaLayout(reg.terrenoChave);
+    void registrar("pagamento", `Troca de prédio paga (${brl(Number(reg.valor))})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: "Crédito de 1 troca de prédio liberado." }, avisarDono: true });
+  } else if (status === "aprovado" && !jaAprovado) {
     await ativarTerreno(reg.terrenoChave, reg.meses);
+    void registrar("pagamento", `Lote pago (${brl(Number(reg.valor))}, ${reg.meses} mês${reg.meses > 1 ? "es" : ""})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: `Pagamento aprovado no Mercado Pago (${p.payment_method_id ?? "pix"}).` } });
     const [d] = await sql<{ email: string; nome: string; empresaNome: string | null; pagoAte: Date | null }[]>`SELECT u.email, u.nome, t.empresa_nome, t.pago_ate FROM usuario u LEFT JOIN terreno t ON t.chave = ${reg.terrenoChave} WHERE u.id = ${reg.usuarioId}`;
     if (d) void enviarEmail("pagamento", d.email, { nome: d.nome, empresa: d.empresaNome ?? "", lote: `Lote ${LOTE_POR_CHAVE[reg.terrenoChave]?.numero ?? "?"}`, valor: brl(Number(reg.valor)), pago_ate: dataBR(d.pagoAte), link_mapa: `https://workend.online/mundo?lote=${encodeURIComponent(reg.terrenoChave)}`, link_painel: "https://workend.online/app" });
   }
@@ -113,6 +119,6 @@ export async function pagamentosDoUsuario(usuarioId: string) {
 }
 export async function listarPagamentosAdmin() {
   await migrar();
-  return sql<PagamentoAdmin[]>`SELECT p.id, p.terreno_chave, p.usuario_id, p.status, p.valor, p.meses, p.metodo, p.preferencia_id, p.pagamento_id, p.criado_em, p.pago_em, u.email, t.empresa_nome
+  return sql<PagamentoAdmin[]>`SELECT p.id, p.terreno_chave, p.usuario_id, p.status, p.valor, p.meses, p.metodo, p.preferencia_id, p.pagamento_id, p.criado_em, p.pago_em, p.tipo, u.email, t.empresa_nome
     FROM pagamento p JOIN usuario u ON u.id = p.usuario_id LEFT JOIN terreno t ON t.chave = p.terreno_chave ORDER BY p.criado_em DESC LIMIT 200`;
 }
