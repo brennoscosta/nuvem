@@ -16,7 +16,7 @@ export function BotoesPersonagem() {
   const posicao = usePersonagem((s) => s.posicao);
   const irCamera = () => useMundo.setState({ alvoCamera: [posicao[0], 0.5, posicao[1]] });
   return (
-    <>
+    <div className="flex items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0">
       {ativo && meu ? (
         <>
           <button onClick={irCamera} title="Centralizar em mim" className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white"><MiniAvatar boneco={meu.boneco} roupa={meu.roupa} tamanho={18} />{meu.nome}</button>
@@ -27,6 +27,6 @@ export function BotoesPersonagem() {
       ) : (
         <button onClick={() => abrir("montar")} className="rounded-full bg-[#16A34A] px-3 py-1.5 text-xs font-bold text-white">{meu ? "Ativar meu personagem" : "Criar personagem"} · {brl(preco)}</button>
       )}
-    </>
+    </div>
   );
 }

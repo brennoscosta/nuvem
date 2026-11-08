@@ -6,6 +6,7 @@ import { usePersonagem, type Redes, type Outro, type Mensagem } from "../persona
 import { useMundo } from "../mundoStore";
 import { TIPOS_AVATAR, TODOS_BONECOS, type Genero } from "../data/bonecos";
 import { PixAberto } from "./Lote";
+import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR");
@@ -41,14 +42,16 @@ export function PainelPersonagem() {
   const [genero, setGenero] = useState<Genero | "todos">("todos");
   const [f, setF] = useState({ nome: "", tipo: TIPOS_AVATAR[0].id, bio: "", redes: {} as Redes, mostrarRedes: false });
   const [erro, setErro] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [salvo, setSalvo] = useState(false);
   const [pagando, setPagando] = useState(false);
   const carregadoDe = useRef<string | null>(null);
   // preenche o formulário com o que já existe (uma vez por personagem)
   useEffect(() => { if (painel === "montar" && meu && carregadoDe.current !== meu.usuarioId) { carregadoDe.current = meu.usuarioId; setF({ nome: meu.nome, tipo: meu.tipo, bio: meu.bio, redes: meu.redes ?? {}, mostrarRedes: meu.mostrarRedes }); } }, [painel, meu]);
   if (painel !== "montar") return null;
   if (!usuario) return (
-    <div className="absolute right-3 top-20 z-20 w-80 rounded-2xl bg-white/97 p-4 text-[#1D2128] shadow-2xl backdrop-blur">
+    <div className={`${FLUTUANTE} ${ESTREITO} painel-entra overflow-y-auto p-4`}>
       <div className="text-lg font-bold">Seu personagem no mundo</div>
       <p className="mt-1 text-sm text-[#5B6472]">Quem não tem personagem só olha. Com o seu, você anda pelo mapa, fala com a equipe das lojas, conversa com quem está online, faz amigos, negocia e faz calls.</p>
       <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm"><span className="text-[#5B6472] line-through">{brl(precoCheio)}</span> <b className="text-[#16A34A]">{brl(preco)}/mês</b></div>
@@ -59,11 +62,23 @@ export function PainelPersonagem() {
   );
   const tipos = TIPOS_AVATAR.filter((t) => genero === "todos" || t.genero === genero);
   const tipo = TIPOS_AVATAR.find((t) => t.id === f.tipo) ?? TIPOS_AVATAR[0];
-  const clicarSalvar = async () => { setErro(null); setSalvando(true); const e = await salvar(f); setSalvando(false); if (e) setErro(e); };
+  // salvar: mostra o "salvo com sucesso" e fecha sozinho (se ainda não pagou, fica aberto no Pix)
+  const clicarSalvar = async () => {
+    setErro(null); setSalvando(true); const e = await salvar(f); setSalvando(false);
+    if (e) { setErro(e); return; }
+    if (!usePersonagem.getState().ativo) { setAviso("Personagem salvo! Agora é só ativar no Pix pra entrar no mapa."); return; }
+    setSalvo(true); setTimeout(() => { setSalvo(false); fechar(); }, 1300);
+  };
   const clicarPagar = async () => { setErro(null); setPagando(true); const e1 = meu ? null : await salvar(f); if (e1) { setErro(e1); setPagando(false); return; } const e = await pagar(1); setPagando(false); if (e) setErro(e); };
   const setRede = (k: keyof Redes, v: string) => setF({ ...f, redes: { ...f.redes, [k]: v } });
   return (
-    <div className="absolute right-3 top-20 z-20 flex max-h-[calc(100vh-7rem)] w-[22rem] flex-col rounded-2xl bg-white/97 text-[#1D2128] shadow-2xl backdrop-blur">
+    <div className={`${FLUTUANTE} ${LARGO} painel-entra flex flex-col overflow-hidden`}>
+      {salvo && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/95">
+          <svg viewBox="0 0 64 64" className="salvo-pop h-20 w-20"><circle cx="32" cy="32" r="30" fill="#16A34A" /><path d="M18 33 L28 43 L46 23" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" className="salvo-risco" /></svg>
+          <div className="text-lg font-bold text-[#166534]">Salvo com sucesso</div>
+        </div>
+      )}
       <div className="flex items-start justify-between p-4 pb-2">
         <div><div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">Meu personagem</div><div className="text-lg font-bold">{meu ? meu.nome : "Monte seu personagem"}</div>
           <div className="text-xs text-[#5B6472]">{ativo ? `Ativo até ${meu?.pagoAte ? dataBR(meu.pagoAte) : "—"} · clique no chão pra andar` : "Ande pelo mapa, converse e faça negócios."}</div></div>
@@ -96,6 +111,7 @@ export function PainelPersonagem() {
           </div>
         )}
         {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
+        {aviso && <div className="mt-2 text-xs font-semibold text-[#166534]">{aviso}</div>}
       </div>
       <div className="flex gap-2 border-t border-black/5 p-4 pt-3">
         <button onClick={fechar} className="rounded-xl bg-[#F1F3F6] px-3 py-2.5 text-sm font-semibold text-[#5B6472]">Fechar</button>
@@ -143,7 +159,7 @@ export function FichaPersonagem() {
   });
   const call = () => guardar(async () => { if (!p.online) { setAviso(`${p.nome} não está online agora. Mande uma mensagem que recebe quando entrar.`); return; } const e = await ligar(p, true); if (e) setAviso(e); else fechar(); });
   return (
-    <div className="absolute right-3 top-20 z-20 w-80 rounded-2xl bg-white/97 p-4 text-[#1D2128] shadow-2xl backdrop-blur">
+    <div className={`${FLUTUANTE} ${ESTREITO} painel-entra overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3"><MiniAvatar boneco={p.boneco} roupa={p.roupa} tamanho={48} /><div><div className="text-lg font-bold leading-tight">{p.nome}</div><div className="text-xs text-[#5B6472]">{p.online ? <span className="text-[#16A34A]">● online agora</span> : "offline"}{souEu && " · você"}{rel === "amigos" && <span className="ml-1.5 rounded-full bg-[#FDE8F3] px-1.5 py-0.5 text-[10px] font-bold text-[#9D174D]">amigos</span>}</div></div></div>
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
@@ -289,7 +305,7 @@ export function ChatPersonagem() {
   const selecionarOutro = usePersonagem((s) => s.selecionarOutro);
   if (painel !== "chat" || !o) return null;
   return (
-    <div className="absolute right-3 top-20 z-20 flex h-[min(70vh,560px)] w-[22rem] flex-col rounded-2xl bg-white/97 text-[#1D2128] shadow-2xl backdrop-blur">
+    <div className={`${FLUTUANTE} ${LARGO} painel-entra flex h-[72vh] flex-col overflow-hidden sm:h-[min(70vh,560px)]`}>
       <div className="flex items-center justify-between border-b border-black/5 p-3">
         <button onClick={() => selecionarOutro(o)} className="flex items-center gap-2 text-left"><MiniAvatar boneco={o.boneco} roupa={o.roupa} tamanho={36} /><div><div className="text-sm font-bold leading-tight">{o.nome}</div><div className="text-[11px] text-[#5B6472]">{o.online ? <span className="text-[#16A34A]">● online · ao vivo</span> : "offline · recebe quando entrar"}</div></div></button>
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
@@ -309,7 +325,7 @@ export function CaixaPersonagem() {
   useEffect(() => { if (painel === "caixa") void carregarCaixa(); }, [painel, carregarCaixa]);
   if (painel !== "caixa") return null;
   return (
-    <div className="absolute right-3 top-20 z-20 w-80 rounded-2xl bg-white/97 p-3 text-[#1D2128] shadow-2xl backdrop-blur">
+    <div className={`${FLUTUANTE} ${ESTREITO} painel-entra overflow-y-auto p-3`}>
       <div className="flex items-center justify-between px-1"><div className="text-sm font-bold">Minhas conversas</div><button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button></div>
       <div className="mt-2 max-h-[60vh] space-y-1 overflow-y-auto">
         {conversas.length === 0 && <div className="py-6 text-center text-xs text-[#5B6472]">Nenhuma conversa ainda. Clique num personagem no mapa.</div>}

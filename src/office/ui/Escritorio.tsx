@@ -1,6 +1,7 @@
 "use client";
 // Painel "Montar escritório": o dono do lote escolhe o layout do prédio, os setores (nome, cor, mesas) e a equipe
 // (atendente e CEO obrigatórios; profissionais por setor). A cena desenha o rascunho ao vivo; Salvar grava no servidor.
+import { FLUTUANTE, LARGO } from "./estilo";
 import { useEffect, useState } from "react";
 import { PixAberto } from "./Lote";
 import { useMundo } from "../mundoStore";
@@ -102,7 +103,7 @@ export function PainelEscritorio() {
   const comprarTroca = async () => { setErroPix(null); const r = await pagar(1, "layout"); if (r) setErroPix(r); };
   const clicarSalvar = async () => { setErro(null); const r = await salvar(); if (r) setErro(r); };
   return (
-    <div className="absolute right-3 top-20 z-10 flex max-h-[calc(100vh-7rem)] w-[22rem] flex-col rounded-2xl bg-white/97 text-[#1D2128] shadow-2xl backdrop-blur">
+    <div className={`${FLUTUANTE} ${LARGO} painel-entra !z-10 flex flex-col overflow-hidden`}>
       <div className="flex items-start justify-between p-4 pb-2">
         <div><div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">Montar escritório</div><div className="text-lg font-bold">Seu prédio, do seu jeito</div><div className="text-xs text-[#5B6472]">O mapa mostra as mudanças na hora. Use “Ver por dentro” pra ver as salas.</div></div>
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>

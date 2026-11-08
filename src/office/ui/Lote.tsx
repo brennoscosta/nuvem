@@ -6,6 +6,7 @@ import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES
 import { NICHOS } from "../data/mundo";
 import { useEscritorio } from "../store";
 import { BotoesPersonagem } from "./BotoesPersonagem";
+import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 
 // Contagem regressiva da reserva (usa o relógio do servidor); quando zera, recarrega (o lote volta a ficar livre)
 function useContagem(ate: string | null | undefined) {
@@ -99,7 +100,7 @@ export function CartaoLote() {
   const diasRestantes = terreno?.pagoAte ? Math.ceil((new Date(terreno.pagoAte).getTime() - agora) / 86400000) : null;
   const clicarPagar = async (meses = 1) => { setErro(null); const e = await pagar(meses); if (e) setErro(e); };
   return (
-    <div className="absolute right-3 top-20 z-10 w-80 rounded-2xl bg-white/97 p-4 text-[#1D2128] shadow-2xl backdrop-blur">
+    <div className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · Lote {l.numero}</div>
@@ -264,7 +265,7 @@ export function PainelEmpresa() {
   const editando = meu === chave;
   const enviar = async () => { setEnviando(true); setErro(null); const e = await reservar(); setEnviando(false); if (e) setErro(e); };
   return (
-    <div className="absolute right-3 top-20 z-20 w-[22rem] rounded-2xl bg-white/97 p-4 text-[#1D2128] shadow-2xl backdrop-blur">
+    <div className={`${FLUTUANTE} ${LARGO} painel-entra overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">Lote {l?.numero} · {editando ? "sua placa" : "montar minha empresa"}</div>
@@ -330,13 +331,13 @@ export function ContaWorkend() {
   const sair = useMundo((s) => s.sairWorkend);
   const selecionarLote = useMundo((s) => s.selecionarLote);
   if (!modoMundo()) return null;
-  if (!usuario) return <div className="flex items-center gap-1.5"><BotoesPersonagem /><a href="/entrar" className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">Entrar</a></div>;
+  if (!usuario) return <div className="flex items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0"><BotoesPersonagem /><a href="/entrar" className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">Entrar</a></div>;
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0">
       <BotoesPersonagem />
-      {meu && <button onClick={() => selecionarLote(meu)} className="rounded-full bg-[#1D4ED8] px-3 py-1.5 text-xs font-bold text-white">Meu chão · Lote {LOTE_POR_CHAVE[meu]?.numero}</button>}
-      <a href="/app" className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80" title={usuario.email}>{usuario.nome.split(" ")[0]}</a>
-      <button onClick={sair} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/60">Sair</button>
+      {meu && <button onClick={() => selecionarLote(meu)} className="rounded-full bg-[#1D4ED8] px-3 py-1.5 text-xs font-bold text-white">Meu chão · {LOTE_POR_CHAVE[meu]?.numero}</button>}
+      <a href="/app" className="hidden rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80 sm:inline-block" title={usuario.email}>{usuario.nome.split(" ")[0]}</a>
+      <button onClick={sair} className="hidden rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/60 sm:inline-block">Sair</button>
     </div>
   );
 }
