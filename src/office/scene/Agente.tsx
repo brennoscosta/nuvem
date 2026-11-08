@@ -12,6 +12,8 @@ import { useEscritorio, removerAgente, type Agente as AgenteDef } from "../store
 import type { Evento } from "../data/eventos";
 import { anel, caixa, mat } from "./geo";
 import { SombraContato } from "./SombraContato";
+import { modoMundo } from "../mundoStore";
+import { usePersonagem } from "../personagemStore";
 
 // Velocidade de caminhada (m/s). ?turbo=N acelera a cena (útil pra testes em máquina lenta).
 const TURBO = typeof window !== "undefined" ? Number(new URLSearchParams(window.location.search).get("turbo") || 1) : 1;
@@ -186,7 +188,12 @@ export function Agente({ def }: { def: AgenteDef }) {
   const corArea = (AREAS[def.area] ?? AREAS.recepcao).cor;
   const nivel = NIVEL[def.nivel];
   const fala = def.fala && def.status !== "chegando" ? def.fala : undefined;
-  const abrir = () => { if (marca === "✓") { setMarca(null); useEscritorio.getState().setAbaPedida("tarefas"); } selecionar(def.id); };
+  const abrir = () => {
+    // No mundo do WorkEnd os funcionários são NPCs: quem não tem personagem só olha; pra interagir, cria o seu
+    if (modoMundo() && !usePersonagem.getState().ativo) { usePersonagem.getState().abrir("montar"); return; }
+    if (marca === "✓") { setMarca(null); useEscritorio.getState().setAbaPedida("tarefas"); } selecionar(def.id);
+  };
+  const semCracha = modoMundo() && !grande; // NPC não anda com balão de nome; aparece só com o mouse em cima
   // mouse no boneco (over e move: o move cobre quem chega vindo de cima de um nome)
   const mouseNoBoneco = (e: ThreeEvent<PointerEvent>) => {
     if (sobreRotulo(e)) { marcarFoco("boneco", false); return; }
@@ -221,7 +228,7 @@ export function Agente({ def }: { def: AgenteDef }) {
           {fala && !marca && (
             <div className="pointer-events-auto max-w-[260px] cursor-pointer rounded-2xl bg-white px-3 py-1.5 text-center text-[14px] font-medium leading-tight text-[#2B2F36] shadow-lg">{fala.length > 60 ? fala.slice(0, 58) + "…" : fala}</div>
           )}
-          <div className={`pointer-events-auto flex cursor-pointer items-center whitespace-nowrap rounded-full transition-all duration-150 ease-out ${grande ? "bg-[#111418]/95 py-1 pl-1.5 pr-3 shadow-lg" : "bg-[#111418]/80 py-[2px] pl-[3px] pr-[6px] shadow"}`}>
+          <div className={`pointer-events-auto flex cursor-pointer items-center whitespace-nowrap rounded-full transition-all duration-150 ease-out ${grande ? "bg-[#111418]/95 py-1 pl-1.5 pr-3 shadow-lg" : "bg-[#111418]/80 py-[2px] pl-[3px] pr-[6px] shadow"} ${semCracha ? "opacity-0" : ""}`}>
             <span className={`shrink-0 rounded-full transition-all duration-150 ease-out ${grande ? "mr-2 h-4 w-4" : "mr-1 h-1.5 w-1.5"}`} style={{ background: nivel.cor }} />
             <span className={`leading-none text-white transition-all duration-150 ease-out ${grande ? "text-[15px] font-bold" : "text-[10px] font-semibold"}`}>{def.nome}</span>
             <span className={`overflow-hidden text-[11px] font-semibold uppercase leading-none text-white/60 transition-all duration-150 ease-out ${grande ? "ml-2 max-w-[120px] opacity-100" : "ml-0 max-w-0 opacity-0"}`}>{nivel.nome}</span>

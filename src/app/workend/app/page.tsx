@@ -21,7 +21,7 @@ export default async function App() {
     <>
       <header className="faixa flex items-center justify-between py-5">
         <Link href="/" aria-label="WorkEnd"><Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} priority className="h-9 w-auto" /></Link>
-        <div className="flex items-center gap-3 text-[15px]">{ehAdmin(u) && <Link href="/app/admin" className="btn btn-claro">Admin</Link>}<span className="hidden text-[var(--tinta-2)] sm:inline">{u.email}</span><BotaoSair /></div>
+        <div className="flex items-center gap-3 text-[15px]"><Link href="/app/rede" className="btn btn-claro">Minha rede</Link>{ehAdmin(u) && <Link href="/app/admin" className="btn btn-claro">Admin</Link>}<span className="hidden text-[var(--tinta-2)] sm:inline">{u.email}</span><BotaoSair /></div>
       </header>
 
       <section className="faixa pt-4">
@@ -57,6 +57,14 @@ export default async function App() {
             <a href={DEMO} target="_blank" rel="noreferrer" aria-label="Abrir um escritório de demonstração funcionando ao vivo"><Image src="/workend/poster.jpg" alt="" width={1280} height={720} /></a>
           </div>
           <a href={DEMO} target="_blank" rel="noreferrer" className="btn btn-tinta absolute bottom-5 left-5 z-10">Ver um escritório funcionando ao vivo</a>
+        </div>
+      </section>
+
+      {/* rede */}
+      <section className="faixa mt-10 rounded-2xl border border-[var(--linha)] p-7">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div><h2 className="text-[1.5rem]">Minha rede</h2><p className="mt-1 max-w-[60ch] text-[var(--tinta-2)]">O WorkEnd também é uma rede de network: com um personagem você anda pelo mundo, fala com a equipe das lojas, faz amigos, negocia e faz calls com quem está online.</p></div>
+          <Link href="/app/rede" className="btn btn-azul">Abrir minha rede</Link>
         </div>
       </section>
 

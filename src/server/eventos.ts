@@ -4,7 +4,7 @@ import { sql, id, migrar } from "./db";
 import { enviarEmail } from "./email";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
 
-export type TipoEvento = "cadastro" | "reserva" | "pagamento" | "escritorio" | "contratacao" | "layout" | "contato" | "admin";
+export type TipoEvento = "cadastro" | "reserva" | "pagamento" | "escritorio" | "contratacao" | "layout" | "contato" | "admin" | "amizade" | "negociacao";
 export interface Evento { id: string; tipo: TipoEvento; usuarioId: string | null; terrenoChave: string | null; titulo: string; dados: Record<string, unknown> | null; criadoEm: Date }
 export interface EventoAdmin extends Evento { email: string | null; empresaNome: string | null }
 

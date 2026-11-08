@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 
 // Veio do mapa querendo um lote (?lote=…)? Depois de entrar volta pro mundo, direto no lote escolhido.
-const destino = () => { const l = new URLSearchParams(window.location.search).get("lote"); return l ? `/mundo?lote=${encodeURIComponent(l)}` : "/app"; };
+const destino = () => { const q = new URLSearchParams(window.location.search); const l = q.get("lote"); const d = q.get("destino"); if (l) return `/mundo?lote=${encodeURIComponent(l)}`; return d && d.startsWith("/") && !d.startsWith("//") ? d : "/app"; };
 
 // query atual (?lote=…) só no navegador, sem erro de hidratação
 const semAssinatura = () => () => {};

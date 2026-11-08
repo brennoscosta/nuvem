@@ -3,7 +3,7 @@
 // por dentro, a planta com recepção, sala do CEO e os setores que o dono escolheu — com a equipe sentada nas mesas.
 // Enquanto o painel "Montar escritório" está aberto, desenha o rascunho ao vivo.
 import * as THREE from "three";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Html, Text } from "@react-three/drei";
 import { caixa, mat, plano } from "./geo";
 import { Estatico } from "./Estatico";
@@ -14,6 +14,7 @@ import { BONECO } from "../data/bonecos";
 import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
 import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, type Escritorio, type Membro, type SalaCliente } from "../data/escritorio";
 import { useMundo } from "../mundoStore";
+import { usePersonagem } from "../personagemStore";
 import { useEscritorio } from "../store";
 
 const FONTE = "/fonts/inter-700.woff";
@@ -141,14 +142,20 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
   const pose: Pose = lugar.emPe ? "idle" : m.papel === "ceo" ? "think" : "type";
   useAnimacao(h, () => pose, fase, HIPS.procedural.base);
   const def = BONECO[m.boneco] ?? BONECO.classico;
+  const [hover, setHover] = useState(false);
+  // NPC: sem balão de nome (só com o mouse em cima). Clicar: quem tem personagem abre a loja; quem não tem, cria o seu.
+  const clicar = () => { if (!usePersonagem.getState().ativo) { usePersonagem.getState().abrir("montar"); return; } useMundo.getState().selecionarLote(chave); };
   return (
     <group position={lugar.pos} rotation={[0, lugar.rot, 0]}>
       <BonecoProcedural ref={h} def={def} camisa={m.camisa} headset={m.papel === "atendente"} cracha={m.papel === "ceo" ? "#D4A017" : "#1D4ED8"} />
-      <Html position={[0, 1.65, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
-        <div data-rotulo="" className="pointer-events-auto flex w-max cursor-pointer select-none flex-col items-center" onClick={(ev) => { ev.stopPropagation(); useMundo.getState().selecionarLote(chave); }}>
-          <div className="rounded-full bg-white/95 px-2.5 py-1 text-[12px] font-bold text-[#1D2128] shadow-md">{m.nome}<span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase text-white" style={{ background: m.papel === "ceo" ? "#D4A017" : m.papel === "atendente" ? "#16A34A" : "#1D4ED8" }}>{m.papel === "ceo" ? "CEO" : m.papel === "atendente" ? "Atendente" : m.cargo.slice(0, 14)}</span></div>
-        </div>
-      </Html>
+      <mesh position={[0, 0.7, 0]} onClick={(e) => { e.stopPropagation(); clicar(); }} onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = "pointer"; }} onPointerOut={() => { setHover(false); document.body.style.cursor = ""; }}>
+        <cylinderGeometry args={[0.4, 0.4, 1.5, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      {hover && (
+        <Html position={[0, 1.65, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
+          <div className="w-max select-none rounded-full bg-white/95 px-2.5 py-1 text-[12px] font-bold text-[#1D2128] shadow-md">{m.nome}<span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase text-white" style={{ background: m.papel === "ceo" ? "#D4A017" : m.papel === "atendente" ? "#16A34A" : "#1D4ED8" }}>{m.papel === "ceo" ? "CEO" : m.papel === "atendente" ? "Atendente" : m.cargo.slice(0, 14)}</span></div>
+        </Html>
+      )}
     </group>
   );
 }

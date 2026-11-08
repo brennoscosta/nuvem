@@ -63,9 +63,9 @@ export async function personagemPublico(usuarioId: string, paraId: string | null
   await migrar();
   const [p] = await sql<Personagem[]>`SELECT ${CAMPOS()} FROM personagem WHERE usuario_id = ${usuarioId}`;
   if (!p) return null;
-  // redes aparecem se ele mostra pra todos ou se já aceitou o pedido de quem está olhando
+  // redes aparecem se ele mostra pra todos ou se os dois são amigos
   let redes: Redes | undefined = p.mostrarRedes ? p.redes : undefined;
-  if (!redes && paraId) { const [ac] = await sql<{ id: string }[]>`SELECT id FROM recado WHERE de_id = ${usuarioId} AND para_id = ${paraId} AND tipo = 'redes_aceite' LIMIT 1`; if (ac) redes = p.redes; }
+  if (!redes && paraId) { const [am] = await sql<{ id: string }[]>`SELECT id FROM amizade WHERE status = 'aceita' AND LEAST(de_id, para_id) = LEAST(${usuarioId}, ${paraId}) AND GREATEST(de_id, para_id) = GREATEST(${usuarioId}, ${paraId}) LIMIT 1`; if (am) redes = p.redes; }
   return { usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, redes, online: !!p.vistoEm && Date.now() - new Date(p.vistoEm).getTime() < SEGUNDOS_ONLINE * 1000 };
 }
 
@@ -76,11 +76,11 @@ export async function enviarMensagem(de: Usuario, paraId: string, tipo: string, 
   if (de.banidoEm) throw new Error("Conta suspensa.");
   if (de.id === paraId) throw new Error("Esse personagem é você.");
   const t = (texto ?? "").trim().slice(0, 1000);
-  const tp = ["chat", "negocio", "redes_pedido", "redes_aceite"].includes(tipo) ? tipo : "chat";
-  if (!t && tp === "chat") throw new Error("Escreva algo.");
+  const tp = ["chat", "negocio", "negocio_status", "amizade_pedido", "amizade_aceite", "chamada"].includes(tipo) ? tipo : "chat";
+  if (!t) throw new Error("Escreva algo.");
   const [alvo] = await sql<{ usuarioId: string }[]>`SELECT usuario_id FROM personagem WHERE usuario_id = ${paraId}`;
   if (!alvo) throw new Error("Esse personagem não existe mais.");
-  const [m] = await sql<Mensagem[]>`INSERT INTO recado (id, de_id, para_id, tipo, texto) VALUES (${id("msg")}, ${de.id}, ${paraId}, ${tp}, ${t || (tp === "redes_pedido" ? "Quer trocar redes sociais?" : tp === "redes_aceite" ? "Aceitei: aqui estão minhas redes." : "")}) RETURNING id, de_id, para_id, tipo, texto, lida_em, criado_em`;
+  const [m] = await sql<Mensagem[]>`INSERT INTO recado (id, de_id, para_id, tipo, texto) VALUES (${id("msg")}, ${de.id}, ${paraId}, ${tp}, ${t}) RETURNING id, de_id, para_id, tipo, texto, lida_em, criado_em`;
   return m;
 }
 // Conversa entre dois (as últimas 80), marcando como lidas as recebidas

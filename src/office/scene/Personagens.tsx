@@ -20,12 +20,12 @@ const def = (id: string) => TODOS_BONECOS[id] ?? BONECOS[1];
 
 function Nome({ nome, cor, eu = false, online = true, onClick }: { nome: string; cor: string; eu?: boolean; online?: boolean; onClick?: () => void }) {
   return (
-    <Html position={[0, 1.55, 0]} center zIndexRange={[6, 0]} style={{ pointerEvents: "none" }}>
+    <Html position={[0, 1.5, 0]} center zIndexRange={[6, 0]} style={{ pointerEvents: "none" }}>
       <div className="flex w-max select-none flex-col items-center" onClick={(e) => { e.stopPropagation(); onClick?.(); }}>
-        <div className={`pointer-events-auto flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-bold shadow-md ${onClick ? "cursor-pointer" : ""} ${eu ? "bg-[#1D4ED8] text-white" : "bg-white/95 text-[#1D2128]"}`}>
-          <span className={`h-2 w-2 rounded-full ${online ? "bg-[#16A34A]" : "bg-[#9AA3AD]"}`} />{nome}{eu && <span className="text-[9px] font-black uppercase text-white/70">você</span>}
+        <div className={`pointer-events-auto flex items-center gap-1 rounded-full px-2 py-[3px] text-[10px] font-bold leading-none shadow-md ${onClick ? "cursor-pointer" : ""} ${eu ? "bg-[#1D4ED8] text-white" : "bg-white/95 text-[#1D2128]"}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-[#16A34A]" : "bg-[#9AA3AD]"}`} />{nome}{eu && <span className="text-[8px] font-black uppercase text-white/70">você</span>}
         </div>
-        <div className={`h-0 w-0 border-x-[5px] border-t-[6px] border-x-transparent ${eu ? "border-t-[#1D4ED8]" : "border-t-white/95"}`} style={eu ? {} : { borderTopColor: cor + "00" }} />
+        <div className={`h-0 w-0 border-x-[4px] border-t-[5px] border-x-transparent ${eu ? "border-t-[#1D4ED8]" : "border-t-white/95"}`} />
       </div>
     </Html>
   );
@@ -122,7 +122,7 @@ export function Personagens() {
   useEffect(() => {
     if (!modoMundo()) return;
     let vivo = true;
-    void carregar().then(() => batida());
+    void carregar().then(() => { void batida(); if (new URLSearchParams(window.location.search).get("personagem") === "1") usePersonagem.getState().abrir("montar"); });
     const t1 = setInterval(() => { if (vivo && document.visibilityState === "visible") void batida(); }, 3000);
     const t2 = setInterval(() => { if (vivo && usePersonagem.getState().painel === "chat") void atualizarChat(); }, 2500);
     return () => { vivo = false; clearInterval(t1); clearInterval(t2); };
