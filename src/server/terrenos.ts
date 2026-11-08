@@ -3,7 +3,7 @@
 // por mês) deixa o chão ativo por 30 dias, com 5 dias de tolerância depois do vencimento; um chão por conta
 // (o admin não tem essa trava); usuário banido não reserva.
 import { sql, migrar } from "./db";
-import { QUARTEIROES } from "@/office/data/mundo";
+import { QUARTEIROES, nichoValido } from "@/office/data/mundo";
 import type { Usuario } from "./usuarios";
 import { escritorioPadrao, normalizarEscritorio, trocasRestantes, TROCAS_LAYOUT_GRATIS, PRECO_TROCA_LAYOUT, LAYOUT, type Escritorio } from "@/office/data/escritorio";
 import { registrar } from "./eventos";
@@ -12,6 +12,7 @@ export interface Terreno {
   chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean;
   reservadoEm: Date; reservadoAte: Date | null; pagoAte: Date | null;
   escritorio: Escritorio | null; // layout, setores e equipe (só quando ativo)
+  nicho: string; // id em NICHOS (vai no balão)
 }
 export interface TerrenoAdmin extends Terreno { email: string; usuarioNome: string; banidoEm: Date | null }
 
@@ -35,7 +36,7 @@ export function loteAVenda(chave: string) {
 }
 
 // trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
-const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio`;
+const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio, t.nicho`;
 
 // Apaga o que venceu: reserva sem pagamento depois de 1 h; chão pago depois do vencimento + tolerância
 async function limparVencidos() {
@@ -64,13 +65,14 @@ export async function obterTerreno(chave: string): Promise<Terreno | null> {
 function corValida(c: string) { return /^#[0-9a-fA-F]{6}$/.test(c); }
 
 // Reserva (ou atualiza a placa de) um lote. Um lote por usuário; se ele já tinha outro reservado, o antigo é liberado.
-export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNome: string; cor?: string; logoBase64?: string | null; logoTipo?: string | null; manterLogo?: boolean; ceoNome?: string | null; atendenteNome?: string | null }) {
+export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNome: string; cor?: string; logoBase64?: string | null; logoTipo?: string | null; manterLogo?: boolean; ceoNome?: string | null; atendenteNome?: string | null; nicho?: string | null }) {
   await migrar(); await limparVencidos();
   if (u.banidoEm) throw new Error("Sua conta foi suspensa por descumprir as políticas de uso. Fale com contato@workend.online.");
   if (!loteAVenda(chave)) throw new Error("Esse lote não está à venda.");
   const nome = (d.empresaNome ?? "").trim().slice(0, 60);
   if (nome.length < 2) throw new Error("Diga o nome da empresa.");
   const cor = d.cor && corValida(d.cor) ? d.cor.toUpperCase() : COR_PADRAO;
+  const nicho = nichoValido(d.nicho);
   let logo: Buffer | null = null, logoTipo: string | null = null;
   if (d.logoBase64) {
     logoTipo = d.logoTipo ?? "image/png";
@@ -92,8 +94,8 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
       await tx`DELETE FROM terreno WHERE usuario_id = ${u.id} AND chave <> ${chave} AND status = 'reservado'`;
     }
     if (dono) {
-      if (d.manterLogo && !logo) await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, atualizado_em = now() WHERE chave = ${chave}`;
-      else await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, logo = ${logo}, logo_tipo = ${logoTipo}, atualizado_em = now() WHERE chave = ${chave}`;
+      if (d.manterLogo && !logo) await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, nicho = ${nicho}, atualizado_em = now() WHERE chave = ${chave}`;
+      else await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, nicho = ${nicho}, logo = ${logo}, logo_tipo = ${logoTipo}, atualizado_em = now() WHERE chave = ${chave}`;
       // editar a placa: só renomeia CEO/atendente se o dono preencheu os campos (não apaga o que ele já montou)
       if (dono.escritorio && (d.ceoNome || d.atendenteNome)) {
         const e = dono.escritorio;
@@ -101,7 +103,7 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
         await tx`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
       } else if (!dono.escritorio) await tx`UPDATE terreno SET escritorio = ${escJson} WHERE chave = ${chave}`;
     } else {
-      await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, logo, logo_tipo, status, reservado_ate, escritorio) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${logo}, ${logoTipo}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${escJson})`;
+      await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, status, reservado_ate, escritorio) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${nicho}, ${logo}, ${logoTipo}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${escJson})`;
     }
     const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${chave}`;
     if (!dono) void registrar("reserva", `${nome} reservou um lote`, { usuarioId: u.id, terrenoChave: chave, dados: { detalhes: `Reserva de 1 hora pra pagar.` } });

@@ -5,9 +5,9 @@ import { create } from "zustand";
 
 
 import type { Escritorio } from "./data/escritorio";
-export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null; escritorio: Escritorio | null }
+export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null; escritorio: Escritorio | null; nicho?: string }
 export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
-export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null; ceoNome: string; atendenteNome: string }
+export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null; ceoNome: string; atendenteNome: string; nicho: string }
 export type AbaEscritorio = "predio" | "setores" | "equipe" | "contratar" | "treinar";
 export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" }
 
@@ -95,7 +95,7 @@ export const useMundo = create<Estado>((set, get) => ({
     const t = terrenos[loteSelecionado];
     const ceo = t?.escritorio?.equipe.find((m) => m.papel === "ceo")?.nome ?? "";
     const atendente = t?.escritorio?.equipe.find((m) => m.papel === "atendente")?.nome ?? "";
-    set({ painelEmpresa: true, rascunho: { empresaNome: t?.empresaNome ?? usuario?.empresaNome ?? "", cor: t?.cor ?? CORES_EMPRESA[0], logoDataUrl: t?.temLogo ? `/api/terrenos/${encodeURIComponent(loteSelecionado)}/logo?v=${Date.now()}` : null, ceoNome: ceo, atendenteNome: atendente } });
+    set({ painelEmpresa: true, rascunho: { empresaNome: t?.empresaNome ?? usuario?.empresaNome ?? "", cor: t?.cor ?? CORES_EMPRESA[0], logoDataUrl: t?.temLogo ? `/api/terrenos/${encodeURIComponent(loteSelecionado)}/logo?v=${Date.now()}` : null, ceoNome: ceo, atendenteNome: atendente, nicho: t?.nicho ?? "negocios" } });
   },
   fecharPainel: () => set({ painelEmpresa: false, rascunho: null }),
   setRascunho: (r) => set((s) => ({ rascunho: s.rascunho ? { ...s.rascunho, ...r } : null })),
@@ -106,7 +106,7 @@ export const useMundo = create<Estado>((set, get) => ({
     if (!usuario) return "Entre na sua conta do WorkEnd.";
     const atual = terrenos[loteSelecionado];
     const logoNovo = rascunho.logoDataUrl?.startsWith("data:") ? rascunho.logoDataUrl : null;
-    const body = { empresaNome: rascunho.empresaNome, cor: rascunho.cor, ceoNome: rascunho.ceoNome, atendenteNome: rascunho.atendenteNome, logoBase64: logoNovo, logoTipo: logoNovo ? (/^data:(image\/[a-z]+)/.exec(logoNovo)?.[1] ?? "image/png") : null, manterLogo: !logoNovo && !!rascunho.logoDataUrl && !!atual?.temLogo };
+    const body = { empresaNome: rascunho.empresaNome, cor: rascunho.cor, ceoNome: rascunho.ceoNome, atendenteNome: rascunho.atendenteNome, nicho: rascunho.nicho, logoBase64: logoNovo, logoTipo: logoNovo ? (/^data:(image\/[a-z]+)/.exec(logoNovo)?.[1] ?? "image/png") : null, manterLogo: !logoNovo && !!rascunho.logoDataUrl && !!atual?.temLogo };
     const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/reservar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return j.erro ?? `Erro ${r.status}`;

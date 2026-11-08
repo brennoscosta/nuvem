@@ -3,6 +3,7 @@
 // o lote coloca o nome. Prédio = modelo do Higgsfield (por fora); estacionamento, faixa do drive-thru, totem,
 // mesinhas e jardim em código. Por dentro (balcão, cozinha, mesas pros funcionários) entra quando tiver equipe.
 import { useMemo } from "react";
+import { Balao } from "./Lotes";
 import * as THREE from "three";
 import { useLoader } from "@react-three/fiber";
 import { caixa, cilindro, esfera, mat, plano, anel, COR } from "./geo";
@@ -291,6 +292,7 @@ export function Restaurante() {
         <ComFallback fallback={null}><LetreirosPredio /></ComFallback>
       </group>
       <ComFallback fallback={null}><LetreiroTotem x={CX - 17} z={CZ + 17.5} /></ComFallback>
+      <Balao position={[LANCH.centro[0], LANCH.altura + 5, LANCH.centro[1]]} nome="Burgers" cor="#4A2A1A" logo="/lanchonete/logo.png" subtitulo="Alimentação" />
       <Estatico visivel={!fora}><LanchoneteFixa /></Estatico>
       <ComFallback fallback={null}>
         <ModeloInstanciado nome="carroSedan" itens={estacionados.sedan} />

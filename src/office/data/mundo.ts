@@ -69,3 +69,14 @@ export const NOME_CONSTRUCAO: Record<string, string> = {
   vazio: "terreno vazio", casaVelha: "casinha antiga pra reformar", casaTerrea: "casinha térrea", casaSobrado: "sobrado moderno", casaColonial: "sobrado colonial", casaModerna: "casa moderna",
 };
 export const descricaoLote = (l: LoteInfo) => (l.lote.tipo === "vazio" ? (l.lote.arvore ? "terreno vazio com uma árvore" : "terreno vazio") : NOME_CONSTRUCAO[l.lote.modelo]);
+
+// Nicho da empresa (vai no balão em cima do lote). O dono escolhe ao montar a marca.
+export const NICHOS: { id: string; nome: string }[] = [
+  { id: "negocios", nome: "Negócios" }, { id: "tecnologia", nome: "Tecnologia" }, { id: "conteudo", nome: "Conteúdo" }, { id: "cursos", nome: "Cursos" },
+  { id: "treinamentos", nome: "Treinamentos" }, { id: "marketing", nome: "Marketing" }, { id: "consultoria", nome: "Consultoria" }, { id: "servicos", nome: "Serviços" },
+  { id: "varejo", nome: "Loja & Varejo" }, { id: "alimentacao", nome: "Alimentação" }, { id: "saude", nome: "Saúde & Bem-estar" }, { id: "beleza", nome: "Beleza" },
+  { id: "educacao", nome: "Educação" }, { id: "financas", nome: "Finanças" }, { id: "juridico", nome: "Jurídico" }, { id: "imoveis", nome: "Imóveis" },
+  { id: "casa", nome: "Casa & Reforma" }, { id: "eventos", nome: "Eventos" }, { id: "turismo", nome: "Turismo" }, { id: "automotivo", nome: "Automotivo" },
+];
+export const nomeNicho = (id: string | null | undefined) => NICHOS.find((n) => n.id === id)?.nome ?? "Negócios";
+export const nichoValido = (id: unknown) => (typeof id === "string" && NICHOS.some((n) => n.id === id) ? id : "negocios");

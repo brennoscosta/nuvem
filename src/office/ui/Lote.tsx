@@ -3,6 +3,7 @@
 // que reflete ao vivo na placa e no tapume do lote. Reservar precisa da conta do WorkEnd.
 import { useEffect, useRef, useState } from "react";
 import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES_EMPRESA } from "../mundoStore";
+import { NICHOS } from "../data/mundo";
 import { useEscritorio } from "../store";
 
 // Contagem regressiva da reserva (usa o relógio do servidor); quando zera, recarrega (o lote volta a ficar livre)
@@ -284,6 +285,11 @@ export function PainelEmpresa() {
         </label>
       </div>
 
+      <label className="mt-3 block text-xs font-semibold text-[#5B6472]">Nicho (aparece no balão da loja)
+        <select value={rascunho.nicho} onChange={(e) => setRascunho({ nicho: e.target.value })} className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]">
+          {NICHOS.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}
+        </select>
+      </label>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <label className="block text-xs font-semibold text-[#5B6472]">Quem é o CEO?
           <input value={rascunho.ceoNome} onChange={(e) => setRascunho({ ceoNome: e.target.value.slice(0, 24) })} placeholder="Ex.: Maria" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />

@@ -3,6 +3,7 @@
 // canteiros e pedestres. As ruas, os postes, os carros e os outros quarteirões ficam em Mundo.tsx.
 // O chão e os canteiros vão pro <Estatico>. No modo leve: menos pedestres.
 import * as THREE from "three";
+import { Balao } from "./Lotes";
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { caixa, cilindro, esfera, mat, plano, COR } from "./geo";
@@ -121,6 +122,7 @@ export function Entorno() {
   return (
     <group>
       <Estatico><EntornoFixo /></Estatico>
+      <Balao position={[0, 11, 0]} nome="Nuvem" cor="#1D4ED8" logo="/brand/nuvem-branco.png" subtitulo="Tecnologia" />
       {/* árvores e bancos: modelos do Higgsfield instanciados (um draw call por modelo); procedural se o GLB faltar */}
       <ComFallback fallback={<Estatico>{(poucos ? ARVORES.slice(0, 9) : ARVORES).map((a, i) => <Arvore key={i} position={a.pos} escala={a.altura / 4.2} />)}</Estatico>}>
         <ModeloInstanciado nome="arvore" itens={poucos ? ARVORES.slice(0, 9) : ARVORES} />
