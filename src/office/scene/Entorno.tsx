@@ -8,12 +8,12 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { caixa, cilindro, esfera, mat, plano, COR } from "./geo";
 import { BonecoProcedural, HIPS, useAnimacao, type BonecoHandle } from "./Boneco";
-import { BONECOS } from "../data/bonecos";
+import { BONECOS, TODOS_BONECOS } from "../data/bonecos";
 import { ComFallback, ModeloInstanciado } from "./Modelos";
 import { Estatico } from "./Estatico";
 import { SombraContato } from "./SombraContato";
 import { leve } from "./qualidade";
-import { MEIO_Q, BORDA_CALCADA } from "../data/mundo";
+import { MEIO_Q, BORDA_CALCADA, PASSO } from "../data/mundo";
 
 const ARVORES = [[-13, -6], [-13, 7], [13, -7], [13, 6], [-11.5, 14.2], [12, 14.2], [-8, -14.2], [1, -14.2], [10, -14.2], [-6, 17.5], [7, 17.8], [-17, -17], [17.5, -16.5], [17.5, 17.5]]
   .map(([x, z], i) => ({ pos: [x, 0, z] as [number, number, number], rot: (i * 1.3) % (Math.PI * 2), altura: 4.2 + ((i * 7) % 5) * 0.45 }));
@@ -57,7 +57,7 @@ function Canteiro({ position, w, d, cor }: { position: [number, number, number];
 }
 
 // Pedestre: anda num trajeto de ida e volta pela calçada
-export function Pedestre({ trajeto, velocidade, boneco, camisa, fase }: { trajeto: [number, number, number][]; velocidade: number; boneco: number; camisa: string; fase: number }) {
+export function Pedestre({ trajeto, velocidade, boneco, camisa, fase }: { trajeto: [number, number, number][]; velocidade: number; boneco: number | string; camisa: string; fase: number }) {
   const g = useRef<THREE.Group>(null);
   const h = useRef<BonecoHandle>(null);
   const st = useRef({ i: 0, dir: 1, parado: 0 });
@@ -72,8 +72,35 @@ export function Pedestre({ trajeto, velocidade, boneco, camisa, fase }: { trajet
     const p = velocidade * dt; o.position.x += (dx / dist) * p; o.position.z += (dz / dist) * p;
     const r = Math.atan2(dx, dz); let d = r - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.rotation.y += d * Math.min(1, dt * 8);
   });
-  const def = BONECOS[boneco % BONECOS.length];
+  const def = typeof boneco === "string" ? (TODOS_BONECOS[boneco] ?? BONECOS[0]) : BONECOS[boneco % BONECOS.length];
   return <group ref={g} position={trajeto[0]}><BonecoProcedural ref={h} def={def} camisa={camisa} cracha="#B8C0CC" /><SombraContato r={0.36} /></group>;
+}
+
+// Gente de praia passeando pela cidade (a praia fica no horizonte sul e leste): surfistas com prancha e
+// mulheres estilo California beach, nas calçadas dos quarteirões de baixo e da direita.
+export function GentePraia() {
+  const poucos = leve();
+  const lista = useMemo(() => {
+    const B = BORDA_CALCADA - 1.2; // meio da calçada de um quarteirão
+    const q = (i: number, j: number): [number, number] => [i * PASSO, j * PASSO];
+    const calc = (i: number, j: number, lado: "s" | "n" | "l" | "o"): [number, number, number][] => {
+      const [cx, cz] = q(i, j);
+      return lado === "s" ? [[cx - B, 0, cz + B], [cx + B, 0, cz + B]] : lado === "n" ? [[cx + B, 0, cz - B], [cx - B, 0, cz - B]] : lado === "l" ? [[cx + B, 0, cz - B], [cx + B, 0, cz + B]] : [[cx - B, 0, cz + B], [cx - B, 0, cz - B]];
+    };
+    const l: { trajeto: [number, number, number][]; velocidade: number; boneco: string; camisa: string; fase: number }[] = [
+      { trajeto: calc(0, 1, "s"), velocidade: 1.0, boneco: "surfista-1", camisa: "#1D8CF0", fase: 0.4 },
+      { trajeto: calc(1, 1, "s"), velocidade: 0.9, boneco: "praia-1", camisa: "#FF4FA3", fase: 1.9 },
+      { trajeto: calc(1, 0, "l"), velocidade: 1.1, boneco: "surfista-2", camisa: "#E2575B", fase: 2.6 },
+      { trajeto: calc(-1, 1, "s"), velocidade: 0.85, boneco: "praia-2", camisa: "#FFD166", fase: 3.3 },
+    ];
+    if (!poucos) l.push(
+      { trajeto: calc(1, -1, "l"), velocidade: 1.0, boneco: "praia-3", camisa: "#2DD4BF", fase: 0.9 },
+      { trajeto: calc(0, 1, "o"), velocidade: 1.05, boneco: "surfista-3", camisa: "#22A86B", fase: 4.1 },
+      { trajeto: calc(1, 1, "l"), velocidade: 0.95, boneco: "praia-4", camisa: "#DB2777", fase: 1.2 },
+    );
+    return l;
+  }, [poucos]);
+  return <group>{lista.map((p, i) => <Pedestre key={i} {...p} />)}</group>;
 }
 
 // Grama do quarteirão, praça e laje do prédio, caminho até a porta, canteiros (fixos). A calçada em volta é do Mundo.

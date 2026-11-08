@@ -10,7 +10,7 @@ import { ComFallback, Modelo, ModeloInstanciado, type ItemInstancia, type NomeMo
 import { Estatico } from "./Estatico";
 import { SombraContato } from "./SombraContato";
 import { leve } from "./qualidade";
-import { Entorno, Arvore } from "./Entorno";
+import { Entorno, Arvore, GentePraia } from "./Entorno";
 import { Restaurante } from "./Restaurante";
 import { Lotes } from "./Lotes";
 import { Horizonte } from "./Horizonte";
@@ -179,6 +179,7 @@ export function Mundo() {
       {/* quarteirões */}
       <Perto cx={0} cz={0} raio={raio + 60}><Entorno /></Perto>
       <Perto cx={PASSO} cz={0} raio={raio}><Restaurante /></Perto>
+      <GentePraia />
       <Perto cx={0} cz={0} raio={raio + 100}><Lotes />
       <EscritoriosClientes /></Perto>
     </group>
