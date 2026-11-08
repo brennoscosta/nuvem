@@ -4,7 +4,8 @@
 import { create } from "zustand";
 
 
-export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null }
+import type { Escritorio } from "./data/escritorio";
+export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null; escritorio: Escritorio | null }
 export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
 export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null }
 export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado" }
@@ -33,6 +34,9 @@ interface Estado {
   desvioRelogio: number; // servidor - navegador (ms), pra contagem regressiva certa
   pagando: boolean;
   pix: Pix | null; // cobrança Pix aberta (QR no cartão do lote)
+  painelEscritorio: boolean; // painel "Montar escritório" aberto
+  rascunhoEscritorio: Escritorio | null; // o que está sendo editado (a cena desenha ao vivo)
+  salvandoEscritorio: boolean;
   carregado: boolean;
   loteSelecionado: string | null;
   loteHover: string | null;
@@ -50,12 +54,16 @@ interface Estado {
   pagar: (meses?: number) => Promise<string | null>;
   conferirPagamento: (ref: string) => Promise<string>;
   fecharPix: () => void;
+  abrirEscritorio: () => void;
+  fecharEscritorio: () => void;
+  setEscritorio: (e: Escritorio) => void;
+  salvarEscritorio: () => Promise<string | null>;
   sairWorkend: () => Promise<void>;
   limparAlvo: () => void;
 }
 
 export const useMundo = create<Estado>((set, get) => ({
-  terrenos: {}, meu: null, usuario: null, admin: false, pagamentoLigado: false, preco: 99, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
+  terrenos: {}, meu: null, usuario: null, admin: false, pagamentoLigado: false, preco: 99, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
 
   carregar: async () => {
     try {
@@ -75,7 +83,7 @@ export const useMundo = create<Estado>((set, get) => ({
 
   selecionarLote: (chave) => {
     const l = chave ? LOTE_POR_CHAVE[chave] : null;
-    set({ loteSelecionado: l ? chave : null, painelEmpresa: false, rascunho: null, alvoCamera: l ? [l.centro[0], 0.5, l.centro[1]] : null });
+    set({ loteSelecionado: l ? chave : null, painelEmpresa: false, rascunho: null, painelEscritorio: false, rascunhoEscritorio: null, alvoCamera: l ? [l.centro[0], 0.5, l.centro[1]] : null });
   },
   setLoteHover: (chave) => set({ loteHover: chave }),
 
@@ -134,6 +142,27 @@ export const useMundo = create<Estado>((set, get) => ({
     return status;
   },
   fecharPix: () => set({ pix: null }),
+
+  // Painel "Montar escritório": edita uma cópia; a cena mostra a cópia enquanto o painel está aberto
+  abrirEscritorio: () => {
+    const { loteSelecionado, terrenos } = get(); if (!loteSelecionado) return;
+    const t = terrenos[loteSelecionado]; if (!t?.escritorio) return;
+    set({ painelEscritorio: true, painelEmpresa: false, rascunhoEscritorio: JSON.parse(JSON.stringify(t.escritorio)) as Escritorio });
+  },
+  fecharEscritorio: () => set({ painelEscritorio: false, rascunhoEscritorio: null }),
+  setEscritorio: (e) => set({ rascunhoEscritorio: e }),
+  salvarEscritorio: async () => {
+    const { loteSelecionado, rascunhoEscritorio } = get(); if (!loteSelecionado || !rascunhoEscritorio) return "Nada pra salvar.";
+    set({ salvandoEscritorio: true });
+    try {
+      const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/escritorio`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(rascunhoEscritorio) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return j.erro ?? `Erro ${r.status}`;
+      set({ painelEscritorio: false, rascunhoEscritorio: null });
+      await get().carregar();
+      return null;
+    } catch (e) { return (e as Error).message; } finally { set({ salvandoEscritorio: false }); }
+  },
 
   sairWorkend: async () => { await fetch("/api/workend/sair", { method: "POST" }); set({ usuario: null, meu: null, painelEmpresa: false, rascunho: null }); await get().carregar(); },
   limparAlvo: () => set({ alvoCamera: null }),

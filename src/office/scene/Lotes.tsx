@@ -2,6 +2,7 @@
 // Lotes à venda: casinhas (modelos do Higgsfield, instanciados por modelo) e terrenos vazios, todos com a placa
 // "À VENDA" na frente. As placas são juntadas num <Estatico> (uma textura compartilhada → um draw call).
 import * as THREE from "three";
+import { useLotesComEscritorio } from "./EscritorioCliente";
 import { useMemo } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
@@ -23,7 +24,7 @@ const CASA: Record<ModeloCasa, { altura: number; frente: number }> = {
 type Casa = { modelo: ModeloCasa; pos: [number, number, number]; rot: number; escala: number };
 type Terreno = { pos: [number, number, number]; rot: number; arvore: boolean };
 
-function listar() {
+function listar(comEscritorio: Set<string>) {
   const casas: Casa[] = [], terrenos: Terreno[] = [], placas: { chave: string; pos: [number, number, number]; rot: number }[] = [];
   for (const q of QUARTEIROES) {
     if (!q.lotes) continue;
@@ -31,8 +32,10 @@ function listar() {
       const [x, z] = centroLote(q.i, q.j, k);
       const rot = frenteDoLote(k);
       const frente = k >= 2 ? 1 : -1; // lado da rua
+      const chave = `${q.i},${q.j},${k}`;
       // placa perto da calçada, num canto do lote
-      placas.push({ chave: `${q.i},${q.j},${k}`, pos: [x + (k % 2 ? 6.5 : -6.5), 0, z + frente * (LOTE / 2 - 1.6)], rot });
+      placas.push({ chave, pos: [x + (k % 2 ? 6.5 : -6.5), 0, z + frente * (LOTE / 2 - 1.6)], rot });
+      if (comEscritorio.has(chave)) return; // o escritório do cliente ocupa o lote: a casa/terreno original some
       if (l.tipo === "casa") casas.push({ modelo: l.modelo, pos: [x, 0, z - frente * 1.2], rot, escala: l.escala ?? 1 });
       else terrenos.push({ pos: [x, 0, z], rot, arvore: !!l.arvore });
     });
@@ -92,8 +95,9 @@ function Jardim({ pos, rot }: { pos: [number, number, number]; rot: number }) {
 }
 
 export function Lotes() {
+  const comEscritorio = useLotesComEscritorio();
   const { casas, terrenos, placas, porModelo } = useMemo(() => {
-    const r = listar();
+    const r = listar(comEscritorio);
     const m = new Map<ModeloCasa, ItemInstancia[]>();
     for (const c of r.casas) {
       const info = CASA[c.modelo];
@@ -101,7 +105,7 @@ export function Lotes() {
       lista.push({ pos: c.pos, rot: c.rot + info.frente, altura: info.altura * c.escala });
     }
     return { ...r, porModelo: [...m.entries()] };
-  }, []);
+  }, [comEscritorio]);
   const reservados = useMundo((s) => s.terrenos);
   const selecionado = useMundo((s) => s.loteSelecionado);
   const hover = useMundo((s) => s.loteHover);
@@ -112,7 +116,7 @@ export function Lotes() {
   const livres = placas.filter((p) => !reservados[p.chave] && p.chave !== emRascunho);
   return (
     <group>
-      <Estatico key={chavesReservadas + "|" + (emRascunho ?? "")}>
+      <Estatico key={chavesReservadas + "|" + (emRascunho ?? "") + "|" + [...comEscritorio].join(",")}>
         {terrenos.map((t, i) => <Terreno key={i} pos={t.pos} />)}
         {casas.map((c, i) => <Jardim key={i} pos={c.pos} rot={c.rot} />)}
         {livres.map((p) => <Placa key={p.chave} pos={p.pos} rot={p.rot} />)}
@@ -127,7 +131,7 @@ export function Lotes() {
         const t = reservados[l.chave];
         const r: Rascunho | null = l.chave === emRascunho ? rascunho : null;
         if (!t && !r) return null;
-        return <LoteReservado key={l.chave} chave={l.chave} nome={r?.empresaNome ?? t?.empresaNome ?? ""} cor={r?.cor ?? t?.cor ?? "#1D4ED8"} logo={r ? r.logoDataUrl : t?.temLogo ? `/api/terrenos/${encodeURIComponent(l.chave)}/logo` : null} ativo={t?.status === "ativo"} />;
+        return <LoteReservado key={l.chave} chave={l.chave} nome={r?.empresaNome ?? t?.empresaNome ?? ""} cor={r?.cor ?? t?.cor ?? "#1D4ED8"} logo={r ? r.logoDataUrl : t?.temLogo ? `/api/terrenos/${encodeURIComponent(l.chave)}/logo` : null} ativo={t?.status === "ativo"} comEscritorio={comEscritorio.has(l.chave)} />;
       })}
       {/* caixas de clique + contorno do lote sob o mouse / selecionado */}
       {LOTES.map((l) => <AlvoLote key={l.chave} chave={l.chave} centro={l.centro} estado={selecionado === l.chave ? "sel" : hover === l.chave ? "hover" : null} />)}
@@ -190,7 +194,7 @@ function texturaEmpresa(nome: string, cor: string, logo: string | null, ativo = 
 }
 
 // Lote reservado: tapume baixo em volta (branco com faixa na cor da empresa) e placa grande na frente
-function LoteReservado({ chave, nome, cor, logo, ativo = false }: { chave: string; nome: string; cor: string; logo: string | null; ativo?: boolean }) {
+function LoteReservado({ chave, nome, cor, logo, ativo = false, comEscritorio = false }: { chave: string; nome: string; cor: string; logo: string | null; ativo?: boolean; comEscritorio?: boolean }) {
   const l = LOTE_POR_CHAVE[chave];
   const tex = useMemo(() => texturaEmpresa(nome, cor, logo, ativo), [nome, cor, logo, ativo]);
   if (!l) return null;
@@ -199,14 +203,14 @@ function LoteReservado({ chave, nome, cor, logo, ativo = false }: { chave: strin
   const lados: [number, number, number, number][] = [[0, -m, comp, 0.12], [0, m, comp, 0.12], [-m, 0, 0.12, comp], [m, 0, 0.12, comp]];
   return (
     <group position={[x, 0, z]}>
-      {lados.map(([lx, lz, w, d], i) => (
+      {!comEscritorio && lados.map(([lx, lz, w, d], i) => (
         <group key={i}>
           <mesh geometry={caixa(w, 1.1, d)} material={mat("#F4F4F2", { rough: 0.9 })} position={[lx, 0.75, lz]} castShadow />
           <mesh geometry={caixa(w + (w > d ? 0 : 0.02), 0.3, d + (w > d ? 0.02 : 0))} material={mat(cor, { rough: 0.7 })} position={[lx, 1.45, lz]} />
         </group>
       ))}
       {/* balão com o nome da empresa flutuando sobre o lote (tamanho fixo na tela, grande e legível) */}
-      <Html position={[0, 7.5, 0]} zIndexRange={[4, 0]} style={{ pointerEvents: "none", transform: "translate(-50%, -100%)" }}>
+      <Html position={[0, comEscritorio ? 10.5 : 7.5, 0]} zIndexRange={[4, 0]} style={{ pointerEvents: "none", transform: "translate(-50%, -100%)" }}>
         <div className="flex w-max select-none flex-col items-center">
           <div className="pointer-events-auto flex cursor-pointer items-center gap-2.5 rounded-2xl px-4 py-2 shadow-xl" style={{ background: cor }} onClick={(e) => { e.stopPropagation(); useMundo.getState().selecionarLote(chave); }}>
             {logo && <img src={logo} alt="" className="h-9 w-9 rounded-lg bg-white/95 object-contain p-0.5" />}

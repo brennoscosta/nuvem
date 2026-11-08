@@ -2,6 +2,7 @@
 // O mundo: grade de ruas, calçadas dos quarteirões, postes, árvores de rua, carros andando e os quarteirões
 // (Nuvem, restaurante e lotes à venda). Cada quarteirão só é desenhado quando está perto da câmera.
 import * as THREE from "three";
+import { EscritoriosClientes } from "./EscritorioCliente";
 import { useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import { caixa, cilindro, mat, plano } from "./geo";
@@ -178,7 +179,8 @@ export function Mundo() {
       {/* quarteirões */}
       <Perto cx={0} cz={0} raio={raio + 60}><Entorno /></Perto>
       <Perto cx={PASSO} cz={0} raio={raio}><Restaurante /></Perto>
-      <Perto cx={0} cz={0} raio={raio + 100}><Lotes /></Perto>
+      <Perto cx={0} cz={0} raio={raio + 100}><Lotes />
+      <EscritoriosClientes /></Perto>
     </group>
   );
 }

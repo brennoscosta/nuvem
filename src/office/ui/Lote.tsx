@@ -75,6 +75,8 @@ export function CartaoLote() {
   const pagamentoLigado = useMundo((s) => s.pagamentoLigado);
   const pagando = useMundo((s) => s.pagando);
   const painel = useMundo((s) => s.painelEmpresa);
+  const painelEsc = useMundo((s) => s.painelEscritorio);
+  const abrirEscritorio = useMundo((s) => s.abrirEscritorio);
   const selecionarLote = useMundo((s) => s.selecionarLote);
   const abrirPainel = useMundo((s) => s.abrirPainel);
   const desistir = useMundo((s) => s.desistir);
@@ -84,7 +86,7 @@ export function CartaoLote() {
   const [confirma, setConfirma] = useState<string | null>(null); // lote cujo "Desistir" está aguardando confirmação
   const [erro, setErro] = useState<string | null>(null);
   const { resta, agora } = useContagem(terreno?.status === "reservado" ? terreno.reservadoAte : null);
-  if (!chave || painel || agenteSelecionado) return null;
+  if (!chave || painel || painelEsc || agenteSelecionado) return null;
   const confirmaDesistir = confirma === chave;
   const l = LOTE_POR_CHAVE[chave]; if (!l) return null;
   const ehMeu = meu === chave || (admin && !!terreno && terreno.usuarioId === usuario?.id);
@@ -147,6 +149,9 @@ export function CartaoLote() {
             <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Renovar +30 dias · ${brl(preco)} no Pix`}</button>
           )}
           {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
+          {ehMeu && ativo && terreno.escritorio && (
+            <button onClick={abrirEscritorio} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#1a44c2]">Montar escritório · {terreno.escritorio.setores.length} {terreno.escritorio.setores.length === 1 ? "setor" : "setores"} · {terreno.escritorio.equipe.length} pessoas</button>
+          )}
           {ehMeu ? (
             <div className="mt-2 flex gap-2">
               <button onClick={abrirPainel} className="flex-1 rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm font-semibold text-[#1D4ED8]">Editar placa</button>

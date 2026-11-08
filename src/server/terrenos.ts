@@ -5,10 +5,12 @@
 import { sql, migrar } from "./db";
 import { QUARTEIROES } from "@/office/data/mundo";
 import type { Usuario } from "./usuarios";
+import { escritorioPadrao, normalizarEscritorio, type Escritorio } from "@/office/data/escritorio";
 
 export interface Terreno {
   chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean;
   reservadoEm: Date; reservadoAte: Date | null; pagoAte: Date | null;
+  escritorio: Escritorio | null; // layout, setores e equipe (só quando ativo)
 }
 export interface TerrenoAdmin extends Terreno { email: string; usuarioNome: string; banidoEm: Date | null }
 
@@ -32,7 +34,7 @@ export function loteAVenda(chave: string) {
 }
 
 // trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
-const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate`;
+const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio`;
 
 // Apaga o que venceu: reserva sem pagamento depois de 1 h; chão pago depois do vencimento + tolerância
 async function limparVencidos() {
@@ -104,6 +106,27 @@ export async function ativarTerreno(chave: string, meses = 1) {
   await migrar();
   await sql`UPDATE terreno SET status = 'ativo', reservado_ate = NULL, atualizado_em = now(),
     pago_ate = GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${DIAS_MES * meses}) WHERE chave = ${chave}`;
+  await garantirEscritorio(chave);
+}
+// Todo escritório nasce com atendente + CEO (nome do dono) e um setor de atendimento; só cria se ainda não tem
+export async function garantirEscritorio(chave: string) {
+  const [t] = await sql<{ empresaNome: string; cor: string; escritorio: Escritorio | null; nome: string }[]>`SELECT t.empresa_nome, t.cor, t.escritorio, u.nome FROM terreno t JOIN usuario u ON u.id = t.usuario_id WHERE t.chave = ${chave}`;
+  if (!t || t.escritorio) return t?.escritorio ?? null;
+  const e = escritorioPadrao(t.empresaNome, t.nome, t.cor);
+  await sql`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
+  return e;
+}
+// O dono (ou o admin) salva o escritório: validamos tudo e gravamos
+export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown) {
+  await migrar();
+  const t = await obterTerreno(chave);
+  if (!t) throw new Error("Lote sem dono.");
+  if (t.usuarioId !== u.id && !ehAdmin(u)) throw new Error("Esse chão não é seu.");
+  if (t.status !== "ativo") throw new Error("Pague o 1º mês pra montar o escritório.");
+  const base = t.escritorio ?? (await garantirEscritorio(chave)) ?? escritorioPadrao(t.empresaNome, u.nome, t.cor);
+  const e = normalizarEscritorio(dados, base);
+  await sql`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])}, atualizado_em = now() WHERE chave = ${chave}`;
+  return e;
 }
 // Enquanto o usuário está pagando, a reserva não pode expirar embaixo dele: estende por mais 30 min
 export async function estenderReserva(chave: string, minutos = 30) {
@@ -129,6 +152,7 @@ export async function adminDias(chave: string, dias: number) {
   const d = Math.max(-3650, Math.min(3650, Math.trunc(dias)));
   await sql`UPDATE terreno SET status = 'ativo', reservado_ate = NULL, atualizado_em = now(),
     pago_ate = GREATEST(now(), GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${d})) WHERE chave = ${chave}`;
+  await garantirEscritorio(chave);
 }
 // Admin edita a placa de qualquer lote (nome e cor); logo continua a do dono
 export async function adminEditar(chave: string, d: { empresaNome?: string; cor?: string }) {
