@@ -46,10 +46,10 @@ export function BarraTopo() {
   if (mundo) return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-2 sm:p-3">
       <div className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-[#111418]/85 px-3 py-2 text-white shadow-xl backdrop-blur sm:gap-3 sm:px-4">
-        <a href="/" className="flex shrink-0 items-center gap-2 border-r border-white/10 pr-2 sm:pr-3">
+        <div className="flex shrink-0 items-center gap-2 border-r border-white/10 pr-2 sm:pr-3">
           <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-[#4F7DF3] to-[#8B6CF0]" />
           <div className="leading-tight"><div className="whitespace-nowrap text-sm font-bold tracking-wide">WorkEnd</div><div className="hidden whitespace-nowrap text-[10px] text-white/50 md:block">Clique num lote à venda pra reservar o seu</div></div>
-        </a>
+        </div>
         <div className="sem-barra min-w-0 flex-1 overflow-x-auto">
           <div className="ml-auto flex w-max items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0">
             <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório" : "Ver o prédio por fora"} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">{vista === "fora" ? "🏢 Por dentro" : "🌆 Por fora"}</button>
