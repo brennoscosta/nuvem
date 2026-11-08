@@ -5,8 +5,9 @@
 import * as THREE from "three";
 import { useMemo, useRef } from "react";
 import { Html, Text } from "@react-three/drei";
-import { caixa, cilindro, mat, plano, COR } from "./geo";
+import { caixa, mat, plano } from "./geo";
 import { Estatico } from "./Estatico";
+import { Modelo, ComFallback, type NomeModelo } from "./Modelos";
 import { Mesa, Sofa, Planta, Balcao, MesaBaixa, Quadro, Cafe } from "./Moveis";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle, type Pose } from "./Boneco";
 import { BONECO } from "../data/bonecos";
@@ -20,69 +21,16 @@ const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = PREDIO_CLIENTE;
 const LARG = X1 - X0, PROF = Z1 - Z0;
 
 // ---------- lado de fora ----------
-// Partes com textura/texto ficam fora do Estatico (toldo listrado, letreiro com texto 3D e logo)
-function ExteriorExtras({ e, cor, nome, logo }: { e: Escritorio; cor: string; nome: string; logo: string | null }) {
-  const h = LAYOUT[e.layout].altura;
+// Prédio gerado no Higgsfield (GLB normalizado: altura 1, base em y=0; frente do Tripo olha pra +x → giramos pra -z)
+function Exterior({ e, cor, nome, logo }: { e: Escritorio; cor: string; nome: string; logo: string | null }) {
+  const L = LAYOUT[e.layout];
   return (
     <group>
-      {e.layout === "loja" && <Toldo cor={cor} h={h} />}
-      <Letreiro nome={nome} cor={cor} logo={logo} y={e.layout === "sobrado" ? h - 1.2 : e.layout === "loja" ? h - 0.55 : h - 0.95} z={Z0 - 0.2} largura={e.layout === "sobrado" ? 9 : 7.5} />
-    </group>
-  );
-}
-function Exterior({ e, cor }: { e: Escritorio; cor: string }) {
-  const L = LAYOUT[e.layout]; const h = L.altura;
-  const parede = e.layout === "loja" ? "#F3E9D8" : "#F7F5F0";
-  return (
-    <group>
-      {/* laje do piso + corpo do prédio */}
-      <mesh geometry={caixa(LARG + 0.6, 0.18, PROF + 0.6)} material={mat("#D8D4CC", { rough: 0.95 })} position={[0, 0.09, 0]} receiveShadow />
-      <mesh geometry={caixa(LARG, h, PROF)} material={mat(parede, { rough: 0.85 })} position={[0, h / 2 + 0.18, 0]} castShadow receiveShadow />
-      {/* vitrine/porta de vidro na frente */}
-      <mesh geometry={caixa(e.layout === "sobrado" ? 7 : 10, e.layout === "sobrado" ? 2.6 : h - 1.1, 0.08)} material={mat(COR.vidro, { rough: 0.15, metal: 0.1 })} position={[0, (e.layout === "sobrado" ? 2.6 : h - 1.1) / 2 + 0.2, Z0 - 0.05]} />
-      <mesh geometry={caixa(2.2, 2.6, 0.12)} material={mat("#2B2E35", { rough: 0.6 })} position={[0, 1.5, Z0 - 0.08]} />
-      <mesh geometry={caixa(0.9, 2.3, 0.06)} material={mat(COR.vidro, { rough: 0.1 })} position={[-0.5, 1.33, Z0 - 0.14]} />
-      <mesh geometry={caixa(0.9, 2.3, 0.06)} material={mat(COR.vidro, { rough: 0.1 })} position={[0.5, 1.33, Z0 - 0.14]} />
-      {/* laje de cima */}
-      <mesh geometry={caixa(LARG + 0.5, 0.3, PROF + 0.5)} material={mat("#CFCAC0", { rough: 0.9 })} position={[0, h + 0.3, 0]} castShadow />
-      {e.layout === "moderno" && (
-        <>
-          <mesh geometry={caixa(LARG + 0.56, 0.5, PROF + 0.56)} material={mat(cor, { rough: 0.6 })} position={[0, h - 0.2, 0]} />
-          {[[-5, Z0], [5, Z0], [X0, 0], [X1, 0]].map(([x, z], i) => <mesh key={i} geometry={caixa(z === 0 ? 0.08 : 2.6, 1.6, z === 0 ? 2.6 : 0.08)} material={mat("#9CC9DA", { rough: 0.2 })} position={[x + (z === 0 ? (x < 0 ? -0.02 : 0.02) : 0), h / 2 + 0.4, z + (z === Z0 ? -0.02 : 0)]} />)}
-        </>
-      )}
-      {e.layout === "sobrado" && (
-        <>
-          <mesh geometry={caixa(LARG + 0.56, 0.4, PROF + 0.56)} material={mat(cor, { rough: 0.6 })} position={[0, h / 2 + 0.2, 0]} />
-          {/* janelas em fita nos dois andares, frente e laterais */}
-          {[1.6, h / 2 + 1.6].map((y, j) => (
-            <group key={j}>
-              <mesh geometry={caixa(LARG - 2, 1.3, 0.08)} material={mat("#9CC9DA", { rough: 0.2 })} position={[0, y + (j ? 0.3 : 1.2), Z1 + 0.02]} />
-              <mesh geometry={caixa(0.08, 1.3, PROF - 2)} material={mat("#9CC9DA", { rough: 0.2 })} position={[X0 - 0.02, y + (j ? 0.3 : 1.2), 0]} />
-              <mesh geometry={caixa(0.08, 1.3, PROF - 2)} material={mat("#9CC9DA", { rough: 0.2 })} position={[X1 + 0.02, y + (j ? 0.3 : 1.2), 0]} />
-              {j === 1 && <mesh geometry={caixa(LARG - 3, 1.3, 0.08)} material={mat("#9CC9DA", { rough: 0.2 })} position={[0, y + 0.3, Z0 - 0.02]} />}
-            </group>
-          ))}
-        </>
-      )}
-      {/* ar-condicionado e caixa d'água na laje */}
-      <mesh geometry={caixa(1.2, 0.7, 0.8)} material={mat("#D6D9DE", { rough: 0.7 })} position={[X1 - 2, h + 0.8, Z1 - 2]} castShadow />
-      <mesh geometry={cilindro(0.8, 0.8, 1.1, 14)} material={mat("#E9ECF0", { rough: 0.7 })} position={[X0 + 2.2, h + 1.0, Z1 - 2.2]} castShadow />
-    </group>
-  );
-}
-
-function Toldo({ cor, h }: { cor: string; h: number }) {
-  const tex = useMemo(() => {
-    const c = document.createElement("canvas"); c.width = 256; c.height = 64; const g = c.getContext("2d")!;
-    for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? "#FFFFFF" : cor; g.fillRect(i * 32, 0, 32, 64); }
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.repeat.set(3, 1); return t;
-  }, [cor]);
-  const larg = LARG - 2, prof = 2.2;
-  return (
-    <group position={[0, h - 1.3, Z0 - prof / 2]} rotation={[0.35, 0, 0]}>
-      <mesh geometry={plano(larg, prof)} rotation={[-Math.PI / 2, 0, 0]} castShadow><meshStandardMaterial map={tex} side={THREE.DoubleSide} roughness={0.8} /></mesh>
-      <mesh geometry={caixa(larg, 0.35, 0.04)} position={[0, -0.17, -prof / 2]}><meshStandardMaterial map={tex} roughness={0.8} /></mesh>
+      <mesh geometry={caixa(LARG + 1.2, 0.16, PROF + 1.2)} material={mat("#D8D4CC", { rough: 0.95 })} position={[0, 0.08, 0]} receiveShadow />
+      <ComFallback fallback={<mesh geometry={caixa(LARG, L.altura * 0.8, PROF)} material={mat("#F1EFEA", { rough: 0.9 })} position={[0, L.altura * 0.4 + 0.16, 0]} />}>
+        <Modelo nome={L.modelo as NomeModelo} position={[0, 0.16, 0]} rotation={Math.PI / 2} altura={L.altura} />
+      </ComFallback>
+      <Letreiro nome={nome} cor={cor} logo={logo} y={L.letreiro.y} z={L.letreiro.z} largura={L.letreiro.largura} />
     </group>
   );
 }
@@ -93,8 +41,8 @@ function Letreiro({ nome, cor, logo, y, z, largura }: { nome: string; cor: strin
   const tamanho = Math.min(0.78, (largura - (logo ? 2.2 : 0.8)) / Math.max(6, texto.length * 0.62));
   return (
     <group position={[0, y, z]}>
-      <mesh geometry={caixa(largura, 1.5, 0.22)} material={mat("#1F2630", { rough: 0.9 })} castShadow />
-      <mesh geometry={caixa(largura, 0.08, 0.26)} material={mat(cor, { emissive: cor, ei: 0.5 })} position={[0, -0.7, 0]} />
+      <mesh geometry={caixa(largura, 1.3, 0.16)} material={mat("#1F2630", { rough: 0.9 })} castShadow />
+      <mesh geometry={caixa(largura, 0.07, 0.2)} material={mat(cor, { emissive: cor, ei: 0.5 })} position={[0, -0.6, 0]} />
       {logo && <LogoPlano url={logo} position={[-largura / 2 + 0.95, 0, -0.14]} tamanho={1.15} />}
       <Text font={FONTE} fontSize={tamanho} anchorX="center" anchorY="middle" position={[logo ? 0.7 : 0, 0.02, -0.14]} color="#FFFFFF" maxWidth={largura - 1} rotation={[0, Math.PI, 0]}>
         {texto}
@@ -214,10 +162,7 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora }: { chave: string; e:
   const assinatura = JSON.stringify(e) + cor + nome + (logo ?? "");
   return (
     <group position={[x, 0, z]} rotation={[0, rot, 0]}>
-      <group visible={fora}>
-        <Estatico key={"f" + assinatura}><Exterior e={e} cor={cor} /></Estatico>
-        <ExteriorExtras e={e} cor={cor} nome={nome} logo={logo} />
-      </group>
+      <group visible={fora}><Exterior e={e} cor={cor} nome={nome} logo={logo} /></group>
       {!fora && (
         <>
           <Estatico key={"d" + assinatura}><InteriorFixo e={e} cor={cor} /></Estatico>

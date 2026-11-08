@@ -3,17 +3,15 @@
 // (atendente e CEO obrigatórios; profissionais por setor). A cena desenha o rascunho ao vivo; Salvar grava no servidor.
 import { useState } from "react";
 import { useMundo } from "../mundoStore";
-import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, vagasLivres, type Escritorio, type Setor, type Membro } from "../data/escritorio";
+import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, vagasLivres, type Escritorio, type Setor, type Membro, type Pronto } from "../data/escritorio";
 import { BONECOS } from "../data/bonecos";
 import { CORES_EMPRESA } from "../mundoStore";
 
 const novoId = (p: string) => `${p}_${Math.random().toString(36).slice(2, 8)}`;
 
-// Miniatura do layout desenhada em CSS (sem imagem)
-function MiniLayout({ id, cor }: { id: string; cor: string }) {
-  if (id === "sobrado") return <div className="relative h-14 w-20 rounded-md bg-[#F7F5F0] shadow-inner"><div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2" style={{ background: cor }} /><div className="absolute left-2 right-2 top-2 h-2 rounded-sm bg-[#9CC9DA]" /><div className="absolute left-2 right-2 bottom-3 h-2 rounded-sm bg-[#9CC9DA]" /><div className="absolute bottom-0 left-1/2 h-3 w-3 -translate-x-1/2 bg-[#2B2E35]" /></div>;
-  if (id === "loja") return <div className="relative h-14 w-20 rounded-md bg-[#F3E9D8] shadow-inner"><div className="absolute inset-x-1 top-3 h-3 rounded-sm" style={{ background: `repeating-linear-gradient(90deg, ${cor} 0 6px, #fff 6px 12px)` }} /><div className="absolute bottom-0 left-2 right-2 h-6 rounded-t-sm bg-[#BFE3F2]" /><div className="absolute bottom-0 left-1/2 h-5 w-3 -translate-x-1/2 bg-[#2B2E35]" /></div>;
-  return <div className="relative h-14 w-20 rounded-md bg-[#F7F5F0] shadow-inner"><div className="absolute inset-x-0 top-1 h-1.5" style={{ background: cor }} /><div className="absolute bottom-0 left-2 right-2 h-7 rounded-t-sm bg-[#BFE3F2]" /><div className="absolute bottom-0 left-1/2 h-5 w-3 -translate-x-1/2 bg-[#2B2E35]" /></div>;
+// Miniatura do layout: a imagem que gerou o prédio (public/escritorios/<id>.jpg)
+function MiniLayout({ id }: { id: string; cor?: string }) {
+  return <img src={`/escritorios/${id}.jpg`} alt="" className="h-16 w-20 shrink-0 rounded-lg bg-white object-cover" />;
 }
 
 function Avatar({ id, camisa, ativo, onClick }: { id: string; camisa: string; ativo: boolean; onClick: () => void }) {
@@ -73,12 +71,17 @@ export function PainelEscritorio() {
   const vista = useMundo((s) => s.loteSelecionado);
   const [erro, setErro] = useState<string | null>(null);
   const [aba, setAba] = useState<"predio" | "setores" | "equipe">("predio");
+  const [catalogo, setCatalogo] = useState(false);
   if (!aberto || !e || !vista) return null;
   const vagas = vagasLivres(e);
   const addSetor = () => { if (e.setores.length >= MAX_SETORES) return; set({ ...e, setores: [...e.setores, { id: novoId("set"), nome: CARGOS_SUGERIDOS[e.setores.length % CARGOS_SUGERIDOS.length], cor: CORES_SETOR[e.setores.length % CORES_SETOR.length], mesas: 2 }] }); };
   const mudarSetor = (id: string, p: Partial<Setor>) => set({ ...e, setores: e.setores.map((s) => (s.id === id ? { ...s, ...p } : s)) });
   const removerSetor = (id: string) => { if (e.setores.length <= 1) return; set({ ...e, setores: e.setores.filter((s) => s.id !== id), equipe: e.equipe.filter((m) => m.setorId !== id) }); };
-  const addMembro = () => { const setor = e.setores.find((s) => s.mesas > e.equipe.filter((m) => m.setorId === s.id).length); if (!setor) return; set({ ...e, equipe: [...e.equipe, { id: novoId("mem"), nome: "Novo", cargo: setor.nome, papel: "profissional", setorId: setor.id, boneco: BONECOS[(e.equipe.length + 2) % BONECOS.length].id, camisa: "#1D4ED8" }] }); };
+  const setorComVaga = (preferido?: string) => { const livre = (s: Setor) => s.mesas > e.equipe.filter((m) => m.setorId === s.id).length; return e.setores.find((s) => s.nome.toLowerCase() === (preferido ?? "").toLowerCase() && livre(s)) ?? e.setores.find(livre) ?? null; };
+  // criar do zero: pessoa em branco pro dono nomear e treinar
+  const addMembro = () => { const setor = setorComVaga(); if (!setor) return; set({ ...e, equipe: [...e.equipe, { id: novoId("mem"), nome: "Novo", cargo: setor.nome, papel: "profissional", setorId: setor.id, boneco: BONECOS[(e.equipe.length + 2) % BONECOS.length].id, camisa: "#1D4ED8", treino: { descricao: "", saudacao: "" } }] }); };
+  // contratar do catálogo: já vem com cargo, aparência e treino (vai pro setor de mesmo nome se tiver vaga)
+  const contratar = (p: Pronto) => { const setor = setorComVaga(p.setor); if (!setor) return; set({ ...e, equipe: [...e.equipe, { id: novoId("mem"), nome: p.nome, cargo: p.cargo, papel: "profissional", setorId: setor.id, boneco: p.boneco, camisa: p.camisa, treino: { ...p.treino } }] }); setCatalogo(false); };
   const clicarSalvar = async () => { setErro(null); const r = await salvar(); if (r) setErro(r); };
   return (
     <div className="absolute right-3 top-20 z-10 flex max-h-[calc(100vh-7rem)] w-[22rem] flex-col rounded-2xl bg-white/97 text-[#1D2128] shadow-2xl backdrop-blur">
@@ -94,11 +97,11 @@ export function PainelEscritorio() {
           <div className="space-y-2">
             {LAYOUTS.map((L) => (
               <button key={L.id} type="button" onClick={() => set({ ...e, layout: L.id })} className={`flex w-full items-center gap-3 rounded-xl border-2 p-2 text-left ${e.layout === L.id ? "border-[#1D4ED8] bg-[#EEF3FF]" : "border-black/10 hover:bg-black/[0.03]"}`}>
-                <MiniLayout id={L.id} cor={useMundo.getState().terrenos[vista]?.cor ?? "#1D4ED8"} />
+                <MiniLayout id={L.id} />
                 <div className="min-w-0"><div className="text-sm font-bold">{L.nome}</div><div className="text-[11px] leading-snug text-[#5B6472]">{L.descricao}</div></div>
               </button>
             ))}
-            <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A cor e a logo da fachada são as da placa (botão “Editar placa” no cartão do lote). A planta por dentro é a mesma nos três: recepção, sala do CEO e até {MAX_SETORES} setores.</div>
+            <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">O letreiro usa o nome, a cor e a logo da placa (botão “Editar placa” no cartão do lote). Por dentro a planta é a mesma em todos: recepção, sala do CEO e até {MAX_SETORES} setores.</div>
           </div>
         )}
         {aba === "setores" && (
@@ -121,7 +124,27 @@ export function PainelEscritorio() {
         {aba === "equipe" && (
           <div className="space-y-2">
             {e.equipe.map((m) => <CartaoMembro key={m.id} m={m} e={e} set={set} podeRemover={m.papel === "profissional"} />)}
-            {vagas > 0 ? <button type="button" onClick={addMembro} className="w-full rounded-xl border-2 border-dashed border-[#1D4ED8]/40 px-3 py-2 text-sm font-semibold text-[#1D4ED8]">+ Contratar profissional ({vagas} {vagas === 1 ? "mesa livre" : "mesas livres"})</button> : <div className="text-center text-[11px] text-[#5B6472]">Todas as mesas estão ocupadas. Adicione mesas nos setores pra contratar mais.</div>}
+            {vagas > 0 ? (
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setCatalogo((v) => !v)} className="flex-1 rounded-xl bg-[#1D4ED8] px-3 py-2 text-sm font-bold text-white">Contratar profissional</button>
+                <button type="button" onClick={addMembro} className="flex-1 rounded-xl border-2 border-dashed border-[#1D4ED8]/40 px-3 py-2 text-sm font-semibold text-[#1D4ED8]">Criar do zero</button>
+              </div>
+            ) : <div className="text-center text-[11px] text-[#5B6472]">Todas as mesas estão ocupadas. Adicione mesas nos setores pra contratar mais.</div>}
+            {vagas > 0 && <div className="text-center text-[11px] text-[#5B6472]">{vagas} {vagas === 1 ? "mesa livre" : "mesas livres"} · incluso no seu plano nesta fase</div>}
+            {catalogo && vagas > 0 && (
+              <div className="rounded-xl border border-black/10 bg-white p-2">
+                <div className="mb-1 text-[11px] font-bold text-[#1D2128]">Profissionais prontos (já vêm treinados)</div>
+                <div className="space-y-1">
+                  {CATALOGO_PROFISSIONAIS.map((p) => (
+                    <button key={p.id} type="button" onClick={() => contratar(p)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[#F1F3F6]">
+                      <span className="h-6 w-6 shrink-0 rounded-full" style={{ background: p.camisa }} />
+                      <span className="min-w-0 flex-1"><span className="text-sm font-semibold">{p.cargo}</span><span className="block truncate text-[11px] text-[#5B6472]">{p.treino.descricao}</span></span>
+                      <span className="text-[11px] font-bold text-[#1D4ED8]">Contratar</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A atendente e o CEO fazem parte de todo escritório. Clique em “Aparência” pra trocar o boneco e <b>treinar</b> cada um (o que sabe e como cumprimenta) — é isso que eles vão usar pra atender os visitantes.</div>
           </div>
         )}

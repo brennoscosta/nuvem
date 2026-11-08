@@ -4,12 +4,30 @@
 // (origem no centro do lote, frente = -z; a cena gira pela rua mais próxima).
 import { BONECOS } from "./bonecos";
 
-export type LayoutId = "moderno" | "sobrado" | "loja";
-export interface LayoutInfo { id: LayoutId; nome: string; descricao: string; altura: number; andares: 1 | 2 }
+// Prédios gerados no Higgsfield (imagem → 3D), em public/modelos/escritorio-*.glb. Todos têm um quadro escuro em
+// branco acima da entrada: é onde entra o letreiro com o nome e a logo da empresa (posição em `letreiro`).
+export type LayoutId = "vidro" | "moderno" | "sobrado" | "loja" | "galpao" | "container";
+export interface LayoutInfo { id: LayoutId; nome: string; descricao: string; altura: number; andares: 1 | 2; modelo: string; letreiro: { y: number; z: number; largura: number } }
 export const LAYOUTS: LayoutInfo[] = [
-  { id: "moderno", nome: "Térreo moderno", descricao: "Caixa branca com vitrine de vidro, faixa na sua cor e laje plana.", altura: 4.2, andares: 1 },
-  { id: "sobrado", nome: "Sobrado comercial", descricao: "Dois andares, janelas em fita e letreiro no alto. Parece maior.", altura: 7.4, andares: 2 },
-  { id: "loja", nome: "Loja de rua", descricao: "Fachada com toldo listrado na sua cor e porta de vidro bem na calçada.", altura: 4.6, andares: 1 },
+  // altura = escala do GLB (normalizado com altura 1); letreiro fica sobre o quadro em branco de cada prédio (medido nas imagens)
+  { id: "vidro", nome: "Cubo de vidro", descricao: "Dois andares todos de vidro, com jardim no terraço. Dá pra ver a equipe trabalhando de fora.", altura: 13, andares: 2, modelo: "escritorioVidro", letreiro: { y: 4.7, z: -5.85, largura: 4.6 } },
+  { id: "moderno", nome: "Térreo moderno", descricao: "Caixa branca com vitrine de vidro e parede de ripas de madeira.", altura: 7.8, andares: 1, modelo: "escritorioModerno", letreiro: { y: 5.5, z: -6.85, largura: 5.6 } },
+  { id: "sobrado", nome: "Sobrado comercial", descricao: "Loja de vidro embaixo, varanda e janelas em fita em cima.", altura: 11.5, andares: 2, modelo: "escritorioSobrado", letreiro: { y: 5.75, z: -6.45, largura: 5 } },
+  { id: "loja", nome: "Loja de rua", descricao: "Telhadinho de barro, vitrine com toldo listrado e vaso na porta.", altura: 11, andares: 1, modelo: "escritorioLoja", letreiro: { y: 6.7, z: -5.4, largura: 4.5 } },
+  { id: "galpao", nome: "Galpão de tijolinho", descricao: "Antigo galpão industrial com janelas em arco e claraboias. Cara de estúdio criativo.", altura: 10.5, andares: 1, modelo: "escritorioGalpao", letreiro: { y: 6.1, z: -7.1, largura: 4.6 } },
+  { id: "container", nome: "Contêineres", descricao: "Três contêineres empilhados com frente de vidro, deck de madeira e escada externa.", altura: 9.2, andares: 2, modelo: "escritorioContainer", letreiro: { y: 3.0, z: -5.35, largura: 4 } },
+];
+// Profissionais prontos pra contratar (vêm com cargo e treino); o dono também pode criar do zero
+export interface Pronto { id: string; nome: string; cargo: string; setor: string; boneco: string; camisa: string; treino: Treino }
+export const CATALOGO_PROFISSIONAIS: Pronto[] = [
+  { id: "vendedor", nome: "Rodrigo", cargo: "Vendedor", setor: "Vendas", boneco: "classico", camisa: "#1D4ED8", treino: { descricao: "Apresenta os produtos e serviços, entende o que o cliente precisa, monta orçamento e fecha a venda. Anota nome, telefone e e-mail de quem tem interesse.", saudacao: "Oi! Posso te ajudar a escolher? Me conta o que você procura." } },
+  { id: "suporte", nome: "Tainá", cargo: "Suporte ao cliente", setor: "Suporte", boneco: "suporte-1", camisa: "#16A34A", treino: { descricao: "Resolve dúvidas e problemas de quem já é cliente, com calma e passo a passo. Quando não resolve, registra o caso pro dono responder.", saudacao: "Olá! Conta o que aconteceu que eu te ajudo a resolver." } },
+  { id: "social", nome: "Vini", cargo: "Social media", setor: "Marketing", boneco: "ruivo", camisa: "#DB2777", treino: { descricao: "Cuida das redes sociais: ideias de post, legendas, calendário de conteúdo e respostas a comentários no tom da marca.", saudacao: "E aí! Bora fazer a sua marca aparecer?" } },
+  { id: "financeiro", nome: "Helena", cargo: "Financeiro", setor: "Financeiro", boneco: "oculos", camisa: "#1F2937", treino: { descricao: "Explica preços, formas de pagamento, prazos e emite segunda via de cobrança. Organiza contas a pagar e a receber.", saudacao: "Olá. Precisa de ajuda com pagamento ou cobrança?" } },
+  { id: "designer", nome: "Luna", cargo: "Designer", setor: "Design", boneco: "longo", camisa: "#7C3AED", treino: { descricao: "Cria artes, posts, banners e identidade visual a partir de um briefing. Pergunta formato, texto e referência antes de começar.", saudacao: "Oi! Me passa o briefing que eu desenho." } },
+  { id: "agendamento", nome: "Caio", cargo: "Agendamentos", setor: "Atendimento", boneco: "careca", camisa: "#0EA5A4", treino: { descricao: "Marca, remarca e confirma horários e visitas. Pede nome, telefone e o melhor dia/horário e confirma por mensagem.", saudacao: "Olá! Quer marcar um horário? Me diz o melhor dia pra você." } },
+  { id: "orcamentos", nome: "Marina", cargo: "Orçamentos", setor: "Orçamentos", boneco: "coque", camisa: "#D97706", treino: { descricao: "Levanta o que o cliente precisa (medidas, quantidade, prazo) e monta o orçamento. Quando falta informação, pergunta antes de dar preço.", saudacao: "Oi! Me conta o que você precisa que eu monto o orçamento." } },
+  { id: "juridico", nome: "Otávio", cargo: "Jurídico", setor: "Jurídico", boneco: "oculos", camisa: "#374151", treino: { descricao: "Tira dúvidas iniciais sobre contratos, prazos e documentos da empresa, sempre orientando a confirmar com o responsável.", saudacao: "Boa tarde. Em que posso orientar?" } },
 ];
 export const LAYOUT: Record<LayoutId, LayoutInfo> = Object.fromEntries(LAYOUTS.map((l) => [l.id, l])) as Record<LayoutId, LayoutInfo>;
 
