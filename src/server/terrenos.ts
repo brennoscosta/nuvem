@@ -44,7 +44,10 @@ async function limparVencidos() {
 
 export async function listarTerrenos(): Promise<Terreno[]> {
   await migrar(); await limparVencidos();
-  return sql<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t ORDER BY t.reservado_em`;
+  const lista = await sql<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t ORDER BY t.reservado_em`;
+  // lotes ativados antes do escritório existir (build 34) ganham o padrão na primeira leitura
+  for (const t of lista) if (t.status === "ativo" && !t.escritorio) t.escritorio = await garantirEscritorio(t.chave);
+  return lista;
 }
 export async function terrenoDoUsuario(usuarioId: string): Promise<Terreno | null> {
   await migrar(); await limparVencidos();
