@@ -59,7 +59,7 @@ export function FormCadastro() {
   );
 }
 
-export function FormEntrar() {
+export function FormEntrar({ esqueci = false }: { esqueci?: boolean }) {
   const busca = useBusca();
   const [f, setF] = useState({ email: "", senha: "" });
   const [erro, setErro] = useState<string | null>(null);
@@ -75,7 +75,44 @@ export function FormEntrar() {
       <label className="campo">Senha<input type="password" value={f.senha} onChange={(e) => setF({ ...f, senha: e.target.value })} autoComplete="current-password" required /></label>
       {erro && <div className="rounded-xl bg-[#FDE8E8] px-3 py-2 text-sm text-[#8A2A2A]">{erro}</div>}
       <button type="submit" disabled={ocupado} className="btn btn-azul mt-2 justify-center text-[1.05rem]">{ocupado ? "Entrando…" : "Entrar"}</button>
+      {esqueci && <Link href="/esqueci" className="text-sm font-semibold text-[var(--azul)]">Esqueci minha senha</Link>}
       <p className="text-sm text-[var(--tinta-2)]">Ainda não tem conta? <Link href={"/cadastro" + busca} className="font-semibold text-[var(--azul)]">Criar conta</Link></p>
+    </form>
+  );
+}
+
+export function FormPedirSenha() {
+  const [email, setEmail] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [pedido, setPedido] = useState(false);
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault(); setErro(null); setOcupado(true);
+    try { await api("/api/workend/senha", { email }); setPedido(true); } catch (x) { setErro((x as Error).message); } finally { setOcupado(false); }
+  };
+  if (pedido) return <p className="text-[var(--tinta-2)]">Se existir uma conta com esse e-mail, o link já está a caminho. Confira também o spam.</p>;
+  return (
+    <form onSubmit={enviar} className="flex flex-col gap-4">
+      <label className="campo">E-mail<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required /></label>
+      {erro && <div className="rounded-xl bg-[#FDE8E8] px-3 py-2 text-sm text-[#8A2A2A]">{erro}</div>}
+      <button type="submit" disabled={ocupado} className="btn btn-azul mt-2 justify-center text-[1.05rem]">{ocupado ? "Enviando…" : "Enviar o link"}</button>
+    </form>
+  );
+}
+
+export function FormNovaSenha({ token }: { token: string }) {
+  const [senha, setSenha] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault(); setErro(null); setOcupado(true);
+    try { await api("/api/workend/senha/nova", { token, senha }); window.location.href = "/app"; } catch (x) { setErro((x as Error).message); setOcupado(false); }
+  };
+  return (
+    <form onSubmit={enviar} className="flex flex-col gap-4">
+      <label className="campo">Nova senha<input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="new-password" minLength={8} required placeholder="pelo menos 8 caracteres" /></label>
+      {erro && <div className="rounded-xl bg-[#FDE8E8] px-3 py-2 text-sm text-[#8A2A2A]">{erro}</div>}
+      <button type="submit" disabled={ocupado} className="btn btn-azul mt-2 justify-center text-[1.05rem]">{ocupado ? "Salvando…" : "Salvar a nova senha"}</button>
     </form>
   );
 }

@@ -8,10 +8,10 @@ import { Topo, Rodape, SETORES } from "./_partes";
 export const dynamic = "force-dynamic";
 
 const CARTOES = [
-  { eyebrow: "Dê a ordem", titulo: "Fale com o gerente do setor como falaria com uma pessoa.", img: "/workend/cenas/ordem.jpg", alt: "Painel de tarefas de um gerente do escritório" },
-  { eyebrow: "Veja acontecer", titulo: "Cada setor é uma sala. Os agentes trabalham à vista.", img: "/workend/cenas/setores.jpg", alt: "Salas dos setores do escritório virtual" },
-  { eyebrow: "Aprove antes de sair", titulo: "Nada é publicado, gasto ou enviado sem o seu ok.", img: "/workend/cenas/aprovar.jpg", alt: "Gerente de design gráfico na mesa dele" },
-  { eyebrow: "Receba o relatório", titulo: "Campanhas, faturamento e custos, explicados por quem fez.", img: "/workend/cenas/predio.jpg", alt: "Fachada de vidro do escritório virtual" },
+  { eyebrow: "Escolha seu lote", titulo: "Um endereço no mapa 3D, com a sua marca na placa.", img: "/workend/cenas/predio.jpg", alt: "Fachada de vidro do escritório virtual" },
+  { eyebrow: "Monte o escritório", titulo: "Cada setor vira uma sala no seu prédio.", img: "/workend/cenas/setores.jpg", alt: "Salas dos setores do escritório virtual" },
+  { eyebrow: "Conheça gente", titulo: "Com um personagem, ande pelo mapa, faça amigos, negocie e ligue para quem está online.", img: "/workend/cenas/aprovar.jpg", alt: "Personagem na mesa do escritório virtual" },
+  { eyebrow: "Em breve", titulo: "Agentes de IA trabalhando de verdade na sua equipe.", img: "/workend/cenas/ordem.jpg", alt: "Painel de tarefas de um gerente do escritório" },
 ];
 
 export default async function Landing() {
@@ -23,8 +23,8 @@ export default async function Landing() {
 
       {/* herói centralizado */}
       <section className="faixa flex flex-col items-center pt-10 text-center lg:pt-20">
-        <h1 className="max-w-[16ch]">O escritório onde agentes de IA <span className="pilula">trabalham</span> por você.</h1>
-        <p className="mt-6 max-w-[52ch] text-lg text-[var(--tinta-2)] lg:text-xl">Monte os setores da sua empresa, contrate especialistas já treinados e receba os relatórios. Você é o CEO.</p>
+        <h1 className="max-w-[16ch]">O mapa 3D onde a sua empresa <span className="pilula">tem</span> endereço.</h1>
+        <p className="mt-6 max-w-[52ch] text-lg text-[var(--tinta-2)] lg:text-xl">Escolha um lote, coloque sua marca na placa e monte o escritório da sua empresa. Os agentes de IA chegam em breve.</p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link href={cta.href} className="btn btn-azul btn-grande">{cta.texto}</Link>
           <Link href="/mundo" className="btn btn-claro btn-grande">Escolher meu chão no mapa</Link>
@@ -37,7 +37,7 @@ export default async function Landing() {
 
       {/* faixa de setores (no lugar da faixa de logos) */}
       <section className="faixa py-14 text-center">
-        <p className="text-[var(--tinta-2)]">Setores que já funcionam no WorkEnd.</p>
+        <p className="text-[var(--tinta-2)]">Setores para montar no seu prédio.</p>
         <ul className="mt-6 flex flex-wrap justify-center gap-2.5">
           {SETORES.map((s) => <li key={s.id}><span className="placa placa-cinza" style={{ ["--cor" as string]: s.cor }}><b />{s.nome}</span></li>)}
         </ul>
@@ -45,7 +45,7 @@ export default async function Landing() {
 
       {/* cartões */}
       <section className="faixa secao">
-        <h2 className="max-w-[20ch]">Agentes onde a sua empresa trabalha.</h2>
+        <h2 className="max-w-[20ch]">Sua empresa, à vista no mapa.</h2>
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           {CARTOES.map((c) => (
             <Link key={c.eyebrow} href={cta.href} className="cartao group">
@@ -67,9 +67,9 @@ export default async function Landing() {
         <h2 className="max-w-[20ch]">Simples assim.</h2>
         <ol className="mt-8 grid gap-6 md:grid-cols-3">
           {[
-            ["Monte seu escritório", "Escolha os setores. Cada um vira uma sala no prédio."],
-            ["Contrate especialistas", "Gestor de tráfego, designer, dev, atendente. Chegam treinados."],
-            ["Dê a ordem e aprove", "A equipe executa, você aprova, o relatório chega."],
+            ["Escolha seu lote", "R$ 99 por mês, com Pix direto no mapa."],
+            ["Coloque sua marca", "Nome e logomarca na placa, à vista de quem passa."],
+            ["Monte sua equipe", "Escolha o prédio, os setores e dê nome a cada pessoa."],
           ].map(([t, d], i) => (
             <li key={t} className="rounded-2xl bg-[var(--cinza)] p-6">
               <div className="text-sm font-semibold text-[var(--tinta-2)]">{i + 1}</div>

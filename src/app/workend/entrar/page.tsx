@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
 import { Topo, Rodape } from "../_partes";
 import { FormEntrar } from "../_conta";
+import { emailLigado } from "@/server/email";
 
 import { meta } from "../seo";
 
@@ -19,7 +20,7 @@ export default async function Entrar() {
           <h1 className="text-[2.2rem] lg:text-[2.8rem]">Bem-vindo de volta.</h1>
           <p className="mt-5 max-w-[48ch] text-[var(--tinta-2)]">Entre pra ver seu escritório e o catálogo de especialistas.</p>
         </div>
-        <div className="rounded-2xl bg-[var(--cinza)] p-6 lg:p-8"><FormEntrar /></div>
+        <div className="rounded-2xl bg-[var(--cinza)] p-6 lg:p-8"><FormEntrar esqueci={emailLigado()} /></div>
       </section>
       <Rodape />
     </>

@@ -7,7 +7,7 @@ export const emailLigado = () => !!process.env.SENDGRID_API_KEY && !!process.env
 export const REMETENTE = () => process.env.EMAIL_REMETENTE ?? "contato@workend.online";
 const SITE = "https://workend.online";
 
-export type ChaveEmail = "cadastro" | "reserva" | "pagamento" | "vencimento" | "contato" | "atividade";
+export type ChaveEmail = "cadastro" | "reserva" | "pagamento" | "vencimento" | "contato" | "atividade" | "senha";
 export interface ModeloEmail { chave: ChaveEmail; nome: string; quando: string; variaveis: string[]; assunto: string; html: string }
 
 const btn = (texto: string, href: string) => `<p style="margin:24px 0"><a href="${href}" style="display:inline-block;background:#0A6CFF;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px">${texto}</a></p>`;
@@ -16,7 +16,7 @@ const btn = (texto: string, href: string) => `<p style="margin:24px 0"><a href="
 export const MODELOS_PADRAO: ModeloEmail[] = [
   { chave: "cadastro", nome: "Boas-vindas (cadastro)", quando: "Quando alguém cria a conta no WorkEnd.", variaveis: ["nome", "email", "empresa", "link_mapa"],
     assunto: "Bem-vindo ao WorkEnd, {{nome}}!",
-    html: `<h1 style="margin:0 0 12px;font-size:24px">Olá, {{nome}}!</h1><p>Sua conta no <b>WorkEnd</b> está pronta. O WorkEnd é um mundo com lotes à venda: você escolhe um chão no mapa, coloca o nome e a logomarca da sua empresa na placa e monta seu escritório com atendentes que trabalham por você.</p>${btn("Escolher meu chão no mapa", "{{link_mapa}}")}<p style="color:#5B6472;font-size:14px">Dúvidas? Responda este e-mail.</p>` },
+    html: `<h1 style="margin:0 0 12px;font-size:24px">Olá, {{nome}}!</h1><p>Sua conta no <b>WorkEnd</b> está pronta. O WorkEnd é um mundo com lotes à venda: você escolhe um chão no mapa, coloca o nome e a logomarca da sua empresa na placa e monta seu escritório virtual.</p>${btn("Escolher meu chão no mapa", "{{link_mapa}}")}<p style="color:#5B6472;font-size:14px">Dúvidas? Responda este e-mail.</p>` },
   { chave: "reserva", nome: "Lote reservado (1 hora pra pagar)", quando: "Quando o usuário reserva um lote. Leva o link pra pagar.", variaveis: ["nome", "empresa", "lote", "descricao", "valor", "prazo", "link_pagar"],
     assunto: "{{empresa}} reservou o {{lote}} — pague em até {{prazo}}",
     html: `<h1 style="margin:0 0 12px;font-size:24px">Seu chão está reservado, {{nome}}!</h1><p>A placa <b>{{empresa}}</b> já aparece no <b>{{lote}}</b> ({{descricao}}). A reserva vale <b>{{prazo}}</b>: pague o 1º mês (<b>{{valor}}</b>, Pix, direto no mapa) pra garantir o lote. Sem pagamento, ele volta a ficar à venda.</p>${btn("Pagar {{valor}} agora", "{{link_pagar}}")}` },
@@ -32,6 +32,9 @@ export const MODELOS_PADRAO: ModeloEmail[] = [
   { chave: "contato", nome: "Alguém falou com a sua loja", quando: "Quando um visitante fala com o atendimento da loja e deixa contato.", variaveis: ["nome", "empresa", "contato_nome", "contato_email", "contato_telefone", "mensagem", "link_painel"],
     assunto: "{{contato_nome}} falou com a {{empresa}} no WorkEnd",
     html: `<h1 style="margin:0 0 12px;font-size:24px">Novo contato na {{empresa}}</h1><p><b>{{contato_nome}}</b> falou com o atendimento da sua loja.</p><table style="border-collapse:collapse;font-size:15px"><tr><td style="padding:4px 12px 4px 0;color:#5B6472">E-mail</td><td>{{contato_email}}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#5B6472">Telefone</td><td>{{contato_telefone}}</td></tr></table><blockquote style="margin:16px 0;padding:12px 16px;background:#F5F6F8;border-left:4px solid #0A6CFF;border-radius:8px">{{mensagem}}</blockquote>${btn("Responder no painel", "{{link_painel}}")}` },
+  { chave: "senha", nome: "Criar nova senha", quando: "Quando alguém pede para trocar a senha.", variaveis: ["nome", "link_senha"],
+    assunto: "Crie uma nova senha no WorkEnd",
+    html: `<h1 style="margin:0 0 12px;font-size:24px">Nova senha, {{nome}}</h1><p>Recebemos um pedido para trocar a senha da sua conta. O link vale 1 hora.</p>${btn("Criar nova senha", "{{link_senha}}")}<p style="color:#5B6472;font-size:14px">Se não foi você, é só ignorar este e-mail.</p>` },
 ];
 const PADRAO: Record<string, ModeloEmail> = Object.fromEntries(MODELOS_PADRAO.map((m) => [m.chave, m]));
 
@@ -74,6 +77,7 @@ export async function restaurarModelo(chave: ChaveEmail) { await migrar(); await
 export const EXEMPLO: Record<string, string> = {
   nome: "Brenno", email: "voce@exemplo.com", empresa: "Padaria da Maria", lote: "Lote 7", descricao: "casinha térrea", valor: "R$ 99,00", prazo: "1 hora", pago_ate: "07/12/2026",
   link_mapa: `${SITE}/mundo`, link_pagar: `${SITE}/mundo?lote=0%2C-1%2C2`, link_painel: `${SITE}/app`,
+  link_senha: `${SITE}/redefinir?t=exemplo`,
   titulo: "Novo profissional contratado", detalhes: "Rodrigo (Vendedor) entrou no setor Vendas.",
   contato_nome: "João Silva", contato_email: "joao@exemplo.com", contato_telefone: "(79) 99999-0000", mensagem: "Quero um orçamento de 200 salgados pra sexta-feira.",
 };

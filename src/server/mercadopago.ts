@@ -2,8 +2,8 @@
 // lote e o comprador paga pelo app do banco dele — sem login no Mercado Pago. A confirmação vem pelo webhook e pela
 // conferência que o mapa faz a cada poucos segundos. Só o Access Token é necessário (MP_ACCESS_TOKEN no CapRover).
 import { sql, id, migrar } from "./db";
-import { precoPara, ativarTerreno, estenderReserva, obterTerreno, creditarTrocaLayout, ehAdmin } from "./terrenos";
-import { ativarPersonagem, PRECO_PERSONAGEM } from "./personagens";
+import { precoPara, ativarTerreno, reverterTerreno, estenderReserva, obterTerreno, creditarTrocaLayout, retirarCreditoLayout, ehAdmin } from "./terrenos";
+import { ativarPersonagem, reverterPersonagem, PRECO_PERSONAGEM } from "./personagens";
 import { registrar } from "./eventos";
 import { PRECO_TROCA_LAYOUT } from "@/office/data/escritorio";
 import type { Usuario } from "./usuarios";
@@ -62,7 +62,7 @@ export async function criarCobranca(u: Usuario, chave: string, numeroLote: numbe
   const unit = precoPara(u); // admin paga R$ 0,99 (teste real sem gastar)
   const valor = tipo === "layout" ? PRECO_TROCA_LAYOUT : Math.round(unit * meses * 100) / 100;
   const r = await criarPix(u, base, { valor, tipo, chave, meses, metadata: { terreno: chave, meses }, descricao: tipo === "layout" ? `WorkEnd · troca de prédio · Lote ${numeroLote} (${t.empresaNome})` : `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"} (${t.empresaNome})` });
-  if (tipo === "lote") await estenderReserva(chave, 60); // ele está pagando: a reserva não some embaixo dele
+  if (tipo === "lote") await estenderReserva(chave, 70); // ele está pagando: a reserva dura mais que o QR (60 min)
   return r;
 }
 // Personagem do visitante: R$ 5,90/mês (admin paga 1/100)
@@ -77,25 +77,44 @@ export async function criarCobrancaPersonagem(u: Usuario, base: string, meses = 
 
 interface PagamentoMP { id: number; status: string; status_detail?: string; external_reference?: string; payment_method_id?: string; payment_type_id?: string; transaction_amount?: number; date_approved?: string; metadata?: Record<string, unknown>; point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } } }
 
-// Aplica um pagamento vindo da API do Mercado Pago (webhook ou conferência): grava e, se aprovado, ativa o chão
+// Aplica um pagamento vindo da API do Mercado Pago (webhook ou conferência). A linha do pagamento fica travada na transação:
+// o webhook e a conferência do mapa chegam juntos e só um deles pode liberar o benefício.
 async function aplicar(p: PagamentoMP) {
   const ref = p.external_reference; if (!ref) return null;
-  const [reg] = await sql<Pagamento[]>`SELECT id, terreno_chave, usuario_id, status, valor, meses, metodo, preferencia_id, pagamento_id, criado_em, pago_em, tipo FROM pagamento WHERE id = ${ref}`;
-  if (!reg) return null;
-  const status = p.status === "approved" ? "aprovado" : p.status === "rejected" ? "rejeitado" : p.status === "refunded" || p.status === "charged_back" ? "estornado" : p.status === "cancelled" ? "cancelado" : "pendente";
-  const jaAprovado = reg.status === "aprovado";
-  await sql`UPDATE pagamento SET status = ${status}, pagamento_id = ${String(p.id)}, metodo = ${p.payment_method_id ?? p.payment_type_id ?? null}, pago_em = ${p.date_approved ? new Date(p.date_approved) : reg.pagoEm}, bruto = ${sql.json(p as unknown as Parameters<typeof sql.json>[0])} WHERE id = ${ref}`;
-  if (status === "aprovado" && !jaAprovado && reg.tipo === "personagem") {
-    await ativarPersonagem(reg.usuarioId, 30 * reg.meses);
-    void registrar("pagamento", `Personagem pago (${brl(Number(reg.valor))})`, { usuarioId: reg.usuarioId, dados: { detalhes: `Personagem ativo por ${30 * reg.meses} dias.` } });
-  } else if (status === "aprovado" && !jaAprovado && reg.tipo === "layout") {
-    await creditarTrocaLayout(reg.terrenoChave);
-    void registrar("pagamento", `Troca de prédio paga (${brl(Number(reg.valor))})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: "Crédito de 1 troca de prédio liberado." }, avisarDono: true });
-  } else if (status === "aprovado" && !jaAprovado) {
-    await ativarTerreno(reg.terrenoChave, reg.meses);
-    void registrar("pagamento", `Lote pago (${brl(Number(reg.valor))}, ${reg.meses} mês${reg.meses > 1 ? "es" : ""})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: `Pagamento aprovado no Mercado Pago (${p.payment_method_id ?? "pix"}).` } });
+  const statusMP = p.status === "approved" ? "aprovado" : p.status === "rejected" ? "rejeitado" : p.status === "refunded" || p.status === "charged_back" ? "estornado" : p.status === "cancelled" ? "cancelado" : "pendente";
+  const feito = await sql.begin(async (tx) => {
+    const db = tx as unknown as typeof sql;
+    const [reg] = await db<Pagamento[]>`SELECT id, terreno_chave, usuario_id, status, valor, meses, metodo, preferencia_id, pagamento_id, criado_em, pago_em, tipo FROM pagamento WHERE id = ${ref} FOR UPDATE`;
+    if (!reg) return null;
+    const aprovadoAntes = reg.status === "aprovado";
+    // aprovado só muda para estornado, e estornado não muda mais
+    const status = reg.status === "estornado" ? "estornado" : aprovadoAntes && statusMP !== "estornado" ? "aprovado" : statusMP;
+    await db`UPDATE pagamento SET status = ${status}, pagamento_id = ${String(p.id)}, metodo = ${p.payment_method_id ?? p.payment_type_id ?? null}, pago_em = ${p.date_approved ? new Date(p.date_approved) : reg.pagoEm}, bruto = ${sql.json(p as unknown as Parameters<typeof sql.json>[0])} WHERE id = ${ref}`;
+    let efeito: "liberou" | "sem_lote" | "estornou" | null = null;
+    if (status === "aprovado" && !aprovadoAntes) {
+      if (reg.tipo === "personagem") { await ativarPersonagem(reg.usuarioId, 30 * reg.meses, db); efeito = "liberou"; }
+      else if (reg.tipo === "layout") efeito = (await creditarTrocaLayout(reg.terrenoChave, reg.usuarioId, db)) ? "liberou" : "sem_lote";
+      else efeito = (await ativarTerreno(reg.terrenoChave, reg.meses, reg.usuarioId, db)) ? "liberou" : "sem_lote";
+    } else if (status === "estornado" && aprovadoAntes) {
+      if (reg.tipo === "personagem") await reverterPersonagem(reg.usuarioId, 30 * reg.meses, db);
+      else if (reg.tipo === "layout") await retirarCreditoLayout(reg.terrenoChave, reg.usuarioId, db);
+      else await reverterTerreno(reg.terrenoChave, reg.meses, reg.usuarioId, db);
+      efeito = "estornou";
+    }
+    return { reg, status, efeito };
+  });
+  if (!feito) return null;
+  const { reg, status, efeito } = feito;
+  const valor = brl(Number(reg.valor));
+  // e-mails e registros só depois de gravar
+  if (efeito === "sem_lote") void registrar("pagamento", `ATENÇÃO: Pix de ${valor} aprovado sem lote`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: `O lote não está mais com quem pagou. Devolva o valor ou realoque pelo painel. Pagamento ${reg.id}.` } });
+  else if (efeito === "estornou") void registrar("pagamento", `Pagamento estornado (${valor})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: `Os dias ou o crédito desse pagamento foram retirados. Pagamento ${reg.id}.` } });
+  else if (efeito === "liberou" && reg.tipo === "personagem") void registrar("pagamento", `Personagem pago (${valor})`, { usuarioId: reg.usuarioId, dados: { detalhes: `Personagem ativo por ${30 * reg.meses} dias.` } });
+  else if (efeito === "liberou" && reg.tipo === "layout") void registrar("pagamento", `Troca de prédio paga (${valor})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: "Crédito de 1 troca de prédio liberado." }, avisarDono: true });
+  else if (efeito === "liberou") {
+    void registrar("pagamento", `Lote pago (${valor}, ${reg.meses} mês${reg.meses > 1 ? "es" : ""})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: `Pagamento aprovado no Mercado Pago (${p.payment_method_id ?? "pix"}).` } });
     const [d] = await sql<{ email: string; nome: string; empresaNome: string | null; pagoAte: Date | null }[]>`SELECT u.email, u.nome, t.empresa_nome, t.pago_ate FROM usuario u LEFT JOIN terreno t ON t.chave = ${reg.terrenoChave} WHERE u.id = ${reg.usuarioId}`;
-    if (d) void enviarEmail("pagamento", d.email, { nome: d.nome, empresa: d.empresaNome ?? "", lote: `Lote ${LOTE_POR_CHAVE[reg.terrenoChave]?.numero ?? "?"}`, valor: brl(Number(reg.valor)), pago_ate: dataBR(d.pagoAte), link_mapa: `https://workend.online/mundo?lote=${encodeURIComponent(reg.terrenoChave)}`, link_painel: "https://workend.online/app" });
+    if (d) void enviarEmail("pagamento", d.email, { nome: d.nome, empresa: d.empresaNome ?? "", lote: `Lote ${LOTE_POR_CHAVE[reg.terrenoChave]?.numero ?? "?"}`, valor, pago_ate: dataBR(d.pagoAte), link_mapa: `https://workend.online/mundo?lote=${encodeURIComponent(reg.terrenoChave)}`, link_painel: "https://workend.online/app" });
   }
   return { ...reg, status };
 }

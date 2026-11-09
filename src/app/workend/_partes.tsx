@@ -34,7 +34,7 @@ export function Rodape() {
       <div className="faixa grid gap-10 py-14 text-[15px] text-[var(--tinta-2)] md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} className="h-8 w-auto" />
-          <p className="mt-4 max-w-[34ch]">O escritório virtual da sua empresa, com agentes de IA especialistas em cada setor.</p>
+          <p className="mt-4 max-w-[34ch]">O mapa 3D onde as empresas têm endereço e fazem contatos.</p>
         </div>
         <div>
           <div className="mb-3 font-semibold text-[var(--tinta)]">Produto</div>
@@ -43,7 +43,7 @@ export function Rodape() {
             <li><Link href="/entrar">Entrar</Link></li>
             <li><Link href="/mundo">Ver o mapa dos lotes</Link></li>
             <li><Link href="/politicas">Políticas de uso</Link></li>
-            <li><a href={DEMO} target="_blank" rel="noreferrer">Ver um escritório funcionando</a></li>
+            <li><a href={DEMO} target="_blank" rel="noreferrer">Ver um escritório de demonstração</a></li>
           </ul>
         </div>
         <div>

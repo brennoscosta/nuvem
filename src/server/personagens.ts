@@ -43,9 +43,13 @@ export async function salvarPersonagem(u: Usuario, d: { nome?: string; tipo?: st
   return p;
 }
 // Pagamento aprovado (ou admin): +30 dias
-export async function ativarPersonagem(usuarioId: string, dias = 30) {
+export async function ativarPersonagem(usuarioId: string, dias = 30, db: typeof sql = sql) {
   await migrar();
-  await sql`UPDATE personagem SET pago_ate = GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${dias}), atualizado_em = now() WHERE usuario_id = ${usuarioId}`;
+  await db`UPDATE personagem SET pago_ate = GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${dias}), atualizado_em = now() WHERE usuario_id = ${usuarioId}`;
+}
+// Pagamento estornado: tira os dias pagos
+export async function reverterPersonagem(usuarioId: string, dias: number, db: typeof sql = sql) {
+  await db`UPDATE personagem SET pago_ate = pago_ate - make_interval(days => ${dias}), atualizado_em = now() WHERE usuario_id = ${usuarioId} AND pago_ate IS NOT NULL`;
 }
 // Batida de presença: grava posição e devolve quem mais está online (sem o próprio)
 export async function presenca(usuarioId: string, pos: { x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number }): Promise<PersonagemPublico[]> {

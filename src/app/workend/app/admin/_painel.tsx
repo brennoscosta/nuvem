@@ -54,6 +54,14 @@ export function PainelAdmin({ config }: { config: ConfigAdmin }) {
     if (!window.confirm(confirmar)) return;
     try { await post(url, body); await carregar(); } catch (e) { setErro((e as Error).message); }
   };
+  const linkSenha = async (id: string, email: string) => {
+    if (!window.confirm(`Criar um link de nova senha para ${email}? Ele vale 24 horas.`)) return;
+    try {
+      const r = await fetch(`/api/admin/usuarios/${id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ acao: "link_senha" }) });
+      const j = await r.json(); if (!r.ok) throw new Error(j.erro);
+      window.prompt("Copie o link e envie só para essa pessoa:", j.link);
+    } catch (e) { setErro((e as Error).message); }
+  };
   const editar = (t: Terreno) => {
     const nome = window.prompt("Nome na placa:", t.empresaNome); if (nome == null) return;
     const cor = window.prompt("Cor da marca (hex):", t.cor); if (cor == null) return;
@@ -157,6 +165,7 @@ export function PainelAdmin({ config }: { config: ConfigAdmin }) {
                     {u.papel === "admin"
                       ? <button onClick={() => agir(`/api/admin/usuarios/${u.id}`, { acao: "dono" }, `Tirar o admin de ${u.email}?`)} className="rounded-lg border border-[var(--linha)] px-2 py-1 text-xs">Tirar admin</button>
                       : <button onClick={() => agir(`/api/admin/usuarios/${u.id}`, { acao: "admin" }, `Tornar ${u.email} admin do WorkEnd?`)} className="rounded-lg border border-[var(--linha)] px-2 py-1 text-xs">Tornar admin</button>}
+                    <button onClick={() => linkSenha(u.id, u.email)} className="ml-1 rounded-lg border border-[var(--linha)] px-2 py-1 text-xs">Link de senha</button>
                   </td>
                 </tr>
               ))}

@@ -178,7 +178,7 @@ export function PainelEscritorio() {
                 </div>
               </div>
             )}
-            <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A atendente e o CEO fazem parte de todo escritório. Clique em “Aparência” pra trocar o boneco e <b>treinar</b> cada um (o que sabe e como cumprimenta) — é isso que eles vão usar pra atender os visitantes.</div>
+            <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A atendente e o CEO fazem parte de todo escritório. Clique em “Aparência” pra trocar o boneco e <b>treinar</b> cada um (o que sabe e como cumprimenta). Por enquanto a equipe é visual: quando os agentes de IA chegarem, é esse treino que eles vão usar para atender os visitantes.</div>
           </div>
         )}
       </div>

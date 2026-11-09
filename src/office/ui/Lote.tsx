@@ -172,7 +172,7 @@ export function CartaoLote() {
             <div className="mt-2 flex gap-2">
               <button onClick={abrirPainel} className="flex-1 rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm font-semibold text-[#1D4ED8]">Editar placa</button>
               {confirmaDesistir
-                ? <button onClick={() => { desistir(); setConfirma(null); }} className="rounded-xl bg-[#E2575B] px-3 py-2 text-sm font-bold text-white">Confirmar</button>
+                ? <button onClick={() => { void desistir().then((e) => { if (e) window.alert(e); }); setConfirma(null); }} className="rounded-xl bg-[#E2575B] px-3 py-2 text-sm font-bold text-white">Confirmar</button>
                 : <button onClick={() => setConfirma(chave)} className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm font-semibold text-[#5B6472]">Desistir</button>}
             </div>
           ) : ehMeu ? (admin ? <AcoesAdminLote chave={chave} /> : null) : admin ? (

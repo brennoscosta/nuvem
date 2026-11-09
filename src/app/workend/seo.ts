@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 
 export const SITE = "https://workend.online";
 export const NOME = "WorkEnd";
-export const TITULO = "WorkEnd — o escritório virtual da sua empresa com agentes de IA";
-export const DESCRICAO = "Monte os setores da sua empresa, contrate agentes de IA especialistas já treinados e receba relatórios de campanhas, faturamento e custos. Você é o CEO.";
-export const OG = { url: "/workend/og.jpg", width: 1200, height: 630, alt: "WorkEnd — o escritório onde agentes de IA trabalham por você" };
+export const TITULO = "WorkEnd — o mapa 3D onde a sua empresa tem endereço";
+export const DESCRICAO = "Escolha um lote no mapa 3D, coloque a marca da sua empresa na placa, monte seu escritório virtual e faça contatos com outras empresas. Agentes de IA em breve.";
+export const OG = { url: "/workend/og.jpg", width: 1200, height: 630, alt: "WorkEnd — o mapa 3D onde a sua empresa tem endereço" };
 
 // Metadados-base (herdados por todas as páginas do site). Cada página passa título/descrição/canonical próprios.
 export function meta(d: { titulo?: string; descricao?: string; caminho: string; indexar?: boolean }): Metadata {
@@ -18,7 +18,7 @@ export function meta(d: { titulo?: string; descricao?: string; caminho: string; 
     title,
     description,
     applicationName: NOME,
-    keywords: ["escritório virtual", "agentes de IA", "automação de marketing", "gestão de tráfego com IA", "social media com IA", "relatórios automáticos", "equipe de IA", "SaaS para empresas", "WorkEnd"],
+    keywords: ["escritório virtual", "mapa 3D", "vitrine virtual", "endereço virtual para empresas", "rede de contatos", "network empresarial", "WorkEnd"],
     authors: [{ name: NOME, url: SITE }],
     creator: NOME,
     publisher: NOME,
@@ -43,10 +43,10 @@ export function jsonLdLanding() {
   const app = {
     "@type": "SoftwareApplication", "@id": `${SITE}/#app`, name: NOME, url: SITE, applicationCategory: "BusinessApplication", operatingSystem: "Web",
     description: DESCRICAO, inLanguage: "pt-BR", image: `${SITE}${OG.url}`,
-    offers: { "@type": "Offer", price: "0", priceCurrency: "BRL", description: "Conta grátis; compra do escritório e contratação de agentes em breve." },
+    offers: { "@type": "Offer", price: "99", priceCurrency: "BRL", description: "Conta grátis. Lote no mapa por R$ 99 ao mês." },
     publisher: { "@id": `${SITE}/#org` },
   };
   const pagina = { "@type": "WebPage", "@id": `${SITE}/#page`, url: SITE, name: TITULO, description: DESCRICAO, inLanguage: "pt-BR", isPartOf: { "@id": `${SITE}/#site` }, about: { "@id": `${SITE}/#app` }, primaryImageOfPage: `${SITE}${OG.url}` };
-  const video = { "@type": "VideoObject", name: "Demonstração do escritório virtual WorkEnd", description: "O prédio de vidro, os setores e os agentes de IA trabalhando no escritório virtual.", thumbnailUrl: `${SITE}/workend/poster.jpg`, contentUrl: `${SITE}/workend/demo.mp4`, uploadDate: "2026-10-20", duration: "PT28S", inLanguage: "pt-BR" };
+  const video = { "@type": "VideoObject", name: "Demonstração do escritório virtual WorkEnd", description: "O prédio de vidro, os setores e a equipe no escritório virtual.", thumbnailUrl: `${SITE}/workend/poster.jpg`, contentUrl: `${SITE}/workend/demo.mp4`, uploadDate: "2026-10-20", duration: "PT28S", inLanguage: "pt-BR" };
   return { "@context": "https://schema.org", "@graph": [org, site, app, pagina, video] };
 }

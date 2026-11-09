@@ -52,7 +52,7 @@ interface Estado {
   fecharPainel: () => void;
   setRascunho: (r: Partial<Rascunho>) => void;
   reservar: () => Promise<string | null>;
-  desistir: () => Promise<void>;
+  desistir: () => Promise<string | null>;
   pagar: (meses?: number, tipo?: "lote" | "layout" | "personagem") => Promise<string | null>;
   conferirPagamento: (ref: string) => Promise<string>;
   fecharPix: () => void;
@@ -116,9 +116,11 @@ export const useMundo = create<Estado>((set, get) => ({
   },
 
   desistir: async () => {
-    const { loteSelecionado } = get(); if (!loteSelecionado) return;
-    await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/reservar`, { method: "DELETE" });
+    const { loteSelecionado } = get(); if (!loteSelecionado) return null;
+    const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/reservar`, { method: "DELETE" });
+    const j = r.ok ? null : await r.json().catch(() => null);
     await get().carregar();
+    return r.ok ? null : j?.erro ?? "Não foi possível desistir agora.";
   },
 
   // Gera o Pix (QR Code + copia e cola) e mostra no cartão do lote; o mapa confere o pagamento a cada poucos segundos

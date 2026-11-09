@@ -13,6 +13,8 @@ import { meta } from "../seo";
 export const metadata = meta({ titulo: "Meu escritório — WorkEnd", caminho: "/app", indexar: false });
 export const dynamic = "force-dynamic";
 
+const faltaMs = (d: Date | string) => new Date(d).getTime() - Date.now();
+
 export default async function App() {
   const u = await usuarioAtual().catch(() => null);
   if (!u) redirect("/entrar");
@@ -24,13 +26,14 @@ export default async function App() {
 
       <section className="faixa pt-4">
         <h1 className="text-[2rem] lg:text-[2.6rem]">Olá, {u.nome.split(" ")[0]}. Este é o painel da {empresa}.</h1>
-        <p className="mt-3 max-w-[60ch] text-[var(--tinta-2)]">Você é o CEO. Daqui você monta o escritório, contrata especialistas e lê os relatórios.</p>
+        <p className="mt-3 max-w-[60ch] text-[var(--tinta-2)]">Daqui você acompanha seu lote e sua rede. Os especialistas de IA e os relatórios chegam em breve.</p>
       </section>
 
       {/* seu escritório: estado vazio com direção */}
       <section className="faixa mt-10 grid gap-8 lg:grid-cols-[1.1fr_1fr]">
         <div className="rounded-2xl bg-[var(--cinza)] p-7">
           <h2 className="text-[1.5rem]">Seu chão no mundo</h2>
+          {chao?.status === "ativo" && chao.pagoAte && faltaMs(chao.pagoAte) < 5 * 86400_000 && <p className="mt-2 rounded-xl bg-[#FFF4DB] px-3 py-2 text-sm text-[#7A5200]">{faltaMs(chao.pagoAte) > 0 ? "Seu lote vence em breve." : "Seu lote venceu e está na tolerância de 5 dias."} Renove pelo mapa para manter o endereço. Se ele sair do mapa, sua marca e sua equipe ficam guardadas na conta.</p>}
           {chao ? (
             <>
               <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">{chao.status === "ativo" ? <>Seu lote de 20 × 20 m está <b>ativo até {chao.pagoAte ? new Date(chao.pagoAte).toLocaleDateString("pt-BR") : "—"}</b>, com a placa <b>{chao.empresaNome}</b> no mapa. Renove pelo mapa quando quiser.</> : <>Você reservou um lote de 20 × 20 m com a placa <b>{chao.empresaNome}</b>. A reserva vale 1 hora: pague o 1º mês (R$ 99) no mapa pra garantir.</>}</p>
@@ -69,10 +72,10 @@ export default async function App() {
       {/* catálogo */}
       <section className="faixa mt-14">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-[1.6rem]">Especialistas já treinados</h2>
-          <span className="text-sm text-[var(--tinta-2)]">Contratação abre junto com o escritório</span>
+          <h2 className="text-[1.6rem]">Especialistas que estão chegando</h2>
+          <span className="text-sm text-[var(--tinta-2)]">Em breve</span>
         </div>
-        <p className="mt-2 max-w-[60ch] text-[var(--tinta-2)]">Cada setor vem com um gerente, que recebe suas ordens e aprova o que sai, e uma equipe que executa. Você contrata um por um.</p>
+        <p className="mt-2 max-w-[60ch] text-[var(--tinta-2)]">Em breve, cada setor terá um gerente de IA, que recebe suas ordens e aprova o que sai, e uma equipe que executa.</p>
         {SETORES.map((s) => (
           <div key={s.id} className="mt-8">
             <div className="mb-4 flex items-center gap-3">

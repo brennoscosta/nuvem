@@ -7,6 +7,13 @@ import { QUARTEIROES, nichoValido } from "@/office/data/mundo";
 import type { Usuario } from "./usuarios";
 import { escritorioPadrao, normalizarEscritorio, trocasRestantes, TROCAS_LAYOUT_GRATIS, PRECO_TROCA_LAYOUT, LAYOUT, type Escritorio } from "@/office/data/escritorio";
 import { registrar } from "./eventos";
+import { enviarEmail, emailLigado, brl, dataBR } from "./email";
+import { LOTE_POR_CHAVE } from "@/office/data/mundo";
+
+declare global {
+  var __workendAvisoEm: number | undefined;
+}
+type Db = typeof sql;
 
 export interface Terreno {
   chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean;
@@ -23,6 +30,8 @@ export const precoPara = (u: Usuario | null | undefined) => (ehAdmin(u) ? Math.r
 export const MINUTOS_RESERVA = 60; // 1 hora pra pagar (pedido do Brenno, 07/11)
 export const DIAS_MES = 30;
 export const DIAS_TOLERANCIA = 5;
+export const DIAS_AVISO = 5; // quantos dias antes do vencimento o dono é avisado
+const ERRO_PIX_ABERTO = "Você tem um Pix aberto deste lote. Pague ou espere ele vencer (até 1 hora) para trocar ou desistir.";
 export const COR_PADRAO = "#1D4ED8";
 const MAX_LOGO = 400 * 1024;
 
@@ -38,10 +47,28 @@ export function loteAVenda(chave: string) {
 // trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
 const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio, t.nicho`;
 
-// Apaga o que venceu: reserva sem pagamento depois de 1 h; chão pago depois do vencimento + tolerância
+// Limpa o que venceu: reserva sem pagamento depois de 1 h é apagada; chão pago sai do mapa depois do vencimento + tolerância,
+// mas a marca e a equipe vão pro arquivo e voltam na próxima reserva do mesmo dono
 async function limparVencidos() {
   await sql`DELETE FROM terreno WHERE status = 'reservado' AND reservado_ate IS NOT NULL AND reservado_ate < now()`;
-  await sql`DELETE FROM terreno WHERE status = 'ativo' AND pago_ate IS NOT NULL AND pago_ate + make_interval(days => ${DIAS_TOLERANCIA}) < now()`;
+  await sql`WITH saiu AS (
+      DELETE FROM terreno WHERE status = 'ativo' AND pago_ate IS NOT NULL AND pago_ate + make_interval(days => ${DIAS_TOLERANCIA}) < now()
+      RETURNING chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, escritorio, pago_ate)
+    INSERT INTO terreno_arquivo (chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, escritorio, pago_ate)
+    SELECT chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, escritorio, pago_ate FROM saiu`;
+  void avisarVencimentos();
+}
+
+// Avisa por e-mail quem está perto de vencer, uma vez por ciclo pago. Sem e-mail ligado, não marca nada: o aviso sai quando ligar.
+async function avisarVencimentos() {
+  if (!emailLigado() || Date.now() - (globalThis.__workendAvisoEm ?? 0) < 3600_000) return;
+  globalThis.__workendAvisoEm = Date.now();
+  try {
+    const lista = await sql<{ chave: string; empresaNome: string; pagoAte: Date; email: string; nome: string }[]>`UPDATE terreno t SET avisado_em = now() FROM usuario u
+      WHERE u.id = t.usuario_id AND t.status = 'ativo' AND t.avisado_em IS NULL AND t.pago_ate < now() + make_interval(days => ${DIAS_AVISO})
+      RETURNING t.chave, t.empresa_nome, t.pago_ate, u.email, u.nome`;
+    for (const d of lista) void enviarEmail("vencimento", d.email, { nome: d.nome, empresa: d.empresaNome, lote: `Lote ${LOTE_POR_CHAVE[d.chave]?.numero ?? "?"}`, valor: brl(PRECO_LOTE), pago_ate: dataBR(d.pagoAte), link_pagar: `https://workend.online/mundo?lote=${encodeURIComponent(d.chave)}` });
+  } catch (e) { console.error("[vencimento]", (e as Error).message); }
 }
 
 export async function listarTerrenos(): Promise<Terreno[]> {
@@ -90,6 +117,10 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
     if (!admin) {
       const [ativo] = await tx<{ chave: string }[]>`SELECT chave FROM terreno WHERE usuario_id = ${u.id} AND status = 'ativo' AND chave <> ${chave}`;
       if (ativo) throw new Error("Você já tem um chão ativo. Nesta fase cada conta tem um lote.");
+      // quem está com Pix aberto não troca de lote: o pagamento precisa encontrar a reserva dele
+      const [pix] = await tx<{ terrenoChave: string }[]>`SELECT p.terreno_chave FROM pagamento p JOIN terreno t ON t.chave = p.terreno_chave AND t.usuario_id = p.usuario_id AND t.status = 'reservado'
+        WHERE p.usuario_id = ${u.id} AND p.terreno_chave <> ${chave} AND p.tipo = 'lote' AND p.status = 'pendente' AND p.criado_em > now() - interval '1 hour' LIMIT 1`;
+      if (pix) throw new Error(ERRO_PIX_ABERTO);
       // libera uma reserva anterior (não paga) do mesmo usuário
       await tx`DELETE FROM terreno WHERE usuario_id = ${u.id} AND chave <> ${chave} AND status = 'reservado'`;
     }
@@ -103,7 +134,12 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
         await tx`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
       } else if (!dono.escritorio) await tx`UPDATE terreno SET escritorio = ${escJson} WHERE chave = ${chave}`;
     } else {
-      await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, status, reservado_ate, escritorio) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${nicho}, ${logo}, ${logoTipo}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${escJson})`;
+      // quem já teve um lote recupera a marca e a equipe guardadas
+      const [guardado] = await tx<{ logo: Uint8Array | null; logoTipo: string | null; escritorio: Escritorio | null }[]>`SELECT logo, logo_tipo, escritorio FROM terreno_arquivo WHERE usuario_id = ${u.id} ORDER BY arquivado_em DESC LIMIT 1`;
+      const logoFinal = logo ?? (guardado?.logo ? Buffer.from(guardado.logo) : null);
+      const tipoFinal = logo ? logoTipo : guardado?.logo ? guardado.logoTipo : null;
+      const escFinal = guardado?.escritorio ? sql.json(guardado.escritorio as unknown as Parameters<typeof sql.json>[0]) : escJson;
+      await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, status, reservado_ate, escritorio) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${nicho}, ${logoFinal}, ${tipoFinal}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${escFinal})`;
     }
     const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${chave}`;
     if (!dono) void registrar("reserva", `${nome} reservou um lote`, { usuarioId: u.id, terrenoChave: chave, dados: { detalhes: `Reserva de 1 hora pra pagar.` } });
@@ -113,23 +149,34 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
 
 export async function liberarTerreno(usuarioId: string, chave: string) {
   await migrar();
+  const [pix] = await sql`SELECT 1 FROM pagamento WHERE usuario_id = ${usuarioId} AND terreno_chave = ${chave} AND tipo = 'lote' AND status = 'pendente' AND criado_em > now() - interval '1 hour' LIMIT 1`;
+  if (pix) throw new Error(ERRO_PIX_ABERTO);
   const r = await sql`DELETE FROM terreno WHERE chave = ${chave} AND usuario_id = ${usuarioId}`;
   return r.count > 0;
 }
 
-// Pagamento aprovado: o chão fica ativo por mais `meses` (soma ao que já estava pago, se ainda valia)
-export async function ativarTerreno(chave: string, meses = 1) {
+// Pagamento aprovado: o chão fica ativo por mais `meses` (soma ao que já estava pago, se ainda valia).
+// Com usuarioId, só ativa se o lote ainda for de quem pagou; devolve false se não for.
+export async function ativarTerreno(chave: string, meses = 1, usuarioId: string | null = null, db: Db = sql) {
   await migrar();
-  await sql`UPDATE terreno SET status = 'ativo', reservado_ate = NULL, atualizado_em = now(),
-    pago_ate = GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${DIAS_MES * meses}) WHERE chave = ${chave}`;
-  await garantirEscritorio(chave);
+  const r = await db`UPDATE terreno SET status = 'ativo', reservado_ate = NULL, avisado_em = NULL, atualizado_em = now(),
+    pago_ate = GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${DIAS_MES * meses}) WHERE chave = ${chave} AND (${usuarioId}::text IS NULL OR usuario_id = ${usuarioId})`;
+  if (!r.count) return false;
+  await garantirEscritorio(chave, db);
+  return true;
+}
+// Pagamento estornado: tira os dias pagos. Se não sobrar nada, o lote sai do mapa na próxima limpeza, sem tolerância.
+export async function reverterTerreno(chave: string, meses: number, usuarioId: string, db: Db = sql) {
+  const dias = DIAS_MES * meses;
+  await db`UPDATE terreno SET atualizado_em = now(), pago_ate = CASE WHEN pago_ate - make_interval(days => ${dias}) > now() THEN pago_ate - make_interval(days => ${dias}) ELSE now() - make_interval(days => ${DIAS_TOLERANCIA + 1}) END
+    WHERE chave = ${chave} AND usuario_id = ${usuarioId} AND status = 'ativo'`;
 }
 // Todo escritório nasce com atendente + CEO (nome do dono) e um setor de atendimento; só cria se ainda não tem
-export async function garantirEscritorio(chave: string) {
-  const [t] = await sql<{ empresaNome: string; cor: string; escritorio: Escritorio | null }[]>`SELECT t.empresa_nome, t.cor, t.escritorio FROM terreno t WHERE t.chave = ${chave}`;
+export async function garantirEscritorio(chave: string, db: Db = sql) {
+  const [t] = await db<{ empresaNome: string; cor: string; escritorio: Escritorio | null }[]>`SELECT t.empresa_nome, t.cor, t.escritorio FROM terreno t WHERE t.chave = ${chave}`;
   if (!t || t.escritorio) return t?.escritorio ?? null;
   const e = escritorioPadrao(t.empresaNome, t.cor);
-  await sql`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
+  await db`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
   return e;
 }
 // O dono (ou o admin) salva o escritório: validamos tudo e gravamos
@@ -162,13 +209,17 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
   else void registrar("escritorio", "Escritório editado", { usuarioId: u.id, terrenoChave: chave, dados: { detalhes: "Nomes, cargos, aparência ou treino da equipe." } });
   return e;
 }
-// Crédito de troca de prédio comprado (R$ 9,90 no Pix)
-export async function creditarTrocaLayout(chave: string) {
+// Crédito de troca de prédio (R$ 9,90 no Pix): soma ao pagar e retira no estorno; só vale se o lote ainda for de quem pagou
+async function ajustarCreditoLayout(chave: string, usuarioId: string, delta: number, db: Db) {
   await migrar();
-  const t = await obterTerreno(chave); if (!t?.escritorio) return;
-  const e = { ...t.escritorio, creditosLayout: (t.escritorio.creditosLayout ?? 0) + 1 };
-  await sql`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
+  const [t] = await db<{ usuarioId: string; escritorio: Escritorio | null }[]>`SELECT usuario_id, escritorio FROM terreno WHERE chave = ${chave} FOR UPDATE`;
+  if (!t?.escritorio || t.usuarioId !== usuarioId) return false;
+  const e = { ...t.escritorio, creditosLayout: Math.max(0, (t.escritorio.creditosLayout ?? 0) + delta) };
+  await db`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
+  return true;
 }
+export const creditarTrocaLayout = (chave: string, usuarioId: string, db: Db = sql) => ajustarCreditoLayout(chave, usuarioId, 1, db);
+export const retirarCreditoLayout = (chave: string, usuarioId: string, db: Db = sql) => ajustarCreditoLayout(chave, usuarioId, -1, db);
 // Enquanto o usuário está pagando, a reserva não pode expirar embaixo dele: estende por mais 30 min
 export async function estenderReserva(chave: string, minutos = 30) {
   await sql`UPDATE terreno SET reservado_ate = GREATEST(reservado_ate, now() + make_interval(mins => ${minutos})) WHERE chave = ${chave} AND status = 'reservado'`;
