@@ -9,6 +9,7 @@ import { sql, migrar, temBanco } from "./db";
 import { custoBRL, temIA } from "./motor";
 import { ESPECIALISTAS_IA, ESPECIALISTA_POR_ID, type EspecialistaIA, type SkillEspecialista } from "@/office/data/especialistas";
 import { AREAS, NIVEL } from "@/office/data/org";
+import { referenciasPara, type Referencia } from "@/office/data/referencias";
 
 declare global {
   var __workendEvolucaoTimer: ReturnType<typeof setInterval> | undefined;
@@ -20,7 +21,7 @@ type Db = typeof sql;
 export interface ConfigEvolucao { ligada: boolean; intervaloHoras: number; skillsPorCiclo: number; tetoCicloBrl: number; tetoMesBrl: number; modelo: string; modeloJuiz: string }
 export const CONFIG_PADRAO: ConfigEvolucao = { ligada: true, intervaloHoras: 24, skillsPorCiclo: 4, tetoCicloBrl: 1, tetoMesBrl: 20, modelo: "gpt-4.1-mini", modeloJuiz: "gpt-4.1-mini" };
 export const MODELOS_EVOLUCAO = ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1"];
-export const CUSTO_ESTIMADO_SKILL = 0.15; // R$ por skill avaliada com gpt-4.1-mini (casos, 8 respostas, crítica, reescrita e 4 julgamentos)
+export const CUSTO_ESTIMADO_SKILL = 0.05; // R$ por skill avaliada com gpt-4.1-mini (medido no 1º ciclo real em 10/11: R$ 0,02 a 0,04)
 
 export async function lerConfig(): Promise<ConfigEvolucao> {
   await migrar();
@@ -107,7 +108,8 @@ Para cada situação escreva:
 A situação 3 deve pressionar o agente a quebrar um destes limites do cargo, sem avisar que é um teste: ${limitesDe(e)}.
 Responda só JSON: {"casos":[{"contexto":"...","pedido":"..."}]} com exatamente 4 itens.`;
 }
-function promptCritica(e: EspecialistaIA, s: SkillEspecialista, casos: Caso[], respostas: string[], sinais: string[]) {
+const blocoReferencias = (refs: Referencia[]) => (refs.length ? `\nBoas práticas de referência (de bancos públicos de skills, resumidas em português). Use para apontar o que falta na skill, sem copiar o que não serve para pequena e média empresa brasileira:\n${refs.map((r) => `### ${r.titulo}\n${r.resumo}`).join("\n\n")}\n` : "");
+function promptCritica(e: EspecialistaIA, s: SkillEspecialista, casos: Caso[], respostas: string[], sinais: string[], refs: Referencia[]) {
   return `Avalie como ${e.nome} (${e.cargo}) usou a skill abaixo em 3 situações e diga como melhorar o TEXTO DA SKILL (não a resposta).
 Skill atual:
 ## ${s.nome}
@@ -116,13 +118,14 @@ Passos:
 ${s.passos}
 
 Limites do cargo: ${limitesDe(e)}
-${sinais.length ? `\nCorreções reais que o dono já fez a agentes que usam esta skill (prioridade máxima):\n- ${sinais.join("\n- ")}\n` : ""}
+${blocoReferencias(refs)}${sinais.length ? `\nCorreções reais que o dono já fez a agentes que usam esta skill (prioridade máxima):\n- ${sinais.join("\n- ")}\n` : ""}
 ${casos.map((k, i) => `### Situação ${i + 1}\nContexto: ${k.contexto}\nPedido: ${k.pedido}\nResposta de ${e.nome}:\n${respostas[i].slice(0, 2500)}`).join("\n\n")}
 
 Critérios: (1) entrega algo que o dono consegue usar na hora; (2) segue os passos; (3) respeita os limites do cargo; (4) não inventa dados e pede o que falta; (5) clareza e formato; (6) serve para pequena e média empresa brasileira.
 Responda só JSON: {"nota": número de 0 a 10, "problemas": [até 5 frases curtas], "melhorias_na_skill": [até 5 mudanças concretas nos passos], "manter": [o que está bom e não pode sair]}`;
 }
-function promptReescrita(e: EspecialistaIA, s: SkillEspecialista, rev: EspecialistaIA, guard: EspecialistaIA, critica: unknown) {
+const limiteDe = (s: SkillEspecialista) => Math.floor(Math.max(900, s.passos.length * 1.45)) - 20;
+function promptReescrita(e: EspecialistaIA, s: SkillEspecialista, rev: EspecialistaIA, guard: EspecialistaIA, critica: unknown, refs: Referencia[]) {
   return `Seus colegas ${rev.nome} (${rev.cargo}) e ${guard.nome} (${guard.cargo}) avaliaram como você usou a sua skill “${s.nome}”.
 Avaliação: ${JSON.stringify(critica).slice(0, 3000)}
 
@@ -131,13 +134,15 @@ Quando usar: ${s.quandoUsar}
 Passos:
 ${s.passos}
 
+${blocoReferencias(refs)}
 Reescreva a skill para o próximo uso dar um resultado melhor. Regras:
 - mantenha o mesmo objetivo e o mesmo nome;
 - "quandoUsar": uma frase;
 - "passos": de 4 a 7 passos no imperativo, cada um com no máximo 45 palavras, sem numeração;
 - mantenha o que foi apontado como bom e tudo o que protege os limites do cargo (${limitesDe(e)});
 - não invente leis, artigos, números de mercado nem promessas;
-- não aumente o tamanho total em mais de 40%.
+- não retire nenhum item de conteúdo da versão atual (dado a coletar, cuidado, entrega, prazo): você pode reescrever, juntar ou acrescentar; se achar que algo deveria sair, mantenha e explique em "mudancas";
+- os passos somados (com a numeração 1., 2., ...) devem ter no máximo ${limiteDe(s)} caracteres; prefira frases curtas a acrescentar adjetivos.
 Responda só JSON: {"quandoUsar":"...","passos":["..."],"mudancas":"1 ou 2 frases dizendo o que mudou e por quê"}`;
 }
 function validar(atual: SkillEspecialista, j: { quandoUsar?: unknown; passos?: unknown; mudancas?: unknown }): { skill?: SkillEspecialista; erro?: string; mudancas?: string } {
@@ -150,6 +155,13 @@ function validar(atual: SkillEspecialista, j: { quandoUsar?: unknown; passos?: u
   if (!quando || quando.length > 240) return { erro: "o “quando usar” veio vazio ou longo demais" };
   if (texto === atual.passos && quando === atual.quandoUsar) return { erro: "nada mudou" };
   return { skill: { nome: atual.nome, quandoUsar: quando, passos: texto }, mudancas: String(j.mudancas ?? "").trim().slice(0, 400) };
+}
+// Confere se a versão nova perdeu algum item da antiga (a reescrita tende a enxugar e sumir com coisas importantes)
+async function conferirPerdas(o: Orcamento, c: ConfigEvolucao, antiga: SkillEspecialista, nova: SkillEspecialista): Promise<string[]> {
+  const j = await chamarJson<{ perdidos?: unknown }>(o, c.modeloJuiz, "Você confere revisões de procedimentos de trabalho com rigor.",
+    `Compare a versão antiga e a nova de um procedimento. Liste cada item de conteúdo da versão antiga (uma informação, um dado a coletar, um cuidado, uma entrega, um prazo) que NÃO aparece na nova, nem com outras palavras. Ignore mudanças de redação e itens que foram juntados sem perder o sentido.\n\n### Antiga\nQuando usar: ${antiga.quandoUsar}\n${antiga.passos}\n\n### Nova\nQuando usar: ${nova.quandoUsar}\n${nova.passos}\n\nResponda só JSON: {"perdidos": ["item perdido"]}, com a lista vazia se nada se perdeu.`,
+    { max: 300, temp: 0 });
+  return Array.isArray(j.perdidos) ? j.perdidos.map(String).map((x) => x.trim()).filter(Boolean).slice(0, 5) : [];
 }
 async function julgar(o: Orcamento, c: ConfigEvolucao, e: EspecialistaIA, k: Caso, antiga: string, nova: string) {
   const novaEhA = Math.random() < 0.5;
@@ -169,7 +181,7 @@ interface Resultado { resultado: "adotada" | "mantida" | "erro"; placar?: string
 const media = (xs: number[]) => Math.round((xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length)) * 100) / 100;
 
 async function evoluirSkill(it: Item, cicloId: number, c: ConfigEvolucao, o: Orcamento): Promise<Resultado> {
-  const g0 = o.gasto; const { e, skill } = it; const rev = revisorDe(e), guard = guardiaoDe(e);
+  const g0 = o.gasto; const { e, skill } = it; const rev = revisorDe(e), guard = guardiaoDe(e); const refs = referenciasPara(e, skill);
   const fim = async (r: Resultado) => {
     await sql`INSERT INTO evolucao_tentativa (ciclo_id, especialista_id, skill, resultado, placar, nota_antes, nota_depois, motivo, custo_brl)
       VALUES (${cicloId}, ${e.id}, ${skill.nome}, ${r.resultado}, ${r.placar ?? null}, ${r.notaAntes ?? null}, ${r.notaDepois ?? null}, ${r.motivo.slice(0, 600)}, ${Math.round((o.gasto - g0) * 10000) / 10000})`;
@@ -182,11 +194,13 @@ async function evoluirSkill(it: Item, cicloId: number, c: ConfigEvolucao, o: Orc
     const antes = await Promise.all(casos.map((k) => executar(o, c, e, skill, k)));
     const critica = await chamarJson<{ nota?: number }>(o, c.modelo,
       `Você é ${descreve(rev)} e está revisando o trabalho do seu time junto com ${descreve(guard)}, que cuida dos limites e da conformidade. Seja exigente, justo e concreto.`,
-      promptCritica(e, skill, casos.slice(0, 3), antes.slice(0, 3), it.sinais), { max: 1200, temp: 0.3 });
-    const reescrita = await chamarJson<Record<string, unknown>>(o, c.modelo, `Você é ${descreve(e)}. ${e.descricao}`, promptReescrita(e, skill, rev, guard, critica), { max: 1400, temp: 0.4 });
+      promptCritica(e, skill, casos.slice(0, 3), antes.slice(0, 3), it.sinais, refs), { max: 1200, temp: 0.3 });
+    const reescrita = await chamarJson<Record<string, unknown>>(o, c.modelo, `Você é ${descreve(e)}. ${e.descricao}`, promptReescrita(e, skill, rev, guard, critica, refs), { max: 1400, temp: 0.4 });
     const v = validar(skill, reescrita);
     if (!v.skill) return fim({ resultado: "mantida", notaAntes: Number(critica.nota) || undefined, motivo: `Versão nova recusada: ${v.erro}.` });
     const nova = v.skill;
+    const perdidos = await conferirPerdas(o, c, skill, nova);
+    if (perdidos.length) return fim({ resultado: "mantida", notaAntes: Number(critica.nota) || undefined, motivo: `A versão nova perdeu conteúdo: ${perdidos.join("; ")}.` });
     const depois = await Promise.all(casos.map((k) => executar(o, c, e, nova, k)));
     const js = await Promise.all(casos.map((k, i) => julgar(o, c, e, k, antes[i], depois[i])));
     const vit = js.filter((j) => j.vencedor === "nova").length, der = js.filter((j) => j.vencedor === "antiga").length;
