@@ -1,6 +1,6 @@
 "use client";
 // Formulários de conta do WorkEnd (cadastro e entrada). Depois de entrar, vai pro dashboard.
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 
 // Veio do mapa querendo um lote (?lote=…)? Depois de entrar volta pro mundo, direto no lote escolhido.
@@ -38,6 +38,7 @@ export function BotaoGoogle({ texto = "Continuar com Google" }: { texto?: string
 export function FormCadastro() {
   const busca = useBusca();
   const [f, setF] = useState({ nome: "", empresaNome: "", email: "", senha: "" });
+  useEffect(() => { const t = setTimeout(() => { const e = new URLSearchParams(window.location.search).get("empresa"); if (e) setF((x) => (x.empresaNome ? x : { ...x, empresaNome: e.slice(0, 80) })); }, 0); return () => clearTimeout(t); }, []);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
