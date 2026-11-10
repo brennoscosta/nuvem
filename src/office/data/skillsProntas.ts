@@ -4,7 +4,7 @@
 import type { AreaId, Nivel } from "./org";
 import { ESPECIALISTAS_IA } from "./especialistas";
 
-export interface SkillPronta { nome: string; quandoUsar: string; passos: string; niveis: (Nivel | "todos")[]; areas?: string[] }
+export interface SkillPronta { nome: string; quandoUsar: string; passos: string; niveis: (Nivel | "todos")[]; areas?: string[]; especialistaId?: string; versao?: number }
 
 const BASE: SkillPronta[] = [
   {
@@ -94,7 +94,7 @@ const NIVEIS_GESTAO: (Nivel | "todos")[] = ["gerente", "diretor"];
 const NIVEIS_TIME: (Nivel | "todos")[] = ["estagiario", "junior", "pleno", "senior"];
 const DOS_ESPECIALISTAS: SkillPronta[] = ESPECIALISTAS_IA.flatMap((e) => {
   const areas = [e.area, ...Object.entries(EQUIVALENTES).filter(([, lista]) => lista.includes(e.area)).map(([area]) => area)];
-  return e.skills.map((k) => ({ ...k, niveis: e.nivel === "gerente" ? NIVEIS_GESTAO : NIVEIS_TIME, areas }));
+  return e.skills.map((k) => ({ ...k, niveis: e.nivel === "gerente" ? NIVEIS_GESTAO : NIVEIS_TIME, areas, especialistaId: e.id }));
 });
 
 export const SKILLS_PRONTAS: SkillPronta[] = [...BASE, ...DOS_ESPECIALISTAS];

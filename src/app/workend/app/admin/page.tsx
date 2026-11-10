@@ -11,6 +11,7 @@ import { PainelAdmin, EntrarAdmin } from "./_painel";
 import { EmailsAdmin } from "./_emails";
 import { CatalogoAdmin, AtividadeAdmin } from "./_catalogo";
 import { PersonagensAdmin } from "./_personagens";
+import { EvolucaoAdmin } from "./_evolucao";
 import { meta } from "../../seo";
 
 export const metadata = meta({ titulo: "Admin — WorkEnd", caminho: "/app/admin", indexar: false });
@@ -37,6 +38,7 @@ export default async function Admin() {
           <PainelAdmin config={{ preco: PRECO_LOTE, precoAdmin: precoPara(u), minutosReserva: MINUTOS_RESERVA, diasMes: DIAS_MES, diasTolerancia: DIAS_TOLERANCIA, pagamento: pagamentoLigado(), adminEmail: ADMIN_EMAIL, eu: u!.email }} />
           <AtividadeAdmin />
           <CatalogoAdmin />
+          <EvolucaoAdmin />
           <PersonagensAdmin />
           <EmailsAdmin />
         </>

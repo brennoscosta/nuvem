@@ -173,7 +173,10 @@ function AbaSkills({ ficha, recarregar }: { ficha: Ficha; recarregar: () => Prom
   const base = `/api/agentes/${ficha.agente.id}/skills`;
   const salvar = async (s: Partial<Skill>) => { if (!s.nome || !s.passos) return; try { await api(base, "POST", s); setEdit(null); await recarregar(); } catch (e) { setMsg((e as Error).message); } };
   const remover = async (sid: string) => { await api(base, "DELETE", { itemId: sid }); await recarregar(); };
-  const prontas = SKILLS_PRONTAS.filter((p) => (p.niveis.includes(ficha.agente.nivel) || p.niveis.includes("todos")) && (!p.areas || p.areas.includes(ficha.agente.area)));
+  // a biblioteca vem do servidor com as versões que evoluíram; enquanto carrega, vale a do código
+  const [lista, setLista] = useState(SKILLS_PRONTAS);
+  useEffect(() => { let vivo = true; fetch("/api/skills/biblioteca").then((r) => (r.ok ? r.json() : null)).then((j) => { if (vivo && j?.skills) setLista(j.skills); }).catch(() => {}); return () => { vivo = false; }; }, []);
+  const prontas = lista.filter((p) => (p.niveis.includes(ficha.agente.nivel) || p.niveis.includes("todos")) && (!p.areas || p.areas.includes(ficha.agente.area)));
   return (
     <div className="flex flex-col gap-2">
       <div className="text-[11px] text-[#5B6472]">Procedimentos que o agente sabe executar: quando usar e o passo a passo. Ele segue isso ao trabalhar.</div>
