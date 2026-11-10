@@ -1,9 +1,12 @@
 // Biblioteca de skills prontas pra instalar em qualquer agente. Editáveis depois de instaladas.
-import type { Nivel } from "./org";
+// Desde 10/11/2026 a biblioteca também traz as 143 skills dos 39 especialistas (src/office/data/especialistas.ts),
+// filtradas pela área e pelo nível de quem vai receber.
+import type { AreaId, Nivel } from "./org";
+import { ESPECIALISTAS_IA } from "./especialistas";
 
-export interface SkillPronta { nome: string; quandoUsar: string; passos: string; niveis: (Nivel | "todos")[] }
+export interface SkillPronta { nome: string; quandoUsar: string; passos: string; niveis: (Nivel | "todos")[]; areas?: string[] }
 
-export const SKILLS_PRONTAS: SkillPronta[] = [
+const BASE: SkillPronta[] = [
   {
     nome: "Transformar meta em plano",
     quandoUsar: "Quando o dono (admin) passar uma meta, objetivo ou problema a resolver.",
@@ -84,3 +87,14 @@ export const SKILLS_PRONTAS: SkillPronta[] = [
 3. Envie pro seu chefe pedindo revisão. Só marque como concluído depois da aprovação.`,
   },
 ];
+
+// Áreas do escritório interno que aproveitam as skills de outros setores
+const EQUIVALENTES: Record<string, AreaId[]> = { criativos: ["criacao", "designgrafico"], consultoria: ["planejamento", "vendas", "analise"], diretoria: ["planejamento"] };
+const NIVEIS_GESTAO: (Nivel | "todos")[] = ["gerente", "diretor"];
+const NIVEIS_TIME: (Nivel | "todos")[] = ["estagiario", "junior", "pleno", "senior"];
+const DOS_ESPECIALISTAS: SkillPronta[] = ESPECIALISTAS_IA.flatMap((e) => {
+  const areas = [e.area, ...Object.entries(EQUIVALENTES).filter(([, lista]) => lista.includes(e.area)).map(([area]) => area)];
+  return e.skills.map((k) => ({ ...k, niveis: e.nivel === "gerente" ? NIVEIS_GESTAO : NIVEIS_TIME, areas }));
+});
+
+export const SKILLS_PRONTAS: SkillPronta[] = [...BASE, ...DOS_ESPECIALISTAS];

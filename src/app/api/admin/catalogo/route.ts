@@ -1,5 +1,5 @@
 // Admin: criar/treinar/apagar os agentes que o WorkEnd vende
-import { listarCatalogoAdmin, salvarAgenteCatalogo, apagarAgenteCatalogo, semearCatalogo, APIS_DISPONIVEIS, type AgenteCatalogo } from "@/server/catalogo";
+import { listarCatalogoAdmin, salvarAgenteCatalogo, apagarAgenteCatalogo, semearCatalogo, semearEspecialistas, APIS_DISPONIVEIS, type AgenteCatalogo } from "@/server/catalogo";
 import { ok, erro, corpo } from "@/server/http";
 import { exigirAdmin, statusDe } from "../_guarda";
 export const dynamic = "force-dynamic";
@@ -10,6 +10,7 @@ export async function POST(req: Request) {
     const d = await corpo<{ acao?: string } & Partial<AgenteCatalogo>>(req);
     if (d.acao === "apagar" && d.id) { await apagarAgenteCatalogo(d.id); return ok({ feito: "apagar" }); }
     if (d.acao === "semear") { await semearCatalogo(); return ok({ feito: "semear" }); }
+    if (d.acao === "especialistas") return ok({ feito: "especialistas", novos: await semearEspecialistas() });
     return ok(await salvarAgenteCatalogo(d));
   } catch (e) { return erro(e, statusDe(e)); }
 }

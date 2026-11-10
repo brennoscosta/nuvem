@@ -2,6 +2,36 @@
 // contratam do catálogo. Enquanto o admin não cadastra nenhum, vale a lista fixa do código (CATALOGO_PROFISSIONAIS).
 import { sql, id, migrar } from "./db";
 import { CATALOGO_PROFISSIONAIS } from "@/office/data/escritorio";
+import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
+import { AREAS } from "@/office/data/org";
+
+declare global {
+  var __workendSementeEsp: Promise<void> | undefined;
+}
+
+// Os 39 especialistas (com a ficha completa: skills com passo a passo, limites, personalidade) entram no catálogo.
+// Só insere os que faltam: o que o admin editou fica como está.
+export async function semearEspecialistas(db: typeof sql = sql) {
+  await migrar();
+  let novos = 0;
+  for (const [i, e] of ESPECIALISTAS_IA.entries()) {
+    const ficha = { area: e.area, nivel: e.nivel, personalidade: e.personalidade, tomDeVoz: e.tomDeVoz, limites: e.limites, skills: e.skills };
+    const r = await db`INSERT INTO agente_catalogo (id, nome, cargo, setor, descricao, saudacao, skills, apis, preco, boneco, camisa, ativo, ordem, ficha)
+      VALUES (${"esp-" + e.id}, ${e.nome}, ${e.cargo}, ${AREAS[e.area].nome}, ${e.descricao}, ${e.saudacao}, ${sql.json(e.skills.map((k) => k.nome))}, ${sql.json(e.apis)}, 0, ${e.boneco}, ${AREAS[e.area].cor}, true, ${100 + i}, ${sql.json(ficha as never)})
+      ON CONFLICT (id) DO NOTHING`;
+    novos += r.count;
+  }
+  return novos;
+}
+// Primeira leitura do catálogo depois da publicação: aplica a semente uma vez só (se o admin apagar algum, ele não volta sozinho)
+function sementeInicial() {
+  globalThis.__workendSementeEsp ??= sql.begin(async (tx) => {
+    const db = tx as unknown as typeof sql;
+    const [nova] = await db`INSERT INTO semente (nome) VALUES ('especialistas-v1') ON CONFLICT (nome) DO NOTHING RETURNING nome`;
+    if (nova) await semearEspecialistas(db);
+  }).then(() => undefined).catch((e) => { globalThis.__workendSementeEsp = undefined; console.error("[catalogo] semente:", (e as Error).message); });
+  return globalThis.__workendSementeEsp;
+}
 
 export interface AgenteCatalogo { id: string; nome: string; cargo: string; setor: string; descricao: string; saudacao: string; skills: string[]; apis: string[]; preco: number; boneco: string; camisa: string; ativo: boolean; ordem: number; criadoEm?: Date; atualizadoEm?: Date }
 export const APIS_DISPONIVEIS = [
@@ -19,13 +49,13 @@ const normal = (a: AgenteCatalogo): AgenteCatalogo => ({ ...a, preco: Number(a.p
 
 // Lista pra venda (ativos). Sem nenhum no banco, devolve os fixos do código
 export async function catalogoAVenda(): Promise<AgenteCatalogo[]> {
-  await migrar();
+  await migrar(); await sementeInicial();
   const lista = await sql<AgenteCatalogo[]>`SELECT ${CAMPOS()} FROM agente_catalogo WHERE ativo ORDER BY ordem, criado_em`;
   if (lista.length) return lista.map(normal);
   return CATALOGO_PROFISSIONAIS.map((p, i) => ({ id: p.id, nome: p.nome, cargo: p.cargo, setor: p.setor, descricao: p.treino.descricao, saudacao: p.treino.saudacao, skills: [], apis: ["chatgpt_texto"], preco: 0, boneco: p.boneco, camisa: p.camisa, ativo: true, ordem: i }));
 }
 export async function listarCatalogoAdmin(): Promise<AgenteCatalogo[]> {
-  await migrar();
+  await migrar(); await sementeInicial();
   return (await sql<AgenteCatalogo[]>`SELECT ${CAMPOS()} FROM agente_catalogo ORDER BY ordem, criado_em`).map(normal);
 }
 const texto = (t: unknown, max: number, padrao = "") => (typeof t === "string" ? t.trim().slice(0, max) : padrao) || padrao;

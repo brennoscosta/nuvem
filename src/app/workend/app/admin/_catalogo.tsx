@@ -22,12 +22,13 @@ export function CatalogoAdmin() {
   const salvar = async () => { if (!edit) return; try { await post(edit); setEdit(null); setAviso("Agente salvo."); await carregar(); } catch (e) { setAviso((e as Error).message); } };
   const apagar = async (a: Agente) => { if (!window.confirm(`Apagar "${a.cargo} · ${a.nome}" do catálogo?`)) return; await post({ acao: "apagar", id: a.id }); await carregar(); };
   const semear = async () => { await post({ acao: "semear" }); await carregar(); setAviso("Os 8 agentes de exemplo foram copiados pro catálogo: edite e treine cada um."); };
+  const especialistas = async () => { try { const r = (await post({ acao: "especialistas" })) as { novos?: number }; await carregar(); setAviso(r?.novos ? `${r.novos} especialista(s) voltaram para o catálogo.` : "Os 39 especialistas já estão no catálogo."); } catch (e) { setAviso((e as Error).message); } };
   const m = (p: Partial<Agente>) => setEdit((e) => (e ? { ...e, ...p } : e));
   return (
     <section className="faixa mt-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div><h2 className="text-[1.4rem]">Agentes à venda</h2><p className="mt-1 max-w-[70ch] text-sm text-[var(--tinta-2)]">Os profissionais prontos que o WorkEnd vende pras lojas. Você cria cada um, dá o treino (o que sabe e faz), as skills e as APIs que ele usa, e o preço. Quem tem loja contrata em “Contratar agentes”.</p></div>
-        <div className="flex gap-2">{agentes && agentes.length === 0 && <button onClick={semear} className="btn btn-linha">Importar os 8 de exemplo</button>}<button onClick={() => setEdit(vazio())} className="btn btn-azul">+ Novo agente</button></div>
+        <div className="flex gap-2">{agentes && agentes.length === 0 && <button onClick={semear} className="btn btn-linha">Importar os 8 de exemplo</button>}<button onClick={especialistas} className="btn btn-linha" title="Coloca de volta os especialistas que foram apagados; os editados ficam como estão">Repor especialistas</button><button onClick={() => setEdit(vazio())} className="btn btn-azul">+ Novo agente</button></div>
       </div>
       {aviso && <div className="mt-3 rounded-xl bg-[var(--cinza)] px-3 py-2 text-sm">{aviso} <button onClick={() => setAviso(null)} className="ml-2 underline">fechar</button></div>}
       {edit && (

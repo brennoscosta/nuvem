@@ -2,6 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { AREAS, AREAS_OPERACIONAIS, FUNCOES, type AreaId } from "@/office/data/org";
+import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 
 export const DEMO = "https://nuvem.nuvemhost.cloud/?vista=fora";
 
@@ -81,11 +82,5 @@ export const ENTREGA: Record<AreaId, string> = {
 
 export const SETORES = AREAS_OPERACIONAIS.map((id) => ({ id, nome: AREAS[id].nome, cor: AREAS[id].cor, entrega: ENTREGA[id], funcoes: FUNCOES[id] }));
 
-// Catálogo de especialistas já treinados (o gerente de cada setor + alguns papéis-chave)
-export const ESPECIALISTAS = AREAS_OPERACIONAIS.flatMap((id) => {
-  const a = AREAS[id];
-  return [
-    { setor: id, cor: a.cor, cargo: `Gerente de ${a.nome}`, faz: `Recebe suas ordens, distribui pro time e aprova o que sai. ${ENTREGA[id][0].toUpperCase()}${ENTREGA[id].slice(1)}.` },
-    ...FUNCOES[id].slice(0, 2).map((f) => ({ setor: id, cor: a.cor, cargo: f, faz: `Especialista do setor de ${a.nome}, treinado pra executar e reportar ao gerente.` })),
-  ];
-});
+// Catálogo de especialistas: os 39 cargos, com treino e skills (src/office/data/especialistas.ts)
+export const ESPECIALISTAS = ESPECIALISTAS_IA.map((e) => ({ setor: e.area, cor: AREAS[e.area].cor, cargo: e.cargo, faz: e.descricao, skills: e.skills.map((k) => k.nome) }));

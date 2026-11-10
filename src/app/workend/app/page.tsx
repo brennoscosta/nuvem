@@ -89,6 +89,7 @@ export default async function App() {
                   <div>
                     <div className="font-semibold">{e.cargo}</div>
                     <small>{e.faz}</small>
+                    <small className="mt-1 block opacity-80">{e.skills.join(" · ")}</small>
                     <div className="mt-2"><span className="inline-block rounded-full border-[1.5px] border-[var(--linha)] px-3 py-1 text-xs font-semibold text-[var(--tinta-2)]">Contratar · em breve</span></div>
                   </div>
                 </li>
