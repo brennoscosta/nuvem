@@ -5,7 +5,8 @@ import { FLUTUANTE, LARGO } from "./estilo";
 import { useEffect, useState } from "react";
 import { PixAberto } from "./Lote";
 import { useMundo } from "../mundoStore";
-import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, vagasLivres, type Escritorio, type Setor, type Membro, type Pronto } from "../data/escritorio";
+import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, vagasLivres, DECOR_PADRAO, ESTILOS_LETREIRO, PISOS, CERCAS, EXTRAS, CORES_TOLDO, type Escritorio, type Setor, type Membro, type Pronto, type Decoracao } from "../data/escritorio";
+import { frenteDoLote, LOTE_POR_CHAVE } from "../data/mundo";
 
 interface AgenteVenda { id: string; nome: string; cargo: string; setor: string; descricao: string; saudacao: string; skills: string[]; apis: string[]; preco: number; boneco: string; camisa: string }
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -80,7 +81,7 @@ export function PainelEscritorio() {
   const setAbaPedida = useMundo((s) => s.setAbaEscritorio);
   // "contratar" e "treinar" são atalhos pra aba Equipe (com o catálogo aberto / com os treinos abertos)
   const aba = abaPedida === "contratar" || abaPedida === "treinar" ? "equipe" : abaPedida;
-  const setAba = (a: "predio" | "setores" | "equipe") => setAbaPedida(a);
+  const setAba = (a: "predio" | "visual" | "setores" | "equipe") => setAbaPedida(a);
   const [catalogoLocal, setCatalogo] = useState<boolean | null>(null);
   const catalogo = catalogoLocal ?? abaPedida === "contratar";
   const [aVenda, setAVenda] = useState<AgenteVenda[] | null>(null);
@@ -109,11 +110,13 @@ export function PainelEscritorio() {
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
       </div>
       <div className="mx-4 flex gap-1 rounded-xl bg-[#F1F3F6] p-1 text-xs font-semibold">
-        {([["predio", "Prédio"], ["setores", `Setores (${e.setores.length})`], ["equipe", `Equipe (${e.equipe.length})`]] as const).map(([k, t]) => <button key={k} onClick={() => setAba(k)} className={`flex-1 rounded-lg px-2 py-1.5 ${aba === k ? "bg-white shadow" : "text-[#5B6472]"}`}>{t}</button>)}
+        {([["predio", "Prédio"], ["visual", "Fachada"], ["setores", `Setores (${e.setores.length})`], ["equipe", `Equipe (${e.equipe.length})`]] as const).map(([k, t]) => <button key={k} onClick={() => setAba(k)} className={`flex-1 rounded-lg px-2 py-1.5 ${aba === k ? "bg-white shadow" : "text-[#5B6472]"}`}>{t}</button>)}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-3">
+        {aba === "visual" && <AbaVisual e={e} set={set} corMarca={terrenoAtual?.cor ?? "#1D4ED8"} />}
         {aba === "predio" && (
           <div className="space-y-2">
+            {LOTE_POR_CHAVE[vista] && <PosicaoPredio k={LOTE_POR_CHAVE[vista].k} e={e} set={set} />}
             {LAYOUTS.map((L) => (
               <button key={L.id} type="button" onClick={() => set({ ...e, layout: L.id })} className={`flex w-full items-center gap-3 rounded-xl border-2 p-2 text-left ${e.layout === L.id ? "border-[#1D4ED8] bg-[#EEF3FF]" : "border-black/10 hover:bg-black/[0.03]"}`}>
                 <MiniLayout id={L.id} />
@@ -189,6 +192,92 @@ export function PainelEscritorio() {
           <button onClick={clicarSalvar} disabled={salvando} className="flex-1 rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#1a44c2] disabled:opacity-50">{salvando ? "Salvando…" : "Salvar escritório"}</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------- posição do prédio no lote e aba "Fachada e lote" (11/11/2026) ----------
+// Para onde a frente olha depois do giro: rua (os lotes de esquina têm duas) ou vizinho
+const NOMES_LADO = { norte: "norte", sul: "sul", leste: "leste", oeste: "oeste" } as const;
+function frentePara(k: number, giro: number) {
+  const rot = frenteDoLote(k) + Math.PI + giro * (Math.PI / 2);
+  const fx = Math.round(-Math.sin(rot)), fz = Math.round(-Math.cos(rot));
+  const lado = fz < 0 ? "norte" : fz > 0 ? "sul" : fx > 0 ? "leste" : "oeste";
+  const temRua = (lado === "norte" && k < 2) || (lado === "sul" && k >= 2) || (lado === "oeste" && k % 2 === 0) || (lado === "leste" && k % 2 === 1);
+  return { lado, temRua, fx, fz };
+}
+function PosicaoPredio({ k, e, set }: { k: number; e: Escritorio; set: (e: Escritorio) => void }) {
+  const d = e.decor ?? DECOR_PADRAO;
+  const f = frentePara(k, d.giro);
+  const girar = (delta: number) => set({ ...e, decor: { ...d, giro: (((d.giro + delta) % 4) + 4) % 4 as Decoracao["giro"] } });
+  return (
+    <div className="rounded-xl border border-black/10 bg-white p-3">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">Posição no lote</div>
+      <div className="mt-1.5 flex items-center gap-3">
+        <button type="button" onClick={() => girar(1)} className="grid h-10 w-10 place-items-center rounded-xl bg-[#EEF3FF] text-lg font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]" title="Girar para a esquerda" aria-label="Girar o prédio para a esquerda">⟲</button>
+        {/* mini planta do lote: a seta mostra para onde fica a porta */}
+        <svg viewBox="-12 -12 24 24" className="h-14 w-14 shrink-0" aria-hidden="true">
+          <rect x="-10" y="-10" width="20" height="20" rx="2" fill="#F1F3F6" stroke="#C3CCD7" />
+          {k < 2 ? <rect x="-12" y="-12" width="24" height="2" fill="#4A4E55" /> : <rect x="-12" y="10" width="24" height="2" fill="#4A4E55" />}
+          {k % 2 === 0 ? <rect x="-12" y="-12" width="2" height="24" fill="#4A4E55" /> : <rect x="10" y="-12" width="2" height="24" fill="#4A4E55" />}
+          <rect x="-6" y="-5" width="12" height="10" rx="1" fill="#1D4ED8" opacity=".85" transform={`rotate(${f.fx ? 90 : 0})`} />
+          <path d={`M0 0 L${f.fx * 8} ${f.fz * 8}`} stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+          <circle cx={f.fx * 8} cy={f.fz * 8} r="2" fill="#16A34A" />
+        </svg>
+        <button type="button" onClick={() => girar(-1)} className="grid h-10 w-10 place-items-center rounded-xl bg-[#EEF3FF] text-lg font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]" title="Girar para a direita" aria-label="Girar o prédio para a direita">⟳</button>
+        <div className="min-w-0 text-[12px] leading-snug">
+          <b>Frente para o {NOMES_LADO[f.lado as keyof typeof NOMES_LADO]}</b>
+          <div className={f.temRua ? "text-[#166534]" : "text-[#7A5A00]"}>{f.temRua ? "A porta dá para a rua: quem passa vê a sua fachada." : "A porta fica virada para o vizinho; a rua vê a lateral do prédio."}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Opcao({ ativo, onClick, children, titulo }: { ativo: boolean; onClick: () => void; children: React.ReactNode; titulo?: string }) {
+  return <button type="button" title={titulo} onClick={onClick} className={`rounded-xl border-2 px-2.5 py-1.5 text-left text-[12px] font-semibold transition ${ativo ? "border-[#1D4ED8] bg-[#EEF3FF] text-[#1D2128]" : "border-black/10 bg-white text-[#5B6472] hover:border-black/25"}`}>{children}</button>;
+}
+function AbaVisual({ e, set, corMarca }: { e: Escritorio; set: (e: Escritorio) => void; corMarca: string }) {
+  const d = e.decor ?? DECOR_PADRAO;
+  const muda = (p: Partial<Decoracao>) => set({ ...e, decor: { ...d, ...p } });
+  const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-[#5B6472] first:mt-0">{t}</div>;
+  return (
+    <div>
+      {titulo("Letreiro")}
+      <div className="grid grid-cols-2 gap-1.5">
+        {ESTILOS_LETREIRO.map((s) => (
+          <Opcao key={s.id} ativo={d.letreiro === s.id} onClick={() => muda({ letreiro: s.id })} titulo={s.desc}>
+            <span className="mb-1 block h-5 rounded-md" style={s.id === "neon" ? { background: "#0E1014", boxShadow: `inset 0 0 0 2px ${corMarca}, 0 0 8px ${corMarca}` } : s.id === "madeira" ? { background: "linear-gradient(#8A5A33,#6E4527)" } : s.id === "metal" ? { background: "linear-gradient(#E3E7EC,#B9C0C9)" } : { background: "#1F2630", borderBottom: `3px solid ${corMarca}` }} />
+            {s.nome}
+          </Opcao>
+        ))}
+      </div>
+      {titulo("Toldo na entrada")}
+      {e.layout === "loja" ? <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A Loja de rua já vem com o toldo listrado dela.</div> : <div className="flex flex-wrap items-center gap-1.5">
+        <Opcao ativo={!d.toldo} onClick={() => muda({ toldo: null })}>Sem toldo</Opcao>
+        {[corMarca, ...CORES_TOLDO.filter((c) => c.toLowerCase() !== corMarca.toLowerCase())].map((c) => (
+          <button key={c} type="button" onClick={() => muda({ toldo: c })} aria-label={`Toldo ${c}`} className={`h-8 w-8 rounded-full border-2 ${d.toldo === c ? "border-[#1D2128]" : "border-transparent"}`} style={{ background: `repeating-linear-gradient(90deg, ${c} 0 6px, #fff 6px 12px)` }} />
+        ))}
+      </div>}
+      {titulo("Piso do lote")}
+      <div className="grid grid-cols-2 gap-1.5">
+        {PISOS.map((p) => <Opcao key={p.id} ativo={d.piso === p.id} onClick={() => muda({ piso: p.id })}><span className="mr-1.5 inline-block h-3 w-3 rounded-sm align-middle" style={{ background: p.cor }} />{p.nome}</Opcao>)}
+      </div>
+      {titulo("Cerca")}
+      <div className="grid grid-cols-2 gap-1.5">
+        {CERCAS.map((c) => <Opcao key={c.id} ativo={d.cerca === c.id} onClick={() => muda({ cerca: c.id })}>{c.nome}</Opcao>)}
+      </div>
+      {titulo("Árvores no lote")}
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => muda({ arvores: Math.max(0, d.arvores - 1) })} className="h-8 w-8 rounded-lg bg-[#F1F3F6] font-bold" aria-label="Menos árvores">−</button>
+        <span className="min-w-[5ch] text-center text-sm font-bold">{d.arvores} {d.arvores === 1 ? "árvore" : "árvores"}</span>
+        <button type="button" onClick={() => muda({ arvores: Math.min(4, d.arvores + 1) })} className="h-8 w-8 rounded-lg bg-[#F1F3F6] font-bold" aria-label="Mais árvores">+</button>
+      </div>
+      {titulo("Na frente da loja")}
+      <div className="grid grid-cols-2 gap-1.5">
+        {EXTRAS.map((x) => { const on = d.extras.includes(x.id); return <Opcao key={x.id} ativo={on} onClick={() => muda({ extras: on ? d.extras.filter((y) => y !== x.id) : [...d.extras, x.id] })}><span className="mr-1">{x.icone}</span>{x.nome}</Opcao>; })}
+      </div>
+      <div className="mt-3 rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">Tudo aparece no mapa enquanto você escolhe. Mudar a fachada e o lote é grátis e não conta como troca de prédio.</div>
     </div>
   );
 }

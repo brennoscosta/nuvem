@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { ControlesCamera, ControlesCameraCelular } from "./ControlesCamera";
 import { PainelEscritorio } from "./Escritorio";
 import { PainelPersonagem, FichaPersonagem, ChatPersonagem, CaixaPersonagem } from "./Personagem";
 import { JanelaChamada } from "./Chamada";
@@ -279,9 +280,11 @@ export function Painel() {
       <ModalLogin />
       <ModalContratar />
       <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2">
-        <div className="hidden rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur sm:block">Arraste pra mover · roda do mouse pra zoom · botão direito pra girar · clique no boneco pra ver a ficha · clique num lote “À venda” pra reservar</div>
+        <div className="hidden rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur sm:block">Arraste pra mover · roda pra zoom · botão direito pra girar · duplo clique vai até o ponto · teclado: WASD e Q/E</div>
+        <ControlesCameraCelular />
         <BotaoGraficos />
       </div>
+      <ControlesCamera />
     </>
   );
 }

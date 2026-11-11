@@ -8,7 +8,7 @@ import type { Escritorio } from "./data/escritorio";
 export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null; escritorio: Escritorio | null; nicho?: string }
 export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
 export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null; ceoNome: string; atendenteNome: string; nicho: string }
-export type AbaEscritorio = "predio" | "setores" | "equipe" | "contratar" | "treinar";
+export type AbaEscritorio = "predio" | "visual" | "setores" | "equipe" | "contratar" | "treinar";
 export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" | "personagem" }
 
 export const CORES_EMPRESA = ["#1D4ED8", "#0EA5A4", "#16A34A", "#D97706", "#DC2626", "#DB2777", "#7C3AED", "#1F2937"];

@@ -8,6 +8,7 @@ import { Predio } from "./Predio";
 import { Mundo } from "./Mundo";
 import { MUNDO } from "../data/mundo";
 import { Fachada } from "./Fachada";
+import { CameraMundo } from "./CameraMundo";
 import { Agente, handlers } from "./Agente";
 import { qualidade } from "./qualidade";
 import { useEscritorio } from "../store";
@@ -193,6 +194,7 @@ export function Cena() {
       {MEDIR && <Medidor />}
       <MapControls ref={controles} target={cam.alvo} minDistance={4} maxDistance={RETRATO ? 138 : 119} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
       <FocoCamera controles={controles} />
+      {modoMundo() && <CameraMundo controles={controles} inicio={CAM_MUNDO} />}
     </Canvas>
   );
 }

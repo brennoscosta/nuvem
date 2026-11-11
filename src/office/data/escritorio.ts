@@ -9,13 +9,14 @@ import { BONECOS } from "./bonecos";
 export type LayoutId = "vidro" | "moderno" | "sobrado" | "loja" | "galpao" | "container";
 export interface LayoutInfo { id: LayoutId; nome: string; descricao: string; altura: number; andares: 1 | 2; modelo: string; letreiro: { y: number; z: number; largura: number } }
 export const LAYOUTS: LayoutInfo[] = [
-  // altura = escala do GLB (normalizado com altura 1); letreiro fica sobre o quadro em branco de cada prédio (medido nas imagens)
+  // altura = escala do GLB (normalizado com altura 1); letreiro fica sobre o quadro em branco de cada prédio (medido nas imagens;
+  // moderno, loja, galpão e contêiner reajustados em 11/11/2026 com fotos de frente: estavam 1 a 2 m abaixo do quadro)
   { id: "vidro", nome: "Cubo de vidro", descricao: "Dois andares todos de vidro, com jardim no terraço. Dá pra ver a equipe trabalhando de fora.", altura: 13, andares: 2, modelo: "escritorioVidro", letreiro: { y: 4.7, z: -5.85, largura: 4.6 } },
-  { id: "moderno", nome: "Térreo moderno", descricao: "Caixa branca com vitrine de vidro e parede de ripas de madeira.", altura: 7.8, andares: 1, modelo: "escritorioModerno", letreiro: { y: 5.5, z: -6.85, largura: 5.6 } },
+  { id: "moderno", nome: "Térreo moderno", descricao: "Caixa branca com vitrine de vidro e parede de ripas de madeira.", altura: 7.8, andares: 1, modelo: "escritorioModerno", letreiro: { y: 7.3, z: -6.85, largura: 5.6 } },
   { id: "sobrado", nome: "Sobrado comercial", descricao: "Loja de vidro embaixo, varanda e janelas em fita em cima.", altura: 11.5, andares: 2, modelo: "escritorioSobrado", letreiro: { y: 5.75, z: -6.45, largura: 5 } },
-  { id: "loja", nome: "Loja de rua", descricao: "Telhadinho de barro, vitrine com toldo listrado e vaso na porta.", altura: 11, andares: 1, modelo: "escritorioLoja", letreiro: { y: 6.7, z: -5.4, largura: 4.5 } },
-  { id: "galpao", nome: "Galpão de tijolinho", descricao: "Antigo galpão industrial com janelas em arco e claraboias. Cara de estúdio criativo.", altura: 10.5, andares: 1, modelo: "escritorioGalpao", letreiro: { y: 6.1, z: -7.1, largura: 4.6 } },
-  { id: "container", nome: "Contêineres", descricao: "Três contêineres empilhados com frente de vidro, deck de madeira e escada externa.", altura: 9.2, andares: 2, modelo: "escritorioContainer", letreiro: { y: 3.0, z: -5.35, largura: 4 } },
+  { id: "loja", nome: "Loja de rua", descricao: "Telhadinho de barro, vitrine com toldo listrado e vaso na porta.", altura: 11, andares: 1, modelo: "escritorioLoja", letreiro: { y: 7.85, z: -5.4, largura: 4.5 } },
+  { id: "galpao", nome: "Galpão de tijolinho", descricao: "Antigo galpão industrial com janelas em arco e claraboias. Cara de estúdio criativo.", altura: 10.5, andares: 1, modelo: "escritorioGalpao", letreiro: { y: 7.95, z: -7.1, largura: 4.6 } },
+  { id: "container", nome: "Contêineres", descricao: "Três contêineres empilhados com frente de vidro, deck de madeira e escada externa.", altura: 9.2, andares: 2, modelo: "escritorioContainer", letreiro: { y: 4.9, z: -5.35, largura: 4 } },
 ];
 // Profissionais prontos pra contratar (vêm com cargo e treino); o dono também pode criar do zero
 export interface Pronto { id: string; nome: string; cargo: string; setor: string; boneco: string; camisa: string; treino: Treino }
@@ -36,7 +37,41 @@ export type PapelMembro = "atendente" | "ceo" | "profissional";
 export interface Treino { descricao: string; saudacao: string } // o que a pessoa sabe/faz e como cumprimenta (base do atendimento)
 // catalogoId: de qual agente do catálogo veio ("esp-<id>" = especialista de IA, com habilidades); vazio = criado do zero
 export interface Membro { id: string; nome: string; cargo: string; papel: PapelMembro; setorId: string | null; boneco: string; camisa: string; treino?: Treino; catalogoId?: string }
-export interface Escritorio { layout: LayoutId; setores: Setor[]; equipe: Membro[]; trocasLayout?: number; creditosLayout?: number }
+export interface Escritorio { layout: LayoutId; setores: Setor[]; equipe: Membro[]; trocasLayout?: number; creditosLayout?: number; decor?: Decoracao }
+
+// ---- Decoração do lote (11/11/2026: "novas formas de personalização de prédios" e "girar para outras posições") ----
+// giro: quartos de volta a partir da frente para a rua (0 = rua principal). Tudo opcional; o padrão é o lote de sempre.
+export type EstiloLetreiro = "painel" | "neon" | "madeira" | "metal";
+export type PisoLote = "grama" | "deck" | "pedra" | "concreto";
+export type CercaLote = "nenhuma" | "viva" | "madeira" | "muro";
+export type ExtraLote = "bancos" | "mesas" | "vasos" | "totem" | "bandeiras" | "luzes" | "bicicletario";
+export interface Decoracao { giro: 0 | 1 | 2 | 3; letreiro: EstiloLetreiro; toldo: string | null; piso: PisoLote; cerca: CercaLote; arvores: number; extras: ExtraLote[] }
+export const DECOR_PADRAO: Decoracao = { giro: 0, letreiro: "painel", toldo: null, piso: "grama", cerca: "nenhuma", arvores: 0, extras: [] };
+export const ESTILOS_LETREIRO: { id: EstiloLetreiro; nome: string; desc: string }[] = [
+  { id: "painel", nome: "Painel", desc: "Painel escuro com faixa na cor da marca" },
+  { id: "neon", nome: "Neon", desc: "Letras e borda acesas na cor da marca" },
+  { id: "madeira", nome: "Madeira", desc: "Placa de madeira com letras claras" },
+  { id: "metal", nome: "Metal", desc: "Chapa escovada com letras escuras" },
+];
+export const PISOS: { id: PisoLote; nome: string; cor: string }[] = [
+  { id: "grama", nome: "Grama", cor: "#79B968" }, { id: "deck", nome: "Deck de madeira", cor: "#B98A5A" },
+  { id: "pedra", nome: "Pedra portuguesa", cor: "#D9D2C3" }, { id: "concreto", nome: "Concreto", cor: "#BFC3C7" },
+];
+export const CERCAS: { id: CercaLote; nome: string }[] = [{ id: "nenhuma", nome: "Sem cerca" }, { id: "viva", nome: "Cerca viva" }, { id: "madeira", nome: "Cerca de madeira" }, { id: "muro", nome: "Muro baixo" }];
+export const EXTRAS: { id: ExtraLote; nome: string; icone: string }[] = [
+  { id: "bancos", nome: "Bancos", icone: "🪑" }, { id: "mesas", nome: "Mesas com guarda-sol", icone: "⛱️" }, { id: "vasos", nome: "Vasos na entrada", icone: "🪴" },
+  { id: "totem", nome: "Totem com a logo", icone: "🪧" }, { id: "bandeiras", nome: "Bandeiras da marca", icone: "🚩" }, { id: "luzes", nome: "Varal de luzinhas", icone: "✨" },
+  { id: "bicicletario", nome: "Bicicletário", icone: "🚲" },
+];
+export const CORES_TOLDO = ["#E2575B", "#F59E0B", "#16A34A", "#1D4ED8", "#7C3AED", "#1F2630"];
+export function limparDecor(x: unknown, base: Decoracao = DECOR_PADRAO): Decoracao {
+  const o = (x && typeof x === "object" ? x : {}) as Partial<Record<keyof Decoracao, unknown>>;
+  const giro = [0, 1, 2, 3].includes(Number(o.giro)) ? (Number(o.giro) as Decoracao["giro"]) : base.giro;
+  const um = <T extends string>(v: unknown, lista: { id: T }[], padrao: T) => (lista.some((l) => l.id === v) ? (v as T) : padrao);
+  const toldo = o.toldo === null ? null : typeof o.toldo === "string" && /^#[0-9a-fA-F]{6}$/.test(o.toldo) ? o.toldo : o.toldo === undefined ? base.toldo : null;
+  const extras = Array.isArray(o.extras) ? [...new Set(o.extras.filter((e): e is ExtraLote => EXTRAS.some((x) => x.id === e)))] : base.extras;
+  return { giro, letreiro: um(o.letreiro, ESTILOS_LETREIRO, base.letreiro), toldo, piso: um(o.piso, PISOS, base.piso), cerca: um(o.cerca, CERCAS, base.cerca), arvores: Math.max(0, Math.min(4, Math.round(Number(o.arvores ?? base.arvores)) || 0)), extras };
+}
 export const TROCAS_LAYOUT_GRATIS = 3;
 export const PRECO_TROCA_LAYOUT = 9.9;
 export const trocasRestantes = (e: Escritorio) => Math.max(0, TROCAS_LAYOUT_GRATIS - (e.trocasLayout ?? 0)) + (e.creditosLayout ?? 0);
@@ -110,7 +145,7 @@ export function normalizarEscritorio(x: unknown, base: Escritorio): Escritorio {
   for (const p of ["atendente", "ceo"] as const) if (!equipe.some((e) => e.papel === p)) equipe.unshift(base.equipe.find((e) => e.papel === p) ?? escritorioPadrao("Empresa", "#1D4ED8").equipe.find((e) => e.papel === p)!);
   equipe.sort((a, b) => ordem(a.papel) - ordem(b.papel));
   // contadores de troca de layout são do servidor: o cliente não mexe neles
-  return { layout, setores, equipe, trocasLayout: base.trocasLayout ?? 0, creditosLayout: base.creditosLayout ?? 0 };
+  return { layout, setores, equipe, trocasLayout: base.trocasLayout ?? 0, creditosLayout: base.creditosLayout ?? 0, decor: limparDecor(o.decor, base.decor ?? DECOR_PADRAO) };
 }
 const ordem = (p: PapelMembro) => (p === "atendente" ? 0 : p === "ceo" ? 1 : 2);
 
