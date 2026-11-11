@@ -1,6 +1,6 @@
 "use client";
 // Vídeo de 1 minuto que explica o WorkEnd. Começa mudo (a legenda está gravada na imagem) quando a seção aparece;
-// "Assistir com som" volta ao começo, liga o áudio e os controles. Só baixa o arquivo quando chega perto da tela.
+// o play grande no centro (o vídeo inteiro é clicável) volta ao começo, liga o áudio e os controles. Só baixa o arquivo quando chega perto da tela.
 import { useEffect, useRef, useState } from "react";
 
 export function VideoExplica({ src, poster }: { src: string; poster: string }) {
@@ -22,9 +22,9 @@ export function VideoExplica({ src, poster }: { src: string; poster: string }) {
     <div className="wc-video">
       <video ref={v} src={carregar ? src : undefined} poster={poster} muted loop playsInline preload="none" aria-label="Como funciona o WorkEnd, em 1 minuto" onEnded={() => setComSom(false)} />
       {!comSom && (
-        <button type="button" className="wc-som" onClick={ouvir}>
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>
-          Assistir com som<small>1 min</small>
+        <button type="button" className="wc-play" onClick={ouvir} aria-label="Assistir com som: como funciona o WorkEnd, em 1 minuto">
+          <span className="wc-play-bola"><svg viewBox="0 0 24 24" aria-hidden><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg></span>
+          <span className="wc-play-rotulo">Assistir com som<small>1 min</small></span>
         </button>
       )}
     </div>
