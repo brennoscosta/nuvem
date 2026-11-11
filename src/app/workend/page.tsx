@@ -9,7 +9,7 @@ import { LOTES } from "@/office/data/mundo";
 import { LAYOUTS, type LayoutId } from "@/office/data/escritorio";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 import { AREAS } from "@/office/data/org";
-import { Rodape, SETORES } from "./_partes";
+import { Rodape, SETORES, fotoEspecialista } from "./_partes";
 import { Logotipo } from "./_marca";
 import { TituloLiquido } from "./_inicio/TituloLiquido";
 import { GaleriaPredios } from "./_inicio/GaleriaPredios";
@@ -85,7 +85,7 @@ export default async function Inicio() {
   const u = await usuarioAtual().catch(() => null);
   const livres = await lotesLivres();
   const lote = livres.length ? LOTES.find((l) => l.chave === livres[0]) ?? null : null;
-  const crachas = ESPECIALISTAS_IA.map((e) => ({ nome: e.nome, cargo: e.cargo, cor: AREAS[e.area].cor, skill: e.skills[0]?.nome ?? "" }));
+  const crachas = ESPECIALISTAS_IA.map((e) => ({ id: e.id, nome: e.nome, cargo: e.cargo, cor: AREAS[e.area].cor, skill: e.skills[0]?.nome ?? "" }));
   const filas = [crachas.filter((_, i) => i % 2 === 0), crachas.filter((_, i) => i % 2 === 1)];
   const cta = u ? { href: "/app", texto: "Abrir meu escritório" } : { href: lote ? `/cadastro?lote=${encodeURIComponent(lote.chave)}` : "/cadastro", texto: "Criar conta grátis" };
   const predios = LAYOUTS.map((l) => ({ id: l.id, nome: l.nome, descricao: l.descricao, andares: l.andares, cores: CORES_PREDIO[l.id] }));
@@ -166,7 +166,7 @@ export default async function Inicio() {
                   <div key={k} className={`wi-fila ${k ? "volta" : ""}`}>
                     <div className="wi-trilho">{[...f, ...f].map((c, i) => (
                       <div key={i} className="wi-cracha" style={{ ["--cor" as string]: c.cor }} aria-hidden={i >= f.length}>
-                        <span className="wi-avatar">{c.nome[0]}</span>
+                        <img className="wi-avatar" src={fotoEspecialista(c.id)} alt="" width={96} height={96} loading="lazy" decoding="async" />
                         <div><b>{c.nome}</b><small>{c.cargo}</small><em>{c.skill}</em></div>
                       </div>
                     ))}</div>

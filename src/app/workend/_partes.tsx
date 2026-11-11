@@ -75,4 +75,6 @@ export const ENTREGA: Record<AreaId, string> = {
 export const SETORES = AREAS_OPERACIONAIS.map((id) => ({ id, nome: AREAS[id].nome, cor: AREAS[id].cor, entrega: ENTREGA[id], funcoes: FUNCOES[id] }));
 
 // Catálogo de especialistas: os 39 cargos, com treino e skills (src/office/data/especialistas.ts)
-export const ESPECIALISTAS = ESPECIALISTAS_IA.map((e) => ({ setor: e.area, cor: AREAS[e.area].cor, cargo: e.cargo, faz: e.descricao, skills: e.skills.map((k) => k.nome) }));
+// foto de cada especialista: public/workend/agentes/<id>.webp (retratos 3D no estilo dos bonecos da cidade)
+export const fotoEspecialista = (id: string) => `/workend/agentes/${id}.webp`;
+export const ESPECIALISTAS = ESPECIALISTAS_IA.map((e) => ({ id: e.id, nome: e.nome, foto: fotoEspecialista(e.id), setor: e.area, cor: AREAS[e.area].cor, cargo: e.cargo, faz: e.descricao, skills: e.skills.map((k) => k.nome) }));

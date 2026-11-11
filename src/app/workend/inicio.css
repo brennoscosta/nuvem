@@ -313,6 +313,7 @@
 .wi .wi-filas:hover .wi-trilho { animation-play-state: paused; }
 @keyframes wi-trilho { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .wi .wi-cracha { flex: none; display: flex; gap: .75rem; align-items: center; width: 290px; padding: .85rem 1rem; border-radius: 20px; background: rgba(6,24,51,.32); border: 1px solid rgba(255,255,255,.16); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: #fff; }
+.wi img.wi-avatar { width: 48px; height: 48px; object-fit: cover; box-shadow: 0 0 0 2px rgba(255,255,255,.85); }
 .wi .wi-cracha b { display: block; } .wi .wi-cracha small { display: block; color: rgba(255,255,255,.72); font-size: .84rem; }
 .wi .wi-cracha em { display: inline-block; margin-top: .25rem; font-style: normal; font-size: .76rem; font-weight: 600; color: #fff; background: color-mix(in srgb, var(--cor) 45%, transparent); padding: .15rem .5rem; border-radius: 6px; }
 

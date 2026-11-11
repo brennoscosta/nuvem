@@ -69,7 +69,8 @@
 .we .placa-cinza { background: var(--cinza); color: var(--tinta-2); box-shadow: none; font-weight: 600; }
 .we .placa-cinza b { background: var(--cor, var(--azul)); }
 .we .cracha { display: grid; grid-template-columns: 50px 1fr; gap: .9rem; align-items: start; background: var(--surface); border: 1px solid var(--linha); border-radius: 12px; padding: 1rem; }
-.we .cracha .foto { width: 50px; height: 50px; border-radius: 10px; background: var(--cor, var(--azul)); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 1.2rem; }
+.we .cracha .foto { width: 50px; height: 50px; border-radius: 12px; overflow: hidden; background: var(--cor, var(--azul)); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 1.2rem; }
+.we .cracha .foto img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .we .cracha small { color: var(--tinta-2); font-size: .85rem; }
 .we .vitrine { position: relative; }
 

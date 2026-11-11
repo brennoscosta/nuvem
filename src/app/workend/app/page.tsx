@@ -85,9 +85,9 @@ export default async function App() {
             <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
               {ESPECIALISTAS.filter((e) => e.setor === s.id).map((e) => (
                 <li key={e.cargo} className="cracha" style={{ ["--cor" as string]: e.cor }}>
-                  <div className="foto">{e.cargo.replace("Gerente de ", "")[0]}</div>
+                  <div className="foto"><img src={e.foto} alt={`Foto de ${e.nome}`} width={100} height={100} loading="lazy" decoding="async" /></div>
                   <div>
-                    <div className="font-semibold">{e.cargo}</div>
+                    <div className="font-semibold">{e.nome} <span className="font-normal text-[var(--tinta-2)]">· {e.cargo}</span></div>
                     <small>{e.faz}</small>
                     <small className="mt-1 block opacity-80">{e.skills.join(" · ")}</small>
                     <div className="mt-2"><span className="inline-block rounded-full border-[1.5px] border-[var(--linha)] px-3 py-1 text-xs font-semibold text-[var(--tinta-2)]">Contratar · em breve</span></div>
