@@ -47,6 +47,6 @@ export function jsonLdLanding() {
     publisher: { "@id": `${SITE}/#org` },
   };
   const pagina = { "@type": "WebPage", "@id": `${SITE}/#page`, url: SITE, name: TITULO, description: DESCRICAO, inLanguage: "pt-BR", isPartOf: { "@id": `${SITE}/#site` }, about: { "@id": `${SITE}/#app` }, primaryImageOfPage: `${SITE}${OG.url}` };
-  const video = { "@type": "VideoObject", name: "Demonstração do escritório virtual WorkEnd", description: "O prédio de vidro, os setores e a equipe no escritório virtual.", thumbnailUrl: `${SITE}/workend/poster.jpg`, contentUrl: `${SITE}/workend/demo.mp4`, uploadDate: "2026-10-20", duration: "PT28S", inLanguage: "pt-BR" };
+  const video = { "@type": "VideoObject", name: "Como funciona o WorkEnd, em 1 minuto", description: "Escolher o lote no mapa, pagar no Pix, pôr a marca na fachada, montar as salas e a equipe e fazer negócio com quem está do lado.", thumbnailUrl: `${SITE}/workend/como-funciona.jpg`, contentUrl: `${SITE}/workend/como-funciona.mp4`, uploadDate: "2026-11-11", duration: "PT1M7S", inLanguage: "pt-BR" };
   return { "@context": "https://schema.org", "@graph": [org, site, app, pagina, video] };
 }

@@ -17,7 +17,9 @@ import { GaleriaPredios } from "./_inicio/GaleriaPredios";
 import { Configurador } from "./_inicio/Configurador";
 import { SecaoEsfera } from "./_inicio/SecaoEsfera";
 import { Setores, type SetorVitrine } from "./_inicio/Setores";
-import { Revelar, Contador, Maquina, Rolagem } from "./_inicio/efeitos";
+import { Revelar, Contador, Rolagem } from "./_inicio/efeitos";
+import { CenaLote, CenaFachada, CenaEquipe } from "./_inicio/CenasPassos";
+import { VideoExplica } from "./_inicio/VideoExplica";
 import "./inicio.css";
 
 export const dynamic = "force-dynamic";
@@ -71,50 +73,6 @@ function Cabecalho({ logado }: { logado: boolean }) {
   );
 }
 
-// Passo 1: o mapa visto de cima; o cursor escolhe um lote livre e ele vira o seu
-function CenaMapa() {
-  const casas = new Set([1, 3, 6, 8, 12, 15, 17]);
-  return (
-    <div className="wi-cena wi-cena-mapa" aria-hidden>
-      <div className="wi-iso">
-        {Array.from({ length: 20 }, (_, k) => <span key={k} className={k === 9 ? "alvo" : casas.has(k) ? "casa" : ""}>{k === 9 && <em className="wi-placa-mini">Sua empresa</em>}</span>)}
-      </div>
-      <svg className="wi-cursor" viewBox="0 0 24 24" width="30" height="30"><path d="M4 2l15 11-6.5 1.2L16 21l-2.6 1.1-3-6.6L5 20z" fill="#121419" stroke="#fff" strokeWidth="1.4" strokeLinejoin="round" /></svg>
-      <i className="wi-toque" />
-    </div>
-  );
-}
-// Passo 2: a fachada recebe a placa com o nome e a cor da marca
-function CenaFachada() {
-  return (
-    <div className="wi-cena wi-cena-fachada" aria-hidden>
-      <div className="wi-predio">
-        <div className="wi-letreiro"><Maquina textos={["Padaria do Bairro", "Studio Ana", "Oficina 77", "Clínica Sorriso"]} /><b /></div>
-        <div className="wi-janelas">{Array.from({ length: 6 }, (_, k) => <i key={k} style={{ ["--k" as string]: k }} />)}</div>
-        <div className="wi-porta" />
-      </div>
-      <div className="wi-arvore-css" />
-      <div className="wi-calcada" />
-    </div>
-  );
-}
-// Passo 3: a equipe entra e senta no setor de cada um
-function CenaEquipe() {
-  const gente: [string, string, string, number, number][] = [["B", "CEO", "#D9A23A", -66, -118], ["F", "Atendente", "#3FBFA8", 66, -118], ["R", "Vendas", "#22A86B", -66, -40], ["J", "Social", "#F2913D", 66, -40]];
-  return (
-    <div className="wi-cena wi-cena-equipe" aria-hidden>
-      <div className="wi-planta">
-        <div className="wi-sala-mini" style={{ ["--cor" as string]: "#D9A23A" }}><small>Diretoria</small></div>
-        <div className="wi-sala-mini" style={{ ["--cor" as string]: "#3FBFA8" }}><small>Atendimento</small></div>
-        <div className="wi-sala-mini" style={{ ["--cor" as string]: "#22A86B" }}><small>Vendas</small></div>
-        <div className="wi-sala-mini" style={{ ["--cor" as string]: "#F2913D" }}><small>Social media</small></div>
-        <span className="wi-entrada">entrada</span>
-        {gente.map(([l, c, cor, x, y], k) => <span key={c} className="wi-pessoa" style={{ ["--k" as string]: k, ["--cor" as string]: cor, ["--x" as string]: `${x}px`, ["--y" as string]: `${y}px` }}>{l}<em>{c}</em></span>)}
-      </div>
-    </div>
-  );
-}
-
 // A rede: duas lojas do mapa conversando, propondo um negócio e fazendo uma chamada
 function CenaRede() {
   return (
@@ -140,7 +98,7 @@ export default async function Inicio() {
   const cta = u ? { href: "/app", texto: "Abrir meu escritório" } : { href: lote ? `/cadastro?lote=${encodeURIComponent(lote.chave)}` : "/cadastro", texto: "Criar conta grátis" };
   const predios = LAYOUTS.map((l) => ({ id: l.id, nome: l.nome, descricao: l.descricao, andares: l.andares, cores: CORES_PREDIO[l.id] }));
   const passos = [
-    { cena: <CenaMapa />, titulo: "Escolha o seu lote", texto: `São ${LOTES.length} lotes espalhados pela cidade. Clique num livre e ele fica reservado por 1 hora enquanto você paga no Pix.` },
+    { cena: <CenaLote />, titulo: "Escolha o seu lote", texto: `São ${LOTES.length} lotes espalhados pela cidade. Clique num livre e ele fica reservado por 1 hora enquanto você paga no Pix.` },
     { cena: <CenaFachada />, titulo: "Ponha a sua marca na fachada", texto: "Nome, logomarca e cor no letreiro e na placa, à vista de todo mundo que passa pela rua." },
     { cena: <CenaEquipe />, titulo: "Monte a sua equipe", texto: "Escolha entre 6 prédios, crie a sala de cada setor e dê nome e rosto a cada pessoa." },
   ];
@@ -193,10 +151,10 @@ export default async function Inicio() {
 
         {/* ---------- a cidade ---------- */}
         <section id="mapa" className="wc">
-          <Revelar className="faixa ws-cab ws-cab-claro"><h2>Uma cidade inteira de empresas, <em>aberta 24 horas.</em></h2><p>Ruas, carros, gente andando na calçada e lojas com a vitrine acesa. Passeie antes de escolher o seu endereço.</p></Revelar>
+          <Revelar className="faixa ws-cab ws-cab-claro"><h2>Uma cidade inteira de empresas, <em>aberta 24 horas.</em></h2><p>Veja em 1 minuto como funciona: escolher o lote, pôr a marca na fachada, montar a equipe e fazer negócio com quem está do lado.</p></Revelar>
           <Rolagem className="wc-zoom">
             <div className="wc-tela">
-              <video src="/workend/demo.mp4" poster="/workend/poster.jpg" autoPlay muted loop playsInline preload="metadata" aria-label="Passeio pelo mapa do WorkEnd" />
+              <VideoExplica src="/workend/como-funciona.mp4" poster="/workend/como-funciona.jpg" />
               <Link href="/mundo" className="wi-btn wi-btn-vidro wc-btn">Passear pelo mapa agora<span aria-hidden>→</span></Link>
             </div>
           </Rolagem>
