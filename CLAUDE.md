@@ -1,6 +1,9 @@
 # WorkEnd (workend.online) — regras de design
 
-Desde 11/11/2026 o site segue o redesign do designer. Antes de mexer no visual do WorkEnd, leia
+Marca (logotipo, azul #0A6CFF) segue o redesign do designer de 11/11/2026. ATENÇÃO: na mesma noite o dono recusou a
+página inicial do designer ("ficou horrível") e pediu 5 seções com imagem, movimento e o vídeo em destaque — a
+página inicial atual (src/app/workend/page.tsx) é essa versão do dono; as regras de movimento e de 3D do brief
+NÃO valem para a página inicial. Valem para a marca. Antes de mexer no visual do WorkEnd, leia
 `docs/redesign-2026-11/BRIEF.md` inteiro (marca, cores, tipografia, 3D, movimento) — as regras dele valem
 acima de preferência pessoal. Resumo do que mais quebra:
 

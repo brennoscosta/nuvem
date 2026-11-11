@@ -1,17 +1,30 @@
 "use client";
-// Vídeo de 1 minuto (como funciona o WorkEnd). Não toca sozinho: só baixa e toca quando a pessoa clica.
-import { useState } from "react";
+// Vídeo de 1 minuto que explica o WorkEnd. Começa mudo (a legenda está gravada na imagem) quando a seção aparece;
+// "Assistir com som" volta ao começo, liga o áudio e os controles. Só baixa o arquivo quando chega perto da tela.
+import { useEffect, useRef, useState } from "react";
 
 export function VideoExplica({ src, poster }: { src: string; poster: string }) {
-  const [tocando, setTocando] = useState(false);
+  const v = useRef<HTMLVideoElement>(null);
+  const [comSom, setComSom] = useState(false);
+  const [carregar, setCarregar] = useState(false);
+  useEffect(() => {
+    const el = v.current; if (!el) return;
+    const parado = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setCarregar(true); if (!parado && el.muted) el.play().catch(() => {}); }
+      else if (el.muted) el.pause();
+    }, { rootMargin: "200px 0px", threshold: 0.25 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const ouvir = () => { const el = v.current; if (!el) return; setCarregar(true); el.muted = false; el.loop = false; el.currentTime = 0; el.controls = true; el.play().catch(() => {}); setComSom(true); };
   return (
-    <div className="viewport" data-asset="video">
-      {tocando ? (
-        <video src={src} poster={poster} controls autoPlay playsInline aria-label="Como funciona o WorkEnd, em 1 minuto" />
-      ) : (
-        <button type="button" className="video-btn" onClick={() => setTocando(true)} aria-label="Assistir: como funciona o WorkEnd, em 1 minuto, com som">
-          <img src={poster} alt="" width={1280} height={720} loading="lazy" decoding="async" />
-          <span><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>Como funciona, em 1 minuto</span>
+    <div className="wc-video">
+      <video ref={v} src={carregar ? src : undefined} poster={poster} muted loop playsInline preload="none" aria-label="Como funciona o WorkEnd, em 1 minuto" onEnded={() => setComSom(false)} />
+      {!comSom && (
+        <button type="button" className="wc-som" onClick={ouvir}>
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>
+          Assistir com som<small>1 min</small>
         </button>
       )}
     </div>
