@@ -1,19 +1,19 @@
 "use client";
-// Galeria arrastável dos 6 prédios (renders ao entardecer em cartões escuros), com inércia e encaixe no centro.
+// Galeria arrastável dos 6 prédios (renders claros sobre cartões em tons pastel), com inércia e encaixe no centro.
 // O nome digitado aparece aceso numa placa (HTML) sobre o prédio do meio. Teclado (setas) e botões também giram.
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export interface PredioGaleria { id: string; nome: string; descricao: string; andares: number }
+export interface PredioGaleria { id: string; nome: string; descricao: string; andares: number; cores: [string, string] }
 
-const larguraDoCartao = (palco: number) => (palco < 640 ? Math.min(330, palco * 0.8) : Math.min(560, palco * 0.44));
+const larguraDoCartao = (palco: number) => (palco < 640 ? Math.min(300, palco * 0.66) : Math.min(350, palco * 0.28));
 
 export function GaleriaPredios({ predios, lote, logado }: { predios: PredioGaleria[]; lote: { chave: string; numero: number } | null; logado: boolean }) {
   const N = predios.length;
   const [pos, setPos] = useState(0);
-  const [w, setW] = useState(480);
+  const [w, setW] = useState(320);
   const [nome, setNome] = useState("");
-  const s = useRef({ pos: 0, alvo: 0, arrastando: false, x0: 0, p0: 0, ultX: 0, ultT: 0, v: 0, moveu: false, w: 480 });
+  const s = useRef({ pos: 0, alvo: 0, arrastando: false, x0: 0, p0: 0, ultX: 0, ultT: 0, v: 0, moveu: false, w: 320 });
   const palco = useRef<HTMLDivElement>(null);
   const raf = useRef(0);
   useEffect(() => {
@@ -66,16 +66,18 @@ export function GaleriaPredios({ predios, lote, logado }: { predios: PredioGaler
         {predios.map((x, i) => {
           let o = i - pos; o = ((((o + N / 2) % N) + N) % N) - N / 2;
           const a = Math.abs(o), sinal = Math.sign(o);
-          const tx = sinal * (Math.min(a, 1) * w * 0.7 + Math.max(0, a - 1) * w * 0.38);
+          const tx = sinal * (Math.min(a, 1) * w * 0.74 + Math.max(0, a - 1) * w * 0.42);
           const estilo = {
-            transform: `translate3d(${tx.toFixed(1)}px, 0, ${(-a * 170).toFixed(1)}px) rotateY(${Math.max(-46, Math.min(46, -o * 32)).toFixed(2)}deg)`,
-            zIndex: 30 - Math.round(a * 6), opacity: a > 2.6 ? 0 : 1, filter: a > 0.5 ? `brightness(${(1 - Math.min(a, 2) * 0.16).toFixed(3)})` : undefined,
+            transform: `translate3d(${tx.toFixed(1)}px, 0, ${(-a * 150).toFixed(1)}px) rotateY(${Math.max(-48, Math.min(48, -o * 34)).toFixed(2)}deg)`,
+            zIndex: 30 - Math.round(a * 6), opacity: a > 2.6 ? 0 : 1, filter: a > 0.5 ? `brightness(${(1 - Math.min(a, 2) * 0.07).toFixed(3)})` : undefined,
+            ["--c1" as string]: x.cores[0], ["--c2" as string]: x.cores[1],
           } as React.CSSProperties;
           return (
             <div key={x.id} id={`wg-${x.id}`} role="option" aria-selected={i === ativo} aria-label={x.nome}
               className={`wg-cartao ${a < 0.5 ? "centro" : ""}`} style={estilo}
               onClick={() => { if (!s.current.moveu && a >= 0.5) ir(Math.round(pos + o)); }}>
-              <img src={`/workend/render/predio-${x.id}.webp`} alt="" width={780} height={540} draggable={false} loading={i < 2 || i > N - 2 ? "eager" : "lazy"} decoding="async" />
+              <img src={`/workend/predios/${x.id}.webp`} alt="" draggable={false} loading={i < 2 || i > N - 2 ? "eager" : "lazy"} decoding="async" />
+              <i className="wg-chao" aria-hidden />
               {a < 0.5 && (
                 <div className={`wg-placa ${v ? "acesa" : ""}`} aria-hidden>
                   <div className="wg-placa-nome">{v || "Sua empresa"}</div><i />

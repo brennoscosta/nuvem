@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usuarioAtual } from "@/server/usuarios";
 import { sql, migrar, temBanco } from "@/server/db";
 import { LOTES } from "@/office/data/mundo";
-import { LAYOUTS } from "@/office/data/escritorio";
+import { LAYOUTS, type LayoutId } from "@/office/data/escritorio";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 import { AREAS } from "@/office/data/org";
 import { Rodape, SETORES } from "./_partes";
@@ -32,6 +32,12 @@ async function lotesLivres() {
   globalThis.__workendLivres = { em: Date.now(), chaves };
   return chaves;
 }
+
+// Cor de cada cartão da galeria (tons claros, um por prédio)
+const CORES_PREDIO: Record<LayoutId, [string, string]> = {
+  vidro: ["#DCEBFF", "#8FBDF4"], moderno: ["#F6EBDD", "#DDB893"], sobrado: ["#E7F0DA", "#A6C98A"],
+  loja: ["#FFE5DB", "#F1A487"], galpao: ["#E8E4F8", "#ADA4E6"], container: ["#D8F2EB", "#84CEBB"],
+};
 
 const PERGUNTAS: [string, string][] = [
   ["Preciso pagar para criar a conta?", "Não. A conta é grátis. Você só paga quando reserva um lote (R$ 99 por mês) ou quando ativa o seu personagem (R$ 5,90 por mês)."],
@@ -82,7 +88,7 @@ export default async function Inicio() {
   const crachas = ESPECIALISTAS_IA.map((e) => ({ nome: e.nome, cargo: e.cargo, cor: AREAS[e.area].cor, skill: e.skills[0]?.nome ?? "" }));
   const filas = [crachas.filter((_, i) => i % 2 === 0), crachas.filter((_, i) => i % 2 === 1)];
   const cta = u ? { href: "/app", texto: "Abrir meu escritório" } : { href: lote ? `/cadastro?lote=${encodeURIComponent(lote.chave)}` : "/cadastro", texto: "Criar conta grátis" };
-  const predios = LAYOUTS.map((l) => ({ id: l.id, nome: l.nome, descricao: l.descricao, andares: l.andares }));
+  const predios = LAYOUTS.map((l) => ({ id: l.id, nome: l.nome, descricao: l.descricao, andares: l.andares, cores: CORES_PREDIO[l.id] }));
   const passos = [
     { cena: <CenaLote />, titulo: "Escolha o seu lote", texto: `São ${LOTES.length} lotes espalhados pela cidade. Clique num livre e ele fica reservado por 1 hora enquanto você paga no Pix.` },
     { cena: <CenaFachada />, titulo: "Ponha a sua marca na fachada", texto: "Nome, logomarca e cor no letreiro e na placa, à vista de todo mundo que passa pela rua." },

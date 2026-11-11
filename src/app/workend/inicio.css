@@ -100,14 +100,18 @@
 .wi .wg-campo { flex: 1 1 320px; display: flex; flex-direction: column; gap: .4rem; font-size: .86rem; font-weight: 600; color: var(--tinta-2); }
 .wi .wg-campo input { font: inherit; font-size: 1.05rem; font-weight: 600; color: var(--tinta); height: 54px; padding: 0 1.1rem; border-radius: 14px; border: 1px solid rgba(18,20,25,.18); background: #fff; outline: none; transition: border-color .15s, box-shadow .15s; }
 .wi .wg-campo input:focus { border-color: var(--azul); box-shadow: 0 0 0 4px rgba(10,108,255,.18); }
-.wi .wg-palco { position: relative; height: calc(var(--w) * .69 + 36px); perspective: 1500px; perspective-origin: 50% 45%; cursor: grab; touch-action: pan-y; user-select: none; -webkit-user-select: none; outline: none; }
+.wi .wg-palco { position: relative; height: calc(var(--w) * 1.25 + 34px); perspective: 1500px; perspective-origin: 50% 45%; cursor: grab; touch-action: pan-y; user-select: none; -webkit-user-select: none; outline: none; }
 .wi .wg-palco:active { cursor: grabbing; }
-.wi .wg-palco:focus-visible { outline: 3px solid rgba(10,108,255,.45); outline-offset: 10px; border-radius: 24px; }
-.wi .wg-cartao { position: absolute; left: 50%; top: 14px; width: var(--w); height: calc(var(--w) * .69); margin-left: calc(var(--w) / -2); border-radius: 20px; overflow: hidden; background: #161C25; box-shadow: 0 30px 60px -32px rgba(10,14,22,.75); will-change: transform; transition: box-shadow .4s ease; }
-.wi .wg-cartao img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-.wi .wg-cartao.centro { box-shadow: 0 0 0 3px var(--papel), 0 0 0 5px var(--azul), 0 50px 80px -36px rgba(10,14,22,.8); }
-.wi .wg-num { position: absolute; left: 16px; top: 12px; z-index: 1; font-weight: 300; font-size: 1.2rem; letter-spacing: -.03em; color: rgba(255,255,255,.55); }
-.wi .wg-placa { position: absolute; left: 50%; top: 7%; transform: translateX(-50%); z-index: 2; min-width: 46%; max-width: 86%; padding: .55rem 1rem .6rem; border-radius: 10px; background: #fff; text-align: center; box-shadow: 0 10px 26px rgba(0,0,0,.45); }
+.wi .wg-palco:focus-visible { outline: 3px solid rgba(10,108,255,.4); outline-offset: 10px; border-radius: 30px; }
+.wi .wg-cartao { position: absolute; left: 50%; top: 12px; width: var(--w); height: calc(var(--w) * 1.25); margin-left: calc(var(--w) / -2); border-radius: 30px; overflow: hidden; background: linear-gradient(165deg, var(--c1) 10%, var(--c2)); box-shadow: 0 30px 60px -36px rgba(18,20,25,.6); will-change: transform; transition: box-shadow .4s ease; }
+.wi .wg-cartao::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.4) 1px, transparent 1px); background-size: 26px 26px; -webkit-mask-image: linear-gradient(180deg, #000, transparent 70%); mask-image: linear-gradient(180deg, #000, transparent 70%); }
+.wi .wg-cartao::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(115deg, rgba(255,255,255,.5), transparent 32%); pointer-events: none; }
+.wi .wg-cartao.centro { box-shadow: 0 0 0 3px var(--papel), 0 0 0 5px var(--azul), 0 50px 80px -40px rgba(18,20,25,.65); }
+.wi .wg-cartao img { position: absolute; left: 7%; bottom: 12%; width: 86%; height: 64%; object-fit: contain; object-position: 50% 100%; pointer-events: none; filter: drop-shadow(0 16px 14px rgba(18,20,25,.22)); transition: transform .7s var(--mola); }
+.wi .wg-cartao.centro img { transform: translateY(-3%) scale(1.05); }
+.wi .wg-chao { position: absolute; left: 16%; right: 16%; bottom: 10.5%; height: 18px; border-radius: 50%; background: radial-gradient(closest-side, rgba(18,20,25,.26), transparent); }
+.wi .wg-num { position: absolute; left: 20px; top: 14px; z-index: 1; font-family: var(--sans); font-weight: 300; font-size: 1.35rem; letter-spacing: -.03em; color: rgba(18,20,25,.5); }
+.wi .wg-placa { position: absolute; left: 50%; top: 6%; transform: translateX(-50%); z-index: 2; width: max-content; min-width: 46%; max-width: 88%; padding: .55rem 1rem .6rem; border-radius: 10px; background: #fff; text-align: center; box-shadow: 0 10px 26px rgba(0,0,0,.45); }
 .wi .wg-placa::after { content: ""; position: absolute; left: 50%; bottom: -9px; margin-left: -9px; border: 9px solid transparent; border-bottom: 0; border-top-color: #fff; }
 .wi .wg-placa-nome { font-weight: 700; font-size: clamp(.95rem, 1.6vw, 1.2rem); line-height: 1.15; letter-spacing: -.02em; color: var(--tinta); word-break: break-word; }
 .wi .wg-placa i { display: block; height: 4px; width: 62%; margin: .45rem auto 0; border-radius: 3px; background: #C3CCD7; transition: background .22s ease, box-shadow .22s ease; }
