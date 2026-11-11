@@ -1,8 +1,8 @@
 "use client";
 // Efeitos da página inicial: revelar ao rolar (liga as animações CSS só quando a seção aparece) e contador.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-export function Revelar({ children, className = "", como = "div", id }: { children: ReactNode; className?: string; como?: "div" | "section"; id?: string }) {
+export function Revelar({ children, className = "", como = "div", id, style }: { children: ReactNode; className?: string; como?: "div" | "section"; id?: string; style?: CSSProperties }) {
   const ref = useRef<HTMLElement>(null);
   const [visto, setVisto] = useState(false);
   useEffect(() => {
@@ -13,7 +13,7 @@ export function Revelar({ children, className = "", como = "div", id }: { childr
     return () => io.disconnect();
   }, []);
   const Tag = como;
-  return <Tag ref={ref as never} id={id} className={`wi-revela ${visto ? "visto" : ""} ${className}`}>{children}</Tag>;
+  return <Tag ref={ref as never} id={id} style={style} className={`wi-revela ${visto ? "visto" : ""} ${className}`}>{children}</Tag>;
 }
 
 export function Contador({ valor, duracao = 1200 }: { valor: number; duracao?: number }) {
@@ -52,4 +52,28 @@ export function Maquina({ textos }: { textos: string[] }) {
     return () => { vivo = false; clearTimeout(t); };
   }, [textos]);
   return <span className="wi-maquina">{txt}<i aria-hidden /></span>;
+}
+
+// Progresso da rolagem em variáveis CSS: --e vai de 0 a 1 enquanto o bloco entra na tela; --p vai de 0 a 1 enquanto
+// ele passa (usado na pilha de cartões e no vídeo que cresce). Sem movimento reduzido: fica tudo no estado final.
+export function Rolagem({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { el.style.setProperty("--e", "1"); el.style.setProperty("--p", "0"); return; }
+    let raf = 0, perto = false;
+    const conta = () => {
+      raf = 0;
+      const r = el.getBoundingClientRect(), vh = window.innerHeight || 800;
+      const e = Math.max(0, Math.min(1, (vh - r.top) / (vh * 0.85)));
+      const p = Math.max(0, Math.min(1, (vh * 0.15 - r.top) / Math.max(1, r.height - vh * 0.75)));
+      el.style.setProperty("--e", e.toFixed(4)); el.style.setProperty("--p", p.toFixed(4));
+    };
+    const pede = () => { if (perto && !raf) raf = requestAnimationFrame(conta); };
+    const io = new IntersectionObserver(([x]) => { perto = x.isIntersecting; if (perto) pede(); }, { rootMargin: "200px 0px" }); io.observe(el);
+    window.addEventListener("scroll", pede, { passive: true }); window.addEventListener("resize", pede);
+    conta();
+    return () => { io.disconnect(); cancelAnimationFrame(raf); window.removeEventListener("scroll", pede); window.removeEventListener("resize", pede); };
+  }, []);
+  return <div ref={ref} className={className}>{children}</div>;
 }

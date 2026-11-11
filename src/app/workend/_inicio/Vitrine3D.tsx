@@ -131,7 +131,6 @@ function Rua() {
       {[-30, -14, 14, 30].map((x) => <Arvore key={"a" + x} position={[x, 0, -10.1]} escala={1.05} />)}
       {[-34, -20, -6, 8, 22, 36].map((x) => <Arvore key={"b" + x} position={[x, 0, -22]} escala={0.95 + ((x + 40) % 3) * 0.1} />)}
       {/* quarteirões do outro lado: volumes baixos que somem na névoa */}
-      {[-44, -26, -8, 10, 28, 46].map((x, i) => <mesh key={"q" + x} geometry={caixa(12, 4 + (i % 3) * 2.5, 10)} material={mat(["#F1EFEA", "#E4ECF5", "#F3E7DA"][i % 3], { rough: 0.9 })} position={[x, 2 + (i % 3) * 1.25, -31]} castShadow />)}
     </group>
   );
 }
@@ -181,7 +180,7 @@ function Camera() {
   useFrame(({ clock }) => {
     const estreito = size.width / size.height < 1.1;
     // no computador o painel cobre o pé da vitrine: a câmera mira na calçada e o prédio sobe na tela
-    if (estreito) alvo.set(0, 4.4, -3.5); else alvo.set(0, 1.6, -9.5);
+    if (estreito) alvo.set(0, 5.9, -3.5); else alvo.set(0, 5.4, -9.5); // alto o bastante para o balão caber no quadro
     const R = estreito ? 56 : 54;
     const a = (reduzir() ? 0 : Math.sin(clock.elapsedTime * 0.12) * 0.32) + ponteiro.current.x * 0.08 - 0.28;
     const e = 0.40 + ponteiro.current.y * 0.03;
