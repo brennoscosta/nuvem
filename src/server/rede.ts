@@ -86,26 +86,77 @@ export async function criarNegociacao(u: Usuario, paraId: string, d: { titulo?: 
   void registrar("negociacao", `${u.nome} propôs "${titulo}"`, { usuarioId: u.id, dados: { para: paraId, valor } });
   return n;
 }
-export async function responderNegociacao(u: Usuario, negId: string, status: "aceita" | "recusada" | "cancelada" | "concluida"): Promise<Negociacao> {
+// Etapas (11/11/2026): aberta → aceita (ou recusada/cancelada) → entregue (um lado marcou como concluída) → concluida
+// (o outro confirmou). "Ainda não terminou" devolve de entregue para aceita. Só depois de concluída os dois se avaliam.
+export type PedidoStatus = "aceita" | "recusada" | "cancelada" | "concluida";
+export async function responderNegociacao(u: Usuario, negId: string, status: PedidoStatus): Promise<Negociacao> {
   await migrar();
-  const [n] = await sql<Negociacao[]>`SELECT id, de_id, para_id, titulo, texto, valor, status, criado_em, respondido_em FROM negociacao WHERE id = ${negId}`;
+  const [n] = await sql<(Negociacao & { concluidaPor: string | null })[]>`SELECT id, de_id, para_id, titulo, texto, valor, status, criado_em, respondido_em, concluida_por FROM negociacao WHERE id = ${negId}`;
   if (!n || (n.deId !== u.id && n.paraId !== u.id)) throw new Error("Negociação não encontrada.");
   const souQuemPropos = n.deId === u.id;
-  if ((status === "aceita" || status === "recusada") && souQuemPropos) throw new Error("Quem propôs não pode aceitar a própria proposta.");
-  if (status === "cancelada" && !souQuemPropos) throw new Error("Só quem propôs pode cancelar.");
-  if (status === "concluida" && n.status !== "aceita") throw new Error("Só uma negociação aceita pode ser concluída.");
-  if ((status === "aceita" || status === "recusada" || status === "cancelada") && n.status !== "aberta") throw new Error("Essa negociação já foi respondida.");
-  const [m] = await sql<Negociacao[]>`UPDATE negociacao SET status = ${status}, respondido_em = now() WHERE id = ${negId} RETURNING id, de_id, para_id, titulo, texto, valor, status, criado_em, respondido_em`;
   const outro = souQuemPropos ? n.paraId : n.deId;
-  await enviarMensagem(u, outro, "negocio_status", JSON.stringify({ negociacaoId: n.id, titulo: n.titulo, status }));
+  let novo: string;
+  if (status === "aceita" && n.status === "entregue") {
+    if (n.concluidaPor === u.id) throw new Error("Espere a outra pessoa responder.");
+    novo = "aceita"; // ainda não terminou: volta para o andamento
+  } else if (status === "concluida") {
+    if (n.status === "aceita") novo = "entregue";
+    else if (n.status === "entregue" && n.concluidaPor !== u.id) novo = "concluida";
+    else if (n.status === "entregue") throw new Error("Você já marcou como concluída. Falta a outra pessoa confirmar.");
+    else throw new Error("Só uma negociação aceita pode ser concluída.");
+  } else {
+    if ((status === "aceita" || status === "recusada") && souQuemPropos) throw new Error("Quem propôs não pode aceitar a própria proposta.");
+    if (status === "cancelada" && !souQuemPropos) throw new Error("Só quem propôs pode cancelar.");
+    if (n.status !== "aberta") throw new Error("Essa negociação já foi respondida.");
+    novo = status;
+  }
+  const [m] = await sql<Negociacao[]>`UPDATE negociacao SET status = ${novo}, respondido_em = COALESCE(respondido_em, now()),
+      concluida_por = CASE WHEN ${novo} = 'entregue' THEN ${u.id} WHEN ${novo} = 'aceita' THEN NULL ELSE concluida_por END,
+      concluida_em = CASE WHEN ${novo} = 'concluida' THEN now() ELSE concluida_em END
+    WHERE id = ${negId} RETURNING id, de_id, para_id, titulo, texto, valor, status, criado_em, respondido_em`;
+  await enviarMensagem(u, outro, "negocio_status", JSON.stringify({ negociacaoId: n.id, titulo: n.titulo, status: novo }));
+  if (novo === "concluida") void registrar("negociacao", `Negócio concluído: "${n.titulo}"`, { usuarioId: u.id, dados: { com: outro, valor: n.valor } });
   return m;
 }
 export async function listarNegociacoes(euId: string) {
   await migrar();
-  return sql<(Negociacao & { outroId: string; outroNome: string; outroBoneco: string; outroRoupa: string })[]>`
-    SELECT n.id, n.de_id, n.para_id, n.titulo, n.texto, n.valor, n.status, n.criado_em, n.respondido_em, p.usuario_id AS outro_id, p.nome AS outro_nome, p.boneco AS outro_boneco, p.roupa AS outro_roupa
+  return sql<(Negociacao & { outroId: string; outroNome: string; outroBoneco: string; outroRoupa: string; concluidaPor: string | null; minhaNota: number | null })[]>`
+    SELECT n.id, n.de_id, n.para_id, n.titulo, n.texto, n.valor, n.status, n.criado_em, n.respondido_em, n.concluida_por,
+      (SELECT a.nota FROM avaliacao a WHERE a.negociacao_id = n.id AND a.de_id = ${euId}) AS minha_nota,
+      p.usuario_id AS outro_id, p.nome AS outro_nome, p.boneco AS outro_boneco, p.roupa AS outro_roupa
     FROM negociacao n JOIN personagem p ON p.usuario_id = CASE WHEN n.de_id = ${euId} THEN n.para_id ELSE n.de_id END
-    WHERE n.de_id = ${euId} OR n.para_id = ${euId} ORDER BY (n.status = 'aberta') DESC, n.criado_em DESC LIMIT 200`;
+    WHERE n.de_id = ${euId} OR n.para_id = ${euId} ORDER BY (n.status IN ('aberta', 'entregue')) DESC, n.criado_em DESC LIMIT 200`;
+}
+
+// ---- avaliações (11/11/2026) ----
+export async function avaliarNegociacao(u: Usuario, negId: string, d: { nota?: unknown; texto?: unknown }) {
+  await migrar();
+  const [n] = await sql<Negociacao[]>`SELECT id, de_id, para_id, titulo, status FROM negociacao WHERE id = ${negId}`;
+  if (!n || (n.deId !== u.id && n.paraId !== u.id)) throw new Error("Negociação não encontrada.");
+  if (n.status !== "concluida") throw new Error("Dá para avaliar depois que os dois confirmam que o negócio foi concluído.");
+  const nota = Math.round(Number(d.nota));
+  if (!(nota >= 1 && nota <= 5)) throw new Error("Escolha de 1 a 5 estrelas.");
+  const texto = typeof d.texto === "string" ? d.texto.trim().slice(0, 400) : "";
+  const para = n.deId === u.id ? n.paraId : n.deId;
+  const [a] = await sql<{ id: string }[]>`INSERT INTO avaliacao (id, negociacao_id, de_id, para_id, nota, texto) VALUES (${id("av")}, ${n.id}, ${u.id}, ${para}, ${nota}, ${texto})
+    ON CONFLICT (negociacao_id, de_id) DO NOTHING RETURNING id`;
+  if (!a) throw new Error("Você já avaliou este negócio.");
+  await enviarMensagem(u, para, "negocio_status", JSON.stringify({ negociacaoId: n.id, titulo: n.titulo, status: "avaliada", nota }));
+  return { id: a.id, nota, texto };
+}
+export async function avaliacoesRecebidas(usuarioId: string, limite = 20) {
+  await migrar();
+  return sql<{ id: string; nota: number; texto: string; criadoEm: Date; deNome: string; titulo: string }[]>`
+    SELECT a.id, a.nota, a.texto, a.criado_em, COALESCE(p.nome, us.nome) AS de_nome, n.titulo
+    FROM avaliacao a JOIN negociacao n ON n.id = a.negociacao_id LEFT JOIN personagem p ON p.usuario_id = a.de_id LEFT JOIN usuario us ON us.id = a.de_id
+    WHERE a.para_id = ${usuarioId} ORDER BY a.criado_em DESC LIMIT ${limite}`;
+}
+// média e quantidade de avaliações de vários usuários de uma vez (busca, fichas)
+export async function reputacao(ids: string[]): Promise<Record<string, { media: number; n: number }>> {
+  if (!ids.length) return {};
+  await migrar();
+  const rows = await sql<{ paraId: string; media: number; n: number }[]>`SELECT para_id, AVG(nota)::float AS media, COUNT(*)::int AS n FROM avaliacao WHERE para_id = ANY(${sql.array(ids)}) GROUP BY para_id`;
+  return Object.fromEntries(rows.map((r) => [r.paraId, { media: r.media, n: r.n }]));
 }
 
 // ---- chamadas ----

@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const SITE = "https://workend.online";
 export const NOME = "WorkEnd";
 export const TITULO = "WorkEnd — o mapa 3D onde a sua empresa tem endereço";
-export const DESCRICAO = "Escolha um lote no mapa 3D, coloque a marca da sua empresa na placa, monte seu escritório virtual e faça contatos com outras empresas. Agentes de IA em breve.";
+export const DESCRICAO = "Escolha um lote no mapa 3D, coloque a marca da sua empresa na placa, monte seu escritório com equipe de IA que atende seus clientes e encontre profissionais e empresas para fechar negócio.";
 export const OG = { url: "/workend/marca/og-workend.jpg", width: 1200, height: 630, alt: "WorkEnd — o mapa 3D onde a sua empresa tem endereço" };
 
 // Metadados-base (herdados por todas as páginas do site). Cada página passa título/descrição/canonical próprios.

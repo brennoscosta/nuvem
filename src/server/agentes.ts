@@ -11,7 +11,11 @@ export interface AgenteDB {
   config: ConfigAgente;
 }
 // Ações automáticas e preferências do agente (coluna config, JSONB)
-export interface ConfigAgente { aoConcluir?: { encaminharPara?: string | null } }
+export interface ConfigAgente {
+  aoConcluir?: { encaminharPara?: string | null };
+  // equipe de cliente do WorkEnd (11/11/2026): de qual membro do escritório o agente nasceu
+  membroId?: string; papel?: "atendente" | "ceo" | "profissional"; saudacao?: string; especialista?: string | null; atendeVisitantes?: boolean;
+}
 export interface ConhecimentoDB { id: string; agenteId: string; titulo: string; conteudo: string; origem: string; ativo: boolean; criadoEm: Date }
 export interface SkillDB { id: string; agenteId: string; nome: string; quandoUsar: string; passos: string; ativo: boolean; ordem: number; criadoEm: Date }
 export interface RegraDB { id: string; agenteId: string; texto: string; origemMensagemId: string | null; ativo: boolean; criadoEm: Date }
@@ -99,12 +103,13 @@ export async function salvarRegra(agenteId: string, d: { id?: string; texto: str
 export async function removerRegra(agenteId: string, rid: string) { await sql`DELETE FROM regra WHERE id = ${rid} AND agente_id = ${agenteId}`; }
 
 // ---- mensagens ----
-export async function listarMensagens(agenteId: string, limite = 60) {
-  const rows = await sql<MensagemDB[]>`SELECT * FROM mensagem WHERE agente_id = ${agenteId} AND papel IN ('user','assistant') ORDER BY criado_em DESC LIMIT ${limite}`;
+// visitanteId: conversa de um visitante com a equipe de uma loja (11/11/2026); nulo = conversa do dono (ou do admin)
+export async function listarMensagens(agenteId: string, limite = 60, visitanteId: string | null = null) {
+  const rows = await sql<MensagemDB[]>`SELECT * FROM mensagem WHERE agente_id = ${agenteId} AND papel IN ('user','assistant') AND visitante_id IS NOT DISTINCT FROM ${visitanteId} ORDER BY criado_em DESC LIMIT ${limite}`;
   return rows.reverse();
 }
-export async function gravarMensagem(d: { agenteId: string; papel: string; autor?: string; conteudo: string; custoBrl?: number; tokensIn?: number; tokensOut?: number }) {
-  const [r] = await sql<MensagemDB[]>`INSERT INTO mensagem (id, agente_id, papel, autor, conteudo, custo_brl, tokens_in, tokens_out) VALUES (${id("msg")}, ${d.agenteId}, ${d.papel}, ${d.autor ?? "admin"}, ${d.conteudo}, ${d.custoBrl ?? 0}, ${d.tokensIn ?? 0}, ${d.tokensOut ?? 0}) RETURNING *`;
+export async function gravarMensagem(d: { agenteId: string; papel: string; autor?: string; conteudo: string; custoBrl?: number; tokensIn?: number; tokensOut?: number; visitanteId?: string | null }) {
+  const [r] = await sql<MensagemDB[]>`INSERT INTO mensagem (id, agente_id, papel, autor, conteudo, custo_brl, tokens_in, tokens_out, visitante_id) VALUES (${id("msg")}, ${d.agenteId}, ${d.papel}, ${d.autor ?? "admin"}, ${d.conteudo}, ${d.custoBrl ?? 0}, ${d.tokensIn ?? 0}, ${d.tokensOut ?? 0}, ${d.visitanteId ?? null}) RETURNING *`;
   return r;
 }
 export async function avaliarMensagem(agenteId: string, mensagemId: string, avaliacao: 1 | -1 | null, correcao?: string) {

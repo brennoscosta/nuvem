@@ -34,7 +34,8 @@ export const LAYOUT: Record<LayoutId, LayoutInfo> = Object.fromEntries(LAYOUTS.m
 export interface Setor { id: string; nome: string; cor: string; mesas: number } // mesas: 1..4
 export type PapelMembro = "atendente" | "ceo" | "profissional";
 export interface Treino { descricao: string; saudacao: string } // o que a pessoa sabe/faz e como cumprimenta (base do atendimento)
-export interface Membro { id: string; nome: string; cargo: string; papel: PapelMembro; setorId: string | null; boneco: string; camisa: string; treino?: Treino }
+// catalogoId: de qual agente do catálogo veio ("esp-<id>" = especialista de IA, com habilidades); vazio = criado do zero
+export interface Membro { id: string; nome: string; cargo: string; papel: PapelMembro; setorId: string | null; boneco: string; camisa: string; treino?: Treino; catalogoId?: string }
 export interface Escritorio { layout: LayoutId; setores: Setor[]; equipe: Membro[]; trocasLayout?: number; creditosLayout?: number }
 export const TROCAS_LAYOUT_GRATIS = 3;
 export const PRECO_TROCA_LAYOUT = 9.9;
@@ -103,7 +104,7 @@ export function normalizarEscritorio(x: unknown, base: Escritorio): Escritorio {
     const id = texto(r.id, 24, papel === "profissional" ? novoId("mem") : papel).replace(/[^a-zA-Z0-9_-]/g, "") || novoId("mem");
     if (equipe.some((e) => e.id === id)) continue;
     const tr = (r.treino && typeof r.treino === "object" ? r.treino : {}) as Partial<Record<keyof Treino, unknown>>;
-    equipe.push({ id, nome: texto(r.nome, 24, papel === "ceo" ? "CEO" : papel === "atendente" ? "Ana" : "Novo"), cargo: texto(r.cargo, 40, papel === "ceo" ? "CEO" : papel === "atendente" ? "Atendente" : "Profissional"), papel, setorId, boneco: bonecoOk(r.boneco), camisa: corOk(r.camisa, papel === "ceo" ? "#1F2630" : "#1D4ED8"), treino: { descricao: texto(tr.descricao, 600), saudacao: texto(tr.saudacao, 160) } });
+    equipe.push({ id, nome: texto(r.nome, 24, papel === "ceo" ? "CEO" : papel === "atendente" ? "Ana" : "Novo"), cargo: texto(r.cargo, 40, papel === "ceo" ? "CEO" : papel === "atendente" ? "Atendente" : "Profissional"), papel, setorId, boneco: bonecoOk(r.boneco), camisa: corOk(r.camisa, papel === "ceo" ? "#1F2630" : "#1D4ED8"), treino: { descricao: texto(tr.descricao, 600), saudacao: texto(tr.saudacao, 160) }, ...(papel === "profissional" && typeof r.catalogoId === "string" && /^[a-zA-Z0-9_-]{1,40}$/.test(r.catalogoId) ? { catalogoId: r.catalogoId } : {}) });
   }
   // a atendente e o CEO são obrigatórios: se sumiram, voltam os do padrão
   for (const p of ["atendente", "ceo"] as const) if (!equipe.some((e) => e.papel === p)) equipe.unshift(base.equipe.find((e) => e.papel === p) ?? escritorioPadrao("Empresa", "#1D4ED8").equipe.find((e) => e.papel === p)!);

@@ -79,3 +79,24 @@
 .we .rodape a:hover { color: var(--tinta); }
 
 @media (prefers-reduced-motion: reduce) { .we * { animation: none !important; transition: none !important; } }
+
+/* Minha equipe (11/11/2026): entrada das mensagens e os três pontinhos de "trabalhando" */
+.we .equipe-entra { animation: equipe-entra .35s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes equipe-entra { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.we .equipe-digitando { display: inline-flex; gap: 3px; }
+.we .equipe-digitando i { width: 6px; height: 6px; border-radius: 50%; background: var(--azul); animation: equipe-ponto 1s ease-in-out infinite; }
+.we .equipe-digitando i:nth-child(2) { animation-delay: .15s; } .we .equipe-digitando i:nth-child(3) { animation-delay: .3s; }
+@keyframes equipe-ponto { 0%, 100% { opacity: .25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .we .equipe-entra, .we .equipe-digitando i { animation: none; } }
+
+/* página da loja: brilho que passa devagar no topo colorido */
+.we .loja-brilho { position: absolute; inset: -40%; background: radial-gradient(closest-side, rgba(255,255,255,.22), transparent 70%); width: 60%; height: 180%; animation: loja-brilho 9s ease-in-out infinite alternate; pointer-events: none; }
+@keyframes loja-brilho { from { transform: translateX(-10%) rotate(8deg); } to { transform: translateX(150%) rotate(8deg); } }
+@media (prefers-reduced-motion: reduce) { .we .loja-brilho { animation: none; } }
+
+/* Encontrar (11/11/2026): grade de pontos de cidade no topo e entrada dos cartões */
+.we .busca-grade { position: absolute; inset: 0; background-image: radial-gradient(rgba(91,157,255,.35) 1px, transparent 1.2px); background-size: 22px 22px; mask-image: linear-gradient(110deg, transparent 20%, #000 75%); animation: busca-grade 18s linear infinite; }
+@keyframes busca-grade { to { background-position: 220px 110px; } }
+.we .busca-cartao { animation: equipe-entra .4s cubic-bezier(.2,.8,.2,1) both; transition: transform .2s ease, box-shadow .2s ease; }
+.we .busca-cartao:hover { transform: translateY(-3px); box-shadow: 0 18px 40px -24px rgba(22,28,37,.45); }
+@media (prefers-reduced-motion: reduce) { .we .busca-grade, .we .busca-cartao { animation: none; } .we .busca-cartao:hover { transform: none; } }

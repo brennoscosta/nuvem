@@ -8,12 +8,14 @@ import { pontoNaCalcada } from "./data/mundo";
 import { useChamada, type ChamadaInfo } from "./chamadaStore";
 
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
-export interface MeuPersonagem { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: string | null; x: number; z: number; rot: number }
+// perfil profissional (11/11/2026): aparece na ficha e na busca de profissionais
+export interface Perfil { profissao: string; nicho: string; servicos: string; preco: string; local: string; portfolio: { titulo: string; url: string }[]; disponivel: boolean }
+export interface MeuPersonagem extends Partial<Perfil> { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: string | null; x: number; z: number; rot: number }
 export type StatusRelacao = "nenhuma" | "pedi" | "pediram" | "amigos" | "recusada";
-export interface Outro { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number; redes?: Redes; online: boolean; relacao?: { status: StatusRelacao; id: string | null } }
+export interface Outro { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number; redes?: Redes; online: boolean; relacao?: { status: StatusRelacao; id: string | null }; perfil?: Perfil | null; reputacao?: { media: number | null; n: number } }
 export interface Amigo { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; redes: Redes; online: boolean; desde: string }
 export interface Pedido { id: string; usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; criadoEm: string; direcao: "recebido" | "enviado" }
-export interface Negociacao { id: string; deId: string; paraId: string; titulo: string; texto: string; valor: number | null; status: string; criadoEm: string; respondidoEm: string | null; outroId: string; outroNome: string; outroBoneco: string; outroRoupa: string }
+export interface Negociacao { id: string; deId: string; paraId: string; titulo: string; texto: string; valor: number | null; status: string; criadoEm: string; respondidoEm: string | null; outroId: string; outroNome: string; outroBoneco: string; outroRoupa: string; concluidaPor?: string | null; minhaNota?: number | null }
 export interface Mensagem { id: string; deId: string; paraId: string; tipo: string; texto: string; criadoEm: string }
 export interface Conversa { outroId: string; nome: string; boneco: string; roupa: string; ultimo: string; tipo: string; quando: string; naoLidas: number; online: boolean }
 
@@ -35,7 +37,7 @@ interface Estado {
   conversas: Conversa[];
   erro: string | null;
   carregar: () => Promise<void>;
-  salvar: (d: { nome: string; tipo: string; bio: string; redes: Redes; mostrarRedes: boolean }) => Promise<string | null>;
+  salvar: (d: { nome: string; tipo: string; bio: string; redes: Redes; mostrarRedes: boolean; perfil?: Perfil }) => Promise<string | null>;
   pagar: (meses?: number) => Promise<string | null>;
   abrir: (painel: Estado["painel"]) => void;
   fechar: () => void;
@@ -54,6 +56,7 @@ interface Estado {
   desfazerAmizade: (outroId: string) => Promise<void>;
   negociar: (paraId: string, d: { titulo: string; texto: string; valor: string }) => Promise<string | null>;
   responderNegociacao: (id: string, status: "aceita" | "recusada" | "cancelada" | "concluida") => Promise<string | null>;
+  avaliarNegociacao: (id: string, nota: number, texto: string) => Promise<string | null>;
   ligar: (o: Outro | { usuarioId: string; nome: string; boneco: string; roupa: string }, video: boolean) => Promise<string | null>;
 }
 
@@ -154,8 +157,14 @@ export const usePersonagem = create<Estado>((set, get) => ({
   responderNegociacao: async (id, status) => {
     const r = await fetch(`/api/negociacoes/${encodeURIComponent(id)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) }); const j = await r.json().catch(() => ({}));
     if (!r.ok) return j.erro ?? `Erro ${r.status}`;
-    set({ negociacoes: get().negociacoes.map((n) => (n.id === id ? { ...n, status } : n)) });
-    if (get().painel === "chat") void get().atualizarChat(); return null;
+    // o servidor decide a etapa seguinte (concluir pede a confirmação do outro lado): usa o status que voltou
+    set({ negociacoes: get().negociacoes.map((n) => (n.id === id ? { ...n, status: (j as { status?: string }).status ?? status, concluidaPor: (j as { status?: string }).status === "entregue" ? get().meu?.usuarioId ?? null : n.concluidaPor } : n)) });
+    if (get().painel === "chat") void get().atualizarChat(); void get().carregarRede(); return null;
+  },
+  avaliarNegociacao: async (id, nota, texto) => {
+    const r = await fetch(`/api/negociacoes/${encodeURIComponent(id)}/avaliacao`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ nota, texto }) }); const j = await r.json().catch(() => ({}));
+    if (!r.ok) return j.erro ?? `Erro ${r.status}`;
+    set({ negociacoes: get().negociacoes.map((n) => (n.id === id ? { ...n, minhaNota: nota } : n)) }); return null;
   },
   ligar: async (o, video) => { const meu = get().meu; if (!meu) return "Monte seu personagem primeiro."; return useChamada.getState().ligar(o.usuarioId, video, meu.usuarioId, { nome: o.nome, boneco: o.boneco, roupa: o.roupa }); },
 }));

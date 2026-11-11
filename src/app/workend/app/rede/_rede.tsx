@@ -2,7 +2,7 @@
 // Painel "Minha rede": o personagem, pedidos de amizade, amigos (online, conversar, negociar, call), conversas e negociações.
 // Usa a mesma store do mapa (usePersonagem) e a mesma janela de chamada.
 import { useEffect, useState } from "react";
-import { usePersonagem, type Outro, type Amigo } from "@/office/personagemStore";
+import { usePersonagem, type Outro, type Amigo, type Negociacao } from "@/office/personagemStore";
 import { MiniAvatar, CorpoChat, LinksRedes } from "@/office/ui/Personagem";
 import { JanelaChamada } from "@/office/ui/Chamada";
 
@@ -28,7 +28,6 @@ export function RedeDashboard({ nome }: { nome: string }) {
   const atualizarChat = usePersonagem((s) => s.atualizarChat);
   const abrirChat = usePersonagem((s) => s.abrirChat);
   const responderAmizade = usePersonagem((s) => s.responderAmizade);
-  const responderNegociacao = usePersonagem((s) => s.responderNegociacao);
   const desfazerAmizade = usePersonagem((s) => s.desfazerAmizade);
   const ligar = usePersonagem((s) => s.ligar);
   const [aba, setAba] = useState<Aba>("amigos");
@@ -42,8 +41,15 @@ export function RedeDashboard({ nome }: { nome: string }) {
     void batida();
     return () => { clearInterval(t1); clearInterval(t2); clearInterval(t3); };
   }, [carregarRede, batida, atualizarChat]);
+  useEffect(() => {
+    if (!carregado || !ativo) return;
+    const q = new URLSearchParams(window.location.search); const com = q.get("com");
+    if (!com || com === meu?.usuarioId) return;
+    fetch(`/api/personagens/${encodeURIComponent(com)}`).then((r) => (r.ok ? r.json() : null)).then((p) => { if (!p) return; void abrirChat({ ...p, x: 0, z: 0, rot: 0, online: !!p.online }); setAba("conversas"); if (q.get("negociar")) setAviso(`Para propor um negócio a ${p.nome}, use o botão 🤝 Negociar na conversa ao lado.`); }).catch(() => {});
+    window.history.replaceState(null, "", "/app/rede");
+  }, [carregado, ativo, meu?.usuarioId, abrirChat]);
   const recebidos = pedidos.filter((p) => p.direcao === "recebido");
-  const abertas = negociacoes.filter((n) => n.status === "aberta");
+  const abertas = negociacoes.filter((n) => n.status === "aberta" || (n.status === "entregue" && n.concluidaPor !== meu?.usuarioId));
   const online = amigos.filter((a) => a.online).length;
   const chamar = async (a: { usuarioId: string; nome: string; boneco: string; roupa: string; online?: boolean }) => { if (!a.online) { setAviso(`${a.nome} não está online agora.`); return; } const e = await ligar(a, true); setAviso(e); };
 
@@ -59,7 +65,7 @@ export function RedeDashboard({ nome }: { nome: string }) {
           <a href="/mundo?personagem=1" className="btn btn-azul mt-5 inline-block">{meu ? "Ativar no mapa (Pix)" : "Montar meu personagem"}</a>
         </div>
         <ul className="grid gap-3 text-[15px]">
-          {[["💬", "Conversar", "Chat ao vivo com quem está online; offline recebe quando entrar."], ["🤝", "Negociar", "Propostas com valor e status: aberta, aceita, concluída."], ["📹", "Fazer uma call", "Áudio e vídeo direto no navegador, sem instalar nada."], ["➕", "Amizade", "Amigos veem as redes sociais um do outro e ficam aqui no seu painel."]].map(([i, t, d]) => <li key={t} className="flex gap-3 rounded-2xl border border-[var(--linha)] p-4"><span className="text-2xl">{i}</span><div><div className="font-semibold">{t}</div><div className="text-sm text-[var(--tinta-2)]">{d}</div></div></li>)}
+          {[["💬", "Conversar", "Chat ao vivo com quem está online; offline recebe quando entrar."], ["🤝", "Negociar", "Propostas com valor, acompanhamento até a conclusão e avaliação dos dois lados."], ["📹", "Fazer uma call", "Áudio e vídeo direto no navegador, sem instalar nada."], ["➕", "Amizade", "Amigos veem as redes sociais um do outro e ficam aqui no seu painel."]].map(([i, t, d]) => <li key={t} className="flex gap-3 rounded-2xl border border-[var(--linha)] p-4"><span className="text-2xl">{i}</span><div><div className="font-semibold">{t}</div><div className="text-sm text-[var(--tinta-2)]">{d}</div></div></li>)}
         </ul>
       </div>
     </section>
@@ -115,21 +121,7 @@ export function RedeDashboard({ nome }: { nome: string }) {
           {aba === "negociacoes" && (
             <ul className="mt-4 grid gap-2">
               {negociacoes.length === 0 && <li className="rounded-2xl bg-[var(--cinza)] p-6 text-center text-sm text-[var(--tinta-2)]">Nenhuma negociação ainda. Abra uma conversa e clique em 🤝 Negociar.</li>}
-              {negociacoes.map((n) => { const minha = n.deId !== n.outroId; const cor = n.status === "aceita" ? "#16A34A" : n.status === "recusada" || n.status === "cancelada" ? "#E2575B" : n.status === "concluida" ? "#1D4ED8" : "#D97706"; return (
-                <li key={n.id} className="rounded-2xl border border-[var(--linha)] p-4">
-                  <div className="flex flex-wrap items-start gap-3">
-                    <MiniAvatar boneco={n.outroBoneco} roupa={n.outroRoupa} tamanho={40} />
-                    <div className="min-w-0 flex-1"><div className="text-xs text-[var(--tinta-2)]">{minha ? `Você propôs pra ${n.outroNome}` : `${n.outroNome} propôs pra você`} · {dataBR(n.criadoEm)}</div><div className="font-semibold">{n.titulo}</div>{n.texto && <div className="text-sm text-[var(--tinta-2)]">{n.texto}</div>}{n.valor != null && <div className="mt-0.5 text-sm font-bold">{brl(Number(n.valor))}</div>}</div>
-                    <span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white" style={{ background: cor }}>{n.status}</span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-bold">
-                    {n.status === "aberta" && !minha && <><button onClick={() => void responderNegociacao(n.id, "aceita")} className="rounded-lg bg-[#16A34A] px-3 py-1.5 text-white">Aceitar</button><button onClick={() => void responderNegociacao(n.id, "recusada")} className="rounded-lg bg-[var(--cinza)] px-3 py-1.5">Recusar</button></>}
-                    {n.status === "aberta" && minha && <button onClick={() => void responderNegociacao(n.id, "cancelada")} className="rounded-lg bg-[var(--cinza)] px-3 py-1.5">Cancelar</button>}
-                    {n.status === "aceita" && <button onClick={() => void responderNegociacao(n.id, "concluida")} className="rounded-lg bg-[#1D4ED8] px-3 py-1.5 text-white">Marcar como concluído</button>}
-                    <button onClick={() => void abrirChat(comoOutro({ usuarioId: n.outroId, nome: n.outroNome, boneco: n.outroBoneco, roupa: n.outroRoupa }))} className="rounded-lg bg-[#EEF3FF] px-3 py-1.5 text-[#1D4ED8]">💬 Conversar</button>
-                  </div>
-                </li>
-              ); })}
+              {negociacoes.map((n) => <CartaoNegocio key={n.id} n={n} euId={meu?.usuarioId ?? ""} conversar={() => void abrirChat(comoOutro({ usuarioId: n.outroId, nome: n.outroNome, boneco: n.outroBoneco, roupa: n.outroRoupa }))} />)}
             </ul>
           )}
         </div>
@@ -146,5 +138,52 @@ export function RedeDashboard({ nome }: { nome: string }) {
       </div>
       <JanelaChamada />
     </section>
+  );
+}
+
+const ETAPA: Record<string, [string, string]> = {
+  aberta: ["Aberta", "#D97706"], aceita: ["Em andamento", "#16A34A"], entregue: ["Esperando confirmação", "#7C3AED"],
+  concluida: ["Concluída", "#1D4ED8"], recusada: ["Recusada", "#E2575B"], cancelada: ["Cancelada", "#E2575B"],
+};
+// Um negócio com as etapas de 11/11/2026: aceitar, marcar como concluído (o outro confirma) e avaliar
+function CartaoNegocio({ n, euId, conversar }: { n: Negociacao; euId: string; conversar: () => void }) {
+  const responder = usePersonagem((s) => s.responderNegociacao);
+  const avaliar = usePersonagem((s) => s.avaliarNegociacao);
+  const [erro, setErro] = useState<string | null>(null);
+  const [nota, setNota] = useState(0);
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const minha = n.deId === euId;
+  const [rotulo, cor] = ETAPA[n.status] ?? [n.status, "#5B6472"];
+  const faz = async (st: "aceita" | "recusada" | "cancelada" | "concluida") => { setErro(null); const e = await responder(n.id, st); if (e) setErro(e); };
+  const enviarNota = async () => { if (!nota) return; setEnviando(true); const e = await avaliar(n.id, nota, texto); setEnviando(false); if (e) setErro(e); };
+  const pedi = n.status === "entregue" && n.concluidaPor === euId;
+  return (
+    <li className="rounded-2xl border border-[var(--linha)] p-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <MiniAvatar boneco={n.outroBoneco} roupa={n.outroRoupa} tamanho={40} />
+        <div className="min-w-0 flex-1"><div className="text-xs text-[var(--tinta-2)]">{minha ? `Você propôs pra ${n.outroNome}` : `${n.outroNome} propôs pra você`} · {dataBR(n.criadoEm)}</div><div className="font-semibold">{n.titulo}</div>{n.texto && <div className="text-sm text-[var(--tinta-2)]">{n.texto}</div>}{n.valor != null && <div className="mt-0.5 text-sm font-bold">{brl(Number(n.valor))}</div>}</div>
+        <span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white" style={{ background: cor }}>{rotulo}</span>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-bold">
+        {n.status === "aberta" && !minha && <><button onClick={() => void faz("aceita")} className="rounded-lg bg-[#16A34A] px-3 py-1.5 text-white">Aceitar</button><button onClick={() => void faz("recusada")} className="rounded-lg bg-[var(--cinza)] px-3 py-1.5">Recusar</button></>}
+        {n.status === "aberta" && minha && <button onClick={() => void faz("cancelada")} className="rounded-lg bg-[var(--cinza)] px-3 py-1.5">Cancelar</button>}
+        {n.status === "aceita" && <button onClick={() => void faz("concluida")} className="rounded-lg bg-[#1D4ED8] px-3 py-1.5 text-white">Marcar como concluído</button>}
+        {n.status === "entregue" && !pedi && <><button onClick={() => void faz("concluida")} className="rounded-lg bg-[#1D4ED8] px-3 py-1.5 text-white">Confirmar que foi concluído</button><button onClick={() => void faz("aceita")} className="rounded-lg bg-[var(--cinza)] px-3 py-1.5">Ainda não terminou</button></>}
+        {pedi && <span className="rounded-lg bg-[#F3EEFF] px-3 py-1.5 text-[#5B21B6]">Esperando {n.outroNome} confirmar</span>}
+        <button onClick={conversar} className="rounded-lg bg-[#EEF3FF] px-3 py-1.5 text-[#1D4ED8]">💬 Conversar</button>
+      </div>
+      {n.status === "concluida" && (n.minhaNota ? (
+        <div className="mt-3 text-sm text-[var(--tinta-2)]">Você avaliou {n.outroNome}: <span className="text-[#B7791F]">{"★".repeat(n.minhaNota)}</span></div>
+      ) : (
+        <div className="mt-3 rounded-xl bg-[var(--cinza)] p-3">
+          <div className="text-sm font-semibold">Como foi negociar com {n.outroNome}?</div>
+          <div className="mt-1 flex gap-1" role="radiogroup" aria-label="Nota de 1 a 5">{[1, 2, 3, 4, 5].map((k) => <button key={k} type="button" role="radio" aria-checked={nota === k} onClick={() => setNota(k)} className={`text-2xl transition ${k <= nota ? "scale-110 text-[#E8A317]" : "text-[var(--line-strong)] hover:text-[#E8A317]"}`}>★</button>)}</div>
+          <input value={texto} onChange={(e) => setTexto(e.target.value.slice(0, 400))} placeholder="Conte em uma frase (opcional; aparece no perfil dela)" className="mt-2 w-full rounded-lg border border-[var(--linha)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--azul)]" />
+          <button type="button" disabled={!nota || enviando} onClick={() => void enviarNota()} className="btn btn-azul mt-2 !py-2 text-sm">{enviando ? "Enviando…" : "Enviar avaliação"}</button>
+        </div>
+      ))}
+      {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
+    </li>
   );
 }

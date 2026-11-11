@@ -52,7 +52,7 @@ export async function versoesAtivas(): Promise<Mapa> {
   const rows = await sql<{ especialistaId: string; skill: string; quandoUsar: string; passos: string; versao: number }[]>`SELECT especialista_id, skill, quando_usar, passos, versao FROM skill_versao WHERE ativa`;
   return new Map(rows.map((r) => [chave(r.especialistaId, r.skill), { quandoUsar: r.quandoUsar, passos: r.passos, versao: r.versao }]));
 }
-function skillEfetiva(e: EspecialistaIA, s: SkillEspecialista, mapa: Mapa): SkillEspecialista & { versao: number } {
+export function skillEfetiva(e: EspecialistaIA, s: SkillEspecialista, mapa: Mapa): SkillEspecialista & { versao: number } {
   const v = mapa.get(chave(e.id, s.nome));
   return v ? { nome: s.nome, quandoUsar: v.quandoUsar, passos: v.passos, versao: v.versao } : { ...s, versao: 1 };
 }

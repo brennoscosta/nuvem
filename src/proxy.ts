@@ -13,6 +13,8 @@ export function proxy(req: NextRequest) {
   if (p === "/admin" || p === "/admin/") { url.pathname = "/"; return noindex(NextResponse.rewrite(url)); }
   if (p === "/mundo" || p === "/mundo/") { url.pathname = "/"; return NextResponse.rewrite(url); }
   if (p === "/app" || p.startsWith("/app/")) { url.pathname = "/workend" + p; return noindex(NextResponse.rewrite(url)); }
+  // busca de profissionais e empresas e a página pública de cada loja (11/11/2026)
+  if (p === "/encontrar" || /^\/loja\/\d{1,4}$/.test(p)) { url.pathname = "/workend" + p; return NextResponse.rewrite(url); }
   if (p === "/" || p === "/cadastro" || p === "/entrar" || p === "/politicas" || p === "/esqueci" || p === "/redefinir") { url.pathname = "/workend" + (p === "/" ? "" : p); return NextResponse.rewrite(url); }
   return NextResponse.next();
 }

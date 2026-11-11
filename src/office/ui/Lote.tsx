@@ -7,6 +7,7 @@ import { NICHOS } from "../data/mundo";
 import { useEscritorio } from "../store";
 import { BotoesPersonagem } from "./BotoesPersonagem";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
+import { ChatLoja, Contatos, Estrelas, useLoja } from "./ChatLoja";
 
 // Contagem regressiva da reserva (usa o relógio do servidor); quando zera, recarrega (o lote volta a ficar livre)
 function useContagem(ate: string | null | undefined) {
@@ -154,6 +155,10 @@ export function CartaoLote() {
             <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Renovar +30 dias · ${brl(preco)} no Pix`}</button>
           )}
           {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
+          {ehMeu && ativo && (
+            // a equipe de IA do lote trabalha de verdade desde 11/11/2026 (tela Minha equipe)
+            <a href="/app/equipe" className="mt-3 block w-full rounded-xl bg-[#1D2128] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-black">💬 Falar com a minha equipe de IA</a>
+          )}
           {ehMeu && ativo && terreno.escritorio && (
             // chão comprado: só opções de edição (prédio, setores, equipe, marca, treino, contratação)
             <div className="mt-3">
@@ -176,12 +181,33 @@ export function CartaoLote() {
                 : <button onClick={() => setConfirma(chave)} className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm font-semibold text-[#5B6472]">Desistir</button>}
             </div>
           ) : ehMeu ? (admin ? <AcoesAdminLote chave={chave} /> : null) : admin ? (
-            <AcoesAdminLote chave={chave} />
+            <><LojaNoMapa numero={l.numero} ativo={ativo} /><AcoesAdminLote chave={chave} /></>
           ) : (
-            <div className="mt-3 text-xs text-[#5B6472]">Este chão já tem dono. Clique num lote com placa “À venda” pra escolher o seu.</div>
+            <LojaNoMapa numero={l.numero} ativo={ativo} />
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// A loja de outra empresa (11/11/2026): o que ela faz, contatos, nota e a conversa com a atendente de IA
+function LojaNoMapa({ numero, ativo }: { numero: number; ativo: boolean }) {
+  const usuario = useMundo((s) => s.usuario);
+  const { loja, erro } = useLoja(ativo ? numero : null);
+  const [conversa, setConversa] = useState(false);
+  if (!ativo) return <div className="mt-3 text-xs text-[#5B6472]">Esta empresa está montando o escritório. A loja abre quando o 1º mês for pago.</div>;
+  if (erro) return <div className="mt-3 text-xs text-[#5B6472]">{erro}</div>;
+  if (!loja) return <div className="mt-3 text-xs text-[#5B6472]">Abrindo a loja…</div>;
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="flex items-center justify-between gap-2"><span className="rounded-full bg-[#EEF3FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">{loja.nicho}</span><Estrelas media={loja.avaliacao.media} n={loja.avaliacao.n} /></div>
+      {loja.sobre ? <p className="line-clamp-4 whitespace-pre-line text-xs text-[#1D2128]">{loja.sobre}</p> : <p className="text-xs text-[#5B6472]">A empresa ainda não contou o que faz. Pergunte à atendente.</p>}
+      <Contatos c={loja.contatos} />
+      {conversa
+        ? <ChatLoja loja={loja} logado={!!usuario} linkEntrar={`/entrar?destino=${encodeURIComponent(`/loja/${numero}`)}`} alto={240} />
+        : loja.atendente && <button onClick={() => setConversa(true)} className="w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d]">💬 Conversar com {loja.atendente.nome}</button>}
+      <a href={`/loja/${numero}`} target="_blank" rel="noreferrer" className="block text-center text-[11px] font-semibold text-[#1D4ED8]">Abrir a página da loja ↗</a>
     </div>
   );
 }

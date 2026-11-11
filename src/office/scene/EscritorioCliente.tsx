@@ -14,7 +14,6 @@ import { BONECO } from "../data/bonecos";
 import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
 import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, type Escritorio, type Membro, type SalaCliente } from "../data/escritorio";
 import { useMundo } from "../mundoStore";
-import { usePersonagem } from "../personagemStore";
 import { useEscritorio } from "../store";
 
 const FONTE = "/fonts/inter-700.woff";
@@ -143,8 +142,9 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
   useAnimacao(h, () => pose, fase, HIPS.procedural.base);
   const def = BONECO[m.boneco] ?? BONECO.classico;
   const [hover, setHover] = useState(false);
-  // NPC: sem balão de nome (só com o mouse em cima). Clicar: quem tem personagem abre a loja; quem não tem, cria o seu.
-  const clicar = () => { if (!usePersonagem.getState().ativo) { usePersonagem.getState().abrir("montar"); return; } useMundo.getState().selecionarLote(chave); };
+  // NPC: sem balão de nome (só com o mouse em cima). Clicar abre o cartão da loja, com a conversa com a atendente de IA
+  // (desde 11/11/2026 não precisa de personagem: basta a conta; no próprio lote, o cartão leva à Minha equipe)
+  const clicar = () => { useMundo.getState().selecionarLote(chave); };
   return (
     <group position={lugar.pos} rotation={[0, lugar.rot, 0]}>
       <BonecoProcedural ref={h} def={def} camisa={m.camisa} headset={m.papel === "atendente"} cracha={m.papel === "ceo" ? "#D4A017" : "#1D4ED8"} />

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usuarioAtual } from "@/server/usuarios";
 import { sql, migrar, temBanco } from "@/server/db";
 import { LOTES } from "@/office/data/mundo";
-import { LAYOUTS, type LayoutId } from "@/office/data/escritorio";
+import { LAYOUTS, MAX_SETORES, type LayoutId } from "@/office/data/escritorio";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 import { AREAS } from "@/office/data/org";
 import { Rodape, SETORES, fotoEspecialista } from "./_partes";
@@ -44,7 +44,8 @@ const PERGUNTAS: [string, string][] = [
   ["Como funciona o pagamento?", "Por Pix, direto no mapa: o QR Code aparece no cartão do lote e a confirmação chega sozinha. A reserva segura o lote por 1 hora enquanto você paga."],
   ["E se eu não renovar?", "Depois do vencimento há 5 dias de tolerância. Sem renovação, o lote volta a ficar à venda, mas a sua marca e a sua equipe ficam guardadas na conta e voltam se você reservar outro lote."],
   ["Posso desistir da compra?", "Pode. Em até 7 dias depois da compra você recebe o valor de volta."],
-  ["Quando chegam os agentes de IA?", "Os especialistas já estão em treinamento e chegam em breve. Por enquanto, a equipe do seu escritório é visual: você escolhe o prédio, monta as salas e dá nome a cada pessoa."],
+  ["A equipe de IA já trabalha?", "Sim. Todo lote vem com CEO e atendente de IA, e você contrata especialistas no mapa. Em Minha equipe você conversa com cada um, aprova ou corrige o que entregam e pede o relatório da semana. A atendente responde quem entra na sua loja e anota os contatos. Cada lote tem R$ 10 de IA por mês incluídos."],
+  ["Sou profissional. Como me acham?", "Monte o seu personagem e preencha o perfil profissional: o que você faz, onde atende e quanto cobra. Você aparece em Encontrar, recebe propostas e, ao concluir cada negócio, os dois lados se avaliam."],
   ["Funciona no celular?", "Funciona. O mapa abre no navegador do celular e do computador, sem instalar nada."],
 ];
 
@@ -158,10 +159,10 @@ export default async function Inicio() {
           <div className="faixa">
             <div className="ia-faixa">
               <div className="ia-texto">
-                <h3>{ESPECIALISTAS_IA.length} especialistas de IA <em>em treinamento.</em></h3>
-                <p>Eles chegam em breve para trabalhar nas salas do seu prédio, em {SETORES.length} setores. Enquanto isso, treinam e avaliam o trabalho uns dos outros todos os dias.</p>
+                <h3>{ESPECIALISTAS_IA.length} especialistas de IA <em>prontos para contratar.</em></h3>
+                <p>Eles trabalham nas salas do seu prédio: escolha entre {SETORES.length} áreas e monte até {MAX_SETORES} setores. A atendente já responde quem entra na sua loja, e todos melhoram as próprias habilidades todos os dias.</p>
               </div>
-              <div className="wi-filas" aria-label="Especialistas que estão chegando">
+              <div className="wi-filas" aria-label="Especialistas para contratar">
                 {filas.map((f, k) => (
                   <div key={k} className={`wi-fila ${k ? "volta" : ""}`}>
                     <div className="wi-trilho">{[...f, ...f].map((c, i) => (
@@ -188,7 +189,8 @@ export default async function Inicio() {
                 <ul className="wi-lista">
                   <li>Seu endereço com placa, nome, logomarca e cor da marca</li>
                   <li>6 tipos de prédio e 3 trocas de prédio grátis</li>
-                  <li>Escritório com os setores e a equipe que você montar</li>
+                  <li>Equipe de IA que trabalha: CEO, atendente e os especialistas que você contratar</li>
+                  <li>R$ 10 de IA por mês incluídos e página própria da loja</li>
                   <li>Pagamento por Pix, direto no mapa</li>
                   <li>Desistiu em até 7 dias? O valor volta para você</li>
                 </ul>
@@ -199,7 +201,8 @@ export default async function Inicio() {
                 <p className="wi-valor"><b>R$ 5,90</b><span>por mês</span></p>
                 <ul className="wi-lista">
                   <li>Seu boneco andando pela cidade</li>
-                  <li>Amigos, mensagens e propostas de negócio</li>
+                  <li>Perfil profissional na busca, amigos e mensagens</li>
+                  <li>Propostas de negócio com avaliação dos dois lados</li>
                   <li>Chamadas de áudio e vídeo</li>
                 </ul>
                 <Link href={u ? "/app/rede" : "/cadastro"} className="wi-btn wi-btn-linha">{u ? "Ativar meu personagem" : "Criar conta grátis"}</Link>

@@ -97,7 +97,7 @@ export function PainelEscritorio() {
   // criar do zero: pessoa em branco pro dono nomear e treinar
   const addMembro = () => { const setor = setorComVaga(); if (!setor) return; set({ ...e, equipe: [...e.equipe, { id: novoId("mem"), nome: "Novo", cargo: setor.nome, papel: "profissional", setorId: setor.id, boneco: BONECOS[(e.equipe.length + 2) % BONECOS.length].id, camisa: "#1D4ED8", treino: { descricao: "", saudacao: "" } }] }); };
   // contratar do catálogo: já vem com cargo, aparência e treino (vai pro setor de mesmo nome se tiver vaga)
-  const contratar = (p: Pronto | AgenteVenda) => { const setor = setorComVaga(p.setor); if (!setor) return; const treino = "treino" in p ? { ...p.treino } : { descricao: p.descricao, saudacao: p.saudacao }; set({ ...e, equipe: [...e.equipe, { id: novoId("mem"), nome: p.nome, cargo: p.cargo, papel: "profissional", setorId: setor.id, boneco: p.boneco, camisa: p.camisa, treino }] }); setCatalogo(false); };
+  const contratar = (p: Pronto | AgenteVenda) => { const setor = setorComVaga(p.setor); if (!setor) return; const treino = "treino" in p ? { ...p.treino } : { descricao: p.descricao, saudacao: p.saudacao }; set({ ...e, equipe: [...e.equipe, { id: novoId("mem"), nome: p.nome, cargo: p.cargo, papel: "profissional", setorId: setor.id, boneco: p.boneco, camisa: p.camisa, treino, catalogoId: p.id }] }); setCatalogo(false); };
   const restantes = trocasRestantes(e);
   const trocou = terrenoAtual?.escritorio && terrenoAtual.escritorio.layout !== e.layout;
   const comprarTroca = async () => { setErroPix(null); const r = await pagar(1, "layout"); if (r) setErroPix(r); };
@@ -178,7 +178,7 @@ export function PainelEscritorio() {
                 </div>
               </div>
             )}
-            <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A atendente e o CEO fazem parte de todo escritório. Clique em “Aparência” pra trocar o boneco e <b>treinar</b> cada um (o que sabe e como cumprimenta). Por enquanto a equipe é visual: quando os agentes de IA chegarem, é esse treino que eles vão usar para atender os visitantes.</div>
+            <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A atendente e o CEO fazem parte de todo escritório. Clique em “Aparência” pra trocar o boneco e <b>treinar</b> cada um (o que sabe e como cumprimenta). Esse treino é o que a equipe de IA usa: a atendente responde os visitantes da loja e você conversa com todos em Minha equipe.</div>
           </div>
         )}
       </div>

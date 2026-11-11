@@ -2,7 +2,8 @@
 // UI do personagem: montar/pagar (nome, gênero, tipo, bio, redes), ficha de outro personagem com as opções
 // (conversar, negociar, fazer uma call, amizade), chat (com propostas) e caixa de entrada.
 import { useEffect, useRef, useState } from "react";
-import { usePersonagem, type Redes, type Outro, type Mensagem } from "../personagemStore";
+import { usePersonagem, type Redes, type Outro, type Mensagem, type Perfil } from "../personagemStore";
+import { NICHOS } from "../data/mundo";
 import { useMundo } from "../mundoStore";
 import { TIPOS_AVATAR, TODOS_BONECOS, type Genero } from "../data/bonecos";
 import { PixAberto } from "./Lote";
@@ -40,7 +41,8 @@ export function PainelPersonagem() {
   const pix = useMundo((s) => s.pix);
   const usuario = useMundo((s) => s.usuario);
   const [genero, setGenero] = useState<Genero | "todos">("todos");
-  const [f, setF] = useState({ nome: "", tipo: TIPOS_AVATAR[0].id, bio: "", redes: {} as Redes, mostrarRedes: false });
+  const [f, setF] = useState({ nome: "", tipo: TIPOS_AVATAR[0].id, bio: "", redes: {} as Redes, mostrarRedes: false, perfil: PERFIL_VAZIO as Perfil });
+  const [abrirPerfil, setAbrirPerfil] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -48,7 +50,7 @@ export function PainelPersonagem() {
   const [pagando, setPagando] = useState(false);
   const carregadoDe = useRef<string | null>(null);
   // preenche o formulário com o que já existe (uma vez por personagem)
-  useEffect(() => { if (painel === "montar" && meu && carregadoDe.current !== meu.usuarioId) { carregadoDe.current = meu.usuarioId; setF({ nome: meu.nome, tipo: meu.tipo, bio: meu.bio, redes: meu.redes ?? {}, mostrarRedes: meu.mostrarRedes }); } }, [painel, meu]);
+  useEffect(() => { if (painel === "montar" && meu && carregadoDe.current !== meu.usuarioId) { carregadoDe.current = meu.usuarioId; setF({ nome: meu.nome, tipo: meu.tipo, bio: meu.bio, redes: meu.redes ?? {}, mostrarRedes: meu.mostrarRedes, perfil: { profissao: meu.profissao ?? "", nicho: meu.nicho ?? "", servicos: meu.servicos ?? "", preco: meu.preco ?? "", local: meu.local ?? "", portfolio: meu.portfolio ?? [], disponivel: meu.disponivel ?? true } }); setAbrirPerfil(!!meu.profissao); } }, [painel, meu]);
   if (painel !== "montar") return null;
   if (!usuario) return (
     <div className={`${FLUTUANTE} ${ESTREITO} painel-entra overflow-y-auto p-4`}>
@@ -101,6 +103,7 @@ export function PainelPersonagem() {
           <input value={f.redes.site ?? ""} onChange={(e) => setRede("site", e.target.value)} placeholder="Site" className="rounded-xl border border-black/10 px-3 py-1.5 text-sm" />
         </div>
         <label className="mt-2 flex items-center gap-2 text-xs text-[#5B6472]"><input type="checkbox" checked={f.mostrarRedes} onChange={(e) => setF({ ...f, mostrarRedes: e.target.checked })} /> Mostrar minhas redes pra todo mundo (senão só pra quem eu aceitar)</label>
+        <CamposPerfil perfil={f.perfil} aberto={abrirPerfil} abrir={() => setAbrirPerfil(true)} mudar={(p) => setF({ ...f, perfil: { ...f.perfil, ...p } })} />
         {!ativo && (
           <div className="mt-3 rounded-2xl border border-[#16A34A]/30 bg-[#F3FBF5] p-3">
             <div className="text-sm"><span className="text-[#5B6472] line-through">{brl(precoCheio)}</span> <b className="text-lg text-[#166534]">{brl(preco)}</b><span className="text-xs text-[#5B6472]">/mês · promoção de lançamento</span></div>
@@ -164,6 +167,8 @@ export function FichaPersonagem() {
         <div className="flex items-center gap-3"><MiniAvatar boneco={p.boneco} roupa={p.roupa} tamanho={48} /><div><div className="text-lg font-bold leading-tight">{p.nome}</div><div className="text-xs text-[#5B6472]">{p.online ? <span className="text-[#16A34A]">● online agora</span> : "offline"}{souEu && " · você"}{rel === "amigos" && <span className="ml-1.5 rounded-full bg-[#FDE8F3] px-1.5 py-0.5 text-[10px] font-bold text-[#9D174D]">amigos</span>}</div></div></div>
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
       </div>
+      {ficha?.perfil && <PerfilNaFicha perfil={ficha.perfil} reputacao={ficha.reputacao} />}
+      {!ficha?.perfil && ficha?.reputacao && ficha.reputacao.n > 0 && <div className="mt-1 text-xs font-semibold text-[#7A5A00]">★ {ficha.reputacao.media?.toFixed(1).replace(".", ",")} · {ficha.reputacao.n} {ficha.reputacao.n === 1 ? "avaliação" : "avaliações"}</div>}
       {p.bio && <p className="mt-2 text-sm text-[#1D2128]">{p.bio}</p>}
       {!souEu && !negociando && (
         <div className="mt-3 grid grid-cols-2 gap-1.5 text-center text-[12px] font-semibold">
@@ -183,6 +188,49 @@ export function FichaPersonagem() {
       {!redes && !souEu && rel !== "amigos" && <div className="mt-2 text-[11px] text-[#5B6472]">As redes sociais aparecem quando vocês forem amigos.</div>}
       {precisa && <div className="mt-3 rounded-xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">Pra conversar, negociar, fazer call e ter amigos você precisa do seu personagem (<b>de R$ 19,90 por R$ 5,90/mês</b>). <button onClick={() => abrir("montar")} className="font-bold underline">Montar agora</button></div>}
       {aviso && <div className="mt-2 text-xs font-semibold text-[#166534]">{aviso}</div>}
+    </div>
+  );
+}
+
+const PERFIL_VAZIO: Perfil = { profissao: "", nicho: "", servicos: "", preco: "", local: "", portfolio: [], disponivel: true };
+
+// Perfil profissional no formulário do personagem (11/11/2026): quem procura profissionais acha você em /encontrar
+function CamposPerfil({ perfil, aberto, abrir, mudar }: { perfil: Perfil; aberto: boolean; abrir: () => void; mudar: (p: Partial<Perfil>) => void }) {
+  if (!aberto) return <button type="button" onClick={abrir} className="mt-3 w-full rounded-xl border-2 border-dashed border-[#1D4ED8]/40 px-3 py-2 text-left text-xs font-semibold text-[#1D4ED8]">+ Sou profissional: aparecer na busca de profissionais<span className="block font-normal text-[#5B6472]">Diga o que você faz, onde atende e quanto cobra. Empresas e clientes acham você em Encontrar.</span></button>;
+  const port = [...perfil.portfolio, { titulo: "", url: "" }].slice(0, 3);
+  const campo = "mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal outline-none focus:border-[#1D4ED8]";
+  return (
+    <div className="mt-3 rounded-2xl border border-[#1D4ED8]/20 bg-[#F5F8FF] p-3">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">Perfil profissional · aparece na busca</div>
+      <div className="mt-1 grid grid-cols-2 gap-2">
+        <label className="block text-xs font-semibold text-[#5B6472]">O que você faz<input value={perfil.profissao} onChange={(e) => mudar({ profissao: e.target.value.slice(0, 60) })} placeholder="Ex.: Fotógrafa de produtos" className={campo} /></label>
+        <label className="block text-xs font-semibold text-[#5B6472]">Área<select value={perfil.nicho} onChange={(e) => mudar({ nicho: e.target.value })} className={`${campo} bg-white`}><option value="">Escolha</option>{NICHOS.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}</select></label>
+      </div>
+      <label className="mt-2 block text-xs font-semibold text-[#5B6472]">Serviços que você oferece<textarea value={perfil.servicos} onChange={(e) => mudar({ servicos: e.target.value.slice(0, 600) })} rows={3} placeholder="Ex.: Fotos de cardápio e de loja, edição e entrega em 3 dias." className={campo} /></label>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <label className="block text-xs font-semibold text-[#5B6472]">Preço<input value={perfil.preco} onChange={(e) => mudar({ preco: e.target.value.slice(0, 60) })} placeholder="Ex.: a partir de R$ 150" className={campo} /></label>
+        <label className="block text-xs font-semibold text-[#5B6472]">Onde atende<input value={perfil.local} onChange={(e) => mudar({ local: e.target.value.slice(0, 60) })} placeholder="Ex.: Remoto · Aracaju (SE)" className={campo} /></label>
+      </div>
+      <div className="mt-2 text-xs font-semibold text-[#5B6472]">Trabalhos (links do portfólio)</div>
+      {port.map((p, i) => (
+        <div key={i} className="mt-1 grid grid-cols-[1fr_1.4fr] gap-1.5">
+          <input value={p.titulo} onChange={(e) => { const l = [...port]; l[i] = { ...p, titulo: e.target.value.slice(0, 60) }; mudar({ portfolio: l.filter((x) => x.url || x.titulo) }); }} placeholder="Título" className="rounded-xl border border-black/10 px-3 py-1.5 text-sm" />
+          <input value={p.url} onChange={(e) => { const l = [...port]; l[i] = { ...p, url: e.target.value.slice(0, 200) }; mudar({ portfolio: l.filter((x) => x.url || x.titulo) }); }} placeholder="Link (Behance, Drive, site…)" className="rounded-xl border border-black/10 px-3 py-1.5 text-sm" />
+        </div>
+      ))}
+      <label className="mt-2 flex items-center gap-2 text-xs text-[#5B6472]"><input type="checkbox" checked={perfil.disponivel} onChange={(e) => mudar({ disponivel: e.target.checked })} /> Disponível para novos trabalhos</label>
+    </div>
+  );
+}
+
+// O perfil profissional na ficha de outra pessoa
+function PerfilNaFicha({ perfil, reputacao }: { perfil: Perfil; reputacao?: { media: number | null; n: number } }) {
+  return (
+    <div className="mt-2 rounded-2xl bg-[#F5F8FF] p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><b>{perfil.profissao || "Profissional"}</b>{perfil.disponivel ? <span className="rounded-full bg-[#E3F6EA] px-1.5 py-0.5 text-[10px] font-bold text-[#166534]">disponível</span> : <span className="rounded-full bg-[#F1F3F6] px-1.5 py-0.5 text-[10px] font-bold text-[#5B6472]">agenda cheia</span>}{reputacao && reputacao.n > 0 && <span className="text-xs font-semibold text-[#7A5A00]">★ {reputacao.media?.toFixed(1).replace(".", ",")} ({reputacao.n})</span>}</div>
+      {(perfil.local || perfil.preco) && <div className="text-xs text-[#5B6472]">{[perfil.local, perfil.preco].filter(Boolean).join(" · ")}</div>}
+      {perfil.servicos && <p className="mt-1 whitespace-pre-line text-xs text-[#1D2128]">{perfil.servicos}</p>}
+      {perfil.portfolio.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1.5">{perfil.portfolio.map((p) => <a key={p.url} href={p.url} target="_blank" rel="noreferrer nofollow" className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#1D4ED8]">{p.titulo}</a>)}</div>}
     </div>
   );
 }
@@ -224,8 +272,8 @@ function Bolha({ m, minha, outroNome, status }: { m: Mensagem; minha: boolean; o
   if (m.tipo === "negocio") {
     let d: { negociacaoId?: string; titulo?: string; texto?: string; valor?: number | null } = {}; try { d = JSON.parse(m.texto); } catch { d = { titulo: m.texto }; }
     const st = status ?? "aberta";
-    const cor = st === "aceita" ? "#16A34A" : st === "recusada" || st === "cancelada" ? "#E2575B" : st === "concluida" ? "#1D4ED8" : "#D97706";
-    const rotulo = st === "aberta" ? "Proposta aberta" : st === "aceita" ? "Proposta aceita" : st === "recusada" ? "Proposta recusada" : st === "cancelada" ? "Proposta cancelada" : "Negócio concluído";
+    const cor = st === "aceita" ? "#16A34A" : st === "recusada" || st === "cancelada" ? "#E2575B" : st === "concluida" || st === "avaliada" ? "#1D4ED8" : st === "entregue" ? "#7C3AED" : "#D97706";
+    const rotulo = st === "aberta" ? "Proposta aberta" : st === "aceita" ? "Em andamento" : st === "entregue" ? "Esperando confirmação" : st === "recusada" ? "Proposta recusada" : st === "cancelada" ? "Proposta cancelada" : "Negócio concluído";
     return (
       <div className={`flex ${minha ? "justify-end" : "justify-start"}`}>
         <div className="max-w-[88%] rounded-2xl border-2 bg-white px-3 py-2 text-sm text-[#1D2128]" style={{ borderColor: cor }}>
@@ -237,6 +285,7 @@ function Bolha({ m, minha, outroNome, status }: { m: Mensagem; minha: boolean; o
             ? <button onClick={async () => { const e = await responderNegociacao(d.negociacaoId!, "cancelada"); if (e) setErro(e); }} className="mt-1.5 text-[11px] font-semibold text-[#5B6472] underline">Cancelar proposta</button>
             : <div className="mt-1.5 flex gap-1.5"><button onClick={async () => { const e = await responderNegociacao(d.negociacaoId!, "aceita"); if (e) setErro(e); }} className="rounded-lg bg-[#16A34A] px-2.5 py-1 text-xs font-bold text-white">Aceitar</button><button onClick={async () => { const e = await responderNegociacao(d.negociacaoId!, "recusada"); if (e) setErro(e); }} className="rounded-lg bg-[#F1F3F6] px-2.5 py-1 text-xs font-bold text-[#5B6472]">Recusar</button></div>)}
           {st === "aceita" && d.negociacaoId && <button onClick={async () => { const e = await responderNegociacao(d.negociacaoId!, "concluida"); if (e) setErro(e); }} className="mt-1.5 text-[11px] font-semibold text-[#1D4ED8] underline">Marcar como concluído</button>}
+          {(st === "entregue" || st === "concluida" || st === "avaliada") && <a href="/app/rede" className="mt-1.5 block text-[11px] font-semibold text-[#1D4ED8] underline">{st === "entregue" ? "Confirmar ou responder em Minha rede" : "Avaliar em Minha rede"}</a>}
           {erro && <div className="mt-1 text-[11px] font-semibold text-[#E2575B]">{erro}</div>}
         </div>
       </div>
@@ -245,8 +294,8 @@ function Bolha({ m, minha, outroNome, status }: { m: Mensagem; minha: boolean; o
   if (m.tipo === "negocio_status") {
     let d: { titulo?: string; status?: string } = {}; try { d = JSON.parse(m.texto); } catch { d = {}; }
     const quem = minha ? "Você" : outroNome;
-    const verbo = d.status === "aceita" ? "aceitou" : d.status === "recusada" ? "recusou" : d.status === "cancelada" ? "cancelou" : "concluiu";
-    return <div className="py-0.5 text-center text-[11px] text-[#5B6472]">🤝 {quem} {verbo} a proposta “{d.titulo}”</div>;
+    const verbo = d.status === "aceita" ? "aceitou a proposta" : d.status === "recusada" ? "recusou a proposta" : d.status === "cancelada" ? "cancelou a proposta" : d.status === "entregue" ? "marcou como concluído o negócio" : d.status === "avaliada" ? "avaliou o negócio" : "confirmou a conclusão do negócio";
+    return <div className="py-0.5 text-center text-[11px] text-[#5B6472]">🤝 {quem} {verbo} “{d.titulo}”</div>;
   }
   if (m.tipo === "amizade_pedido" || m.tipo === "amizade_aceite" || m.tipo === "chamada") return <div className="py-0.5 text-center text-[11px] text-[#5B6472]">{m.tipo === "chamada" ? "📹" : "➕"} {minha ? "Você" : outroNome}: {m.texto}</div>;
   return (
