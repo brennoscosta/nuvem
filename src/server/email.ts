@@ -42,7 +42,7 @@ const PADRAO: Record<string, ModeloEmail> = Object.fromEntries(MODELOS_PADRAO.ma
 export function moldura(corpo: string) {
   return `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#F5F6F8;font-family:Inter,Segoe UI,Arial,sans-serif;color:#1C1F24">
 <div style="max-width:560px;margin:0 auto;padding:32px 16px">
-  <div style="margin-bottom:16px"><img src="${SITE}/workend/logo.png" alt="WorkEnd" height="34" style="height:34px"></div>
+  <div style="margin-bottom:16px"><img src="${SITE}/workend/marca/workend-logotipo-email.png" alt="WorkEnd" width="161" height="30" style="height:30px;width:161px;display:block"></div>
   <div style="background:#fff;border-radius:16px;padding:28px 28px 20px;line-height:1.55;font-size:16px">${corpo}</div>
   <p style="color:#8A919C;font-size:12px;margin:16px 4px">WorkEnd · o mundo onde as empresas atendem · <a href="${SITE}" style="color:#8A919C">workend.online</a> · <a href="${SITE}/politicas" style="color:#8A919C">políticas de uso</a></p>
 </div></body></html>`;

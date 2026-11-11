@@ -5,19 +5,23 @@
   "lang": "pt-BR",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FFFFFF",
-  "theme_color": "#FFFFFF",
+  "background_color": "#DFE5EC",
+  "theme_color": "#DFE5EC",
   "icons": [
     {
-      "src": "/workend/icone-64.png",
-      "sizes": "64x64",
+      "src": "/workend/marca/workend-icone-192.png",
+      "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/workend/icone-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "src": "/workend/marca/workend-icone-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/workend/marca/workend-favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     }
   ]
 }

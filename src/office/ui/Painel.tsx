@@ -15,6 +15,8 @@ import { Mural } from "./Mural";
 import { ModalLogin, CartaoPublico } from "./Login";
 import { CartaoLote, PainelEmpresa, ContaWorkend, AvisoPagamento } from "./Lote";
 import { useMundo, modoMundo } from "../mundoStore";
+import Link from "next/link";
+import { Logotipo } from "@/app/workend/_marca";
 
 // Estamos no mapa do WorkEnd (workend.online/mundo)? Só dá pra saber no navegador (sem erro de hidratação).
 const semAssinatura = () => () => {};
@@ -47,8 +49,8 @@ export function BarraTopo() {
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-2 sm:p-3">
       <div className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-[#111418]/85 px-3 py-2 text-white shadow-xl backdrop-blur sm:gap-3 sm:px-4">
         <div className="flex shrink-0 items-center gap-2 border-r border-white/10 pr-2 sm:pr-3">
-          <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-[#4F7DF3] to-[#8B6CF0]" />
-          <div className="leading-tight"><div className="whitespace-nowrap text-sm font-bold tracking-wide">WorkEnd</div><div className="hidden whitespace-nowrap text-[10px] text-white/50 md:block">Clique num lote à venda pra reservar o seu</div></div>
+          <Link href="/" aria-label="WorkEnd, início" className="py-1.5"><Logotipo altura={18} claro /></Link>
+          <div className="hidden whitespace-nowrap text-[10px] leading-tight text-white/50 md:block">Clique num lote à venda<br />pra reservar o seu</div>
         </div>
         <div className="sem-barra min-w-0 flex-1 overflow-x-auto">
           <div className="ml-auto flex w-max items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0">
@@ -64,7 +66,7 @@ export function BarraTopo() {
       <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-[#111418]/85 px-4 py-2 text-white shadow-xl backdrop-blur">
         <div className="flex items-center gap-2 pr-3 border-r border-white/10">
           <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-[#4F7DF3] to-[#8B6CF0]" />
-          <div className="leading-tight"><div className="text-sm font-bold tracking-wide">{mundo ? "WorkEnd · Mundo" : "Escritório Nuvem"}</div><div className="text-[10px] text-white/50">{mundo ? "Clique num lote à venda pra reservar o seu" : `${total} agentes · ${trabalhando} trabalhando · R$ ${gasto.toFixed(2)} hoje`}</div></div>
+          <div className="leading-tight"><div className="text-sm font-bold tracking-wide">Escritório Nuvem</div><div className="text-[10px] text-white/50">{`${total} agentes · ${trabalhando} trabalhando · R$ ${gasto.toFixed(2)} hoje`}</div></div>
         </div>
         <div className="flex flex-1 items-center gap-1.5 overflow-x-auto">
           {ordem.map((id) => { const a = agentes[id]; if (!a) return null; const st = STATUS[a.status]; return (

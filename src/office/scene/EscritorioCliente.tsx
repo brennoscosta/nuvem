@@ -81,7 +81,7 @@ function ParedeComPorta({ de, ate, vao = 1.6 }: { de: [number, number]; ate: [nu
   );
 }
 
-function InteriorFixo({ e, cor }: { e: Escritorio; cor: string }) {
+export function InteriorFixo({ e, cor }: { e: Escritorio; cor: string }) {
   const planta = useMemo(() => plantaCliente(e), [e]);
   const zMeio = planta.salas[0].z1;
   return (

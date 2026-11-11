@@ -1,6 +1,6 @@
 // Peças compartilhadas do site WorkEnd: topo, rodapé e dados do catálogo de setores/especialistas.
 import Link from "next/link";
-import Image from "next/image";
+import { Logotipo } from "./_marca";
 import { AREAS, AREAS_OPERACIONAIS, FUNCOES, type AreaId } from "@/office/data/org";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 
@@ -9,9 +9,7 @@ export const DEMO = "https://nuvem.nuvemhost.cloud/?vista=fora";
 export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
   return (
     <header className="faixa flex items-center justify-between py-4">
-      <Link href="/" aria-label="WorkEnd — início" className="flex items-center">
-        <Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} priority className="h-8 w-auto" />
-      </Link>
+      <Link href="/" aria-label="WorkEnd, início" className="flex items-center py-2"><Logotipo altura={22} /></Link>
       <nav className="flex items-center gap-3 text-[15px]">
         {logado ? (
           <>
@@ -32,27 +30,21 @@ export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
 export function Rodape() {
   return (
     <footer className="rodape">
-      <div className="faixa grid gap-10 py-14 text-[15px] text-[var(--tinta-2)] md:grid-cols-[1.4fr_1fr_1fr]">
-        <div>
-          <Image src="/workend/logo.png" alt="WorkEnd" width={1259} height={355} className="h-8 w-auto" />
-          <p className="mt-4 max-w-[34ch]">O mapa 3D onde as empresas têm endereço e fazem contatos.</p>
+      <div className="faixa flex flex-wrap items-start gap-x-16 gap-y-7 pb-14 pt-10 text-[15px] text-[var(--muted)]">
+        <div className="min-w-[260px] flex-[1_1_280px]">
+          <div className="mb-3 py-1"><Logotipo altura={24} /></div>
+          <p className="max-w-[40ch]">O endereço da sua empresa numa cidade 3D aberta 24 horas.</p>
         </div>
-        <div>
-          <div className="mb-3 font-semibold text-[var(--tinta)]">Produto</div>
-          <ul className="space-y-2">
-            <li><Link href="/cadastro">Criar conta</Link></li>
-            <li><Link href="/entrar">Entrar</Link></li>
-            <li><Link href="/mundo">Ver o mapa dos lotes</Link></li>
-            <li><Link href="/politicas">Políticas de uso</Link></li>
-            <li><a href={DEMO} target="_blank" rel="noreferrer">Ver um escritório de demonstração</a></li>
-          </ul>
-        </div>
-        <div>
-          <div className="mb-3 font-semibold text-[var(--tinta)]">Empresa</div>
-          <ul className="space-y-2">
-            <li><a href="mailto:contato@workend.online">contato@workend.online</a></li>
-            <li>© {new Date().getFullYear()} WorkEnd</li>
-          </ul>
+        <nav className="flex flex-col gap-[11px]" aria-label="Rodapé">
+          <Link href="/cadastro">Criar conta</Link>
+          <Link href="/entrar">Entrar</Link>
+          <Link href="/mundo">Passear pelo mapa</Link>
+          <a href={DEMO} target="_blank" rel="noreferrer">Escritório de demonstração</a>
+          <Link href="/politicas">Políticas de uso</Link>
+        </nav>
+        <div className="flex flex-col gap-[11px]">
+          <a href="mailto:contato@workend.online">contato@workend.online</a>
+          <span>&copy; {new Date().getFullYear()} WorkEnd</span>
         </div>
       </div>
     </footer>

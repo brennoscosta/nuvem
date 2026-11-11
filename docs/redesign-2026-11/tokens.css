@@ -1,0 +1,15 @@
+/* WorkEnd — tokens. Hex tirados do site em produção (workend.online, 11/11/2026). */
+:root{
+  --ink:#1D2128;          /* texto e logotipo. Era --foreground no site atual */
+  --bg:#DFE5EC;           /* fundo da página. Era --background no site atual */
+  --surface:#F2F5F8;      /* cartões e campos, um nível acima do fundo */
+  --surface-dim:#D6DDE6;  /* estado não selecionado */
+  --line:#C3CCD7;         /* traço de 1px */
+  --line-strong:#A9B4C2;  /* borda de campo */
+  --muted:#5A6472;        /* texto secundário. 4,7:1 sobre --bg */
+  --blue:#0A6CFF;         /* marca e ação. Branco em cima: 4,6:1 */
+  --blue-dark:#0453CC;    /* hover */
+  --blue-lit:#5B9DFF;     /* azul sobre superfície escura. 6,3:1 sobre --night */
+  --night:#161C25;        /* visor do 3D. Toda cena 3D vive aqui dentro */
+  --font:"Inter",ui-sans-serif,system-ui,sans-serif;
+}

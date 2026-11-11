@@ -5,7 +5,7 @@ export const SITE = "https://workend.online";
 export const NOME = "WorkEnd";
 export const TITULO = "WorkEnd — o mapa 3D onde a sua empresa tem endereço";
 export const DESCRICAO = "Escolha um lote no mapa 3D, coloque a marca da sua empresa na placa, monte seu escritório virtual e faça contatos com outras empresas. Agentes de IA em breve.";
-export const OG = { url: "/workend/og.jpg", width: 1200, height: 630, alt: "WorkEnd — o mapa 3D onde a sua empresa tem endereço" };
+export const OG = { url: "/workend/marca/og-workend.jpg", width: 1200, height: 630, alt: "WorkEnd — o mapa 3D onde a sua empresa tem endereço" };
 
 // Metadados-base (herdados por todas as páginas do site). Cada página passa título/descrição/canonical próprios.
 export function meta(d: { titulo?: string; descricao?: string; caminho: string; indexar?: boolean }): Metadata {
@@ -29,7 +29,7 @@ export function meta(d: { titulo?: string; descricao?: string; caminho: string; 
       : { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
     openGraph: { type: "website", url, siteName: NOME, locale: "pt_BR", title, description, images: [OG] },
     twitter: { card: "summary_large_image", title, description, images: [OG.url] },
-    icons: { icon: [{ url: "/workend/icone-64.png", sizes: "64x64", type: "image/png" }, { url: "/workend/icone-192.png", sizes: "192x192", type: "image/png" }], apple: [{ url: "/workend/icone-192.png", sizes: "192x192" }], shortcut: "/workend/icone-64.png" },
+    icons: { icon: [{ url: "/workend/marca/workend-favicon.svg", type: "image/svg+xml" }, { url: "/workend/marca/workend-icone-32.png", sizes: "32x32", type: "image/png" }], apple: [{ url: "/workend/marca/workend-icone-180.png", sizes: "180x180" }], shortcut: "/workend/marca/workend-icone-32.png" },
     manifest: "/workend/manifest.webmanifest",
     formatDetection: { telephone: false, email: false, address: false },
     other: { "format-detection": "telephone=no" },
@@ -38,7 +38,7 @@ export function meta(d: { titulo?: string; descricao?: string; caminho: string; 
 
 // Dados estruturados da landing: organização, site e o produto (aplicação web, grátis pra entrar).
 export function jsonLdLanding() {
-  const org = { "@type": "Organization", "@id": `${SITE}/#org`, name: NOME, url: SITE, logo: `${SITE}/workend/icone-192.png`, email: "contato@workend.online", sameAs: [] as string[] };
+  const org = { "@type": "Organization", "@id": `${SITE}/#org`, name: NOME, url: SITE, logo: `${SITE}/workend/marca/workend-icone-512.png`, email: "contato@workend.online", sameAs: [] as string[] };
   const site = { "@type": "WebSite", "@id": `${SITE}/#site`, url: SITE, name: NOME, inLanguage: "pt-BR", publisher: { "@id": `${SITE}/#org` } };
   const app = {
     "@type": "SoftwareApplication", "@id": `${SITE}/#app`, name: NOME, url: SITE, applicationCategory: "BusinessApplication", operatingSystem: "Web",
