@@ -14,6 +14,7 @@ import { MUNDO, LIMITE_CAMERA } from "../data/mundo";
 import { Fachada } from "./Fachada";
 import { CameraMundo } from "./CameraMundo";
 import { CicloDia } from "./CicloDia";
+import { Acabamento } from "./Acabamento";
 import { Agente, handlers } from "./Agente";
 import { qualidade, qualidadeManual, lembrarLeveAuto, escolherQualidade, escolherMapa } from "./qualidade";
 import { useEscritorio } from "../store";
@@ -229,8 +230,9 @@ function Luzes({ sombras, luz, hemi, preench }: { sombras: boolean; luz: React.R
       <directionalLight
         ref={luz}
         position={[12, 22, 10]} intensity={2.2} color="#FFF6E8" castShadow={sombras}
-        shadow-mapSize={[1024, 1024]} shadow-bias={-0.0004} shadow-normalBias={0.02} shadow-radius={4}
-        shadow-camera-left={-26} shadow-camera-right={26} shadow-camera-top={26} shadow-camera-bottom={-26} shadow-camera-near={1} shadow-camera-far={80}
+        // modo completo (12/11/2026): sombra em 2048 cobrindo ±32 m (antes 1024 em ±26 m): mais nítida e mais longe
+        shadow-mapSize={sombras ? [2048, 2048] : [1024, 1024]} shadow-bias={-0.0004} shadow-normalBias={0.02} shadow-radius={sombras ? 3 : 4}
+        shadow-camera-left={-32} shadow-camera-right={32} shadow-camera-top={32} shadow-camera-bottom={-32} shadow-camera-near={1} shadow-camera-far={90}
       />
       <directionalLight ref={preench} position={[-14, 10, -8]} intensity={0.5} color="#DCE8FF" />
     </>
@@ -280,6 +282,7 @@ export function Cena3D() {
       )}
       <Luzes sombras={!leveInicial} luz={luz} hemi={hemi} preench={preench} />
       {modoMundo() && <CicloDia luzes={{ hemi, sol: luz, preench }} />}
+      {modoMundo() && !leveInicial && <Acabamento hemi={hemi} preench={preench} />}
       <Suspense fallback={null}>
         <Mundo />
         <Predio />

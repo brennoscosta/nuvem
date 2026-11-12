@@ -32,12 +32,25 @@ export function texturaBrilho() {
   TEX_BRILHO = new THREE.CanvasTexture(c); TEX_BRILHO.wrapS = TEX_BRILHO.wrapT = THREE.RepeatWrapping; return TEX_BRILHO;
 }
 export const MAT_BRILHO = new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+// o lago tem o próprio brilho (12/11/2026, pedido do dono: "a água tá movimentando muito rápido"): água parada não corre
+// para o lado como rio, só ondula de leve no lugar. Mesma imagem, deslocamento separado.
+export const MAT_BRILHO_LAGO = new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+let TEX_BRILHO_LAGO: THREE.Texture | null = null;
+export function texturaBrilhoLago() {
+  if (TEX_BRILHO_LAGO) return TEX_BRILHO_LAGO;
+  const t = texturaBrilho(); if (!t) return null;
+  TEX_BRILHO_LAGO = t.clone(); TEX_BRILHO_LAGO.needsUpdate = true; return TEX_BRILHO_LAGO;
+}
 const corAgua = new THREE.Color();
 // a água escurece à noite e ganha reflexo quente (das luzes da cidade); a correnteza anda para leste
 export function animarAgua(t: number) {
   corAgua.copy(CORES_AGUA.dia).lerp(CORES_AGUA.noite, ceu.noite); MAT_AGUA.color.copy(corAgua);
   MAT_BRILHO.color.setRGB(1 - ceu.noite * 0.2, 1 - ceu.noite * 0.08, 1); MAT_BRILHO.opacity = 0.28 + ceu.noite * 0.25;
-  if (MAT_BRILHO.map) { MAT_BRILHO.map.offset.x = (t * 0.035) % 1; MAT_BRILHO.map.offset.y = Math.sin(t * 0.4) * 0.02; }
+  MAT_BRILHO_LAGO.color.copy(MAT_BRILHO.color); MAT_BRILHO_LAGO.opacity = 0.22 + ceu.noite * 0.22;
+  // rio: correnteza calma (~0,17 m/s; a imagem repete a cada 14 m) com um tremular lento; antes era ~0,5 m/s
+  if (MAT_BRILHO.map) { MAT_BRILHO.map.offset.x = (t * 0.012) % 1; MAT_BRILHO.map.offset.y = Math.sin(t * 0.13) * 0.012; }
+  // lago: só um vaivém pequeno e lento, sem direção
+  if (MAT_BRILHO_LAGO.map) { MAT_BRILHO_LAGO.map.offset.x = Math.sin(t * 0.05) * 0.018; MAT_BRILHO_LAGO.map.offset.y = Math.cos(t * 0.037) * 0.014; }
 }
 
 // ---------- calçadão, muretas e margens ----------

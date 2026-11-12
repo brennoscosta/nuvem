@@ -25,7 +25,8 @@ function criarBandos(n: number, porBando: number): Bando[] {
       const fileira = Math.ceil(k / 2), lado = k === 0 ? 0 : (k % 2 ? 1 : -1) * fileira;
       return { tras: fileira * 2.4 + ((k * 37) % 7) * 0.15, lado: lado * 2.0, alto: ((k * 53) % 9) * 0.2 - 0.8, asa: (k * 0.9) % (Math.PI * 2) };
     });
-    lista.push({ cx: [-20, 25, 5][b % 3], cz: [10, -15, 30][b % 3], R: 38 + b * 12, h: 19 + b * 5, vel: 7.5 + b * 0.8, fase: b * 2.1, sentido: b % 2 ? 1 : -1, aves });
+    lista.push({ cx: [-20, 25, 5][b % 3], cz: [10, -15, 30][b % 3], R: 38 + b * 12, h: 19 + b * 5, vel: 3.6 + b * 0.45, // voo calmo (12/11/2026: o dono achou rápido demais a 7,5–9 m/s)
+       fase: b * 2.1, sentido: b % 2 ? 1 : -1, aves });
   }
   return lista;
 }
@@ -66,7 +67,9 @@ function Passaros() {
         aux.s.setScalar(vis * perto * 0.55);
         aux.base.compose(aux.p, aux.q, aux.s);
         rC.current?.setMatrixAt(i, aux.base);
-        const bate = Math.sin(t * 9 + a.asa) * 0.65 + 0.15;
+        // batida de asa mais lenta, com pausas planando (asa quase parada e aberta) de tempos em tempos
+        const plana = 1 - 0.75 * THREE.MathUtils.smoothstep(Math.sin(t * 0.35 + a.asa * 0.7), 0.4, 0.75); // entra e sai do planeio suave
+        const bate = Math.sin(t * 5.2 + a.asa) * 0.55 * plana + 0.12;
         rE.current?.setMatrixAt(i, aux.m.multiplyMatrices(aux.base, aux.asa.makeRotationX(bate)));
         rD.current?.setMatrixAt(i, aux.m.multiplyMatrices(aux.base, aux.asa.makeRotationX(-bate)));
         i++;

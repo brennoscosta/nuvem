@@ -10,7 +10,7 @@ import { leve } from "./qualidade";
 import { ceu } from "./CicloDia";
 import { Estatico } from "./Estatico";
 import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
-import { MAT_AGUA, MAT_BRILHO, texturaBrilho, animarAgua, PostesClassicos, X_OESTE, X_LESTE } from "./Rio";
+import { MAT_AGUA, MAT_BRILHO_LAGO, texturaBrilhoLago, animarAgua, PostesClassicos, X_OESTE, X_LESTE } from "./Rio";
 import { HalosPostes } from "./Bairros";
 import { NORTE } from "../data/mundo";
 
@@ -196,7 +196,7 @@ function Lago() {
   const geoJato = useMemo(() => { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(N * 3), 3)); return g; }, [N]);
   const pts = useRef<THREE.Points>(null);
   useEffect(() => {
-    const t = texturaBrilho(); if (t && !MAT_BRILHO.map) { MAT_BRILHO.map = t; MAT_BRILHO.needsUpdate = true; }
+    const t = texturaBrilhoLago(); if (t && !MAT_BRILHO_LAGO.map) { MAT_BRILHO_LAGO.map = t; MAT_BRILHO_LAGO.needsUpdate = true; }
     const g = texturaGota(); if (g && !MAT_JATO.map) { MAT_JATO.map = g; MAT_JATO.needsUpdate = true; }
   }, []);
   useFrame(({ clock }) => {
@@ -212,7 +212,7 @@ function Lago() {
   return (
     <group>
       <mesh geometry={agua} material={MAT_AGUA} position={[LAGO.x, -0.16, LAGO.z]} scale={[LAGO.rx, 1, LAGO.rz]} receiveShadow />
-      <mesh geometry={brilho} material={MAT_BRILHO} position={[LAGO.x, -0.14, LAGO.z]} scale={[LAGO.rx, 1, LAGO.rz]} renderOrder={2} />
+      <mesh geometry={brilho} material={MAT_BRILHO_LAGO} position={[LAGO.x, -0.14, LAGO.z]} scale={[LAGO.rx, 1, LAGO.rz]} renderOrder={2} />
       {/* chafariz: bacia, coluna, taça */}
       <group position={[LAGO.x, 0, LAGO.z]}>
         <mesh geometry={cilindro(3.3, 3.5, 0.75, 32)} material={pedra} position={[0, 0.2, 0]} castShadow />
