@@ -133,7 +133,9 @@ function SombrasFixas({ luz, controles }: { luz: React.RefObject<THREE.Direction
 function Limite30() {
   useEffect(() => {
     let id = 0, ultimo = 0;
-    const loop = (t: number) => { id = requestAnimationFrame(loop); if (t - ultimo < 1000 / 30 - 3) return; ultimo = t; advance(t); };
+    // advance() com frameloop "never" usa o número como clock.elapsedTime: tem de ser em SEGUNDOS (12/11/2026). Em milissegundos
+    // a água, os pássaros e tudo que usa clock.elapsedTime andavam 1000× mais rápido no modo leve, e o trânsito 3× (dt preso em 0,1).
+    const loop = (t: number) => { id = requestAnimationFrame(loop); if (t - ultimo < 1000 / 30 - 3) return; ultimo = t; advance(t / 1000); };
     id = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(id);
   }, []);
