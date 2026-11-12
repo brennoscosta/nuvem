@@ -4,7 +4,8 @@
 // olha e o ponto azul é o meu personagem. Clicar num lote voa até ele e abre o cartão.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useMundo, modoMundo, LOTES, useAgora, promocaoAtiva } from "../mundoStore";
-import { NICHOS, nomeNicho, centroQuarteirao, QUARTEIRAO, CALCADA, LOTE } from "../data/mundo";
+import { NICHOS, nomeNicho, centroQuarteirao, QUARTEIRAO, CALCADA, LOTE, BAIRROS, BAIRRO_DO_QUARTEIRAO, bairroDoLote, NORTE, RUAS } from "../data/mundo";
+import { useRuas } from "../scene/RuasPlacas";
 import { PRACA_CHAVE } from "../data/praca";
 import { cameraInfo } from "../scene/CameraMundo";
 import { eventosDoMomento } from "../scene/Praca";
@@ -12,6 +13,7 @@ import { minhaPos, usePersonagem } from "../personagemStore";
 
 const semAssinatura = () => () => {};
 const LIM = 80; // metade do lado visível do mapa (m)
+const TOPO = -114; // ao norte o mapa mostra o rio e o começo do Parque da Cidade (12/11/2026)
 const Q = QUARTEIRAO + 2 * CALCADA;
 const BLOCOS: { i: number; j: number; nome?: string; cor?: string }[] = [
   { i: 0, j: 0, nome: "Nuvem", cor: "#1D4ED8" }, { i: 1, j: 0, nome: "Lanchonete", cor: "#D97706" },
@@ -27,6 +29,7 @@ export function MiniMapa() {
   const praca = useMundo((s) => s.praca);
   const temPersonagem = usePersonagem((s) => !!s.meu);
   const agora = useAgora();
+  const { nomes } = useRuas();
   const [nicho, setNicho] = useState("");
   const [abertoCel, setAbertoCel] = useState(false);
   const [minimizado, setMin] = useState(false);
@@ -52,7 +55,7 @@ export function MiniMapa() {
     const cor = ehPraca ? (vivo ? "#E11D48" : "#0F766E") : !t ? "#3A4452" : t.status === "ativo" ? t.cor : "#E0A91B";
     const area = principal?.nicho ?? "negocios";
     const promo = t && !t.anexoDe && t.status === "ativo" ? promocaoAtiva(t, agora) : null; // promoção na fachada (12/11/2026)
-    const apagado = nicho === "__promo" ? !promo : !!nicho && (ehPraca || !t || t.status !== "ativo" || area !== nicho);
+    const apagado = nicho === "__promo" ? !promo : nicho.startsWith("bairro:") ? bairroDoLote(l.chave)?.id !== nicho.slice(7) : !!nicho && (ehPraca || !t || t.status !== "ativo" || area !== nicho);
     const nome = ehPraca ? `Praça de Eventos${vivo ? " · ao vivo agora" : ""}` : !t ? `Lote ${l.numero} · à venda` : `${principal?.empresaNome ?? t.empresaNome} · Lote ${l.numero}${t.status === "ativo" ? ` · ${nomeNicho(area)}` : " · em obras"}${promo ? ` · 🏷️ ${promo.texto}` : ""}`;
     return { l, t, cor, apagado, nome, ehPraca, promo: !!promo, contratando: !!t && !t.anexoDe && (vagas[l.chave] ?? 0) > 0 };
   });
@@ -65,11 +68,24 @@ export function MiniMapa() {
           <span className="text-[10px] font-bold uppercase tracking-wide text-white/60">Mapa da cidade</span>
           <button onClick={() => { setAbertoCel(false); setMin(true); }} aria-label="Fechar o mapa" className="rounded-full px-1.5 text-white/60 hover:bg-white/10">✕</button>
         </div>
-        <svg viewBox={`${-LIM} ${-LIM} ${LIM * 2} ${LIM * 2}`} className="block w-full rounded-xl bg-[#1B222B]" role="img" aria-label="Mapa da cidade visto de cima">
+        <svg viewBox={`${-LIM} ${TOPO} ${LIM * 2} ${LIM - TOPO}`} className="block w-full rounded-xl bg-[#1B222B]" role="img" aria-label="Mapa da cidade visto de cima">
+          {/* além da avenida norte: calçadão, rio com as pontes e o começo do parque */}
+          <rect x={-LIM} y={NORTE.calcadao.z1} width={LIM * 2} height={NORTE.calcadao.z0 - NORTE.calcadao.z1} fill="#3A3F47" />
+          <rect x={-LIM} y={NORTE.rio.z1} width={LIM * 2} height={NORTE.rio.z0 - NORTE.rio.z1} fill="#2F6FA3" />
+          {NORTE.pontes.map((x) => <rect key={x} x={x - (x === 0 ? 2.6 : 1.5)} y={NORTE.rio.z1 - 1} width={x === 0 ? 5.2 : 3} height={NORTE.rio.z0 - NORTE.rio.z1 + 2} rx={0.8} fill="#D8D0BF" />)}
+          <g className="cursor-pointer" onClick={() => { useMundo.setState({ alvoCamera: [0, 0.5, -122], loteSelecionado: null }); setAbertoCel(false); }}>
+            <title>Parque da Cidade: lago, chafariz e coreto (atravesse uma das pontes)</title>
+            <rect x={-LIM} y={TOPO} width={LIM * 2} height={NORTE.rio.z1 - TOPO} fill="#2F6B45" />
+            <text x={0} y={TOPO + 7.6} textAnchor="middle" fontSize={7} fontWeight={800} fill="#fff" style={{ pointerEvents: "none" }}>Parque da Cidade ↑</text>
+          </g>
+          {/* nomes das ruas ao passar o dedo/mouse (faixa invisível sobre cada rua) */}
+          {RUAS.map((r) => <rect key={r.id} x={r.eixo === "x" ? r.valor - 3.5 : -LIM} y={r.eixo === "z" ? r.valor - 3.5 : NORTE.calcadao.z0} width={r.eixo === "x" ? 7 : LIM * 2} height={r.eixo === "z" ? 7 : LIM - NORTE.calcadao.z0} fill="transparent"><title>{nomes[r.id] ?? r.padrao}</title></rect>)}
           {/* ruas e calçadas dos quarteirões */}
           {BLOCOS.map((b) => { const [cx, cz] = centroQuarteirao(b.i, b.j); return (
             <g key={`${b.i},${b.j}`}>
               <rect x={cx - Q / 2} y={cz - Q / 2} width={Q} height={Q} rx={3} fill="#2B333E" />
+              {/* bairro: a calçada na cor dele */}
+              {BAIRRO_DO_QUARTEIRAO[`${b.i},${b.j}`] && <rect x={cx - Q / 2} y={cz - Q / 2} width={Q} height={Q} rx={3} fill={BAIRRO_DO_QUARTEIRAO[`${b.i},${b.j}`].cor} opacity={0.42}><title>{BAIRRO_DO_QUARTEIRAO[`${b.i},${b.j}`].nome}</title></rect>}
               {b.nome && <g className="cursor-pointer" onClick={() => { useMundo.setState({ alvoCamera: [cx, 0.5, cz], loteSelecionado: null }); setAbertoCel(false); }}>
                 <title>{b.nome}</title>
                 <rect x={cx - QUARTEIRAO / 2 + 1} y={cz - QUARTEIRAO / 2 + 1} width={QUARTEIRAO - 2} height={QUARTEIRAO - 2} rx={2.5} fill={b.cor} opacity={nicho ? 0.25 : 0.85} />
@@ -90,6 +106,8 @@ export function MiniMapa() {
               </g>
             );
           })}
+          {/* nome curto de cada bairro no meio do quarteirão */}
+          {BAIRROS.map((b) => { const [cx, cz] = centroQuarteirao(b.i, b.j); return <text key={b.id} x={cx} y={cz + 1.8} textAnchor="middle" fontSize={5.4} fontWeight={800} fill="#fff" stroke="#111418" strokeWidth={1.6} paintOrder="stroke" opacity={nicho && nicho !== `bairro:${b.id}` ? 0.35 : 0.95} style={{ pointerEvents: "none" }}>{b.curto}</text>; })}
           {/* meu personagem e a câmera */}
           {temPersonagem && <circle ref={eu} r={2.6} fill="#38BDF8" stroke="#fff" strokeWidth={1} />}
           <g ref={cam} style={{ pointerEvents: "none" }}><path d="M0 0 L-7 -14 L7 -14 Z" fill="rgba(255,255,255,.22)" /><circle r={2} fill="#fff" /></g>
@@ -98,6 +116,7 @@ export function MiniMapa() {
           <option value="">Todas as áreas</option>
           {algumaPromo && <option value="__promo">🏷️ Com promoção agora</option>}
           {nichosPresentes.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}
+          <optgroup label="Bairros">{BAIRROS.map((b) => <option key={b.id} value={`bairro:${b.id}`}>{b.nome}</option>)}</optgroup>
         </select>
         <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 px-0.5 text-[9.5px] text-white/60">
           <span><i className="mr-1 inline-block h-2 w-2 rounded-sm border border-dashed border-white/50 align-middle" />à venda</span>

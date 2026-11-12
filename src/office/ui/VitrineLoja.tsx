@@ -3,6 +3,7 @@
 // o dono já com a mensagem do produto. O WorkEnd não passa dinheiro adiante. Sem WhatsApp, o botão leva à atendente de
 // IA da loja. No cartão do mapa (compacto) é uma faixa que rola de lado; na página /loja/N, uma grade.
 // Cada pedido no WhatsApp conta um clique no painel de resultados do dono (/api/workend/clique).
+import { avisarClique } from "./LinkRastreado";
 import { useEffect, useState } from "react";
 
 export type ProdutoVitrine = { id: string; nome: string; preco: number | null; descricao: string; foto: string | null };
@@ -15,7 +16,7 @@ export function linkPedido(whatsapp: string, p: ProdutoVitrine) {
   return `https://wa.me/${numeroZap(whatsapp)}?text=${encodeURIComponent(`Olá! Vi o produto ${p.nome} (${preco}) na sua loja do WorkEnd.`)}`;
 }
 function contarClique(numero: number, produtoId: string) {
-  try { navigator.sendBeacon?.("/api/workend/clique", JSON.stringify({ numero, tipo: "produto", ref: produtoId })); } catch { /* o clique segue mesmo sem contar */ }
+  avisarClique(numero, "produto", produtoId); // conta no painel e faz sair o motoboy da loja na cena
 }
 
 // Leva a pergunta até a conversa com a atendente: preenche o campo do chat (página da loja ou cartão do mapa); com o

@@ -3,11 +3,14 @@
 // "À VENDA" na frente. As placas são juntadas num <Estatico> (uma textura compartilhada → um draw call).
 import * as THREE from "three";
 import { useLotesComEscritorio } from "./EscritorioCliente";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { Obra, LOTES_EM_OBRA_VISTOS } from "./ObraFesta";
+import { alturaPredio } from "../data/escritorio";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { caixa, cilindro, esfera, mat, plano } from "./geo";
-import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
+import { ComFallback, type ItemInstancia } from "./Modelos";
+import { ModeloInstanciadoNoite } from "./PredioMaterial";
 import { Estatico } from "./Estatico";
 import { QUARTEIROES, centroLote, frenteDoLote, LOTE, nomeNicho, type ModeloCasa } from "../data/mundo";
 import { useMundo, LOTES, LOTE_POR_CHAVE, useAgora, promocaoAtiva, type Rascunho } from "../mundoStore";
@@ -24,7 +27,8 @@ const CASA: Record<ModeloCasa, { altura: number; frente: number }> = {
 type Casa = { modelo: ModeloCasa; pos: [number, number, number]; rot: number; escala: number };
 type Terreno = { pos: [number, number, number]; rot: number; arvore: boolean };
 
-function listar(comEscritorio: Set<string>) {
+// emObra: lotes reservados (sem pagar): a casa sai e entra a obra (12/11/2026)
+function listar(comEscritorio: Set<string>, emObra: Set<string>) {
   const casas: Casa[] = [], terrenos: Terreno[] = [], placas: { chave: string; pos: [number, number, number]; rot: number }[] = [];
   for (const q of QUARTEIROES) {
     if (!q.lotes) continue;
@@ -36,7 +40,7 @@ function listar(comEscritorio: Set<string>) {
       // placa perto da calçada, num canto do lote
       if (l.tipo === "praca") return; // a praça tem a cena dela (scene/Praca.tsx), sem placa de venda
       placas.push({ chave, pos: [x + (k % 2 ? 6.5 : -6.5), 0, z + frente * (LOTE / 2 - 1.6)], rot });
-      if (comEscritorio.has(chave)) return; // o escritório do cliente ocupa o lote: a casa/terreno original some
+      if (comEscritorio.has(chave) || emObra.has(chave)) return; // o escritório do cliente (ou a obra) ocupa o lote: a casa/terreno original some
       if (l.tipo === "casa") casas.push({ modelo: l.modelo, pos: [x, 0, z - frente * 1.2], rot, escala: l.escala ?? 1 });
       else terrenos.push({ pos: [x, 0, z], rot, arvore: !!l.arvore });
     });
@@ -97,8 +101,10 @@ function Jardim({ pos, rot }: { pos: [number, number, number]; rot: number }) {
 
 export function Lotes() {
   const comEscritorio = useLotesComEscritorio();
+  const terrenosMundo = useMundo((s) => s.terrenos);
+  const chavesObra = Object.values(terrenosMundo).filter((t) => t.status === "reservado").map((t) => t.chave).sort().join("|");
   const { casas, terrenos, placas, porModelo } = useMemo(() => {
-    const r = listar(comEscritorio);
+    const r = listar(comEscritorio, new Set(chavesObra ? chavesObra.split("|") : []));
     const m = new Map<ModeloCasa, ItemInstancia[]>();
     for (const c of r.casas) {
       const info = CASA[c.modelo];
@@ -106,13 +112,14 @@ export function Lotes() {
       lista.push({ pos: c.pos, rot: c.rot + info.frente, altura: info.altura * c.escala });
     }
     return { ...r, porModelo: [...m.entries()] };
-  }, [comEscritorio]);
+  }, [comEscritorio, chavesObra]);
   const reservados = useMundo((s) => s.terrenos);
   const selecionado = useMundo((s) => s.loteSelecionado);
   const hover = useMundo((s) => s.loteHover);
   const rascunho = useMundo((s) => s.rascunho);
   const chavesReservadas = Object.keys(reservados).sort().join("|");
   const vagas = useMundo((s) => s.vagas);
+  const rascunhoEsc = useMundo((s) => s.rascunhoEscritorio);
   const agora = useAgora();
   // lote duplo: o balão do principal vai para o meio dos dois terrenos; a ampliação em obras mostra o tapume com a marca do principal
   const anexoAtivo = useMemo(() => { const m: Record<string, string> = {}; for (const t of Object.values(reservados)) if (t.anexoDe && t.status === "ativo") m[t.anexoDe] = t.chave; return m; }, [reservados]);
@@ -128,7 +135,7 @@ export function Lotes() {
       </Estatico>
       {porModelo.map(([modelo, itens]) => (
         <ComFallback key={modelo} fallback={<Estatico>{itens.map((it, i) => <CasaProcedural key={i} pos={it.pos} rot={it.rot ?? 0} altura={it.altura ?? 5} />)}</Estatico>}>
-          <ModeloInstanciado nome={modelo} itens={itens} />
+          <ModeloInstanciadoNoite nome={modelo} itens={itens} />
         </ComFallback>
       ))}
       {/* lotes reservados: tapume e placa da empresa; o rascunho do painel aparece ao vivo */}
@@ -139,10 +146,13 @@ export function Lotes() {
         if (t?.anexoDe) {
           const p = reservados[t.anexoDe];
           if (t.status === "ativo" && comEscritorio.has(l.chave)) return null; // o prédio do principal já ocupa este terreno
-          return <LoteReservado key={l.chave} chave={l.chave} nome={p?.empresaNome ?? t.empresaNome} cor={p?.cor ?? t.cor} logo={p?.temLogo ? `/api/terrenos/${encodeURIComponent(p.chave)}/logo` : null} nicho={p?.nicho} ativo={false} comEscritorio={false} semBalao />;
+          return <LoteReservado key={l.chave} chave={l.chave} nome={p?.empresaNome ?? t.empresaNome} cor={p?.cor ?? t.cor} logo={p?.temLogo ? `/api/terrenos/${encodeURIComponent(p.chave)}/logo` : null} nicho={p?.nicho} ativo={false} comEscritorio={false} semBalao obra={t.status === "reservado"} />;
         }
         const anexo = anexoAtivo[l.chave]; const meio = anexo && LOTE_POR_CHAVE[anexo] ? (LOTE_POR_CHAVE[anexo].centro[0] - l.centro[0]) / 2 : 0;
-        return <LoteReservado key={l.chave} chave={l.chave} nome={r?.empresaNome ?? t?.empresaNome ?? ""} cor={r?.cor ?? t?.cor ?? "#1D4ED8"} logo={r ? r.logoDataUrl : t?.temLogo ? `/api/terrenos/${encodeURIComponent(l.chave)}/logo` : null} nicho={r?.nicho ?? t?.nicho} ativo={t?.status === "ativo"} comEscritorio={comEscritorio.has(l.chave)} meio={meio} vagas={t?.status === "ativo" ? vagas[l.chave] ?? 0 : 0} promo={t?.status === "ativo" ? promocaoAtiva(t, agora)?.texto ?? null : null} />;
+        // o balão sobe com o prédio (andares a mais e cobertura); no lote em edição, segue o rascunho
+        const esc = l.chave === selecionado && rascunhoEsc ? rascunhoEsc : t?.escritorio ?? null;
+        const alturaBalao = t?.status === "ativo" && esc && comEscritorio.has(l.chave) ? Math.max(meio ? 12.4 : 10.5, alturaPredio(esc, !!anexo) + 2.2) : undefined;
+        return <LoteReservado key={l.chave} chave={l.chave} nome={r?.empresaNome ?? t?.empresaNome ?? ""} cor={r?.cor ?? t?.cor ?? "#1D4ED8"} logo={r ? r.logoDataUrl : t?.temLogo ? `/api/terrenos/${encodeURIComponent(l.chave)}/logo` : null} nicho={r?.nicho ?? t?.nicho} ativo={t?.status === "ativo"} comEscritorio={comEscritorio.has(l.chave)} meio={meio} vagas={t?.status === "ativo" ? vagas[l.chave] ?? 0 : 0} promo={t?.status === "ativo" ? promocaoAtiva(t, agora)?.texto ?? null : null} alturaBalao={alturaBalao} obra={t?.status === "reservado"} />;
       })}
       {/* caixas de clique + contorno do lote sob o mouse / selecionado */}
       {LOTES.map((l) => <AlvoLote key={l.chave} chave={l.chave} centro={l.centro} estado={selecionado === l.chave ? "sel" : hover === l.chave ? "hover" : null} />)}
@@ -230,8 +240,10 @@ export function Balao({ position, nome, cor, logo, subtitulo, onClick, apagado =
 }
 
 // Lote reservado: tapume baixo em volta (branco com faixa na cor da empresa) e placa grande na frente (enquanto não paga)
-function LoteReservado({ chave, nome, cor, logo, nicho, ativo = false, comEscritorio = false, semBalao = false, meio = 0, vagas = 0, promo = null }: { chave: string; nome: string; cor: string; logo: string | null; nicho?: string; ativo?: boolean; comEscritorio?: boolean; semBalao?: boolean; meio?: number; vagas?: number; promo?: string | null }) {
+function LoteReservado({ chave, nome, cor, logo, nicho, ativo = false, comEscritorio = false, semBalao = false, meio = 0, vagas = 0, promo = null, alturaBalao, obra = false }: { chave: string; nome: string; cor: string; logo: string | null; nicho?: string; ativo?: boolean; comEscritorio?: boolean; semBalao?: boolean; meio?: number; vagas?: number; promo?: string | null; alturaBalao?: number; obra?: boolean }) {
   const l = LOTE_POR_CHAVE[chave];
+  // a sessão viu este lote em obra: quando ele virar prédio, o prédio sobe com animação (scene/ObraFesta.tsx)
+  useEffect(() => { if (obra) LOTES_EM_OBRA_VISTOS.add(chave); }, [obra, chave]);
   const tex = useMemo(() => texturaEmpresa(nome, cor, logo, ativo), [nome, cor, logo, ativo]);
   const filtro = useMemo(() => nichoDestacado(), []);
   if (!l) return null;
@@ -246,7 +258,8 @@ function LoteReservado({ chave, nome, cor, logo, nicho, ativo = false, comEscrit
           <mesh geometry={caixa(w + (w > d ? 0 : 0.02), 0.3, d + (w > d ? 0.02 : 0))} material={mat(cor, { rough: 0.7 })} position={[lx, 1.45, lz]} />
         </group>
       ))}
-      {!semBalao && <Balao position={[meio, comEscritorio ? (meio ? 12.4 : 10.5) : 7.5, 0]} nome={nome} cor={cor} logo={logo} subtitulo={ativo ? nomeNicho(nicho) : "Reservado · em obras"} onClick={() => useMundo.getState().selecionarLote(chave)} apagado={!!filtro && (!ativo || nicho !== filtro)} destaque={!!filtro && ativo && nicho === filtro} selo={vagas > 0 ? `Estamos contratando · ${vagas}` : null} promo={promo} />}
+      {obra && <Obra frente={frente as 1 | -1} semente={(l.numero * 1.37) % 6.28} />}
+      {!semBalao && <Balao position={[meio, alturaBalao ?? (comEscritorio ? (meio ? 12.4 : 10.5) : obra ? 9.5 : 7.5), 0]} nome={nome} cor={cor} logo={logo} subtitulo={ativo ? nomeNicho(nicho) : "Reservado · em obras"} onClick={() => useMundo.getState().selecionarLote(chave)} apagado={!!filtro && (!ativo || nicho !== filtro)} destaque={!!filtro && ativo && nicho === filtro} selo={vagas > 0 ? `Estamos contratando · ${vagas}` : null} promo={promo} />}
       {/* placa na frente só enquanto está reservado: comprou, a placa sai e fica o prédio com o letreiro */}
       {!ativo && <group position={[l.k % 2 ? -3.5 : 3.5, 0, frente * (m - 0.2)]} rotation={[0, rot, 0]}>
         {[-1.3, 1.3].map((px) => <mesh key={px} geometry={caixa(0.12, 2.6, 0.12)} material={mat("#3A3F47")} position={[px, 1.3, 0]} castShadow />)}

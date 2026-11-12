@@ -104,3 +104,58 @@ export function passeioNaCalcada(x: number, z: number, sorte = Math.random()): [
   if (naVertical) { const nz = Math.max(cz - B, Math.min(cz + B, pz + sentido * passo)); return [px, nz]; }
   const nx = Math.max(cx - B, Math.min(cx + B, px + sentido * passo)); return [nx, pz];
 }
+
+// ================= cidade com identidade (12/11/2026) =================
+// Além da Avenida Beira-Rio (eixo z = -78): calçadão, rio e o Parque da Cidade. É só cenário: os carros continuam
+// virando na borda, os pedestres andam nas calçadas de sempre e nenhum lote novo foi criado (a numeração não muda).
+export const NORTE = {
+  calcadao: { z0: -81.5, z1: -90 }, // calçadão de pedra portuguesa na beira do rio (os outdoors N1 e N2 ficam nele)
+  rio: { z0: -90, z1: -102.5 }, // água
+  parque: { z0: -103.5, z1: -150, x: 74 }, // Parque da Cidade (lago, chafariz, coreto)
+  fim: -158, // onde o chão termina ao norte (o painel da cidade fica logo depois)
+  pontes: [0, -52, 52], // x das pontes de pedestre (a do meio é a grande, de pedra)
+};
+// até onde o centro da tela pode ir ao arrastar (Cena.tsx): ao norte vai até o meio do parque
+export const LIMITE_CAMERA = { xMin: -(MUNDO.x - 22), xMax: MUNDO.x - 22, zMin: -128, zMax: MUNDO.z - 22 };
+
+// Bairros: cada quarteirão de lotes tem um tema, com piso, árvores, galhardetes nos postes e uma placa. É sugestão e
+// visual: qualquer empresa compra em qualquer bairro.
+export type PisoBairro = "terracota" | "xadrezRosa" | "graficoNeon" | "folhas" | "granilite" | "granito" | "mosaico";
+export type ArvoreBairro = "ipeAmarelo" | "ipeRosa" | "topiaria" | "copaVerde" | "jacaranda" | "palmeiraImperial" | "oiti";
+export interface Bairro { id: string; nome: string; curto: string; lema: string; cor: string; corLuz: string; i: number; j: number; piso: PisoBairro; arvore: ArvoreBairro; sugestao: string[] }
+export const BAIRROS: Bairro[] = [
+  { id: "gastronomico", nome: "Polo Gastronômico", curto: "Gastronomia", lema: "comida, café e bar", cor: "#D9661F", corLuz: "#FFB060", i: 1, j: 1, piso: "terracota", arvore: "ipeAmarelo", sugestao: ["alimentacao", "eventos", "turismo"] },
+  { id: "moda", nome: "Rua da Moda", curto: "Moda", lema: "moda, beleza e varejo", cor: "#D6337A", corLuz: "#FF8CC6", i: -1, j: 1, piso: "xadrezRosa", arvore: "ipeRosa", sugestao: ["varejo", "beleza"] },
+  { id: "tech", nome: "Distrito Tech", curto: "Tech", lema: "tecnologia e inovação", cor: "#0E8FD6", corLuz: "#5FE3FF", i: -1, j: -1, piso: "graficoNeon", arvore: "topiaria", sugestao: ["tecnologia", "marketing", "conteudo"] },
+  { id: "saude", nome: "Saúde & Bem-estar", curto: "Saúde", lema: "clínicas, academias e terapias", cor: "#18A058", corLuz: "#B8FFD2", i: -1, j: 0, piso: "folhas", arvore: "copaVerde", sugestao: ["saude", "beleza"] },
+  { id: "criativos", nome: "Vila dos Criativos", curto: "Criativos", lema: "design, arte e conteúdo", cor: "#7C4DDB", corLuz: "#D2B8FF", i: 0, j: -1, piso: "granilite", arvore: "jacaranda", sugestao: ["conteudo", "marketing", "cursos", "eventos"] },
+  { id: "negocios", nome: "Centro de Negócios", curto: "Negócios", lema: "escritórios e serviços", cor: "#2B4C8C", corLuz: "#FFE3A3", i: 1, j: -1, piso: "granito", arvore: "palmeiraImperial", sugestao: ["negocios", "consultoria", "financas", "juridico", "imoveis"] },
+  { id: "praca", nome: "Largo da Praça", curto: "Praça", lema: "eventos e feira de sábado", cor: "#0F8A7E", corLuz: "#9FF5E8", i: 0, j: 1, piso: "mosaico", arvore: "oiti", sugestao: ["eventos", "educacao", "servicos", "casa"] },
+];
+export const BAIRRO_DO_QUARTEIRAO: Record<string, Bairro> = Object.fromEntries(BAIRROS.map((b) => [`${b.i},${b.j}`, b]));
+// bairro de um lote (para o cartão do lote): pela chave "i,j,k"
+export function bairroDoLote(chave: string | null | undefined): Bairro | null {
+  const m = /^(-?\d+),(-?\d+),[0-3]$/.exec(chave ?? ""); if (!m) return null;
+  return BAIRRO_DO_QUARTEIRAO[`${m[1]},${m[2]}`] ?? null;
+}
+
+// Ruas com nome: as 8 ruas da grade (4 de leste a oeste, z fixo; 4 de norte a sul, x fixo). As da borda são avenidas.
+// Fundador pode dar nome a uma rua livre (src/server/ruas.ts); senão vale o nome padrão.
+export interface RuaInfo { id: string; eixo: "x" | "z"; valor: number; tipo: "Rua" | "Avenida"; padrao: string }
+export const RUAS: RuaInfo[] = EIXOS_RUA.flatMap((v) => {
+  const borda = Math.abs(v) > PASSO; // eixos ±78
+  const tipo: RuaInfo["tipo"] = borda ? "Avenida" : "Rua";
+  const PADRAO_Z: Record<string, string> = { "-78": "Avenida Beira-Rio", "-26": "Rua das Nuvens", "26": "Rua dos Ipês", "78": "Avenida da Praia" };
+  const PADRAO_X: Record<string, string> = { "-78": "Avenida do Poente", "-26": "Rua das Palmeiras", "26": "Rua do Comércio", "78": "Avenida Atlântica" };
+  return [
+    { id: `z${v}`, eixo: "z" as const, valor: v, tipo, padrao: PADRAO_Z[String(v)] ?? `${tipo} ${v}` },
+    { id: `x${v}`, eixo: "x" as const, valor: v, tipo, padrao: PADRAO_X[String(v)] ?? `${tipo} ${v}` },
+  ];
+});
+export const RUA_POR_ID: Record<string, RuaInfo> = Object.fromEntries(RUAS.map((r) => [r.id, r]));
+// rua da frente de um lote: lotes do norte (k 0 e 1) olham para a rua ao norte do quarteirão; os do sul, para a do sul
+export function ruaDaFrente(chave: string | null | undefined): RuaInfo | null {
+  const l = LOTE_POR_CHAVE[chave ?? ""]; if (!l) return null;
+  const z = l.j * PASSO + (l.k >= 2 ? EIXO_RUA : -EIXO_RUA);
+  return RUA_POR_ID[`z${z}`] ?? null;
+}

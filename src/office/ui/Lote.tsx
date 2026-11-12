@@ -3,7 +3,9 @@
 // que reflete ao vivo na placa e no tapume do lote. Reservar precisa da conta do WorkEnd.
 import { useEffect, useRef, useState } from "react";
 import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES_EMPRESA, useAgora, promocaoAtiva } from "../mundoStore";
-import { NICHOS } from "../data/mundo";
+import { NICHOS, bairroDoLote } from "../data/mundo";
+import { NomearRua } from "./NomearRua";
+import { FotoPredio } from "./FotoPredio";
 import { useEscritorio } from "../store";
 import { BotoesPersonagem } from "./BotoesPersonagem";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
@@ -175,6 +177,8 @@ export function CartaoLote() {
           <div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · Lote {l.numero}</div>
           <div className="text-lg font-bold">{livre ? "À venda" : ehAnexo ? (ehMeu ? "Ampliação do seu prédio" : principal?.empresaNome ?? terreno.empresaNome) : ehMeu ? "Seu chão" : terreno.empresaNome}</div>
           <div className="text-xs text-[#5B6472]">20 × 20 m · {descricaoLote(l)}</div>
+          {/* bairro do quarteirão (12/11/2026): só identidade visual, qualquer área compra em qualquer bairro */}
+          {(() => { const b = bairroDoLote(chave); return b ? <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: b.cor }}>{b.nome}</span> : null; })()}
         </div>
         <button onClick={() => selecionarLote(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
       </div>
@@ -253,6 +257,8 @@ export function CartaoLote() {
                 <a href="/app/resultados" className="col-span-2 rounded-xl bg-[#1D2128] px-2 py-2 text-white hover:bg-black">📈 Resultados da loja</a>
               </div>
               <PromocaoDono chave={chave} />
+              <div className="mt-1.5"><FotoPredio chave={chave} /></div>
+              <NomearRua />
               {/* lote duplo: o vizinho do lado vira ampliação e o prédio cresce */}
               {anexoDeste ? (
                 <button onClick={() => selecionarLote(anexoDeste.chave)} className="mt-2 w-full rounded-xl bg-[#EEF3FF] px-3 py-2 text-left text-xs text-[#1D4ED8]"><b>Lote duplo</b> com o Lote {LOTE_POR_CHAVE[anexoDeste.chave]?.numero} · {anexoDeste.status === "ativo" ? "ativo" : "reservado, falta pagar"} →</button>

@@ -22,6 +22,7 @@ export interface Terreno {
   nicho: string; // id em NICHOS (vai no balão)
   anexoDe: string | null; // lote duplo (12/11/2026): este lote é a ampliação do lote principal indicado
   promocao: Promocao | null; // promoção na fachada (12/11/2026); só vem enquanto vale
+  inauguradoEm: Date | null; // 1ª vez que o lote ficou ativo (12/11/2026): a cena faz a festa de inauguração por 24 h
 }
 export interface Promocao { texto: string; ate: string; desde: string }
 export interface TerrenoAdmin extends Terreno { email: string; usuarioNome: string; banidoEm: Date | null }
@@ -49,7 +50,7 @@ export function loteAVenda(chave: string) {
 
 // trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
 const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio, t.nicho, t.anexo_de,
-  CASE WHEN (t.promocao->>'ate')::timestamptz > now() THEN t.promocao END AS promocao`;
+  CASE WHEN (t.promocao->>'ate')::timestamptz > now() THEN t.promocao END AS promocao, t.inaugurado_em`;
 
 // Limpa o que venceu: reserva sem pagamento depois de 1 h é apagada; chão pago sai do mapa depois do vencimento + tolerância,
 // mas a marca e a equipe vão pro arquivo e voltam na próxima reserva do mesmo dono
@@ -166,6 +167,7 @@ export async function liberarTerreno(usuarioId: string, chave: string) {
 export async function ativarTerreno(chave: string, meses = 1, usuarioId: string | null = null, db: Db = sql) {
   await migrar();
   const r = await db`UPDATE terreno SET status = 'ativo', reservado_ate = NULL, avisado_em = NULL, atualizado_em = now(),
+    inaugurado_em = CASE WHEN status = 'reservado' THEN COALESCE(inaugurado_em, now()) ELSE inaugurado_em END,
     pago_ate = GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${DIAS_MES * meses}) WHERE chave = ${chave} AND (${usuarioId}::text IS NULL OR usuario_id = ${usuarioId})`;
   if (!r.count) return false;
   await garantirEscritorio(chave, db);
@@ -249,6 +251,7 @@ export async function adminDias(chave: string, dias: number) {
   await migrar();
   const d = Math.max(-3650, Math.min(3650, Math.trunc(dias)));
   await sql`UPDATE terreno SET status = 'ativo', reservado_ate = NULL, atualizado_em = now(),
+    inaugurado_em = CASE WHEN status = 'reservado' THEN COALESCE(inaugurado_em, now()) ELSE inaugurado_em END,
     pago_ate = GREATEST(now(), GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${d})) WHERE chave = ${chave}`;
   await garantirEscritorio(chave);
 }

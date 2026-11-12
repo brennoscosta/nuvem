@@ -5,7 +5,7 @@ import { FLUTUANTE, LARGO } from "./estilo";
 import { useEffect, useState } from "react";
 import { PixAberto } from "./Lote";
 import { useMundo } from "../mundoStore";
-import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, vagasLivres, DECOR_PADRAO, ESTILOS_LETREIRO, PISOS, CERCAS, EXTRAS, CORES_TOLDO, INTERIOR_PADRAO, CORES_PAREDE, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Setor, type Membro, type Pronto, type Decoracao, type Interior } from "../data/escritorio";
+import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, vagasLivres, DECOR_PADRAO, ESTILOS_LETREIRO, PISOS, CERCAS, EXTRAS, CORES_TOLDO, INTERIOR_PADRAO, CORES_PAREDE, PISOS_INTERIOR, MOVEIS_INTERIOR, LAYOUT, MAX_ANDARES, COBERTURAS, MATERIAIS, CORES_LED, LED_PADRAO, PECAS, PECA_POR_NICHO, andaresDoPredio, type Led, type Escritorio, type Setor, type Membro, type Pronto, type Decoracao, type Interior } from "../data/escritorio";
 import { useEscritorio } from "../store";
 import { frenteDoLote, LOTE_POR_CHAVE } from "../data/mundo";
 import { natalAtivo } from "../scene/Natal";
@@ -116,11 +116,12 @@ export function PainelEscritorio() {
         {([["predio", "Prédio"], ["visual", "Fachada"], ["interior", "Interior"], ["setores", `Setores ${e.setores.length}`], ["equipe", `Equipe ${e.equipe.length}`]] as const).map(([k, t]) => <button key={k} onClick={() => setAba(k)} className={`flex-1 whitespace-nowrap rounded-lg px-1 py-1.5 ${aba === k ? "bg-white shadow" : "text-[#5B6472]"}`}>{t}</button>)}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-3">
-        {aba === "visual" && <AbaVisual e={e} set={set} corMarca={terrenoAtual?.cor ?? "#1D4ED8"} />}
+        {aba === "visual" && <AbaVisual e={e} set={set} corMarca={terrenoAtual?.cor ?? "#1D4ED8"} nicho={terrenoAtual?.nicho ?? "negocios"} />}
         {aba === "interior" && <AbaInterior e={e} set={set} temLogo={!!terrenoAtual?.temLogo} />}
         {aba === "predio" && (
           <div className="space-y-2">
             {LOTE_POR_CHAVE[vista] && <PosicaoPredio k={LOTE_POR_CHAVE[vista].k} e={e} set={set} />}
+            <AlturaFachada e={e} set={set} corMarca={terrenoAtual?.cor ?? "#1D4ED8"} />
             {LAYOUTS.map((L) => (
               <button key={L.id} type="button" onClick={() => set({ ...e, layout: L.id })} className={`flex w-full items-center gap-3 rounded-xl border-2 p-2 text-left ${e.layout === L.id ? "border-[#1D4ED8] bg-[#EEF3FF]" : "border-black/10 hover:bg-black/[0.03]"}`}>
                 <MiniLayout id={L.id} />
@@ -273,12 +274,90 @@ function AbaInterior({ e, set, temLogo }: { e: Escritorio; set: (e: Escritorio) 
     </div>
   );
 }
-function AbaVisual({ e, set, corMarca }: { e: Escritorio; set: (e: Escritorio) => void; corMarca: string }) {
+// Altura, cobertura e revestimento (12/11/2026): na aba Prédio, junto da escolha do modelo
+function AlturaFachada({ e, set, corMarca }: { e: Escritorio; set: (e: Escritorio) => void; corMarca: string }) {
+  const d = e.decor ?? DECOR_PADRAO;
+  const muda = (p: Partial<Decoracao>) => set({ ...e, decor: { ...d, ...p } });
+  const nativo = LAYOUT[e.layout].andares, atual = andaresDoPredio(e);
+  const material = d.material ?? "original", cobertura = d.cobertura ?? "nenhuma";
+  const corF = d.corFachada ?? corMarca;
+  const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">{t}</div>;
+  return (
+    <div className="rounded-xl border border-black/10 p-2.5">
+      {titulo("Andares")}
+      <div className="flex flex-wrap gap-1.5">
+        {Array.from({ length: MAX_ANDARES - nativo + 1 }, (_, i) => nativo + i).map((n) => (
+          <Opcao key={n} ativo={atual === n} onClick={() => muda({ andares: n === nativo ? 0 : n })}>{n === nativo ? `${n} · como o modelo` : `${n} andares`}</Opcao>
+        ))}
+      </div>
+      <div className="mt-1 text-[11px] text-[#5B6472]">Os andares a mais sobem atrás da fachada, com o mesmo revestimento; à noite as janelas acendem.</div>
+      {titulo("No topo")}
+      <div className="grid grid-cols-2 gap-1.5">
+        {COBERTURAS.map((c) => <Opcao key={c.id} ativo={cobertura === c.id} onClick={() => muda({ cobertura: c.id })}><span className="mr-1">{c.icone}</span>{c.nome}</Opcao>)}
+      </div>
+      {titulo("Revestimento da fachada")}
+      <div className="grid grid-cols-2 gap-1.5">
+        {MATERIAIS.map((m) => (
+          <Opcao key={m.id} ativo={material === m.id} onClick={() => muda({ material: m.id })}>
+            <span className="mb-1 block h-4 rounded-md border border-black/10" style={{ background: m.id === "pintura" ? corF : m.amostra }} />{m.nome}
+          </Opcao>
+        ))}
+      </div>
+      {material === "pintura" && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {[corMarca, "#F1EFEA", "#E9D8B4", "#9FB8A0", "#7A8CA3", "#2B2F36", "#B9533A"].map((c) => (
+            <button key={c} type="button" onClick={() => muda({ corFachada: c.toUpperCase() === corMarca.toUpperCase() ? null : c })} aria-label={`Pintura ${c}`} className={`h-8 w-8 rounded-lg border-2 ${corF.toUpperCase() === c.toUpperCase() ? "border-[#1D2128]" : "border-black/10"}`} style={{ background: c }} />
+          ))}
+          <label className="relative h-8 w-8 cursor-pointer overflow-hidden rounded-lg border border-black/10 bg-[conic-gradient(red,yellow,lime,cyan,blue,magenta,red)]" title="Outra cor">
+            <input type="color" value={corF} onChange={(ev) => muda({ corFachada: ev.target.value.toUpperCase() })} className="absolute inset-0 cursor-pointer opacity-0" />
+          </label>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const MODOS_LED: [Led["modo"], string][] = [["texto", "Meu texto"], ["promocao", "Promoção atual"], ["horario", "Aberto ou fechado"]];
+const DIAS_CURTOS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const HORAS = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
+function AbaVisual({ e, set, corMarca, nicho }: { e: Escritorio; set: (e: Escritorio) => void; corMarca: string; nicho: string }) {
   const d = e.decor ?? DECOR_PADRAO;
   const muda = (p: Partial<Decoracao>) => set({ ...e, decor: { ...d, ...p } });
   const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-[#5B6472] first:mt-0">{t}</div>;
+  const led = d.led ?? LED_PADRAO;
+  const mudaLed = (p: Partial<Led>) => muda({ led: { ...led, ...p } });
+  const pecaAuto = PECAS.find((p) => p.id === PECA_POR_NICHO[nicho]) ?? PECAS.find((p) => p.id === "relogio")!;
   return (
     <div>
+      {titulo("Letreiro de LED")}
+      <div className="rounded-xl border border-black/10 p-2.5">
+        <label className="flex items-center justify-between gap-2 text-[12px] font-semibold"><span>💡 Painel de LED com texto correndo, em cima do letreiro</span><input type="checkbox" checked={led.ligado} onChange={(ev) => mudaLed({ ligado: ev.target.checked })} className="h-4 w-4" /></label>
+        {led.ligado && (
+          <div className="mt-2 space-y-2">
+            <div className="grid grid-cols-3 gap-1.5">{MODOS_LED.map(([m, n]) => <Opcao key={m} ativo={led.modo === m} onClick={() => mudaLed({ modo: m })}>{n}</Opcao>)}</div>
+            {led.modo === "texto" && <input value={led.texto} onChange={(ev) => mudaLed({ texto: ev.target.value.slice(0, 40) })} placeholder="Ex.: Café fresquinho o dia todo" aria-label="Texto do LED" className="w-full rounded-lg border border-black/10 px-2 py-1.5 text-base sm:text-xs" />}
+            {led.modo === "promocao" && <div className="rounded-lg bg-[#F1F3F6] px-2 py-1.5 text-[11px] text-[#5B6472]">Mostra a promoção ligada no cartão do lote. Sem promoção, mostra o nome da empresa.</div>}
+            {led.modo === "horario" && (
+              <div className="space-y-1.5 rounded-lg bg-[#F1F3F6] p-2 text-[11px] text-[#5B6472]">
+                <div>Se a agenda da loja estiver ligada, vale o horário dela. Sem agenda, vale este:</div>
+                <div className="flex items-center gap-1.5">Abre <select value={led.abre} onChange={(ev) => mudaLed({ abre: ev.target.value })} aria-label="Abre às" className="rounded-md border border-black/10 bg-white px-1 py-1 text-base sm:text-xs">{HORAS.map((h) => <option key={h}>{h}</option>)}</select>
+                  fecha <select value={led.fecha} onChange={(ev) => mudaLed({ fecha: ev.target.value })} aria-label="Fecha às" className="rounded-md border border-black/10 bg-white px-1 py-1 text-base sm:text-xs">{HORAS.map((h) => <option key={h}>{h}</option>)}</select></div>
+                <div className="flex flex-wrap gap-1">{DIAS_CURTOS.map((n, i) => <button key={n} type="button" onClick={() => mudaLed({ dias: led.dias.includes(i) ? led.dias.filter((x) => x !== i) : [...led.dias, i].sort() })} className={`rounded-md px-2 py-1 font-semibold ${led.dias.includes(i) ? "bg-[#1D4ED8] text-white" : "bg-white text-[#5B6472]"}`}>{n}</button>)}</div>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">{(Object.keys(CORES_LED) as Led["cor"][]).map((c) => <button key={c} type="button" onClick={() => mudaLed({ cor: c })} aria-label={`LED ${CORES_LED[c].nome}`} title={CORES_LED[c].nome} className={`h-7 w-7 rounded-full border-2 ${led.cor === c ? "border-[#1D2128]" : "border-transparent"}`} style={{ background: CORES_LED[c].hex, boxShadow: `0 0 8px ${CORES_LED[c].hex}` }} />)}</div>
+          </div>
+        )}
+      </div>
+      {titulo("Peça da área na frente da loja")}
+      <select value={d.peca ?? "auto"} onChange={(ev) => muda({ peca: ev.target.value as Decoracao["peca"] })} aria-label="Peça da área" className="w-full rounded-xl border border-black/10 bg-white px-2 py-2 text-base sm:text-xs">
+        <option value="auto">Automática pela área: {pecaAuto.icone} {pecaAuto.nome}</option>
+        {PECAS.map((p) => <option key={p.id} value={p.id}>{p.icone} {p.nome}</option>)}
+        <option value="nenhuma">Nenhuma</option>
+      </select>
+      {titulo("Vitrine na janela")}
+      <label className="flex items-center justify-between gap-2 rounded-xl border border-black/10 p-2.5 text-[12px] font-semibold"><span>🛍️ Mostrar os produtos da vitrine colados no vidro da frente</span><input type="checkbox" checked={d.vitrineJanela ?? true} onChange={(ev) => muda({ vitrineJanela: ev.target.checked })} className="h-4 w-4" /></label>
+      <div className="mt-1 text-[11px] text-[#5B6472]">Os cartazes usam as fotos e os preços de <a href="/app/vitrine" target="_blank" className="font-semibold text-[#1D4ED8]">Minha vitrine</a>.</div>
       {titulo("Letreiro")}
       <div className="grid grid-cols-2 gap-1.5">
         {ESTILOS_LETREIRO.map((s) => (

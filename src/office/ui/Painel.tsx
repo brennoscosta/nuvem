@@ -7,7 +7,7 @@ import { PainelPersonagem, FichaPersonagem, ChatPersonagem, CaixaPersonagem } fr
 import { JanelaChamada } from "./Chamada";
 import { AREAS, AREAS_APOIO, FUNCOES, NIVEIS, NIVEL, PERSONALIDADES, type AreaId, type Nivel } from "../data/org";
 import { SETORES_ESCRITORIO } from "../data/layout";
-import { qualidade, escolherQualidade } from "../scene/qualidade";
+import { qualidade, escolherQualidade, usarMapa2D, escolherMapa } from "../scene/qualidade";
 import { BONECOS } from "../data/bonecos";
 import { useEscritorio } from "../store";
 import { useSimulador } from "../sim/simulador";
@@ -20,6 +20,7 @@ import { CartaoPraca, AvisoEventos } from "./Praca";
 import { MiniMapa } from "./MiniMapa";
 import { Sino } from "./Sino";
 import { VisitaGuiada } from "./VisitaGuiada";
+import { BotaoSom } from "./Som";
 import { useMundo, modoMundo } from "../mundoStore";
 import Link from "next/link";
 import { Logotipo } from "@/app/workend/_marca";
@@ -61,6 +62,7 @@ export function BarraTopo() {
         <div className="sem-barra min-w-0 flex-1 overflow-x-auto">
           <div className="ml-auto flex w-max items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0">
             <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório" : "Ver o prédio por fora"} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">{vista === "fora" ? "🏢 Ver por dentro" : "🌆 Ver por fora"}</button>
+            <BotaoSom />
             <ContaWorkend />
           </div>
         </div>
@@ -242,13 +244,19 @@ function PainelOuCartao() {
 function BotaoGraficos() {
   // no servidor não existe aparelho pra detectar: o botão só aparece no navegador (sem erro de hidratação)
   const q = useSyncExternalStore(semAssinatura, qualidade, () => null);
-  if (!q) return null;
+  // mapa simples em 2D (12/11/2026): ele tem os próprios botões, inclusive o "Ver em 3D"
+  const dois = useSyncExternalStore(semAssinatura, () => modoMundo() && usarMapa2D(), () => false);
+  const mundo = useSyncExternalStore(semAssinatura, modoMundo, () => false);
+  if (!q || dois) return null;
   const leve = q === "leve";
   return (
+    <>
     <button onClick={() => escolherQualidade(leve ? "alta" : "leve")} title={leve ? "Gráficos leves: sem sombras, resolução menor e 30 quadros/s. Clique pra usar os completos." : "Gráficos completos. Clique pra usar os leves (melhor em celular e computador fraco)."}
       className="pointer-events-auto shrink-0 rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur hover:bg-[#111418]/85">
       {leve ? "⚡ Gráficos leves" : "✨ Gráficos completos"}
     </button>
+    {mundo && <button onClick={() => escolherMapa("2d")} title="Mapa simples em 2D: as mesmas lojas, mais leve para aparelhos fracos" className="pointer-events-auto shrink-0 rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur hover:bg-[#111418]/85">🗺️ <span className="hidden sm:inline">Mapa simples</span><span className="sm:hidden">2D</span></button>}
+    </>
   );
 }
 
@@ -268,6 +276,8 @@ export function Painel() {
   useTimeInicial();
   useServidor();
   useMundoServidor();
+  // mapa simples em 2D (12/11/2026): ele já é o mapa; o mini-mapa e a dica de arrastar do 3D saem
+  const mapa2d = useSyncExternalStore(semAssinatura, () => modoMundo() && usarMapa2D(), () => false);
   return (
     <>
       <BarraTopo />
@@ -286,12 +296,12 @@ export function Painel() {
       <JanelaChamada />
       <AvisoPagamento />
       <AvisoEventos />
-      <MiniMapa />
+      {!mapa2d && <MiniMapa />}
       <VisitaGuiada />
       <ModalLogin />
       <ModalContratar />
       <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2">
-        <div className="hidden rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur sm:block">Arraste pra mover · roda pra zoom · botão direito pra girar · duplo clique vai até o ponto · teclado: WASD e Q/E</div>
+        {!mapa2d && <div className="hidden rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur sm:block">Arraste pra mover · roda pra zoom · botão direito pra girar · duplo clique vai até o ponto · teclado: WASD e Q/E</div>}
         <ControlesCameraCelular />
         <BotaoGraficos />
       </div>

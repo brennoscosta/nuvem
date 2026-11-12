@@ -63,7 +63,49 @@ export function limparInterior(x: unknown, base: Interior = INTERIOR_PADRAO): In
   const moveis = MOVEIS_INTERIOR.some((m) => m.id === o.moveis) ? (o.moveis as MovelInterior) : base.moveis;
   return { parede, piso, moveis, quadros: typeof o.quadros === "boolean" ? o.quadros : base.quadros, plantas: typeof o.plantas === "boolean" ? o.plantas : base.plantas };
 }
-export interface Decoracao { giro: 0 | 1 | 2 | 3; letreiro: EstiloLetreiro; toldo: string | null; piso: PisoLote; cerca: CercaLote; arvores: number; extras: ExtraLote[]; interior?: Interior }
+// ---- Prédio e fachada (12/11/2026, lote visual do dono) ----
+// andares: total de andares do prédio (0 = o do modelo). Os andares a mais sobem como um bloco recuado atrás da fachada
+// (o térreo do modelo continua sendo a "cara" da loja), com o mesmo revestimento. Cobertura vai no topo desse bloco.
+export type CoberturaId = "nenhuma" | "terraco" | "jardim" | "letreiro" | "solar";
+export type MaterialFachada = "original" | "vidro" | "tijolinho" | "madeira" | "concreto" | "pintura";
+export type CorLed = "ambar" | "verde" | "vermelho" | "branco";
+export type ModoLed = "texto" | "promocao" | "horario";
+export interface Led { ligado: boolean; modo: ModoLed; texto: string; cor: CorLed; abre: string; fecha: string; dias: number[] }
+export type PecaArea = "auto" | "nenhuma" | "barbearia" | "cafe" | "clinica" | "academia" | "tecnologia" | "estudio" | "megafone" | "lousa" | "balanca" | "cofrinho" | "relogio" | "ferramentas" | "arara" | "imobiliaria" | "baloes" | "malas" | "pneus";
+export const MAX_ANDARES = 5;
+export const COBERTURAS: { id: CoberturaId; nome: string; icone: string }[] = [
+  { id: "nenhuma", nome: "Só a laje", icone: "▭" }, { id: "terraco", nome: "Terraço com mesas", icone: "⛱️" }, { id: "jardim", nome: "Jardim no teto", icone: "🌿" },
+  { id: "letreiro", nome: "Letreiro no teto", icone: "🔠" }, { id: "solar", nome: "Painel solar", icone: "☀️" },
+];
+export const MATERIAIS: { id: MaterialFachada; nome: string; amostra: string }[] = [
+  { id: "original", nome: "Original do prédio", amostra: "linear-gradient(135deg,#F1EFEA 50%,#9AA4B1 50%)" },
+  { id: "vidro", nome: "Vidro espelhado", amostra: "linear-gradient(160deg,#6E90AE,#22364A)" },
+  { id: "tijolinho", nome: "Tijolinho", amostra: "repeating-linear-gradient(0deg,#A4503A 0 6px,#D8CFC2 6px 7px)" },
+  { id: "madeira", nome: "Ripas de madeira", amostra: "repeating-linear-gradient(90deg,#9C6B3E 0 5px,#6E4527 5px 6px)" },
+  { id: "concreto", nome: "Concreto aparente", amostra: "linear-gradient(135deg,#C2C5C8,#9EA3A7)" },
+  { id: "pintura", nome: "Pintura", amostra: "linear-gradient(135deg,#1D4ED8,#7C3AED)" },
+];
+export const CORES_LED: Record<CorLed, { nome: string; hex: string }> = { ambar: { nome: "Âmbar", hex: "#FFB020" }, verde: { nome: "Verde", hex: "#38E07B" }, vermelho: { nome: "Vermelho", hex: "#FF3B3B" }, branco: { nome: "Branco", hex: "#F4F7FF" } };
+export const LED_PADRAO: Led = { ligado: false, modo: "texto", texto: "", cor: "ambar", abre: "08:00", fecha: "18:00", dias: [1, 2, 3, 4, 5, 6] };
+export const PECAS: { id: Exclude<PecaArea, "auto" | "nenhuma">; nome: string; icone: string }[] = [
+  { id: "barbearia", nome: "Poste de barbearia", icone: "💈" }, { id: "cafe", nome: "Mesinhas de café", icone: "☕" }, { id: "clinica", nome: "Cruz verde de clínica", icone: "➕" },
+  { id: "academia", nome: "Halteres e saco de pancada", icone: "🏋️" }, { id: "tecnologia", nome: "Totem de neon com código", icone: "💻" }, { id: "estudio", nome: "Câmera e luz de estúdio", icone: "🎬" },
+  { id: "megafone", nome: "Megafone gigante", icone: "📣" }, { id: "lousa", nome: "Lousa na calçada", icone: "🧑‍🏫" }, { id: "balanca", nome: "Balança da justiça", icone: "⚖️" },
+  { id: "cofrinho", nome: "Cofrinho gigante", icone: "🐷" }, { id: "relogio", nome: "Relógio de rua", icone: "🕰️" }, { id: "ferramentas", nome: "Escada e ferramentas", icone: "🧰" },
+  { id: "arara", nome: "Arara de roupas e manequim", icone: "👗" }, { id: "imobiliaria", nome: "Placa de imobiliária", icone: "🏠" }, { id: "baloes", nome: "Arco de balões", icone: "🎈" },
+  { id: "malas", nome: "Malas de viagem e globo", icone: "🧳" }, { id: "pneus", nome: "Pilha de pneus", icone: "🛞" },
+];
+// peça que liga sozinha pela área da empresa (o dono pode trocar ou desligar)
+export const PECA_POR_NICHO: Record<string, Exclude<PecaArea, "auto" | "nenhuma">> = {
+  beleza: "barbearia", alimentacao: "cafe", saude: "clinica", tecnologia: "tecnologia", conteudo: "estudio", marketing: "megafone",
+  cursos: "lousa", treinamentos: "lousa", educacao: "lousa", juridico: "balanca", financas: "cofrinho", negocios: "relogio", consultoria: "relogio",
+  servicos: "ferramentas", casa: "ferramentas", varejo: "arara", imoveis: "imobiliaria", eventos: "baloes", turismo: "malas", automotivo: "pneus",
+};
+export const pecaEfetiva = (d: Decoracao | undefined, nicho: string | null | undefined) => { const p = d?.peca ?? "auto"; return p === "nenhuma" ? null : p === "auto" ? PECA_POR_NICHO[nicho ?? "negocios"] ?? "relogio" : p; };
+export interface Decoracao {
+  giro: 0 | 1 | 2 | 3; letreiro: EstiloLetreiro; toldo: string | null; piso: PisoLote; cerca: CercaLote; arvores: number; extras: ExtraLote[]; interior?: Interior;
+  andares?: number; cobertura?: CoberturaId; material?: MaterialFachada; corFachada?: string | null; led?: Led; vitrineJanela?: boolean; peca?: PecaArea;
+}
 export const DECOR_PADRAO: Decoracao = { giro: 0, letreiro: "painel", toldo: null, piso: "grama", cerca: "nenhuma", arvores: 0, extras: [] };
 export const ESTILOS_LETREIRO: { id: EstiloLetreiro; nome: string; desc: string }[] = [
   { id: "painel", nome: "Painel", desc: "Painel escuro com faixa na cor da marca" },
@@ -92,7 +134,37 @@ export function limparDecor(x: unknown, base: Decoracao = DECOR_PADRAO): Decorac
   const um = <T extends string>(v: unknown, lista: { id: T }[], padrao: T) => (lista.some((l) => l.id === v) ? (v as T) : padrao);
   const toldo = o.toldo === null ? null : typeof o.toldo === "string" && /^#[0-9a-fA-F]{6}$/.test(o.toldo) ? o.toldo : o.toldo === undefined ? base.toldo : null;
   const extras = Array.isArray(o.extras) ? [...new Set(o.extras.filter((e): e is ExtraLote => EXTRAS.some((x) => x.id === e)))] : base.extras;
-  return { giro, letreiro: um(o.letreiro, ESTILOS_LETREIRO, base.letreiro), toldo, piso: um(o.piso, PISOS, base.piso), cerca: um(o.cerca, CERCAS, base.cerca), arvores: Math.max(0, Math.min(4, Math.round(Number(o.arvores ?? base.arvores)) || 0)), extras, interior: limparInterior(o.interior, base.interior ?? INTERIOR_PADRAO) };
+  const andaresIn = o.andares === undefined ? base.andares ?? 0 : Math.round(Number(o.andares)) || 0;
+  const andares = Math.max(0, Math.min(MAX_ANDARES, andaresIn));
+  const corFachada = o.corFachada === null ? null : typeof o.corFachada === "string" && /^#[0-9a-fA-F]{6}$/.test(o.corFachada) ? o.corFachada.toUpperCase() : o.corFachada === undefined ? base.corFachada ?? null : null;
+  const peca: PecaArea = o.peca === "auto" || o.peca === "nenhuma" || PECAS.some((p) => p.id === o.peca) ? (o.peca as PecaArea) : base.peca ?? "auto";
+  return {
+    giro, letreiro: um(o.letreiro, ESTILOS_LETREIRO, base.letreiro), toldo, piso: um(o.piso, PISOS, base.piso), cerca: um(o.cerca, CERCAS, base.cerca), arvores: Math.max(0, Math.min(4, Math.round(Number(o.arvores ?? base.arvores)) || 0)), extras, interior: limparInterior(o.interior, base.interior ?? INTERIOR_PADRAO),
+    andares, cobertura: um(o.cobertura, COBERTURAS, base.cobertura ?? "nenhuma"), material: um(o.material, MATERIAIS, base.material ?? "original"), corFachada,
+    led: limparLed(o.led, base.led ?? LED_PADRAO), vitrineJanela: typeof o.vitrineJanela === "boolean" ? o.vitrineJanela : base.vitrineJanela ?? true, peca,
+  };
+}
+const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+export function limparLed(x: unknown, base: Led = LED_PADRAO): Led {
+  const o = (x && typeof x === "object" ? x : {}) as Partial<Record<keyof Led, unknown>>;
+  const texto = typeof o.texto === "string" ? o.texto.replace(/<[^>]*>/g, "").replace(/[<>{}[\]\\]/g, "").replace(/\s+/g, " ").trim().slice(0, 40) : base.texto;
+  const modo: ModoLed = o.modo === "texto" || o.modo === "promocao" || o.modo === "horario" ? o.modo : base.modo;
+  const cor: CorLed = typeof o.cor === "string" && o.cor in CORES_LED ? (o.cor as CorLed) : base.cor;
+  const dias = Array.isArray(o.dias) ? [...new Set(o.dias.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))].sort() : base.dias;
+  return { ligado: typeof o.ligado === "boolean" ? o.ligado : base.ligado, modo, texto, cor, abre: typeof o.abre === "string" && HORA.test(o.abre) ? o.abre : base.abre, fecha: typeof o.fecha === "string" && HORA.test(o.fecha) ? o.fecha : base.fecha, dias };
+}
+// Medidas dos modelos (largura em x e profundidade em z, em metros, já na escala do layout; medidas dos GLB em 12/11/2026)
+export const DIM_LAYOUT: Record<LayoutId, { largura: number; prof: number }> = {
+  vidro: { largura: 11.5, prof: 11.2 }, moderno: { largura: 14.0, prof: 13.2 }, sobrado: { largura: 11.7, prof: 12.4 },
+  loja: { largura: 11.2, prof: 10.3 }, galpao: { largura: 12.9, prof: 13.7 }, container: { largura: 12.5, prof: 10.2 },
+};
+// altura de cada andar a mais: proporcional ao modelo (os modelos têm pé-direito alto), entre 3,4 e 4,4 m
+export const andarAltura = (layout: LayoutId) => Math.max(3.4, Math.min(4.4, (LAYOUT[layout].altura / LAYOUT[layout].andares) * 0.55));
+export const andaresDoPredio = (e: Escritorio) => { const n = LAYOUT[e.layout].andares; const a = e.decor?.andares ?? 0; return Math.max(n, Math.min(MAX_ANDARES, a || n)); };
+// altura do topo do prédio (m), para o balão e a câmera
+export function alturaPredio(e: Escritorio, duplo = false) {
+  const L = LAYOUT[e.layout]; const extra = andaresDoPredio(e) - L.andares; const cob = e.decor?.cobertura ?? "nenhuma";
+  return L.altura * (duplo ? 1.2 : 1) + extra * andarAltura(e.layout) + (cob === "letreiro" ? 3.2 : cob === "terraco" ? 2.6 : cob === "jardim" ? 1.6 : cob === "solar" ? 1.2 : 0.4);
 }
 export const TROCAS_LAYOUT_GRATIS = 3;
 export const PRECO_TROCA_LAYOUT = 9.9;

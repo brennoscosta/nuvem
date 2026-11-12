@@ -16,7 +16,8 @@ export function visitanteDe(h: Headers, usuarioId?: string | null) {
   return "a:" + createHash("sha256").update(`${ip}|${ua}|${diaBR()}|workend-visita`).digest("base64url").slice(0, 18);
 }
 // robôs de busca e prévias de link não contam
-const ehRobo = (h: Headers) => /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|headless/i.test(h.get("user-agent") ?? "");
+// programas (curl, scripts) também não contam: só navegador de gente (12/11/2026, a checagem da publicação contou uma visita falsa)
+const ehRobo = (h: Headers) => { const ua = h.get("user-agent") ?? ""; return !/mozilla\//i.test(ua) || /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|headless|curl|wget|python|node-fetch|axios|okhttp|go-http|java\//i.test(ua); };
 
 // a loja (lote principal) de um número de lote; uma ampliação conta para o lote principal
 export async function lojaDoNumero(numero: number): Promise<{ chave: string; donoId: string } | null> {

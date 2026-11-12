@@ -3,7 +3,7 @@
 // por dentro, a planta com recepção, sala do CEO e os setores que o dono escolheu — com a equipe sentada nas mesas.
 // Enquanto o painel "Montar escritório" está aberto, desenha o rascunho ao vivo.
 import * as THREE from "three";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Html, Text } from "@react-three/drei";
 import { caixa, cilindro, esfera, mat, plano, toro } from "./geo";
 import { Arvore } from "./Entorno";
@@ -11,12 +11,17 @@ import { natalAtivo, NatalLote, NatalLetreiro } from "./Natal";
 import { PlacaEsquina } from "./Anuncios";
 import { nomeNicho } from "../data/mundo";
 import { Estatico } from "./Estatico";
-import { Modelo, ComFallback, type NomeModelo } from "./Modelos";
+import { ComFallback, type NomeModelo } from "./Modelos";
 import { Mesa, Sofa, Planta, Balcao, MesaBaixa, Quadro, Cafe } from "./Moveis";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle, type Pose } from "./Boneco";
 import { BONECO } from "../data/bonecos";
 import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
-import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, INTERIOR_PADRAO, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote } from "../data/escritorio";
+import { ModeloPredio, RelogioPredios, FACHADA_TESTE } from "./PredioMaterial";
+import { Torre } from "./PredioTopo";
+import { LetreiroLed, VitrineJanela } from "./PredioFrente";
+import { PecaArea } from "./PecasArea";
+import { Inauguracao, LOTES_EM_OBRA_VISTOS, INAUGURAR_TESTE, easeSubida } from "./ObraFesta";
+import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, andaresDoPredio, alturaPredio, pecaEfetiva, LED_PADRAO, type Led, MAX_ANDARES, COBERTURAS, DIM_LAYOUT, type CoberturaId, INTERIOR_PADRAO, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote } from "../data/escritorio";
 import { useMundo, useAgora, promocaoAtiva } from "../mundoStore";
 import { useFrame } from "@react-three/fiber";
 import { useEscritorio } from "../store";
@@ -30,21 +35,40 @@ const LARG = X1 - X0, PROF = Z1 - Z0;
 // Lote duplo (12/11/2026): o prédio fica 60% mais largo e 20% mais alto (a profundidade não muda, então a frente do lote
 // continua no mesmo lugar) e o letreiro acompanha a largura.
 export const DUPLO = { x: 1.6, y: 1.2 };
-function Exterior({ e, cor, nome, logo, duplo = false, contratando = false }: { e: Escritorio; cor: string; nome: string; logo: string | null; duplo?: boolean; contratando?: boolean }) {
+// parâmetros de conferência (fotos): ?andaresTeste=4 e ?coberturaTeste=terraco valem para todos os prédios
+const PARAM = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
+const ANDARES_TESTE = PARAM?.get("andaresTeste") ? Math.max(1, Math.min(MAX_ANDARES, Number(PARAM.get("andaresTeste")) || 0)) : null;
+const LED_TESTE = PARAM?.get("ledTeste") ? { ...LED_PADRAO, ligado: true, modo: (PARAM.get("ledTeste") === "horario" ? "horario" : "texto") as Led["modo"], texto: "Teste do letreiro de LED", cor: "ambar" as const } : null;
+const COBERTURA_TESTE = (() => { const c = PARAM?.get("coberturaTeste"); return c && COBERTURAS.some((x) => x.id === c) ? (c as CoberturaId) : null; })();
+// onde fica a fachada (z) de cada modelo: a medida do GLB inclui floreiras e degraus na frente, então vem das fotos
+// (plano da frente do GLB × altura do modelo; o vidro da vitrine fica nele) e FRENTE_Z = o que mais avança (floreiras, toldo)
+export const FACHADA_Z: Record<string, number> = { vidro: -5.22, moderno: -5.09, sobrado: -5.43, loja: -3.32, galpao: -5.17, container: -2.05 };
+export const FRENTE_Z: Record<string, number> = { vidro: -5.6, moderno: -6.62, sobrado: -6.21, loja: -5.14, galpao: -6.85, container: -5.09 };
+function Exterior({ e, cor, nome, logo, duplo = false, contratando = false, numero = null, promo = null }: { e: Escritorio; cor: string; nome: string; logo: string | null; duplo?: boolean; contratando?: boolean; numero?: number | null; promo?: string | null }) {
   const L = LAYOUT[e.layout];
   const d = e.decor ?? DECOR_PADRAO;
   const sx = duplo ? DUPLO.x : 1, sy = duplo ? DUPLO.y : 1;
   const ly = L.letreiro.y * sy, larg = L.letreiro.largura * (duplo ? 1.35 : 1);
+  // revestimento, andares a mais e cobertura (12/11/2026)
+  const material = FACHADA_TESTE ?? d.material ?? "original";
+  const corF = d.corFachada ?? cor;
+  const andares = ANDARES_TESTE ? Math.max(L.andares, ANDARES_TESTE) : andaresDoPredio(e);
+  const cobertura = COBERTURA_TESTE ?? d.cobertura ?? "nenhuma";
+  const led = LED_TESTE ?? d.led;
   return (
     <group>
       <mesh geometry={caixa(LARG * sx + 1.2, 0.16, PROF + 1.2)} material={mat("#D8D4CC", { rough: 0.95 })} position={[0, 0.08, 0]} receiveShadow />
       <group scale={[sx, sy, 1]}>
         <ComFallback fallback={<mesh geometry={caixa(LARG, L.altura * 0.8, PROF)} material={mat("#F1EFEA", { rough: 0.9 })} position={[0, L.altura * 0.4 + 0.16, 0]} />}>
-          <Modelo nome={L.modelo as NomeModelo} position={[0, 0.16, 0]} rotation={Math.PI / 2} altura={L.altura} />
+          <ModeloPredio nome={L.modelo as NomeModelo} position={[0, 0.16, 0]} rotation={Math.PI / 2} altura={L.altura} material={material} cor={corF} seed={nome} />
         </ComFallback>
       </group>
+      <Torre layout={e.layout} extra={andares - L.andares} cobertura={cobertura} material={material} corFachada={corF} duplo={duplo} nome={nome} cor={cor} logo={logo} />
       <Letreiro nome={nome} cor={cor} logo={logo} y={ly} z={L.letreiro.z} largura={larg} estilo={d.letreiro} />
-      {contratando && <PlacaContratando x={larg / 2 - 1.15} y={ly + 0.98} z={L.letreiro.z} />}
+      {/* letreiro de LED em cima do letreiro (12/11/2026); a placa de vagas sobe para cima dele */}
+      {led?.ligado && <LetreiroLed led={led} numero={numero} promo={promo} nome={nome} y={ly + 1.0} z={L.letreiro.z - 0.02} largura={larg} />}
+      {contratando && <PlacaContratando x={larg / 2 - 1.15} y={ly + (led?.ligado ? 1.78 : 0.98)} z={L.letreiro.z} />}
+      {(d.vitrineJanela ?? true) && <VitrineJanela numero={numero} layout={e.layout} z={FACHADA_Z[e.layout] ?? -DIM_LAYOUT[e.layout].prof / 2} sx={sx} sy={sy} cor={cor} />}
       {/* a Loja de rua já vem com toldo listrado no modelo */}
       {d.toldo && e.layout !== "loja" && <Toldo cor={d.toldo} y={ly - 1.05} z={L.letreiro.z} largura={larg} />}
       {d.extras.includes("natal") && natalAtivo() && <NatalLetreiro y={ly} z={L.letreiro.z} largura={larg} />}
@@ -270,7 +294,19 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
 }
 
 // ---------- um escritório no lote ----------
-function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, contratando = false, promo = null }: { chave: string; e: Escritorio; cor: string; nome: string; logo: string | null; fora: boolean; nicho: string; anexo?: string | null; contratando?: boolean; promo?: string | null }) {
+function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, contratando = false, promo = null, festa = false, inauguradoEm = null }: { chave: string; e: Escritorio; cor: string; nome: string; logo: string | null; fora: boolean; nicho: string; anexo?: string | null; contratando?: boolean; promo?: string | null; festa?: boolean; inauguradoEm?: string | null }) {
+  // inauguração: o prédio sobe (~2 s) quando a sessão viu o lote em obra, quando foi inaugurado há pouco ou com ?inaugurar=
+  const sobe = useRef<THREE.Group>(null), inicio = useRef(0);
+  useEffect(() => {
+    const recente = !!inauguradoEm && Date.now() - new Date(inauguradoEm).getTime() < 120_000;
+    if (LOTES_EM_OBRA_VISTOS.has(chave) || recente || INAUGURAR_TESTE === chave) { inicio.current = performance.now(); LOTES_EM_OBRA_VISTOS.delete(chave); }
+  }, [chave, inauguradoEm]);
+  useFrame(() => {
+    const g = sobe.current; if (!g || !inicio.current) return;
+    const p = (performance.now() - inicio.current) / 2000;
+    if (p >= 1) { g.scale.y = 1; inicio.current = 0; return; }
+    g.scale.y = Math.max(0.02, easeSubida(p));
+  });
   const l = LOTE_POR_CHAVE[chave]; if (!l) return null;
   // lote duplo: o prédio vai para o meio dos dois terrenos (o vizinho do lado, mesma rua)
   const la = anexo ? LOTE_POR_CHAVE[anexo] : null; const dx = la ? (la.centro[0] - l.centro[0]) / 2 : 0;
@@ -284,13 +320,16 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
   const assinatura = JSON.stringify(e) + cor + nome + (logo ?? "");
   // a placa de esquina fica na ponta do lote virada para o cruzamento (não gira com o prédio)
   const placa = (e.decor?.extras ?? []).includes("placa");
+  const peca = pecaEfetiva(e.decor, nicho);
   return (
     <group position={[x, 0, z]}>
     {placa && <group position={[-dx, 0, 0]}><PlacaEsquina d={{ nome, cor, nicho: nomeNicho(nicho), numero: l.numero, logo }} sx={l.k % 2 ? 1 : -1} sz={l.k >= 2 ? 1 : -1} /></group>}
     <group rotation={[0, rot, 0]}>
-      <group visible={fora}><Exterior e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} /></group>
+      <group ref={sobe}><group visible={fora}><Exterior e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} numero={l.numero} promo={promo} /></group></group>
       <DecorLote d={e.decor ?? DECOR_PADRAO} cor={cor} logo={logo} duplo={!!la} />
       {promo && <FaixaPromo texto={promo} duplo={!!la} />}
+      {peca && <PecaArea tipo={peca} cor={cor} zf={FRENTE_Z[e.layout] ?? -DIM_LAYOUT[e.layout].prof / 2} zw={FACHADA_Z[e.layout]} sx={la ? DUPLO.x : 1} />}
+      {(festa || INAUGURAR_TESTE === chave) && <Inauguracao cor={cor} zf={FRENTE_Z[e.layout] ?? -DIM_LAYOUT[e.layout].prof / 2} sx={la ? DUPLO.x : 1} topo={alturaPredio(e, !!la)} />}
       {!fora && (
         <>
           <Estatico key={"d" + assinatura}><InteriorFixo e={e} cor={cor} /></Estatico>
@@ -304,6 +343,9 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
   );
 }
 
+// inaugurado_em vem do servidor junto com o lote (12/11/2026); a festa dura 24 h
+const inauguradoDe = (t: object) => (t as { inauguradoEm?: string | null }).inauguradoEm ?? null;
+const festaInauguracao = (t: object, agora: number) => { const i = inauguradoDe(t); return !!i && agora > 0 && agora - new Date(i).getTime() < 86_400_000; };
 export function EscritoriosClientes() {
   const terrenos = useMundo((s) => s.terrenos);
   const selecionado = useMundo((s) => s.loteSelecionado);
@@ -315,12 +357,13 @@ export function EscritoriosClientes() {
   const anexos = useMemo(() => { const m: Record<string, string> = {}; for (const t of Object.values(terrenos)) if (t.anexoDe && t.status === "ativo") m[t.anexoDe] = t.chave; return m; }, [terrenos]);
   return (
     <group>
+      <RelogioPredios />
       {Object.values(terrenos).map((t) => {
         const e = t.chave === selecionado && rascunho ? rascunho : t.escritorio;
         if (t.status !== "ativo" || !e || t.anexoDe) return null; // a ampliação não tem prédio próprio: o principal cresce
         const placa = t.chave === selecionado && rascunhoPlaca ? rascunhoPlaca : null;
         const logo = placa ? placa.logoDataUrl : t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null;
-        return <EscritorioLote key={t.chave} chave={t.chave} e={e} cor={placa?.cor ?? t.cor} nome={placa?.empresaNome ?? t.empresaNome} logo={logo} fora={fora} nicho={placa?.nicho ?? t.nicho ?? "negocios"} anexo={anexos[t.chave] ?? null} contratando={(vagas[t.chave] ?? 0) > 0} promo={promocaoAtiva(t, agora)?.texto ?? null} />;
+        return <EscritorioLote key={t.chave} chave={t.chave} e={e} cor={placa?.cor ?? t.cor} nome={placa?.empresaNome ?? t.empresaNome} logo={logo} fora={fora} nicho={placa?.nicho ?? t.nicho ?? "negocios"} anexo={anexos[t.chave] ?? null} contratando={(vagas[t.chave] ?? 0) > 0} promo={promocaoAtiva(t, agora)?.texto ?? null} festa={festaInauguracao(t, agora)} inauguradoEm={inauguradoDe(t)} />;
       })}
     </group>
   );

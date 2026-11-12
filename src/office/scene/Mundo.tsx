@@ -14,12 +14,19 @@ import { Entorno, Arvore, GentePraia } from "./Entorno";
 import { Restaurante } from "./Restaurante";
 import { Lotes } from "./Lotes";
 import { Horizonte } from "./Horizonte";
+import { Clima } from "./Clima";
+import { Fauna } from "./Fauna";
+import { SomCena } from "./SomCena";
 import { Semaforos, Trafego, Passantes, PontosOnibus } from "./Transito";
 import { LuzesPostes } from "./CicloDia";
 import { natalAtivo, ArvoreNatal, LuzesNatalPostes } from "./Natal";
 import { Outdoors } from "./Anuncios";
 import { Praca } from "./Praca";
-import { QUARTEIROES, centroQuarteirao, centroLote, EIXOS_RUA, COMPRIMENTO_RUA, RUA, CALCADA, MEIO_Q, BORDA_CALCADA, MUNDO, PASSO, N, EIXO_RUA } from "../data/mundo";
+import { CalcadaBairro, ArvoresDeRua, Galhardetes, PlacasBairro, HalosPostes } from "./Bairros";
+import { PlacasDeRua } from "./RuasPlacas";
+import { Rio } from "./Rio";
+import { Parque, ParqueChao, LAGO } from "./Parque";
+import { QUARTEIROES, centroQuarteirao, centroLote, EIXOS_RUA, COMPRIMENTO_RUA, RUA, CALCADA, MEIO_Q, BORDA_CALCADA, MUNDO, PASSO, N, EIXO_RUA, NORTE, BAIRRO_DO_QUARTEIRAO } from "../data/mundo";
 
 const ASFALTO = "#4A4E55", FAIXA = "#E8E4D8", CALC = "#D9D5CC";
 
@@ -38,7 +45,8 @@ function Ruas() {
   return (
     <group>
       {/* chão geral (grama) até a borda do mundo */}
-      <mesh geometry={plano(MUNDO.x * 2, MUNDO.z * 2)} material={mat("#79B968", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow />
+      {/* do calçadão da beira-rio até a borda sul; ao norte, o rio e o parque têm chão próprio (12/11/2026) */}
+      <mesh geometry={plano(MUNDO.x * 2, MUNDO.z - NORTE.calcadao.z0)} material={mat("#79B968", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, (MUNDO.z + NORTE.calcadao.z0) / 2]} receiveShadow />
       {EIXOS_RUA.map((e) => <mesh key={"h" + e} geometry={plano(L, RUA)} material={mat(ASFALTO, { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, e]} receiveShadow />)}
       {EIXOS_RUA.map((e) => <mesh key={"v" + e} geometry={plano(RUA, L)} material={mat(ASFALTO, { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[e, -0.004, 0]} receiveShadow />)}
       {tracos}
@@ -116,22 +124,35 @@ export function Mundo() {
     for (const [dx, dz] of [[-18, -18], [18, 18], [18, -18]]) add(PASSO + dx, dz, 5.5);
     // fileira na borda do mundo (depois da última rua)
     const B = N * PASSO + EIXO_RUA + 7;
-    for (let s = -B + 6; s <= B - 6; s += poucos ? 24 : 14) { add(s, -B, 5 + (n % 3)); add(s, B, 5 + (n % 3)); add(-B, s, 5 + (n % 3)); add(B, s, 5 + (n % 3)); }
+    // (a fileira do norte agora fica no calçadão da beira-rio, em Rio.tsx)
+    for (let s = -B + 6; s <= B - 6; s += poucos ? 24 : 14) { add(s, B, 5 + (n % 3)); add(-B, s, 5 + (n % 3)); add(B, s, 5 + (n % 3)); }
     return lista;
   }, [poucos]);
 
   return (
     <group>
       <Horizonte />
+      <Clima />
+      <SomCena />
       <Estatico>
         <Ruas />
-        {calcadas.map(([cx, cz], i) => <Calcada key={i} cx={cx} cz={cz} />)}
+        {calcadas.map(([cx, cz], i) => { const b = BAIRRO_DO_QUARTEIRAO[`${Math.round(cx / PASSO)},${Math.round(cz / PASSO)}`]; return b ? <CalcadaBairro key={i} cx={cx} cz={cz} b={b} /> : <Calcada key={i} cx={cx} cz={cz} />; })}
       </Estatico>
       <ComFallback fallback={<Estatico>{postes.map((p, i) => <Poste key={i} position={p.pos} />)}</Estatico>}>
         <ModeloInstanciado nome="poste" itens={postes} />
       </ComFallback>
-      {/* à noite os postes acendem (luz no chão e lâmpada) */}
+      {/* à noite os postes acendem (luz no chão e lâmpada) e ganham um halo na cor do bairro */}
       <LuzesPostes itens={postes} />
+      <HalosPostes postes={postes} />
+      {/* bairros com identidade (12/11/2026): galhardetes, árvores de rua e a placa de cada bairro; placas com o nome das ruas */}
+      <Galhardetes postes={postes} />
+      <ArvoresDeRua />
+      <PlacasBairro />
+      <PlacasDeRua />
+      {/* além da Avenida Beira-Rio: calçadão, rio, pontes e o Parque da Cidade (o chão aparece sempre; o resto, de perto) */}
+      <Rio />
+      <ParqueChao />
+      <Perto cx={LAGO.x} cz={LAGO.z} raio={raio + 10}><Parque /></Perto>
       {/* Natal (1º/12 a 6/1): árvore na praça da Nuvem e pisca-pisca nos postes */}
       {natal && <><ArvoreNatal /><LuzesNatalPostes itens={postes} /></>}
       {/* árvores do mundo: modelo do Higgsfield (5 mil triângulos cada) no modo completo; no leve, a árvore desenhada em código (600) juntada num lote só */}
@@ -147,6 +168,7 @@ export function Mundo() {
       <Trafego />
       {/* vida na rua (12/11/2026): pedestres que atravessam na faixa e o ônibus com pontos */}
       <Passantes />
+      <Fauna />
       <PontosOnibus />
       {/* outdoors nas avenidas da borda (aluguel de 30 dias) */}
       <Outdoors />

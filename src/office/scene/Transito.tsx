@@ -6,15 +6,21 @@
 //  - Carros: param na linha no vermelho, decidem no amarelo se dá para parar, guardam distância do carro da frente (fila),
 //    seguem reto ou viram à direita; na borda do mapa viram (à direita ou, sem ninguém vindo, à esquerda) para continuar
 //    na cidade. Mão direita: o carro anda à direita do eixo da rua.
+//  - Vida na rua (12/11/2026, "vida e clima"): ciclistas e motoboys andam na mesma simulação dos carros (param no
+//    vermelho, esperam pedestre, guardam distância). O motoboy sai da frente da loja quando alguém pede pelo WhatsApp
+//    (evento "workend:pedido" e /api/workend/movimento, ver Motoboys) e some depois de ~30 s. À noite e na chuva os
+//    faróis ganham o cone de luz.
 import * as THREE from "three";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
-import { caixa, cilindro, mat, plano } from "./geo";
+import { caixa, cilindro, esfera, mat, plano, toro } from "./geo";
 import { Estatico } from "./Estatico";
 import { ComFallback, Modelo, type NomeModelo } from "./Modelos";
 import { SombraContato } from "./SombraContato";
 import { leve } from "./qualidade";
-import { EIXOS_RUA, RUA, QUARTEIROES, PASSO, BORDA_CALCADA } from "../data/mundo";
+import { EIXOS_RUA, RUA, QUARTEIROES, PASSO, BORDA_CALCADA, LOTES, LOTE_POR_CHAVE } from "../data/mundo";
+import { useMundo } from "../mundoStore";
+import { clima } from "../clima";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle } from "./Boneco";
 import { BONECO } from "../data/bonecos";
 import { ceu, texturaLuz } from "./CicloDia";
@@ -184,6 +190,10 @@ interface Carro {
   // decisão para o próximo cruzamento: chave do cruzamento e o que fazer
   plano: { chave: string; acao: "reto" | "direita" | "esquerda" } | null;
   freando: boolean;
+  // vida na rua (12/11/2026): motoboy (some sozinho; ativo = false fica guardado fora da cidade) e ciclista
+  ativo?: boolean;
+  moto?: { cor: string; ate: number; saindo: number | null };
+  bici?: { cor: string; camisa: string };
 }
 const lateral = (c: { x: number; z: number; d: V2 }) => { const r = direita(c.d); return c.x * r[0] + c.z * r[1]; }; // coordenada do lado
 const frente = (c: { x: number; z: number; d: V2 }) => c.x * c.d[0] + c.z * c.d[1]; // coordenada ao longo do caminho
@@ -209,6 +219,7 @@ function temRua(cr: Cruzamento, nd: V2) {
 function decidir(c: Carro, cr: Cruzamento): "reto" | "direita" | "esquerda" {
   const r = direita(c.d);
   if (c.onibus && temRua(cr, r)) return "direita";
+  if (c.moto && temRua(cr, c.d) && Math.random() < 0.8) return "reto";
   const reto = temRua(cr, c.d), dir = temRua(cr, r), esq = temRua(cr, [-r[0], -r[1]]);
   if (reto && dir) return Math.random() < 0.28 ? "direita" : "reto";
   if (reto) return "reto";
@@ -240,11 +251,33 @@ function criarCarros(n: number): Carro[] {
     const modelo = modelos[lista.length % 3];
     lista.push({ modelo, x, z, d, v: 0, vMax: 5.2 + sorte() * 2.6, curva: null, plano: null, freando: false, meio: FRENTE });
   }
+  // ciclistas: andam na faixa dos carros, devagar (os carros esperam atrás, como na rua de verdade)
+  const coresBici = ["#E2575B", "#22A86B", "#1D4ED8", "#FFB020", "#8B6CF0", "#EC6B8D"], camisas = ["#FFFFFF", "#2B2F36", "#40C4FF", "#F2913D", "#3FBFA8", "#FFD24A"];
+  const nBici = Math.round(n / 4.5); let feitos = 0; tentativas = 0;
+  while (feitos < nBici && tentativas++ < 2000) {
+    const d = DIRECOES[Math.floor(sorte() * 4)]; const r = direita(d);
+    const rua = EIXOS_RUA[Math.floor(sorte() * EIXOS_RUA.length)];
+    const ao = MIN_E + 6 + sorte() * (MAX_E - MIN_E - 12);
+    if (EIXOS_RUA.some((e) => Math.abs(ao - e) < LINHA_PARADA + FRENTE + 1)) continue;
+    const x = d[0] !== 0 ? ao : rua + r[0] * FAIXA_CARRO, z = d[0] !== 0 ? rua + r[1] * FAIXA_CARRO : ao;
+    if (lista.some((o) => Math.hypot(o.x - x, o.z - z) < 10)) continue;
+    lista.push({ modelo: "carroHatch", x, z, d, v: 0, vMax: 3.8 + sorte() * 1.1, curva: null, plano: null, freando: false, meio: MEIO_BICI, bici: { cor: coresBici[feitos % coresBici.length], camisa: camisas[(feitos * 5) % camisas.length] } });
+    feitos++;
+  }
+  // vagas de motoboy: guardadas fora da cidade até alguém pedir
+  for (let k = 0; k < MAX_MOTOS; k++) lista.push({ modelo: "carroHatch", x: 5000 + k * 50, z: 5000, d: [1, 0], v: 0, vMax: 8.5, curva: null, plano: null, freando: false, meio: MEIO_MOTO, ativo: false, moto: { cor: "#1D4ED8", ate: 0, saindo: null } });
   return lista;
 }
+const MEIO_BICI = 0.95, MEIO_MOTO = 1.1, MAX_MOTOS = 3;
 
 function passo(carros: Carro[], dt: number, t: number) {
   for (const c of carros) {
+    if (c.ativo === false) continue;
+    // motoboy: acabou a entrega, some numa reta (encolhe em 0,7 s e volta para a vaga)
+    if (c.moto) {
+      if (c.moto.saindo == null && t > c.moto.ate && !c.curva) c.moto.saindo = t;
+      if (c.moto.saindo != null && t - c.moto.saindo > 0.7) { c.ativo = false; c.x = 5000; c.z = 5000; c.v = 0; c.plano = null; continue; }
+    }
     // ---- na curva: anda pelo arco e sai na rua nova ----
     if (c.curva) {
       const k = c.curva;
@@ -280,7 +313,7 @@ function passo(carros: Carro[], dt: number, t: number) {
       if (c.plano.acao !== "reto" && dist < 14 && dist > -0.5) {
         const lado = c.plano.acao === "direita" ? 1 : -1; const r = direita(c.d); const nd: V2 = [lado * r[0], lado * r[1]];
         const sx = cr.x + nd[0] * MEIA_RUA + direita(nd)[0] * FAIXA_CARRO, sz = cr.z + nd[1] * MEIA_RUA + direita(nd)[1] * FAIXA_CARRO;
-        const ocupada = carros.some((o) => o !== c && !o.curva && o.d[0] === nd[0] && o.d[1] === nd[1] && Math.abs((o.x - sx) * direita(nd)[0] + (o.z - sz) * direita(nd)[1]) < 1.2 && (() => { const g = (o.x - sx) * nd[0] + (o.z - sz) * nd[1]; return g > -1 && g < DISTANCIA + 1; })());
+        const ocupada = carros.some((o) => o !== c && o.ativo !== false && !o.curva && o.d[0] === nd[0] && o.d[1] === nd[1] && Math.abs((o.x - sx) * direita(nd)[0] + (o.z - sz) * direita(nd)[1]) < 1.2 && (() => { const g = (o.x - sx) * nd[0] + (o.z - sz) * nd[1]; return g > -1 && g < DISTANCIA + 1; })());
         // e só vira se ninguém está atravessando a faixa da rua de destino
         const pedestre = pedestreNaFrente(sx - nd[0] * 1.2, sz - nd[1] * 1.2, nd[0], nd[1], 4.5, 3.6);
         if (ocupada || pedestre) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, dist - (pedestre ? MEIA_RUA + 0.2 : PARADA_CENTRO)))));
@@ -291,7 +324,7 @@ function passo(carros: Carro[], dt: number, t: number) {
     const latMeu = lateral(c), fMeu = frente(c);
     let gap = Infinity, folga = DISTANCIA;
     for (const o of carros) {
-      if (o === c) continue;
+      if (o === c || o.ativo === false) continue;
       const lat = o.x * direita(c.d)[0] + o.z * direita(c.d)[1];
       if (Math.abs(lat - latMeu) > 1.3) continue;
       const g = o.x * c.d[0] + o.z * c.d[1] - fMeu;
@@ -330,23 +363,109 @@ const rotacao = (c: Carro) => {
 // faróis: acesos de leve de dia e fortes à noite, com o facho de luz na pista
 const FAROL = new THREE.MeshStandardMaterial({ color: "#F5F3EA", emissive: "#FFF4D6", emissiveIntensity: 0.3, roughness: 0.3 });
 const FACHO = new THREE.MeshBasicMaterial({ color: "#FFE9B8", transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false });
-function acenderFarois() { FAROL.emissiveIntensity = 0.3 + ceu.noite * 2.6; FACHO.opacity = ceu.noite * 0.42; if (!FACHO.map) { const t = texturaLuz(); if (t) { FACHO.map = t; FACHO.needsUpdate = true; } } }
+// cone de luz dos faróis (12/11/2026): só aparece à noite, mais forte na neblina e na chuva (a luz "pega" na água do ar)
+let TEX_CONE: THREE.CanvasTexture | null = null;
+function texturaCone() {
+  if (TEX_CONE || typeof document === "undefined") return TEX_CONE;
+  const c = document.createElement("canvas"); c.width = 8; c.height = 128; const g = c.getContext("2d")!;
+  const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, "rgba(255,244,214,1)"); gr.addColorStop(0.35, "rgba(255,236,196,.45)"); gr.addColorStop(1, "rgba(255,230,190,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 8, 128); TEX_CONE = new THREE.CanvasTexture(c); TEX_CONE.colorSpace = THREE.SRGBColorSpace; return TEX_CONE;
+}
+const CONE = new THREE.MeshBasicMaterial({ color: "#FFF1D0", transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false, side: THREE.DoubleSide });
+// cilindro aberto deitado: a ponta estreita no farol (x = 0), a boca larga 7,5 m à frente, um pouco para baixo
+function geometriaCone(comp: number, boca: number) {
+  const g = new THREE.CylinderGeometry(0.22, boca, comp, 18, 1, true);
+  g.rotateZ(Math.PI / 2); g.translate(comp / 2, 0, 0); g.rotateZ(-0.075);
+  return g;
+}
+function acenderFarois() {
+  FAROL.emissiveIntensity = 0.3 + ceu.noite * 2.6;
+  FACHO.opacity = ceu.noite * 0.42 * (1 + clima.molhado * 0.6);
+  CONE.opacity = ceu.noite * (0.08 + clima.neblina * 0.14 + clima.chuva * 0.08);
+  if (!FACHO.map) { const t = texturaLuz(); if (t) { FACHO.map = t; FACHO.needsUpdate = true; } }
+  if (!CONE.map) { const t = texturaCone(); if (t) { CONE.map = t; CONE.needsUpdate = true; } }
+}
 const LUZ_FREIO = new THREE.MeshStandardMaterial({ color: "#5A0E0E", emissive: "#FF2020", emissiveIntensity: 0, roughness: 0.4 });
 const LUZ_FREIO_ACESA = new THREE.MeshStandardMaterial({ color: "#FF3030", emissive: "#FF2020", emissiveIntensity: 2.2, roughness: 0.4 });
+
+// ---------- motoboys (12/11/2026) ----------
+// Cada pedido pelo WhatsApp (o meu, pelo evento da página, e o dos outros visitantes, por /api/workend/movimento) põe um
+// motoboy na faixa da rua em frente à loja. Se a faixa estiver ocupada, ele espera um pouco (até 15 s) para sair.
+const FILA_MOTOS: { numero: number; ate: number }[] = [];
+export function chamarMotoboy(numero: number) { if (FILA_MOTOS.length < 6 && Number.isFinite(numero)) FILA_MOTOS.push({ numero, ate: relogio.t + 15 }); }
+function saidaDaLoja(numero: number): { x: number; z: number; d: V2; cor: string } | null {
+  const l = LOTES.find((x) => x.numero === numero); if (!l) return null;
+  const ts = useMundo.getState().terrenos;
+  const t = ts[l.chave]; const principal = (t?.anexoDe ? LOTE_POR_CHAVE[t.anexoDe] : null) ?? l;
+  const anexo = Object.values(ts).find((o) => o.anexoDe === principal.chave && o.status === "ativo");
+  const la = anexo ? LOTE_POR_CHAVE[anexo.chave] : null;
+  const x = la ? (principal.centro[0] + la.centro[0]) / 2 : principal.centro[0];
+  // a frente do lote: k >= 2 olha para +z (rua de baixo), senão para -z; a moto sai na faixa do lado da loja
+  const frenteMais = principal.k >= 2, eixo = principal.j * PASSO + (frenteMais ? PASSO / 2 : -PASSO / 2);
+  const d: V2 = frenteMais ? [-1, 0] : [1, 0];
+  return { x, z: eixo + direita(d)[1] * FAIXA_CARRO, d, cor: ts[principal.chave]?.cor ?? "#1D4ED8" };
+}
+function soltarMotos(carros: Carro[], t: number) {
+  // vence o que esperou demais; depois tenta cada pedido da fila (um pedido preso não segura os outros)
+  for (let k = FILA_MOTOS.length - 1; k >= 0; k--) if (t > FILA_MOTOS[k].ate) FILA_MOTOS.splice(k, 1);
+  for (let k = 0; k < FILA_MOTOS.length; k++) {
+    const vaga = carros.find((c) => c.moto && c.ativo === false); if (!vaga) return; // as 3 motos estão na rua: espera
+    const saida = saidaDaLoja(FILA_MOTOS[k].numero); if (!saida) { FILA_MOTOS.splice(k--, 1); continue; }
+    const r = direita(saida.d);
+    // em frente à loja; se tiver carro ali, um pouco antes ou depois na mesma calçada (fora dos cruzamentos)
+    for (const dx of [0, -7, 7, -13, 13]) {
+      const x = saida.x + saida.d[0] * dx, z = saida.z;
+      if (EIXOS_RUA.some((e) => Math.abs(x - e) < LINHA_PARADA + FRENTE + 1)) continue;
+      const ocupado = carros.some((o) => o.ativo !== false && (o.curva ? Math.hypot(o.x - x, o.z - z) < 9 : o.d[0] === saida.d[0] && o.d[1] === saida.d[1] && Math.abs((o.x - x) * r[0] + (o.z - z) * r[1]) < 1.3 && Math.abs((o.x - x) * saida.d[0] + (o.z - z) * saida.d[1]) < 8));
+      if (ocupado) continue;
+      Object.assign(vaga, { x, z, d: saida.d, v: 0, curva: null, plano: null, ativo: true, freando: false });
+      vaga.moto = { cor: saida.cor, ate: t + 32, saindo: null };
+      FILA_MOTOS.splice(k--, 1);
+      break;
+    }
+  }
+}
+// pedidos: o meu na hora (evento da página) e os de todo mundo a cada 20 s (sem repetir o mesmo)
+function useChamadasMotoboy() {
+  useEffect(() => {
+    const vistos = new Set<string>(); const meus: { numero: number; em: number }[] = [];
+    const aoPedir = (e: Event) => { const n = Number((e as CustomEvent<{ numero?: number }>).detail?.numero); if (!n) return; meus.push({ numero: n, em: Date.now() }); chamarMotoboy(n); };
+    const conferir = () => {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/workend/movimento").then((r) => (r.ok ? r.json() : null)).then((j: { pedidos?: { numero: number; em: number }[]; agora?: number } | null) => {
+        const agora = j?.agora ?? Date.now();
+        for (const p of j?.pedidos ?? []) {
+          const k = `${p.numero}:${p.em}`; if (vistos.has(k)) continue; vistos.add(k);
+          if (agora - p.em > 90_000) continue; // pedido velho de quando a página abriu
+          if (meus.some((m) => m.numero === p.numero && Math.abs(m.em - p.em) < 60_000)) continue; // esse fui eu
+          chamarMotoboy(p.numero);
+        }
+      }).catch(() => { /* sem movimento: tudo bem */ });
+    };
+    window.addEventListener("workend:pedido", aoPedir);
+    const t0 = setTimeout(conferir, 3000), t = setInterval(conferir, 20_000);
+    return () => { window.removeEventListener("workend:pedido", aoPedir); clearTimeout(t0); clearInterval(t); };
+  }, []);
+}
 
 export function Trafego() {
   const poucos = leve();
   const carros = useMemo(() => criarCarros(poucos ? 10 : 22), [poucos]);
   // ?medir=1: os testes leem as posições dos carros e o relógio do semáforo
-  useEffect(() => { if (new URLSearchParams(window.location.search).has("medir")) (window as unknown as { __trafego?: unknown }).__trafego = { carros, luzDe, CRUZAMENTOS, agora, passo, relogio, PEDESTRES, passoPedestres }; }, [carros]);
+  useEffect(() => { if (new URLSearchParams(window.location.search).has("medir")) (window as unknown as { __trafego?: unknown }).__trafego = { carros, luzDe, CRUZAMENTOS, agora, passo, relogio, PEDESTRES, passoPedestres, chamarMotoboy, soltarMotos, FILA_MOTOS }; }, [carros]);
+  useChamadasMotoboy();
+  const cone = useMemo(() => geometriaCone(7.5, 1.7), []), coneMoto = useMemo(() => geometriaCone(5, 1), []);
   const grupos = useRef<(THREE.Group | null)[]>([]);
   const freios = useRef<(THREE.Mesh | null)[][]>([]);
   useFrame((_, dt) => {
     const passoDt = Math.min(dt, 0.1); relogio.t += passoDt; const t = relogio.t;
+    soltarMotos(carros, t);
     passo(carros, passoDt, t);
     acenderFarois();
     carros.forEach((c, i) => {
       const g = grupos.current[i]; if (!g) return;
+      g.visible = c.ativo !== false;
+      if (!g.visible) return;
       g.position.set(c.x, 0, c.z);
       const alvo = rotacao(c); let dif = alvo - g.rotation.y; dif = Math.atan2(Math.sin(dif), Math.cos(dif));
       g.rotation.y += dif * Math.min(1, passoDt * 14); // suaviza a virada
@@ -357,23 +476,102 @@ export function Trafego() {
     <group>
       {carros.map((c, i) => (
         <group key={i} ref={(el) => { grupos.current[i] = el; }} position={[c.x, 0, c.z]} rotation={[0, rotacao(c), 0]}>
-          {c.onibus ? <Onibus /> : (
+          {c.onibus ? <Onibus /> : c.moto ? <Moto c={c} freio={(el) => { (freios.current[i] ??= [])[0] = el; }} /> : c.bici ? <Bicicleta c={c} /> : (
             <ComFallback fallback={<mesh geometry={caixa(4.2, 1.3, 1.9)} material={mat("#E53935")} position={[0, 0.7, 0]} />}>
               <Modelo nome={c.modelo as NomeModelo} position={[0, 0, 0]} altura={ALTURA[c.modelo]} sombra={false} />
             </ComFallback>
           )}
           {/* luzes de freio na traseira (acendem quando o carro freia ou está parado no sinal) */}
-          {[-0.62, 0.62].map((lz, k) => (
+          {!c.moto && !c.bici && [-0.62, 0.62].map((lz, k) => (
             <mesh key={k} ref={(el) => { (freios.current[i] ??= [])[k] = el; }} geometry={caixa(0.06, 0.12, 0.3)} material={LUZ_FREIO} position={[-c.meio + 0.08, c.onibus ? 0.9 : 0.78, lz * (c.onibus ? 1.6 : 1)]} />
           ))}
-          {[-0.6, 0.6].map((lz, k) => <mesh key={`f${k}`} geometry={caixa(0.06, 0.16, 0.36)} material={FAROL} position={[c.meio - 0.08, c.onibus ? 0.8 : 0.72, lz * (c.onibus ? 1.6 : 1)]} />)}
-          <mesh geometry={plano(6.5, 3.4)} material={FACHO} rotation={[-Math.PI / 2, 0, 0]} position={[c.meio + 3, 0.04, 0]} renderOrder={2} />
-          <SombraContato r={c.onibus ? 5.6 : 2.4} />
+          {!c.moto && !c.bici && [-0.6, 0.6].map((lz, k) => <mesh key={`f${k}`} geometry={caixa(0.06, 0.16, 0.36)} material={FAROL} position={[c.meio - 0.08, c.onibus ? 0.8 : 0.72, lz * (c.onibus ? 1.6 : 1)]} />)}
+          {!c.bici && <mesh geometry={c.moto ? plano(3.8, 1.8) : plano(6.5, 3.4)} material={FACHO} rotation={[-Math.PI / 2, 0, 0]} position={[c.meio + (c.moto ? 1.9 : 3), 0.04, 0]} renderOrder={2} />}
+          {!c.bici && <mesh geometry={c.moto ? coneMoto : cone} material={CONE} position={[c.meio - 0.05, c.onibus ? 0.85 : c.moto ? 0.85 : 0.72, 0]} renderOrder={3} />}
+          <SombraContato r={c.onibus ? 5.6 : c.moto ? 1.3 : c.bici ? 1.1 : 2.4} />
         </group>
       ))}
     </group>
   );
 }
+
+// ---------- moto do motoboy e bicicleta (12/11/2026) ----------
+// Desenhadas em código (poucas peças): a moto com o baú na cor da loja que fez a venda; o ciclista pedala no ritmo da
+// velocidade. As duas olham para +x, como os carros.
+// o baú troca de cor quando a mesma moto sai de outra loja
+function pintar(o: THREE.Mesh | null, cor: string) { const m = o?.material as THREE.MeshStandardMaterial | undefined; if (m && m.userData.cor !== cor) { m.color.set(cor); m.userData.cor = cor; } }
+function Moto({ c, freio }: { c: Carro; freio: (el: THREE.Mesh | null) => void }) {
+  const g = useRef<THREE.Group>(null), bauRef = useRef<THREE.Mesh>(null);
+  const bau = useMemo(() => new THREE.MeshStandardMaterial({ color: "#1D4ED8", roughness: 0.55 }), []);
+  const rodas = useRef<(THREE.Mesh | null)[]>([]);
+  useFrame((_, dt) => {
+    const m = c.moto; if (!m || !g.current) return;
+    pintar(bauRef.current, m.cor);
+    const sc = m.saindo != null ? Math.max(0.01, 1 - (relogio.t - m.saindo) / 0.7) : 1;
+    g.current.scale.setScalar(sc);
+    for (const r of rodas.current) if (r) r.rotation.y -= (c.v * Math.min(dt, 0.1)) / 0.3;
+  });
+  const preto = mat("#1B1E23", { rough: 0.7 }), metal = mat("#9AA3AE", { metal: 0.6, rough: 0.35 }), jaqueta = mat("#2B2F36", { rough: 0.8 }), pele = mat("#C98E6B", { rough: 0.8 }), branco = mat("#F4F5F7", { rough: 0.4 });
+  return (
+    <group ref={g}>
+      {[0.62, -0.62].map((x, k) => <mesh key={x} ref={(el) => { rodas.current[k] = el; }} geometry={cilindro(0.3, 0.3, 0.12, 14)} material={preto} position={[x, 0.3, 0]} rotation={[Math.PI / 2, 0, 0]} />)}
+      <mesh geometry={caixa(1.05, 0.3, 0.28)} material={mat("#C62828", { rough: 0.45 })} position={[0.05, 0.62, 0]} castShadow />
+      <mesh geometry={caixa(0.55, 0.09, 0.3)} material={preto} position={[-0.2, 0.82, 0]} />
+      <mesh geometry={cilindro(0.025, 0.025, 0.62, 6)} material={metal} position={[0.48, 0.66, 0]} rotation={[0, 0, -0.35]} />
+      <mesh geometry={caixa(0.05, 0.05, 0.62)} material={metal} position={[0.55, 1.0, 0]} />
+      <mesh geometry={caixa(0.08, 0.12, 0.16)} material={FAROL} position={[0.66, 0.86, 0]} />
+      <mesh ref={freio} geometry={caixa(0.05, 0.08, 0.14)} material={LUZ_FREIO} position={[-0.8, 0.82, 0]} />
+      {/* baú de entrega na cor da loja, com faixa branca */}
+      <mesh ref={bauRef} geometry={caixa(0.48, 0.44, 0.48)} material={bau} position={[-0.58, 1.08, 0]} castShadow />
+      <mesh geometry={caixa(0.49, 0.07, 0.49)} material={branco} position={[-0.58, 1.12, 0]} />
+      {/* motoboy: corpo inclinado para a frente, braços no guidão, capacete */}
+      <mesh geometry={caixa(0.3, 0.5, 0.36)} material={jaqueta} position={[-0.06, 1.16, 0]} rotation={[0, 0, -0.32]} castShadow />
+      {[-0.17, 0.17].map((z) => <mesh key={z} geometry={caixa(0.5, 0.09, 0.09)} material={jaqueta} position={[0.26, 1.13, z]} rotation={[0, 0, -0.42]} />)}
+      {[-0.13, 0.13].map((z) => <mesh key={`p${z}`} geometry={caixa(0.45, 0.13, 0.13)} material={mat("#3A4150", { rough: 0.8 })} position={[0.02, 0.83, z]} rotation={[0, 0, -0.35]} />)}
+      <mesh geometry={caixa(0.1, 0.1, 0.1)} material={pele} position={[0.06, 1.42, 0]} />
+      <mesh geometry={esfera(0.17, 12)} material={branco} position={[0.1, 1.56, 0]} />
+      <mesh geometry={caixa(0.06, 0.1, 0.22)} material={mat("#1C2B3A", { rough: 0.15, metal: 0.4 })} position={[0.25, 1.55, 0]} />
+    </group>
+  );
+}
+function Bicicleta({ c }: { c: Carro }) {
+  const pedal = useRef<THREE.Group>(null), pernas = useRef<(THREE.Mesh | null)[]>([]), rodas = useRef<(THREE.Mesh | null)[]>([]);
+  const ang = useRef(0);
+  useFrame((_, dt) => {
+    const v = c.v; ang.current += (v * Math.min(dt, 0.1)) / 0.34 * 0.55;
+    const a = ang.current;
+    if (pedal.current) pedal.current.rotation.z = -a;
+    for (const r of rodas.current) if (r) r.rotation.z -= (v * Math.min(dt, 0.1)) / 0.34;
+    // pernas: do quadril (x -0.12, y 0.98) até cada pedal (centro do pedivela em x 0, y 0.36, raio 0.16)
+    [0, Math.PI].forEach((f, k) => {
+      const p = pernas.current[k]; if (!p) return;
+      const px = Math.cos(-a + f) * 0.16, py = 0.36 + Math.sin(-a + f) * 0.16;
+      const hx = -0.12, hy = 0.98, dx = px - hx, dy = py - hy, L = Math.hypot(dx, dy);
+      p.position.set((hx + px) / 2, (hy + py) / 2, k ? 0.1 : -0.1); p.rotation.z = Math.atan2(dy, dx) + Math.PI / 2; p.scale.y = L / 0.62;
+    });
+  });
+  const preto = mat("#1B1E23", { rough: 0.7 }), quadro = mat(c.bici?.cor ?? "#E2575B", { rough: 0.45, metal: 0.3 }), camisa = mat(c.bici?.camisa ?? "#FFFFFF", { rough: 0.8 }), pele = mat("#B98263", { rough: 0.8 });
+  return (
+    <group>
+      {[0.52, -0.52].map((x, k) => <mesh key={x} ref={(el) => { rodas.current[k] = el; }} geometry={toro(0.32, 0.035, 20)} material={preto} position={[x, 0.36, 0]} />)}
+      <mesh geometry={caixa(0.78, 0.05, 0.05)} material={quadro} position={[0.02, 0.62, 0]} rotation={[0, 0, -0.18]} />
+      <mesh geometry={caixa(0.62, 0.05, 0.05)} material={quadro} position={[-0.2, 0.5, 0]} rotation={[0, 0, 0.72]} />
+      <mesh geometry={caixa(0.5, 0.05, 0.05)} material={quadro} position={[0.28, 0.5, 0]} rotation={[0, 0, -0.95]} />
+      <mesh geometry={caixa(0.05, 0.05, 0.5)} material={preto} position={[0.46, 0.92, 0]} />
+      <mesh geometry={caixa(0.2, 0.05, 0.1)} material={preto} position={[-0.2, 0.86, 0]} />
+      <group ref={pedal} position={[0, 0.36, 0]}><mesh geometry={caixa(0.34, 0.04, 0.04)} material={metal()} /></group>
+      {/* ciclista: tronco inclinado, braços no guidão, capacete; as pernas acompanham os pedais */}
+      <mesh geometry={caixa(0.26, 0.52, 0.32)} material={camisa} position={[0.0, 1.18, 0]} rotation={[0, 0, -0.55]} castShadow />
+      {[-0.16, 0.16].map((z) => <mesh key={z} geometry={caixa(0.48, 0.08, 0.08)} material={camisa} position={[0.26, 1.12, z]} rotation={[0, 0, -0.3]} />)}
+      {[0, 1].map((k) => <mesh key={`l${k}`} ref={(el) => { pernas.current[k] = el; }} geometry={caixa(0.11, 0.62, 0.11)} material={mat("#2B2F36", { rough: 0.85 })} />)}
+      <mesh geometry={esfera(0.13, 10)} material={pele} position={[0.24, 1.46, 0]} />
+      <mesh geometry={esfera(0.15, 10)} material={mat(c.bici?.cor ?? "#E2575B", { rough: 0.4 })} position={[0.22, 1.53, 0]} scale={[1.15, 0.7, 1]} />
+      <mesh geometry={caixa(0.05, 0.07, 0.1)} material={FAROL} position={[0.5, 0.98, 0]} />
+      <mesh geometry={caixa(0.04, 0.06, 0.08)} material={LUZ_FREIO_ACESA} position={[-0.62, 0.78, 0]} />
+    </group>
+  );
+}
+const metal = () => mat("#9AA3AE", { metal: 0.6, rough: 0.35 });
 
 // ---------- ônibus e pontos (12/11/2026, "vida na rua") ----------
 const MEIO_ONIBUS = 5.3;

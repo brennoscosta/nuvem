@@ -173,6 +173,49 @@ export function PainelAdmin({ config }: { config: ConfigAdmin }) {
           </table>
         </div>
       </section>
+      <RuasAdmin />
     </>
+  );
+}
+
+// Ruas com nome (12/11/2026): as ruas que as empresas fundadoras batizaram; "Voltar ao padrão" devolve o nome do mapa
+function RuasAdmin() {
+  const [lista, setLista] = useState<{ rua: string; nome: string; empresa: string; email: string | null; criadoEm: string }[]>([]);
+  const [padrao, setPadrao] = useState<Record<string, string>>({});
+  const [erro, setErro] = useState<string | null>(null);
+  const carregar = useCallback(async () => {
+    const j = await fetch("/api/workend/ruas?admin=1", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+    if (j) { setLista(j.admin ?? []); setPadrao(Object.fromEntries((j.ruas ?? []).map((r: { id: string; padrao: string }) => [r.id, r.padrao]))); }
+  }, []);
+  useEffect(() => { const t = setTimeout(carregar, 0); return () => clearTimeout(t); }, [carregar]);
+  const limpar = async (rua: string, nome: string) => {
+    if (!window.confirm(`Voltar "${nome}" ao nome padrão (${padrao[rua] ?? rua})? A empresa pode escolher outra rua depois.`)) return;
+    const r = await fetch(`/api/workend/ruas?rua=${encodeURIComponent(rua)}`, { method: "DELETE" });
+    if (!r.ok) { setErro((await r.json().catch(() => ({}))).erro ?? `Erro ${r.status}`); return; }
+    await carregar();
+  };
+  return (
+    <section className="faixa mt-12">
+      <h2 className="text-[1.4rem]">Ruas com nome</h2>
+      <p className="mt-1 text-sm text-[var(--tinta-2)]">Empresas fundadoras dão nome a uma rua livre. Se um nome não for adequado, devolva a rua ao padrão.</p>
+      {erro && <div className="mt-2 rounded-xl bg-[#FDE8E8] px-3 py-2 text-sm text-[#8A2A2A]">{erro}</div>}
+      <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--linha)]">
+        <table className="w-full text-sm">
+          <thead className="bg-[var(--cinza)] text-left text-xs uppercase text-[var(--tinta-2)]"><tr><th className="p-3">Rua</th><th className="p-3">Nome dado</th><th className="p-3">Empresa</th><th className="p-3">Quando</th><th className="p-3"></th></tr></thead>
+          <tbody>
+            {lista.length === 0 && <tr><td colSpan={5} className="p-3 text-[var(--tinta-2)]">Nenhuma rua batizada ainda. Todas usam o nome padrão.</td></tr>}
+            {lista.map((r) => (
+              <tr key={r.rua} className="border-t border-[var(--linha)]">
+                <td className="p-3 text-xs text-[var(--tinta-2)]">{padrao[r.rua] ?? r.rua}</td>
+                <td className="p-3 font-semibold">{r.nome}</td>
+                <td className="p-3">{r.empresa || "—"}{r.email && <div className="text-xs text-[var(--tinta-2)]">{r.email}</div>}</td>
+                <td className="p-3">{new Date(r.criadoEm).toLocaleDateString("pt-BR")}</td>
+                <td className="p-3"><button onClick={() => limpar(r.rua, r.nome)} className="rounded-lg border border-[var(--linha)] px-2 py-1 text-xs">Voltar ao padrão</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

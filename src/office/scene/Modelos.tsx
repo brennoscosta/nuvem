@@ -1,6 +1,9 @@
 "use client";
 // Modelos 3D gerados no Higgsfield (otimizados em scripts/cidade/otimizar.mjs).
 // Cada arquivo é carregado uma vez e instanciado várias; altura normalizada = 1, base no y = 0.
+// 12/11/2026: os arquivos vêm comprimidos (scripts/cidade/comprimir.mjs: meshopt + texturas WebP; o drei descomprime
+// sozinho). Testei carregar em duas levas (prédios antes de árvores e carros): no celular simulado não adiantou em 3G e
+// atrasou em 4G (o gargalo ali é o processador), então tudo continua pedido de uma vez.
 import * as THREE from "three";
 import { Component, Suspense, useMemo, type ReactNode } from "react";
 import { useGLTF } from "@react-three/drei";
