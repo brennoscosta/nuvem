@@ -22,3 +22,18 @@ export const ATALHOS: [string, string][] = [
   ["W A S D ou setas", "mover"], ["Q / E", "girar"], ["+ / −", "aproximar e afastar"], ["T", "ver de cima"], ["V", "ver da rua"],
   ["F", "seguir meu personagem"], ["P", "passeio automático"], ["H", "voltar ao início"], ["duplo clique", "ir até o ponto"],
 ];
+
+// Hora do mapa (12/11/2026): automática (horário de Brasília), sempre dia ou sempre noite. Lembrada só neste navegador.
+export type ModoHora = "auto" | "dia" | "noite";
+const CHAVE_HORA = "workend-hora";
+function lerModoHora(): ModoHora {
+  try { const v = typeof window !== "undefined" ? window.localStorage.getItem(CHAVE_HORA) : null; return v === "dia" || v === "noite" ? v : "auto"; } catch { return "auto"; }
+}
+export const useHora = create<{ modo: ModoHora; proximo: () => void }>((set, get) => ({
+  modo: lerModoHora(),
+  proximo: () => {
+    const modo: ModoHora = get().modo === "auto" ? "dia" : get().modo === "dia" ? "noite" : "auto";
+    try { window.localStorage.setItem(CHAVE_HORA, modo); } catch { /* sem armazenamento: vale só nesta visita */ }
+    set({ modo });
+  },
+}));

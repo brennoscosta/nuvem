@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { ControlesCamera, ControlesCameraCelular } from "./ControlesCamera";
+import { CartaoOutdoor } from "./Outdoor";
 import { PainelEscritorio } from "./Escritorio";
 import { PainelPersonagem, FichaPersonagem, ChatPersonagem, CaixaPersonagem } from "./Personagem";
 import { JanelaChamada } from "./Chamada";
@@ -269,6 +270,7 @@ export function Painel() {
       <MuralSeNuvem />
       <PainelOuCartao />
       <CartaoLote />
+      <CartaoOutdoor />
       <PainelEmpresa />
       <PainelEscritorio />
       <PainelPersonagem />

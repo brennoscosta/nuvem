@@ -9,6 +9,7 @@ import { Mundo } from "./Mundo";
 import { MUNDO } from "../data/mundo";
 import { Fachada } from "./Fachada";
 import { CameraMundo } from "./CameraMundo";
+import { CicloDia } from "./CicloDia";
 import { Agente, handlers } from "./Agente";
 import { qualidade } from "./qualidade";
 import { useEscritorio } from "../store";
@@ -140,17 +141,17 @@ function Medidor() {
 }
 const MEDIR = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("medir");
 
-function Luzes({ sombras, luz }: { sombras: boolean; luz: React.RefObject<THREE.DirectionalLight | null> }) {
+function Luzes({ sombras, luz, hemi, preench }: { sombras: boolean; luz: React.RefObject<THREE.DirectionalLight | null>; hemi: React.RefObject<THREE.HemisphereLight | null>; preench: React.RefObject<THREE.DirectionalLight | null> }) {
   return (
     <>
-      <hemisphereLight args={["#FFFFFF", "#CDD3DB", 0.9]} />
+      <hemisphereLight ref={hemi} args={["#FFFFFF", "#CDD3DB", 0.9]} />
       <directionalLight
         ref={luz}
         position={[12, 22, 10]} intensity={2.2} color="#FFF6E8" castShadow={sombras}
         shadow-mapSize={[1024, 1024]} shadow-bias={-0.0004} shadow-normalBias={0.02} shadow-radius={4}
         shadow-camera-left={-26} shadow-camera-right={26} shadow-camera-top={26} shadow-camera-bottom={-26} shadow-camera-near={1} shadow-camera-far={80}
       />
-      <directionalLight position={[-14, 10, -8]} intensity={0.5} color="#DCE8FF" />
+      <directionalLight ref={preench} position={[-14, 10, -8]} intensity={0.5} color="#DCE8FF" />
     </>
   );
 }
@@ -160,6 +161,8 @@ export function Cena() {
   const ordem = useEscritorio((s) => s.ordem);
   const controles = useRef<any>(null);
   const luz = useRef<THREE.DirectionalLight | null>(null);
+  const hemi = useRef<THREE.HemisphereLight | null>(null);
+  const preench = useRef<THREE.DirectionalLight | null>(null);
   const leve = qualidade() === "leve";
   // alta: resolução até 1,5x, baixa pra 1x se o computador não der conta (PerformanceMonitor); leve: sempre 1x
   const maxDpr = leve ? 1 : Math.min(1.5, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
@@ -183,7 +186,8 @@ export function Cena() {
           <PerformanceMonitor bounds={() => [35, 55]} flipflops={4} onDecline={() => setDpr(1)} onIncline={() => setDpr(maxDpr)} onFallback={() => setDpr(1)} />
         </>
       )}
-      <Luzes sombras={!leve} luz={luz} />
+      <Luzes sombras={!leve} luz={luz} hemi={hemi} preench={preench} />
+      {modoMundo() && <CicloDia luzes={{ hemi, sol: luz, preench }} />}
       <Suspense fallback={null}>
         <Mundo />
         <Predio />

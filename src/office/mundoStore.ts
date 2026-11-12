@@ -9,12 +9,13 @@ export interface Terreno { chave: string; usuarioId: string; status: "reservado"
 export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
 export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null; ceoNome: string; atendenteNome: string; nicho: string }
 export type AbaEscritorio = "predio" | "visual" | "setores" | "equipe" | "contratar" | "treinar";
-export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" | "personagem" }
+export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" | "personagem" | "outdoor" }
 
 export const CORES_EMPRESA = ["#1D4ED8", "#0EA5A4", "#16A34A", "#D97706", "#DC2626", "#DB2777", "#7C3AED", "#1F2937"];
 
 export { LOTES, LOTE_POR_CHAVE, NOME_CONSTRUCAO, descricaoLote, type LoteInfo } from "./data/mundo";
 import { LOTE_POR_CHAVE } from "./data/mundo";
+import { OUTDOOR_POR_ID, type OutdoorPublico } from "./data/outdoors";
 
 // Estamos no mapa do WorkEnd (workend.online/mundo)? Aí o login é o do WorkEnd, não o do admin da Nuvem.
 export const modoMundo = () => typeof window !== "undefined" && (window.location.pathname.startsWith("/mundo") || new URLSearchParams(window.location.search).has("mundo"));
@@ -45,6 +46,11 @@ interface Estado {
   painelEmpresa: boolean; // painel "Montar minha empresa" aberto
   rascunho: Rascunho | null; // o que está sendo editado (a cena mostra ao vivo)
   alvoCamera: [number, number, number] | null; // a câmera desliza até aqui
+  // outdoors nas avenidas (12/11/2026)
+  outdoors: OutdoorPublico[]; precoOutdoor: number; outdoorSelecionado: string | null;
+  carregarOutdoors: () => Promise<void>;
+  abrirOutdoor: (slot: string | null) => void;
+  pagarOutdoor: (slot: string, frase: string) => Promise<string | null>;
   carregar: () => Promise<void>;
   selecionarLote: (chave: string | null) => void;
   setLoteHover: (chave: string | null) => void;
@@ -66,9 +72,23 @@ interface Estado {
 }
 
 export const useMundo = create<Estado>((set, get) => ({
+  outdoors: [], precoOutdoor: 29.9, outdoorSelecionado: null,
+  carregarOutdoors: async () => { const j = await fetch("/api/outdoors", { cache: "no-store" }).then((r) => r.json()).catch(() => null); if (j?.vagas) set({ outdoors: j.vagas, precoOutdoor: j.preco ?? 29.9 }); },
+  abrirOutdoor: (slot) => { const v = slot ? OUTDOOR_POR_ID[slot] : null; set({ outdoorSelecionado: v ? slot : null, loteSelecionado: v ? null : get().loteSelecionado, painelEmpresa: false, painelEscritorio: false, alvoCamera: v ? [v.pos[0] * 0.82, 0.5, v.pos[1] * 0.82] : get().alvoCamera }); },
+  pagarOutdoor: async (slot, frase) => {
+    set({ pagando: true });
+    try {
+      const r = await fetch(`/api/outdoors/${encodeURIComponent(slot)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ frase }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return j.erro ?? `Erro ${r.status}`;
+      set({ pix: { id: j.id, lote: `outdoor:${slot}`, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: "pendente", tipo: "outdoor" } });
+      void get().carregarOutdoors(); return null;
+    } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
+  },
   terrenos: {}, meu: null, usuario: null, admin: false, pagamentoLigado: false, preco: 99, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
 
   carregar: async () => {
+    void get().carregarOutdoors();
     try {
       const [t, u] = await Promise.all([
         fetch("/api/terrenos").then((r) => r.json()).catch(() => ({ terrenos: [], meu: null })),
@@ -86,7 +106,7 @@ export const useMundo = create<Estado>((set, get) => ({
 
   selecionarLote: (chave) => {
     const l = chave ? LOTE_POR_CHAVE[chave] : null;
-    set({ loteSelecionado: l ? chave : null, painelEmpresa: false, rascunho: null, painelEscritorio: false, rascunhoEscritorio: null, alvoCamera: l ? [l.centro[0], 0.5, l.centro[1]] : null });
+    set({ outdoorSelecionado: null, loteSelecionado: l ? chave : null, painelEmpresa: false, rascunho: null, painelEscritorio: false, rascunhoEscritorio: null, alvoCamera: l ? [l.centro[0], 0.5, l.centro[1]] : null });
   },
   setLoteHover: (chave) => set({ loteHover: chave }),
 
@@ -144,6 +164,7 @@ export const useMundo = create<Estado>((set, get) => ({
     if (pix && pix.id === ref) {
       if (status === "aprovado") {
         set({ pix: { ...pix, status: "aprovado" } }); await get().carregar();
+        if (pix.tipo === "outdoor") await get().carregarOutdoors();
         if (pix.tipo === "personagem") { const { usePersonagem } = await import("./personagemStore"); await usePersonagem.getState().carregar(); }
         // crédito de troca de prédio comprado com o painel aberto: atualiza os contadores do rascunho
         const t = get().terrenos[pix.lote]; const r = get().rascunhoEscritorio;

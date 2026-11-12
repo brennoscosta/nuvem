@@ -7,6 +7,9 @@ import { useMemo, useRef, useState } from "react";
 import { Html, Text } from "@react-three/drei";
 import { caixa, cilindro, esfera, mat, plano, toro } from "./geo";
 import { Arvore } from "./Entorno";
+import { natalAtivo, NatalLote, NatalLetreiro } from "./Natal";
+import { PlacaEsquina } from "./Anuncios";
+import { nomeNicho } from "../data/mundo";
 import { Estatico } from "./Estatico";
 import { Modelo, ComFallback, type NomeModelo } from "./Modelos";
 import { Mesa, Sofa, Planta, Balcao, MesaBaixa, Quadro, Cafe } from "./Moveis";
@@ -35,6 +38,7 @@ function Exterior({ e, cor, nome, logo }: { e: Escritorio; cor: string; nome: st
       <Letreiro nome={nome} cor={cor} logo={logo} y={L.letreiro.y} z={L.letreiro.z} largura={L.letreiro.largura} estilo={d.letreiro} />
       {/* a Loja de rua já vem com toldo listrado no modelo */}
       {d.toldo && e.layout !== "loja" && <Toldo cor={d.toldo} y={L.letreiro.y - 1.05} z={L.letreiro.z} largura={L.letreiro.largura} />}
+      {d.extras.includes("natal") && natalAtivo() && <NatalLetreiro y={L.letreiro.y} z={L.letreiro.z} largura={L.letreiro.largura} />}
     </group>
   );
 }
@@ -182,15 +186,19 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
 }
 
 // ---------- um escritório no lote ----------
-function EscritorioLote({ chave, e, cor, nome, logo, fora }: { chave: string; e: Escritorio; cor: string; nome: string; logo: string | null; fora: boolean }) {
+function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho }: { chave: string; e: Escritorio; cor: string; nome: string; logo: string | null; fora: boolean; nicho: string }) {
   const l = LOTE_POR_CHAVE[chave]; if (!l) return null;
   const [x, z] = l.centro;
   // nossa frente local é -z; frenteDoLote usa rot 0 = frente pra +z. O dono pode girar o prédio em quartos de volta (decor.giro)
   const rot = frenteDoLote(l.k) + Math.PI + (e.decor?.giro ?? 0) * (Math.PI / 2);
   const planta = plantaCliente(e);
   const assinatura = JSON.stringify(e) + cor + nome + (logo ?? "");
+  // a placa de esquina fica na ponta do lote virada para o cruzamento (não gira com o prédio)
+  const placa = (e.decor?.extras ?? []).includes("placa");
   return (
-    <group position={[x, 0, z]} rotation={[0, rot, 0]}>
+    <group position={[x, 0, z]}>
+    {placa && <PlacaEsquina d={{ nome, cor, nicho: nomeNicho(nicho), numero: l.numero, logo }} sx={l.k % 2 ? 1 : -1} sz={l.k >= 2 ? 1 : -1} />}
+    <group rotation={[0, rot, 0]}>
       <group visible={fora}><Exterior e={e} cor={cor} nome={nome} logo={logo} /></group>
       <DecorLote d={e.decor ?? DECOR_PADRAO} cor={cor} logo={logo} />
       {!fora && (
@@ -200,6 +208,7 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora }: { chave: string; e:
           {e.equipe.map((m) => { const lugar = planta.lugares[m.id]; return lugar ? <MembroCena key={m.id} m={m} lugar={lugar} chave={chave} /> : null; })}
         </>
       )}
+    </group>
     </group>
   );
 }
@@ -217,7 +226,7 @@ export function EscritoriosClientes() {
         if (t.status !== "ativo" || !e) return null;
         const placa = t.chave === selecionado && rascunhoPlaca ? rascunhoPlaca : null;
         const logo = placa ? placa.logoDataUrl : t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null;
-        return <EscritorioLote key={t.chave} chave={t.chave} e={e} cor={placa?.cor ?? t.cor} nome={placa?.empresaNome ?? t.empresaNome} logo={logo} fora={fora} />;
+        return <EscritorioLote key={t.chave} chave={t.chave} e={e} cor={placa?.cor ?? t.cor} nome={placa?.empresaNome ?? t.empresaNome} logo={logo} fora={fora} nicho={placa?.nicho ?? t.nicho ?? "negocios"} />;
       })}
     </group>
   );
@@ -391,6 +400,7 @@ export function DecorLote({ d, cor, logo }: { d: Decoracao; cor: string; logo: s
       </Estatico>
       {tem("totem") && logo && <LogoPlano url={logo} position={[-3.2, 1.45, -9.42]} tamanho={0.62} />}
       {arvores.map(([x, z]) => <Arvore key={`${x},${z}`} position={[x, 0, z]} escala={1.15} />)}
+      {tem("natal") && natalAtivo() && <NatalLote />}
     </group>
   );
 }

@@ -44,7 +44,7 @@ export interface Escritorio { layout: LayoutId; setores: Setor[]; equipe: Membro
 export type EstiloLetreiro = "painel" | "neon" | "madeira" | "metal";
 export type PisoLote = "grama" | "deck" | "pedra" | "concreto";
 export type CercaLote = "nenhuma" | "viva" | "madeira" | "muro";
-export type ExtraLote = "bancos" | "mesas" | "vasos" | "totem" | "bandeiras" | "luzes" | "bicicletario";
+export type ExtraLote = "bancos" | "mesas" | "vasos" | "totem" | "bandeiras" | "luzes" | "bicicletario" | "placa" | "natal";
 export interface Decoracao { giro: 0 | 1 | 2 | 3; letreiro: EstiloLetreiro; toldo: string | null; piso: PisoLote; cerca: CercaLote; arvores: number; extras: ExtraLote[] }
 export const DECOR_PADRAO: Decoracao = { giro: 0, letreiro: "painel", toldo: null, piso: "grama", cerca: "nenhuma", arvores: 0, extras: [] };
 export const ESTILOS_LETREIRO: { id: EstiloLetreiro; nome: string; desc: string }[] = [
@@ -62,6 +62,10 @@ export const EXTRAS: { id: ExtraLote; nome: string; icone: string }[] = [
   { id: "bancos", nome: "Bancos", icone: "🪑" }, { id: "mesas", nome: "Mesas com guarda-sol", icone: "⛱️" }, { id: "vasos", nome: "Vasos na entrada", icone: "🪴" },
   { id: "totem", nome: "Totem com a logo", icone: "🪧" }, { id: "bandeiras", nome: "Bandeiras da marca", icone: "🚩" }, { id: "luzes", nome: "Varal de luzinhas", icone: "✨" },
   { id: "bicicletario", nome: "Bicicletário", icone: "🚲" },
+  // todo lote 2×2 é de esquina: a placa fica na ponta do cruzamento e se lê das duas ruas
+  { id: "placa", nome: "Placa de esquina", icone: "📍" },
+  // só aparece na aba e no mapa de 1º/12 a 6/1 (scene/Natal.tsx)
+  { id: "natal", nome: "Decoração de Natal", icone: "🎄" },
 ];
 export const CORES_TOLDO = ["#E2575B", "#F59E0B", "#16A34A", "#1D4ED8", "#7C3AED", "#1F2630"];
 export function limparDecor(x: unknown, base: Decoracao = DECOR_PADRAO): Decoracao {

@@ -14,7 +14,10 @@ import { Estatico } from "./Estatico";
 import { ComFallback, Modelo, type NomeModelo } from "./Modelos";
 import { SombraContato } from "./SombraContato";
 import { leve } from "./qualidade";
-import { EIXOS_RUA, RUA } from "../data/mundo";
+import { EIXOS_RUA, RUA, QUARTEIROES, PASSO, BORDA_CALCADA } from "../data/mundo";
+import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle } from "./Boneco";
+import { BONECO } from "../data/bonecos";
+import { ceu, texturaLuz } from "./CicloDia";
 
 // ---------- tempos do semáforo (segundos) ----------
 const VERDE = 9, AMARELO = 2.5, TODOS_VERMELHOS = 1.5;
@@ -175,6 +178,9 @@ const ACEL = 2.4, FREIO = 6, FREIO_CONFORTO = 3.2, VEL_CURVA = 3.6, DISTANCIA = 
 interface Curva { cx: number; cz: number; lado: 1 | -1; R: number; d: V2; r: V2; phi: number }
 interface Carro {
   modelo: Modelo3; x: number; z: number; d: V2; v: number; vMax: number; curva: Curva | null;
+  meio: number; // meio comprimento (carro 2,2; ônibus 5,3)
+  // ônibus (12/11/2026): rota fixa virando sempre à direita em volta da Nuvem e paradas nos pontos
+  onibus?: { paradas: { x: number; z: number; d: V2 }[]; esperaAte: number; ultima: number };
   // decisão para o próximo cruzamento: chave do cruzamento e o que fazer
   plano: { chave: string; acao: "reto" | "direita" | "esquerda" } | null;
   freando: boolean;
@@ -202,6 +208,7 @@ function temRua(cr: Cruzamento, nd: V2) {
 }
 function decidir(c: Carro, cr: Cruzamento): "reto" | "direita" | "esquerda" {
   const r = direita(c.d);
+  if (c.onibus && temRua(cr, r)) return "direita";
   const reto = temRua(cr, c.d), dir = temRua(cr, r), esq = temRua(cr, [-r[0], -r[1]]);
   if (reto && dir) return Math.random() < 0.28 ? "direita" : "reto";
   if (reto) return "reto";
@@ -218,10 +225,11 @@ function iniciarCurva(c: Carro, cr: Cruzamento, lado: 1 | -1) {
 
 function criarCarros(n: number): Carro[] {
   const modelos: Modelo3[] = ["carroSedan", "carroHatch", "carroSuv"];
-  const lista: Carro[] = [];
+  // o ônibus nasce primeiro (os carros sorteados ficam longe dele)
+  const lista: Carro[] = [{ modelo: "carroSedan", x: -12, z: -26 + FAIXA_CARRO, d: [1, 0], v: 0, vMax: 5, curva: null, plano: null, freando: false, meio: MEIO_ONIBUS, onibus: { paradas: PONTOS_ONIBUS, esperaAte: 0, ultima: -1 } }];
   let semente = 7; const sorte = () => ((semente = (semente * 9301 + 49297) % 233280) / 233280);
   let tentativas = 0;
-  while (lista.length < n && tentativas++ < 2000) {
+  while (lista.length < n + 1 && tentativas++ < 2000) {
     const d = DIRECOES[Math.floor(sorte() * 4)]; const r = direita(d);
     const rua = EIXOS_RUA[Math.floor(sorte() * EIXOS_RUA.length)];
     const ao = MIN_E + 6 + sorte() * (MAX_E - MIN_E - 12);
@@ -230,7 +238,7 @@ function criarCarros(n: number): Carro[] {
     const x = d[0] !== 0 ? ao : rua + r[0] * FAIXA_CARRO, z = d[0] !== 0 ? rua + r[1] * FAIXA_CARRO : ao;
     if (lista.some((o) => Math.hypot(o.x - x, o.z - z) < 9)) continue;
     const modelo = modelos[lista.length % 3];
-    lista.push({ modelo, x, z, d, v: 0, vMax: 5.2 + sorte() * 2.6, curva: null, plano: null, freando: false });
+    lista.push({ modelo, x, z, d, v: 0, vMax: 5.2 + sorte() * 2.6, curva: null, plano: null, freando: false, meio: FRENTE });
   }
   return lista;
 }
@@ -239,7 +247,11 @@ function passo(carros: Carro[], dt: number, t: number) {
   for (const c of carros) {
     // ---- na curva: anda pelo arco e sai na rua nova ----
     if (c.curva) {
-      const k = c.curva; c.v = Math.min(VEL_CURVA, c.v + ACEL * dt);
+      const k = c.curva;
+      // pedestre na frente (na faixa da rua de destino): espera no meio da curva
+      const hx = k.d[0] * Math.cos(k.phi) + k.lado * k.r[0] * Math.sin(k.phi), hz = k.d[1] * Math.cos(k.phi) + k.lado * k.r[1] * Math.sin(k.phi);
+      if (pedestreNaFrente(c.x, c.z, hx, hz, c.meio + 4.5, 1.8)) { c.v = 0; c.freando = true; continue; }
+      c.v = Math.min(c.onibus ? 3 : VEL_CURVA, c.v + ACEL * dt);
       k.phi = Math.min(Math.PI / 2, k.phi + (c.v * dt) / k.R);
       const co = Math.cos(k.phi), si = Math.sin(k.phi);
       c.x = k.cx - k.lado * k.r[0] * k.R * co + k.d[0] * k.R * si;
@@ -257,7 +269,7 @@ function passo(carros: Carro[], dt: number, t: number) {
       if (!c.plano || c.plano.chave !== chave) c.plano = { chave, acao: decidir(c, cr) };
       const eixo = c.d[0] !== 0 ? "x" : "z";
       const luz = luzDe(cr.grupo, eixo, t);
-      const atePararr = dist - PARADA_CENTRO; // quanto falta até o ponto de parada
+      const atePararr = dist - (LINHA_PARADA + 0.4 + c.meio); // quanto falta até o ponto de parada
       if (atePararr > -0.2 && luz !== "verde") {
         // amarelo: só para se dá para parar com freada confortável; vermelho: para sempre
         const precisa = (c.v * c.v) / (2 * FREIO_CONFORTO);
@@ -269,23 +281,40 @@ function passo(carros: Carro[], dt: number, t: number) {
         const lado = c.plano.acao === "direita" ? 1 : -1; const r = direita(c.d); const nd: V2 = [lado * r[0], lado * r[1]];
         const sx = cr.x + nd[0] * MEIA_RUA + direita(nd)[0] * FAIXA_CARRO, sz = cr.z + nd[1] * MEIA_RUA + direita(nd)[1] * FAIXA_CARRO;
         const ocupada = carros.some((o) => o !== c && !o.curva && o.d[0] === nd[0] && o.d[1] === nd[1] && Math.abs((o.x - sx) * direita(nd)[0] + (o.z - sz) * direita(nd)[1]) < 1.2 && (() => { const g = (o.x - sx) * nd[0] + (o.z - sz) * nd[1]; return g > -1 && g < DISTANCIA + 1; })());
-        if (ocupada) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, dist - PARADA_CENTRO))));
+        // e só vira se ninguém está atravessando a faixa da rua de destino
+        const pedestre = pedestreNaFrente(sx - nd[0] * 1.2, sz - nd[1] * 1.2, nd[0], nd[1], 4.5, 3.6);
+        if (ocupada || pedestre) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, dist - (pedestre ? MEIA_RUA + 0.2 : PARADA_CENTRO)))));
         else if (dist <= MEIA_RUA + 0.05) { iniciarCurva(c, cr, lado); continue; }
       }
     }
     // carro da frente na mesma faixa (inclusive quem está entrando nela numa curva)
     const latMeu = lateral(c), fMeu = frente(c);
-    let gap = Infinity;
+    let gap = Infinity, folga = DISTANCIA;
     for (const o of carros) {
       if (o === c) continue;
       const lat = o.x * direita(c.d)[0] + o.z * direita(c.d)[1];
       if (Math.abs(lat - latMeu) > 1.3) continue;
       const g = o.x * c.d[0] + o.z * c.d[1] - fMeu;
-      if (g > 0 && g < gap) gap = g;
+      if (g > 0 && g < gap) { gap = g; folga = c.meio + o.meio + 2.6; }
     }
-    if (gap < Infinity) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, gap - DISTANCIA))));
+    if (gap < Infinity) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, gap - folga))));
+    // pedestre atravessando na frente: para antes da faixa
+    const p = pedestreAFrente(c.x, c.z, c.d[0], c.d[1], c.meio + 7, 1.7);
+    if (p != null) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO * Math.max(0, p - c.meio - 1.6))));
+    // ônibus: para 6 s em cada ponto
+    if (c.onibus) {
+      const o = c.onibus;
+      o.paradas.forEach((pt, i) => {
+        if (pt.d[0] !== c.d[0] || pt.d[1] !== c.d[1] || i === o.ultima) return;
+        const g = (pt.x - c.x) * c.d[0] + (pt.z - c.z) * c.d[1], lat = Math.abs((pt.x - c.x) * direita(c.d)[0] + (pt.z - c.z) * direita(c.d)[1]);
+        if (lat > 1 || g < -0.5 || g > 40) return;
+        vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, g))));
+        if (g < 0.4 && c.v < 0.2) { o.esperaAte = t + 6; o.ultima = i; }
+      });
+      if (t < o.esperaAte) vAlvo = 0;
+    }
     // não fica parado no meio do cruzamento: se a fila do outro lado chega até a saída, espera na linha de parada
-    if (prox && c.plano?.acao === "reto" && gap < prox.dist + MEIA_RUA + DISTANCIA && prox.dist - PARADA_CENTRO > -0.2) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, prox.dist - PARADA_CENTRO))));
+    if (prox && c.plano?.acao === "reto" && gap < prox.dist + MEIA_RUA + folga && prox.dist - PARADA_CENTRO > -0.2) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, prox.dist - PARADA_CENTRO))));
     const antes = c.v;
     c.v = c.v < vAlvo ? Math.min(vAlvo, c.v + ACEL * dt) : Math.max(vAlvo, c.v - FREIO * dt);
     c.freando = c.v < antes - 0.01 || (c.v < 0.3 && vAlvo < 0.3);
@@ -298,6 +327,10 @@ const rotacao = (c: Carro) => {
   return -Math.atan2(c.d[1], c.d[0]); // o modelo olha para +x
 };
 
+// faróis: acesos de leve de dia e fortes à noite, com o facho de luz na pista
+const FAROL = new THREE.MeshStandardMaterial({ color: "#F5F3EA", emissive: "#FFF4D6", emissiveIntensity: 0.3, roughness: 0.3 });
+const FACHO = new THREE.MeshBasicMaterial({ color: "#FFE9B8", transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false });
+function acenderFarois() { FAROL.emissiveIntensity = 0.3 + ceu.noite * 2.6; FACHO.opacity = ceu.noite * 0.42; if (!FACHO.map) { const t = texturaLuz(); if (t) { FACHO.map = t; FACHO.needsUpdate = true; } } }
 const LUZ_FREIO = new THREE.MeshStandardMaterial({ color: "#5A0E0E", emissive: "#FF2020", emissiveIntensity: 0, roughness: 0.4 });
 const LUZ_FREIO_ACESA = new THREE.MeshStandardMaterial({ color: "#FF3030", emissive: "#FF2020", emissiveIntensity: 2.2, roughness: 0.4 });
 
@@ -305,12 +338,13 @@ export function Trafego() {
   const poucos = leve();
   const carros = useMemo(() => criarCarros(poucos ? 10 : 22), [poucos]);
   // ?medir=1: os testes leem as posições dos carros e o relógio do semáforo
-  useEffect(() => { if (new URLSearchParams(window.location.search).has("medir")) (window as unknown as { __trafego?: unknown }).__trafego = { carros, luzDe, CRUZAMENTOS, agora, passo, relogio }; }, [carros]);
+  useEffect(() => { if (new URLSearchParams(window.location.search).has("medir")) (window as unknown as { __trafego?: unknown }).__trafego = { carros, luzDe, CRUZAMENTOS, agora, passo, relogio, PEDESTRES, passoPedestres }; }, [carros]);
   const grupos = useRef<(THREE.Group | null)[]>([]);
   const freios = useRef<(THREE.Mesh | null)[][]>([]);
   useFrame((_, dt) => {
     const passoDt = Math.min(dt, 0.1); relogio.t += passoDt; const t = relogio.t;
     passo(carros, passoDt, t);
+    acenderFarois();
     carros.forEach((c, i) => {
       const g = grupos.current[i]; if (!g) return;
       g.position.set(c.x, 0, c.z);
@@ -323,16 +357,148 @@ export function Trafego() {
     <group>
       {carros.map((c, i) => (
         <group key={i} ref={(el) => { grupos.current[i] = el; }} position={[c.x, 0, c.z]} rotation={[0, rotacao(c), 0]}>
-          <ComFallback fallback={<mesh geometry={caixa(4.2, 1.3, 1.9)} material={mat("#E53935")} position={[0, 0.7, 0]} />}>
-            <Modelo nome={c.modelo as NomeModelo} position={[0, 0, 0]} altura={ALTURA[c.modelo]} sombra={false} />
-          </ComFallback>
+          {c.onibus ? <Onibus /> : (
+            <ComFallback fallback={<mesh geometry={caixa(4.2, 1.3, 1.9)} material={mat("#E53935")} position={[0, 0.7, 0]} />}>
+              <Modelo nome={c.modelo as NomeModelo} position={[0, 0, 0]} altura={ALTURA[c.modelo]} sombra={false} />
+            </ComFallback>
+          )}
           {/* luzes de freio na traseira (acendem quando o carro freia ou está parado no sinal) */}
           {[-0.62, 0.62].map((lz, k) => (
-            <mesh key={k} ref={(el) => { (freios.current[i] ??= [])[k] = el; }} geometry={caixa(0.06, 0.12, 0.3)} material={LUZ_FREIO} position={[-2.12, 0.78, lz]} />
+            <mesh key={k} ref={(el) => { (freios.current[i] ??= [])[k] = el; }} geometry={caixa(0.06, 0.12, 0.3)} material={LUZ_FREIO} position={[-c.meio + 0.08, c.onibus ? 0.9 : 0.78, lz * (c.onibus ? 1.6 : 1)]} />
           ))}
-          <SombraContato r={2.4} />
+          {[-0.6, 0.6].map((lz, k) => <mesh key={`f${k}`} geometry={caixa(0.06, 0.16, 0.36)} material={FAROL} position={[c.meio - 0.08, c.onibus ? 0.8 : 0.72, lz * (c.onibus ? 1.6 : 1)]} />)}
+          <mesh geometry={plano(6.5, 3.4)} material={FACHO} rotation={[-Math.PI / 2, 0, 0]} position={[c.meio + 3, 0.04, 0]} renderOrder={2} />
+          <SombraContato r={c.onibus ? 5.6 : 2.4} />
         </group>
       ))}
     </group>
   );
+}
+
+// ---------- ônibus e pontos (12/11/2026, "vida na rua") ----------
+const MEIO_ONIBUS = 5.3;
+// pontos nas calçadas norte e sul do quarteirão da Nuvem (o ônibus contorna a Nuvem virando sempre à direita)
+const PONTOS_ONIBUS: { x: number; z: number; d: V2 }[] = [
+  { x: 2, z: -26 + FAIXA_CARRO, d: [1, 0] },
+  { x: -2, z: 26 - FAIXA_CARRO, d: [-1, 0] },
+];
+const AZUL = "#0A6CFF";
+function Onibus() {
+  const vidro = mat("#1C2B3A", { rough: 0.2, metal: 0.4 }), roda = mat("#1B1E23", { rough: 0.8 });
+  return (
+    <group>
+      <mesh geometry={caixa(10.4, 2.5, 2.5)} material={mat(AZUL, { rough: 0.55 })} position={[0, 1.65, 0]} castShadow />
+      <mesh geometry={caixa(10.42, 0.35, 2.52)} material={mat("#FFFFFF", { rough: 0.6 })} position={[0, 1.05, 0]} />
+      <mesh geometry={caixa(10.3, 0.12, 2.4)} material={mat("#E8ECF2", { rough: 0.6 })} position={[0, 2.95, 0]} />
+      {/* janelas dos dois lados e para-brisa */}
+      <mesh geometry={caixa(8.6, 0.95, 2.54)} material={vidro} position={[-0.5, 2.15, 0]} />
+      <mesh geometry={caixa(0.06, 1.3, 2.2)} material={vidro} position={[5.21, 2.05, 0]} />
+      {/* letreiro de destino aceso */}
+      <mesh geometry={caixa(0.07, 0.3, 1.6)} material={mat("#FFB020", { emissive: "#FFB020", ei: 1.4 })} position={[5.23, 2.78, 0]} />
+      {[[-3.4, 1], [-3.4, -1], [3.3, 1], [3.3, -1]].map(([x, z], i) => <mesh key={i} geometry={cilindro(0.48, 0.48, 0.3, 14)} material={roda} position={[x, 0.48, z * 1.13]} rotation={[Math.PI / 2, 0, 0]} />)}
+    </group>
+  );
+}
+function PontoOnibus({ x, z, frente }: { x: number; z: number; frente: 1 | -1 }) {
+  const metal = mat("#2B2F36", { metal: 0.4, rough: 0.5 });
+  return (
+    <group position={[x, 0, z]} rotation={[0, frente > 0 ? 0 : Math.PI, 0]}>
+      {[-1.5, 1.5].map((px) => <mesh key={px} geometry={caixa(0.08, 2.5, 0.08)} material={metal} position={[px, 1.25, 0.55]} />)}
+      <mesh geometry={caixa(3.4, 0.08, 1.5)} material={mat("#F2F4F7", { rough: 0.5 })} position={[0, 2.5, 0]} castShadow />
+      <mesh geometry={caixa(3.2, 1.7, 0.05)} material={mat("#BFE3FF", { opacity: 0.45, rough: 0.1 })} position={[0, 1.3, 0.62]} />
+      <mesh geometry={caixa(2.4, 0.08, 0.42)} material={mat("#A0703C", { rough: 0.9 })} position={[0, 0.46, 0.38]} />
+      <mesh geometry={cilindro(0.04, 0.04, 2.6, 6)} material={metal} position={[-2.1, 1.3, 0]} />
+      <mesh geometry={caixa(0.06, 0.55, 0.55)} material={mat(AZUL, { emissive: AZUL, ei: 0.4 })} position={[-2.1, 2.45, 0]} />
+    </group>
+  );
+}
+export function PontosOnibus() {
+  // abrigo na beira da calçada, ao lado de onde o ônibus para
+  return <Estatico>{PONTOS_ONIBUS.map((p, i) => <PontoOnibus key={i} x={p.x} z={p.z + (p.d[0] > 0 ? 2.05 : -2.05)} frente={p.d[0] > 0 ? 1 : -1} />)}</Estatico>;
+}
+
+// ---------- pedestres que atravessam na faixa (12/11/2026) ----------
+// Andam pelo meio da calçada em volta do quarteirão; em cada esquina às vezes atravessam para o quarteirão vizinho, pela
+// faixa, quando os carros daquela rua estão no vermelho (e ainda dá tempo de chegar do outro lado). Os carros param
+// para quem está na faixa, inclusive quem vira à direita.
+const B_CALCADA = BORDA_CALCADA - 1.2; // meio da calçada (21,3 do centro do quarteirão)
+const EIXO = PASSO / 2; // eixo da rua a partir do centro do quarteirão (26)
+const QUART = new Set(QUARTEIROES.map((q) => `${q.i},${q.j}`));
+interface Passante { x: number; z: number; v: number; vMax: number; estado: "andando" | "esperando" | "atravessando"; alvo: [number, number]; i: number; j: number; canto: number; sentido: 1 | -1; espera: { cr: Cruzamento; eixoCarros: "x" | "z"; i: number; j: number; canto: number } | null; boneco: string; camisa: string; rot: number }
+export const PEDESTRES: Passante[] = [];
+const cantoXZ = (i: number, j: number, k: number): [number, number] => [i * PASSO + (k === 1 || k === 2 ? B_CALCADA : -B_CALCADA), j * PASSO + (k >= 2 ? B_CALCADA : -B_CALCADA)];
+
+function pedestreAFrente(x: number, z: number, hx: number, hz: number, alcance: number, largura: number): number | null {
+  let menor: number | null = null;
+  for (const p of PEDESTRES) {
+    if (p.estado !== "atravessando") continue;
+    const dx = p.x - x, dz = p.z - z, g = dx * hx + dz * hz, lat = Math.abs(-dx * hz + dz * hx);
+    if (g > 0 && g < alcance && lat < largura && (menor == null || g < menor)) menor = g;
+  }
+  return menor;
+}
+const pedestreNaFrente = (x: number, z: number, hx: number, hz: number, alcance: number, largura: number) => pedestreAFrente(x, z, hx, hz, alcance, largura) != null;
+
+function criarPedestres(n: number): Passante[] {
+  const bonecos = ["casual-f", "casual-m", "exec-f", "exec-m", "criativo-f", "criativo-m", "classico", "coque", "longo", "ruivo"];
+  const cores = ["#E2575B", "#F2913D", "#3FBFA8", "#1D4ED8", "#8B6CF0", "#22A86B", "#EC6B8D", "#FFB020", "#2B2F36", "#40C4FF"];
+  const lista: Passante[] = [];
+  for (let k = 0; k < n; k++) {
+    const q = QUARTEIROES[k % QUARTEIROES.length]; const canto = (k * 3) % 4; const sentido: 1 | -1 = k % 2 ? 1 : -1;
+    const [cx, cz] = cantoXZ(q.i, q.j, canto); const prox = (canto + sentido + 4) % 4; const [ax, az] = cantoXZ(q.i, q.j, prox);
+    const t = ((k * 37) % 100) / 100; // começa no meio do lado
+    lista.push({ x: cx + (ax - cx) * t, z: cz + (az - cz) * t, v: 0, vMax: 1.1 + ((k * 13) % 5) * 0.1, estado: "andando", alvo: [ax, az], i: q.i, j: q.j, canto: prox, sentido, espera: null, boneco: bonecos[k % bonecos.length], camisa: cores[(k * 7) % cores.length], rot: 0 });
+  }
+  return lista;
+}
+
+// travessias possíveis numa esquina: atravessar a rua de cima/baixo (carros do eixo x param) ou a do lado (eixo z)
+function travessias(p: Passante) {
+  const sx = p.canto === 1 || p.canto === 2 ? 1 : -1, sz = p.canto >= 2 ? 1 : -1;
+  const cx = p.i * PASSO, cz = p.j * PASSO;
+  const cr = CRUZAMENTOS.find((c) => Math.abs(c.x - (cx + sx * EIXO)) < 0.01 && Math.abs(c.z - (cz + sz * EIXO)) < 0.01);
+  const op: NonNullable<Passante["espera"]>[] = [];
+  if (!cr) return op;
+  if (QUART.has(`${p.i},${p.j + sz}`)) op.push({ cr, eixoCarros: "x", i: p.i, j: p.j + sz, canto: sz > 0 ? (sx > 0 ? 1 : 0) : (sx > 0 ? 2 : 3) });
+  if (QUART.has(`${p.i + sx},${p.j}`)) op.push({ cr, eixoCarros: "z", i: p.i + sx, j: p.j, canto: sx > 0 ? (sz > 0 ? 3 : 0) : (sz > 0 ? 2 : 1) });
+  return op;
+}
+
+function passoPedestres(lista: Passante[], dt: number, t: number) {
+  for (const p of lista) {
+    if (p.estado === "esperando" && p.espera) {
+      const e = p.espera; const pedestre = e.eixoCarros === "x" ? "z" : "x"; // anda quando a rua que cruza (o eixo dos pedestres) está verde
+      const podeIr = luzDe(e.cr.grupo, pedestre, t) === "verde" && luzDe(e.cr.grupo, pedestre, t + 7.5) === "verde";
+      p.v = 0;
+      if (podeIr) { p.estado = "atravessando"; p.alvo = cantoXZ(e.i, e.j, e.canto); }
+      continue;
+    }
+    const dx = p.alvo[0] - p.x, dz = p.alvo[1] - p.z, dist = Math.hypot(dx, dz);
+    p.v = Math.min(p.vMax * (p.estado === "atravessando" ? 1.15 : 1), p.v + 2 * dt);
+    if (dist > 0.05) { const s = Math.min(dist, p.v * dt); p.x += (dx / dist) * s; p.z += (dz / dist) * s; p.rot = Math.atan2(dx, dz); }
+    if (dist > 0.08) continue;
+    // chegou: terminou a travessia (está na esquina do quarteirão novo) ou chegou numa esquina
+    if (p.estado === "atravessando" && p.espera) { p.i = p.espera.i; p.j = p.espera.j; p.canto = p.espera.canto; p.espera = null; }
+    p.estado = "andando";
+    const op = travessias(p);
+    if (op.length && Math.random() < 0.5) { p.espera = op[Math.floor(Math.random() * op.length)]; p.estado = "esperando"; continue; }
+    if (Math.random() < 0.25) p.sentido = (p.sentido * -1) as 1 | -1;
+    p.canto = (p.canto + p.sentido + 4) % 4; p.alvo = cantoXZ(p.i, p.j, p.canto);
+  }
+}
+
+function PassanteBoneco({ p }: { p: Passante }) {
+  const g = useRef<THREE.Group>(null), h = useRef<BonecoHandle>(null);
+  const fase = useMemo(() => (p.x * 7 + p.z * 3) % 5, [p]);
+  useAnimacao(h, () => (p.v > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base);
+  useFrame(() => { const o = g.current; if (!o) return; o.position.set(p.x, 0, p.z); let dif = p.rot - o.rotation.y; dif = Math.atan2(Math.sin(dif), Math.cos(dif)); o.rotation.y += dif * 0.25; });
+  const def = BONECO[p.boneco] ?? BONECO.classico;
+  return <group ref={g} position={[p.x, 0, p.z]}><BonecoProcedural ref={h} def={def} camisa={p.camisa} cracha={p.camisa} /></group>;
+}
+
+export function Passantes() {
+  const lista = useMemo(() => criarPedestres(leve() ? 6 : 14), []);
+  useEffect(() => { PEDESTRES.length = 0; PEDESTRES.push(...lista); return () => { PEDESTRES.length = 0; }; }, [lista]);
+  useFrame((_, dt) => passoPedestres(lista, Math.min(dt, 0.1), relogio.t));
+  return <group>{lista.map((p, i) => <PassanteBoneco key={i} p={p} />)}</group>;
 }

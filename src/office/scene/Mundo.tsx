@@ -14,7 +14,10 @@ import { Entorno, Arvore, GentePraia } from "./Entorno";
 import { Restaurante } from "./Restaurante";
 import { Lotes } from "./Lotes";
 import { Horizonte } from "./Horizonte";
-import { Semaforos, Trafego } from "./Transito";
+import { Semaforos, Trafego, Passantes, PontosOnibus } from "./Transito";
+import { LuzesPostes } from "./CicloDia";
+import { natalAtivo, ArvoreNatal, LuzesNatalPostes } from "./Natal";
+import { Outdoors } from "./Anuncios";
 import { QUARTEIROES, centroQuarteirao, centroLote, EIXOS_RUA, COMPRIMENTO_RUA, RUA, CALCADA, MEIO_Q, BORDA_CALCADA, MUNDO, PASSO, N, EIXO_RUA } from "../data/mundo";
 
 const ASFALTO = "#4A4E55", FAIXA = "#E8E4D8", CALC = "#D9D5CC";
@@ -83,6 +86,7 @@ function Perto({ cx, cz, raio, children }: { cx: number; cz: number; raio: numbe
 
 export function Mundo() {
   const poucos = leve();
+  const natal = useMemo(() => natalAtivo(), []);
   const raio = poucos ? 150 : 220;
   const calcadas = useMemo(() => QUARTEIROES.map((q) => centroQuarteirao(q.i, q.j)), []);
   // postes nas esquinas e no meio de cada lado dos quarteirões, do lado de fora da calçada
@@ -125,6 +129,10 @@ export function Mundo() {
       <ComFallback fallback={<Estatico>{postes.map((p, i) => <Poste key={i} position={p.pos} />)}</Estatico>}>
         <ModeloInstanciado nome="poste" itens={postes} />
       </ComFallback>
+      {/* à noite os postes acendem (luz no chão e lâmpada) */}
+      <LuzesPostes itens={postes} />
+      {/* Natal (1º/12 a 6/1): árvore na praça da Nuvem e pisca-pisca nos postes */}
+      {natal && <><ArvoreNatal /><LuzesNatalPostes itens={postes} /></>}
       {/* árvores do mundo: modelo do Higgsfield (5 mil triângulos cada) no modo completo; no leve, a árvore desenhada em código (600) juntada num lote só */}
       {poucos ? (
         <Estatico>{arvores.map((a, i) => <Arvore key={i} position={a.pos} escala={(a.altura ?? 4.5) / 4.2} />)}</Estatico>
@@ -136,6 +144,11 @@ export function Mundo() {
       {/* trânsito: semáforos, faixas de pedestre e carros que obedecem (11/11/2026) */}
       <Semaforos />
       <Trafego />
+      {/* vida na rua (12/11/2026): pedestres que atravessam na faixa e o ônibus com pontos */}
+      <Passantes />
+      <PontosOnibus />
+      {/* outdoors nas avenidas da borda (aluguel de 30 dias) */}
+      <Outdoors />
       {/* quarteirões */}
       <Perto cx={0} cz={0} raio={raio + 60}><Entorno /></Perto>
       <Perto cx={PASSO} cz={0} raio={raio}><Restaurante /></Perto>

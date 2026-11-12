@@ -10,6 +10,7 @@ import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
 import { Estatico } from "./Estatico";
 import { MUNDO } from "../data/mundo";
 import { leve } from "./qualidade";
+import { registrarHorizonte } from "./CicloDia";
 
 const R = MUNDO.x + 6; // distância dos painéis ao centro
 const RZ = MUNDO.z + 6;
@@ -19,7 +20,8 @@ const ALT = (LARG / REPETE) * (9 / 16); // altura mantém a proporção 16:9 de 
 const Y0 = -0.6;
 
 function Painel({ textura, position, rotation }: { textura: THREE.Texture; position: [number, number, number]; rotation: number }) {
-  const m = useMemo(() => new THREE.MeshBasicMaterial({ map: textura, fog: false, toneMapped: false }), [textura]);
+  // registrado no ciclo de dia e noite: a foto escurece à noite
+  const m = useMemo(() => { const mm = new THREE.MeshBasicMaterial({ map: textura, fog: false, toneMapped: false }); registrarHorizonte(mm); return mm; }, [textura]);
   return <mesh geometry={plano(LARG, ALT)} material={m} position={position} rotation={[0, rotation, 0]} />;
 }
 

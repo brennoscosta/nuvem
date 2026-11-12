@@ -7,6 +7,7 @@ import { PixAberto } from "./Lote";
 import { useMundo } from "../mundoStore";
 import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, vagasLivres, DECOR_PADRAO, ESTILOS_LETREIRO, PISOS, CERCAS, EXTRAS, CORES_TOLDO, type Escritorio, type Setor, type Membro, type Pronto, type Decoracao } from "../data/escritorio";
 import { frenteDoLote, LOTE_POR_CHAVE } from "../data/mundo";
+import { natalAtivo } from "../scene/Natal";
 
 interface AgenteVenda { id: string; nome: string; cargo: string; setor: string; descricao: string; saudacao: string; skills: string[]; apis: string[]; preco: number; boneco: string; camisa: string }
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -275,7 +276,7 @@ function AbaVisual({ e, set, corMarca }: { e: Escritorio; set: (e: Escritorio) =
       </div>
       {titulo("Na frente da loja")}
       <div className="grid grid-cols-2 gap-1.5">
-        {EXTRAS.map((x) => { const on = d.extras.includes(x.id); return <Opcao key={x.id} ativo={on} onClick={() => muda({ extras: on ? d.extras.filter((y) => y !== x.id) : [...d.extras, x.id] })}><span className="mr-1">{x.icone}</span>{x.nome}</Opcao>; })}
+        {EXTRAS.filter((x) => x.id !== "natal" || natalAtivo()).map((x) => { const on = d.extras.includes(x.id); return <Opcao key={x.id} ativo={on} onClick={() => muda({ extras: on ? d.extras.filter((y) => y !== x.id) : [...d.extras, x.id] })}><span className="mr-1">{x.icone}</span>{x.nome}</Opcao>; })}
       </div>
       <div className="mt-3 rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">Tudo aparece no mapa enquanto você escolhe. Mudar a fachada e o lote é grátis e não conta como troca de prédio.</div>
     </div>
