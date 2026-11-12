@@ -2,6 +2,7 @@
 import { usuarioAtual } from "@/server/usuarios";
 import { personagemPublico } from "@/server/personagens";
 import { relacao } from "@/server/rede";
+import { selosDe } from "@/server/cidade";
 import { ok, erro } from "@/server/http";
 export const dynamic = "force-dynamic";
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -9,6 +10,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const u = await usuarioAtual(); const { id } = await params; const p = await personagemPublico(id, u?.id ?? null);
     if (!p) return erro("Personagem não encontrado.", 404);
     const rel = u && u.id !== id ? await relacao(u.id, id) : { status: "nenhuma", id: null };
-    return ok({ ...p, relacao: rel });
+    const selos = (await selosDe([id]).catch(() => ({} as Record<string, string[]>)))[id] ?? [];
+    return ok({ ...p, relacao: rel, selos });
   } catch (e) { return erro(e); }
 }

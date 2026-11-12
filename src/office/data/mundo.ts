@@ -19,7 +19,8 @@ export const MUNDO = { x: N * PASSO + EIXO_RUA + 14, z: N * PASSO + EIXO_RUA + 1
 export type ModeloCasa = "casaVelha" | "casaTerrea" | "casaSobrado" | "casaColonial" | "casaModerna";
 export type Lote =
   | { tipo: "vazio"; arvore?: boolean }
-  | { tipo: "casa"; modelo: ModeloCasa; rot?: number; escala?: number };
+  | { tipo: "casa"; modelo: ModeloCasa; rot?: number; escala?: number }
+  | { tipo: "praca" }; // praça de eventos (12/11/2026): não está à venda (data/praca.ts)
 
 export interface Quarteirao {
   i: number; // coluna (x)
@@ -50,7 +51,8 @@ export const QUARTEIROES: Quarteirao[] = [
   { i: 0, j: -1, lotes: [V(true), C("casaVelha", 1.05), C("casaColonial"), V()] },
   { i: 1, j: -1, lotes: [C("casaModerna", 1.05), V(), V(true), C("casaSobrado", 0.95)] },
   { i: -1, j: 1, lotes: [V(), C("casaModerna"), C("casaVelha", 0.95), V(true)] },
-  { i: 0, j: 1, lotes: [C("casaColonial", 0.95), V(true), V(), C("casaTerrea", 1.05)] },
+  // o lote 0,1,1 (ao sul da Nuvem) virou a praça de eventos e da feira de sábado em 12/11/2026
+  { i: 0, j: 1, lotes: [C("casaColonial", 0.95), { tipo: "praca" }, V(), C("casaTerrea", 1.05)] },
   { i: 1, j: 1, lotes: [C("casaVelha"), C("casaSobrado", 1.05), C("casaModerna", 0.95), V()] },
 ];
 
@@ -68,7 +70,7 @@ export const LOTE_POR_CHAVE: Record<string, LoteInfo> = Object.fromEntries(LOTES
 export const NOME_CONSTRUCAO: Record<string, string> = {
   vazio: "terreno vazio", casaVelha: "casinha antiga pra reformar", casaTerrea: "casinha térrea", casaSobrado: "sobrado moderno", casaColonial: "sobrado colonial", casaModerna: "casa moderna",
 };
-export const descricaoLote = (l: LoteInfo) => (l.lote.tipo === "vazio" ? (l.lote.arvore ? "terreno vazio com uma árvore" : "terreno vazio") : NOME_CONSTRUCAO[l.lote.modelo]);
+export const descricaoLote = (l: LoteInfo) => (l.lote.tipo === "praca" ? "praça de eventos e feira de sábado" : l.lote.tipo === "vazio" ? (l.lote.arvore ? "terreno vazio com uma árvore" : "terreno vazio") : NOME_CONSTRUCAO[l.lote.modelo]);
 
 // Nicho da empresa (vai no balão em cima do lote). O dono escolhe ao montar a marca.
 export const NICHOS: { id: string; nome: string }[] = [

@@ -45,7 +45,25 @@ export type EstiloLetreiro = "painel" | "neon" | "madeira" | "metal";
 export type PisoLote = "grama" | "deck" | "pedra" | "concreto";
 export type CercaLote = "nenhuma" | "viva" | "madeira" | "muro";
 export type ExtraLote = "bancos" | "mesas" | "vasos" | "totem" | "bandeiras" | "luzes" | "bicicletario" | "placa" | "natal";
-export interface Decoracao { giro: 0 | 1 | 2 | 3; letreiro: EstiloLetreiro; toldo: string | null; piso: PisoLote; cerca: CercaLote; arvores: number; extras: ExtraLote[] }
+// Interior personalizável (12/11/2026): cor das paredes, piso, acabamento dos móveis e quadros com a logo da empresa
+export type PisoInterior = "salas" | "madeira" | "porcelanato" | "carpete" | "cimento";
+export type MovelInterior = "branco" | "madeira" | "preto";
+export interface Interior { parede: string; piso: PisoInterior; moveis: MovelInterior; quadros: boolean; plantas: boolean }
+export const INTERIOR_PADRAO: Interior = { parede: "#F4F1EB", piso: "salas", moveis: "branco", quadros: false, plantas: true };
+export const CORES_PAREDE = ["#F4F1EB", "#E6EDF5", "#F7E3D3", "#DDEFE2", "#EAE3F5", "#FFF1C9", "#3A414D"];
+export const PISOS_INTERIOR: { id: PisoInterior; nome: string; cor: string | null }[] = [
+  { id: "salas", nome: "Uma cor por sala", cor: null }, { id: "madeira", nome: "Taco de madeira", cor: "#B98A5A" }, { id: "porcelanato", nome: "Porcelanato claro", cor: "#E9E5DE" },
+  { id: "carpete", nome: "Carpete grafite", cor: "#596574" }, { id: "cimento", nome: "Cimento queimado", cor: "#BFC3C6" },
+];
+export const MOVEIS_INTERIOR: { id: MovelInterior; nome: string; tampo: string }[] = [{ id: "branco", nome: "Branco", tampo: "#F7F7F5" }, { id: "madeira", nome: "Madeira", tampo: "#A0703C" }, { id: "preto", nome: "Preto fosco", tampo: "#2B2F36" }];
+export function limparInterior(x: unknown, base: Interior = INTERIOR_PADRAO): Interior {
+  const o = (x && typeof x === "object" ? x : {}) as Partial<Record<keyof Interior, unknown>>;
+  const parede = typeof o.parede === "string" && /^#[0-9a-fA-F]{6}$/.test(o.parede) ? o.parede.toUpperCase() : base.parede;
+  const piso = PISOS_INTERIOR.some((p) => p.id === o.piso) ? (o.piso as PisoInterior) : base.piso;
+  const moveis = MOVEIS_INTERIOR.some((m) => m.id === o.moveis) ? (o.moveis as MovelInterior) : base.moveis;
+  return { parede, piso, moveis, quadros: typeof o.quadros === "boolean" ? o.quadros : base.quadros, plantas: typeof o.plantas === "boolean" ? o.plantas : base.plantas };
+}
+export interface Decoracao { giro: 0 | 1 | 2 | 3; letreiro: EstiloLetreiro; toldo: string | null; piso: PisoLote; cerca: CercaLote; arvores: number; extras: ExtraLote[]; interior?: Interior }
 export const DECOR_PADRAO: Decoracao = { giro: 0, letreiro: "painel", toldo: null, piso: "grama", cerca: "nenhuma", arvores: 0, extras: [] };
 export const ESTILOS_LETREIRO: { id: EstiloLetreiro; nome: string; desc: string }[] = [
   { id: "painel", nome: "Painel", desc: "Painel escuro com faixa na cor da marca" },
@@ -74,7 +92,7 @@ export function limparDecor(x: unknown, base: Decoracao = DECOR_PADRAO): Decorac
   const um = <T extends string>(v: unknown, lista: { id: T }[], padrao: T) => (lista.some((l) => l.id === v) ? (v as T) : padrao);
   const toldo = o.toldo === null ? null : typeof o.toldo === "string" && /^#[0-9a-fA-F]{6}$/.test(o.toldo) ? o.toldo : o.toldo === undefined ? base.toldo : null;
   const extras = Array.isArray(o.extras) ? [...new Set(o.extras.filter((e): e is ExtraLote => EXTRAS.some((x) => x.id === e)))] : base.extras;
-  return { giro, letreiro: um(o.letreiro, ESTILOS_LETREIRO, base.letreiro), toldo, piso: um(o.piso, PISOS, base.piso), cerca: um(o.cerca, CERCAS, base.cerca), arvores: Math.max(0, Math.min(4, Math.round(Number(o.arvores ?? base.arvores)) || 0)), extras };
+  return { giro, letreiro: um(o.letreiro, ESTILOS_LETREIRO, base.letreiro), toldo, piso: um(o.piso, PISOS, base.piso), cerca: um(o.cerca, CERCAS, base.cerca), arvores: Math.max(0, Math.min(4, Math.round(Number(o.arvores ?? base.arvores)) || 0)), extras, interior: limparInterior(o.interior, base.interior ?? INTERIOR_PADRAO) };
 }
 export const TROCAS_LAYOUT_GRATIS = 3;
 export const PRECO_TROCA_LAYOUT = 9.9;

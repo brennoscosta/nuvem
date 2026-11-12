@@ -80,8 +80,8 @@ export function LuzesNatalPostes({ itens }: { itens: ItemInstancia[] }) {
 }
 
 // decoração de Natal no lote da empresa: arvorezinha na entrada e luzinhas em volta do letreiro
-export function NatalLote() {
-  return <ArvoreNatal position={[3.1, 0, -8.35]} escala={0.32} />;
+export function NatalLote({ x = 3.1 }: { x?: number }) {
+  return <ArvoreNatal position={[x, 0, -8.35]} escala={0.32} />;
 }
 export function NatalLetreiro({ y, z, largura }: { y: number; z: number; largura: number }) {
   const pontos = useMemo(() => {

@@ -11,7 +11,7 @@ import { meta } from "../../seo";
 export const metadata = meta({ titulo: "Minha equipe — WorkEnd", caminho: "/app/equipe", indexar: false });
 export const dynamic = "force-dynamic";
 
-export default async function Equipe({ searchParams }: { searchParams: Promise<{ lote?: string; membro?: string }> }) {
+export default async function Equipe({ searchParams }: { searchParams: Promise<{ lote?: string; membro?: string; aba?: string }> }) {
   const u = await usuarioAtual().catch(() => null);
   if (!u) redirect("/entrar?destino=/app/equipe");
   const sp = await searchParams;
@@ -31,7 +31,7 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
           </div>
         </section>
       ) : (
-        <EquipePainel chaveInicial={sp.lote ?? chao?.chave ?? null} membroInicial={sp.membro ?? null} />
+        <EquipePainel chaveInicial={sp.lote ?? chao?.chave ?? null} membroInicial={sp.membro ?? null} abaInicial={sp.aba === "vagas" || sp.aba === "visitantes" || sp.aba === "sobre" ? sp.aba : undefined} />
       )}
       <div className="h-16" />
       <Rodape />

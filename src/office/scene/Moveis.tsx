@@ -10,10 +10,11 @@ import type { Mesa as MesaDef } from "../data/layout";
 
 // ---------- mesa de trabalho ----------
 // Parte fixa: tampo, pés, monitor (com a tela apagada), teclado, mouse, celular, caneca e cadeira.
-export function Mesa({ def, cor }: { def: MesaDef; cor: string }) {
+// tampoCor (12/11/2026): o interior personalizável do cliente troca o acabamento das mesas comuns
+export function Mesa({ def, cor, tampoCor }: { def: MesaDef; cor: string; tampoCor?: string }) {
   const grande = def.tipo !== "comum";
   const w = grande ? 1.9 : 1.5, d = grande ? 0.9 : 0.75;
-  const tampo = def.tipo === "ceo" || def.tipo === "diretor" ? COR.madeiraEscura : COR.branco;
+  const tampo = def.tipo === "ceo" || def.tipo === "diretor" ? COR.madeiraEscura : tampoCor ?? COR.branco;
   return (
     <group position={def.pos} rotation={[0, def.rot, 0]}>
       <mesh geometry={caixa(w, 0.05, d)} material={mat(tampo, { rough: 0.6 })} position={[0, 0.72, 0]} castShadow receiveShadow />

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { usePersonagem, type Outro, type Amigo, type Negociacao } from "@/office/personagemStore";
 import { MiniAvatar, CorpoChat, LinksRedes } from "@/office/ui/Personagem";
 import { JanelaChamada } from "@/office/ui/Chamada";
+import { PainelMissoes } from "./_missoes";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
@@ -68,6 +69,7 @@ export function RedeDashboard({ nome }: { nome: string }) {
           {[["💬", "Conversar", "Chat ao vivo com quem está online; offline recebe quando entrar."], ["🤝", "Negociar", "Propostas com valor, acompanhamento até a conclusão e avaliação dos dois lados."], ["📹", "Fazer uma call", "Áudio e vídeo direto no navegador, sem instalar nada."], ["➕", "Amizade", "Amigos veem as redes sociais um do outro e ficam aqui no seu painel."]].map(([i, t, d]) => <li key={t} className="flex gap-3 rounded-2xl border border-[var(--linha)] p-4"><span className="text-2xl">{i}</span><div><div className="font-semibold">{t}</div><div className="text-sm text-[var(--tinta-2)]">{d}</div></div></li>)}
         </ul>
       </div>
+      <PainelMissoes />
     </section>
   );
   return (
@@ -86,6 +88,8 @@ export function RedeDashboard({ nome }: { nome: string }) {
           </ul>
         </div>
       )}
+
+      <PainelMissoes />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_380px]">
         <div>

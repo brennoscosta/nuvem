@@ -14,10 +14,10 @@ export const SEGUNDOS_ONLINE = 25;
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
 // Perfil profissional (11/11/2026): o que a pessoa faz, para quem procura profissionais na busca (/encontrar)
 export interface Perfil { profissao: string; nicho: string; servicos: string; preco: string; local: string; portfolio: { titulo: string; url: string }[]; disponivel: boolean }
-export interface Personagem extends Perfil { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: Date | null; x: number; z: number; rot: number; destX: number | null; destZ: number | null; vel: number; vistoEm: Date | null; criadoEm: Date }
-export interface PersonagemPublico { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino: [number, number] | null; vel: number; redes?: Redes; online: boolean; perfil?: Perfil | null; reputacao?: { media: number | null; n: number } }
+export interface Personagem extends Perfil { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: Date | null; x: number; z: number; rot: number; destX: number | null; destZ: number | null; vel: number; vistoEm: Date | null; criadoEm: Date; acessorios: string[] }
+export interface PersonagemPublico { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino: [number, number] | null; vel: number; redes?: Redes; online: boolean; perfil?: Perfil | null; reputacao?: { media: number | null; n: number }; acessorios?: string[] }
 
-const CAMPOS = () => sql`usuario_id, nome, tipo, boneco, roupa, bio, redes, mostrar_redes, pago_ate, x, z, rot, dest_x, dest_z, vel, visto_em, criado_em, profissao, nicho, servicos, preco, local, portfolio, disponivel`;
+const CAMPOS = () => sql`usuario_id, nome, tipo, boneco, roupa, bio, redes, mostrar_redes, pago_ate, x, z, rot, dest_x, dest_z, vel, visto_em, criado_em, profissao, nicho, servicos, preco, local, portfolio, disponivel, acessorios`;
 const texto = (t: unknown, max: number, padrao = "") => (typeof t === "string" ? t.trim().slice(0, max) : padrao) || padrao;
 function limparPerfil(x: unknown, atual: Partial<Perfil> | null): Perfil {
   const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
@@ -79,7 +79,7 @@ export async function presenca(usuarioId: string, pos: { x: number; z: number; r
 export async function outrosOnline(excetoId: string | null): Promise<PersonagemPublico[]> {
   await migrar();
   const lista = await sql<(Personagem & { usuarioNome: string })[]>`SELECT ${CAMPOS()} FROM personagem WHERE visto_em > now() - make_interval(secs => ${SEGUNDOS_ONLINE}) AND (pago_ate > now() OR usuario_id IN (SELECT id FROM usuario WHERE papel = 'admin')) AND usuario_id <> ${excetoId ?? ""} ORDER BY visto_em DESC LIMIT 200`;
-  return lista.map((p) => ({ usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, destino: p.destX != null && p.destZ != null ? [p.destX, p.destZ] as [number, number] : null, vel: p.vel ?? 0, redes: p.mostrarRedes ? p.redes : undefined, online: true }));
+  return lista.map((p) => ({ usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, destino: p.destX != null && p.destZ != null ? [p.destX, p.destZ] as [number, number] : null, vel: p.vel ?? 0, redes: p.mostrarRedes ? p.redes : undefined, online: true, acessorios: p.acessorios ?? [] }));
 }
 export async function personagemPublico(usuarioId: string, paraId: string | null): Promise<PersonagemPublico | null> {
   await migrar();
@@ -89,7 +89,7 @@ export async function personagemPublico(usuarioId: string, paraId: string | null
   let redes: Redes | undefined = p.mostrarRedes ? p.redes : undefined;
   if (!redes && paraId) { const [am] = await sql<{ id: string }[]>`SELECT id FROM amizade WHERE status = 'aceita' AND LEAST(de_id, para_id) = LEAST(${usuarioId}, ${paraId}) AND GREATEST(de_id, para_id) = GREATEST(${usuarioId}, ${paraId}) LIMIT 1`; if (am) redes = p.redes; }
   const [rep] = await sql<{ media: number | null; n: number }[]>`SELECT AVG(nota)::float AS media, COUNT(*)::int AS n FROM avaliacao WHERE para_id = ${usuarioId}`;
-  return { usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, destino: null, vel: 0, redes, online: !!p.vistoEm && Date.now() - new Date(p.vistoEm).getTime() < SEGUNDOS_ONLINE * 1000, perfil: perfilDe(p), reputacao: { media: rep?.media ?? null, n: rep?.n ?? 0 } };
+  return { usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, destino: null, vel: 0, redes, online: !!p.vistoEm && Date.now() - new Date(p.vistoEm).getTime() < SEGUNDOS_ONLINE * 1000, perfil: perfilDe(p), reputacao: { media: rep?.media ?? null, n: rep?.n ?? 0 }, acessorios: p.acessorios ?? [] };
 }
 
 // Busca de profissionais (11/11/2026): personagens ativos com perfil profissional, por texto, área, disponibilidade e online.

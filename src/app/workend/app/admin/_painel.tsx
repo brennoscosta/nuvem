@@ -134,8 +134,8 @@ export function PainelAdmin({ config }: { config: ConfigAdmin }) {
               {pagamentos.length === 0 && <tr><td colSpan={7} className="p-4 text-[var(--tinta-2)]">Nenhum pagamento ainda.</td></tr>}
               {pagamentos.map((p) => (
                 <tr key={p.id} className="border-t border-[var(--linha)]">
-                  <td className="p-3">{dt(p.criadoEm)}</td><td className="p-3"><LinkLote chave={p.terrenoChave} /></td><td className="p-3">{p.email}<br /><span className="text-xs text-[var(--tinta-2)]">{p.empresaNome ?? ""}</span></td>
-                  <td className="p-3">{brl(Number(p.valor))} · {p.tipo === "layout" ? "troca de prédio" : `${p.meses} mês${p.meses > 1 ? "es" : ""}`}</td>
+                  <td className="p-3">{dt(p.criadoEm)}</td><td className="p-3">{LOTE_POR_CHAVE[p.terrenoChave] ? <LinkLote chave={p.terrenoChave} /> : <span className="text-xs font-semibold text-[var(--tinta-2)]">{p.tipo === "barraca" ? "Feira de sábado" : p.tipo === "item" ? "Personagem" : p.tipo === "outdoor" ? "Outdoor" : p.tipo === "personagem" ? "Personagem" : p.terrenoChave}</span>}</td><td className="p-3">{p.email}<br /><span className="text-xs text-[var(--tinta-2)]">{p.empresaNome ?? ""}</span></td>
+                  <td className="p-3">{brl(Number(p.valor))} · {p.tipo === "layout" ? "troca de prédio" : p.tipo === "barraca" ? "barraca (1 sábado)" : p.tipo === "item" ? `roupa: ${p.terrenoChave.replace(/^item:/, "")}` : p.tipo === "outdoor" ? "outdoor 30 dias" : `${p.meses} mês${p.meses > 1 ? "es" : ""}`}</td>
                   <td className="p-3"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${p.status === "aprovado" ? "bg-[#E3F6EA] text-[#1B8A4C]" : p.status === "pendente" ? "bg-[#FFF4D6] text-[#7A5A00]" : "bg-[#FDE8E8] text-[#8A2A2A]"}`}>{p.status}</span>{p.status === "pendente" && <button onClick={() => fetch(`/api/pagamentos/${p.id}`, { method: "POST" }).then(carregar)} className="ml-2 text-xs underline">conferir</button>}</td>
                   <td className="p-3">{p.metodo ?? "—"}</td><td className="p-3 text-xs">{p.pagamentoId ?? "—"}</td>
                 </tr>

@@ -100,3 +100,11 @@
 .we .busca-cartao { animation: equipe-entra .4s cubic-bezier(.2,.8,.2,1) both; transition: transform .2s ease, box-shadow .2s ease; }
 .we .busca-cartao:hover { transform: translateY(-3px); box-shadow: 0 18px 40px -24px rgba(22,28,37,.45); }
 @media (prefers-reduced-motion: reduce) { .we .busca-grade, .we .busca-cartao { animation: none; } .we .busca-cartao:hover { transform: none; } }
+
+/* Missões de visitante (12/11/2026): a barra enche ao entrar e o selo conquistado tem um brilho que passa */
+.we .missao-barra { transform-origin: left; animation: missao-barra .9s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes missao-barra { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.we .selo-ganho { position: relative; overflow: hidden; }
+.we .selo-ganho::after { content: ""; position: absolute; inset: -30%; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.75) 50%, transparent 60%); animation: selo-brilho 3.6s ease-in-out infinite; }
+@keyframes selo-brilho { 0%, 55% { transform: translateX(-70%); } 100% { transform: translateX(70%); } }
+@media (prefers-reduced-motion: reduce) { .we .missao-barra, .we .selo-ganho::after { animation: none; } }

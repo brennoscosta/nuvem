@@ -83,6 +83,8 @@ function irPara(x: Ctx, e: MouseEvent, el: HTMLElement) {
 }
 
 const frenteV = new THREE.Vector3(), ladoV = new THREE.Vector3(), mov = new THREE.Vector3();
+// para onde a câmera olha (alvo no chão e direção), lido pelo mini-mapa a cada quadro (12/11/2026)
+export const cameraInfo = { x: 0, z: 0, ang: 0, pronto: false };
 function quadro(x: Ctx, dt: number) {
   const { c, camera } = x; const t = c.target; let mudou = false;
   // animação em andamento
@@ -119,6 +121,7 @@ function quadro(x: Ctx, dt: number) {
     mudou = true;
   }
   if (mudou) c.update();
+  cameraInfo.x = t.x; cameraInfo.z = t.z; cameraInfo.ang = Math.atan2(t.x - camera.position.x, t.z - camera.position.z); cameraInfo.pronto = true;
 }
 
 export function CameraMundo({ controles, inicio }: { controles: React.RefObject<Controles | null>; inicio: { pos: THREE.Vector3; alvo: THREE.Vector3 } }) {

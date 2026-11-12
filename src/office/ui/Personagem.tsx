@@ -1,19 +1,39 @@
 "use client";
 // UI do personagem: montar/pagar (nome, gênero, tipo, bio, redes), ficha de outro personagem com as opções
-// (conversar, negociar, fazer uma call, amizade), chat (com propostas) e caixa de entrada.
-import { useEffect, useRef, useState } from "react";
+// (conversar, negociar, fazer uma call, amizade), chat (com propostas) e caixa de entrada. Desde 12/11/2026: loja de
+// roupas e acessórios do personagem (Pix por item) e os selos das missões de visitante na ficha.
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
 import { usePersonagem, type Redes, type Outro, type Mensagem, type Perfil } from "../personagemStore";
 import { NICHOS } from "../data/mundo";
 import { useMundo } from "../mundoStore";
 import { TIPOS_AVATAR, TODOS_BONECOS, type Genero } from "../data/bonecos";
 import { PixAberto } from "./Lote";
+import { ACESSORIOS, ACESSORIO_POR_ID, type LugarAcessorio } from "../data/acessorios";
+import { MISSAO_POR_ID, type Missao } from "../data/missoes";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR");
 
-// Mini avatar em CSS (pele, cabelo, roupa)
-export function MiniAvatar({ boneco, roupa, tamanho = 40 }: { boneco: string; roupa: string; tamanho?: number }) {
+// Mini avatar em CSS (pele, cabelo, roupa); com acessórios, o ícone de cada um aparece no lugar dele
+const POS_ICONE: Record<LugarAcessorio, (t: number) => CSSProperties> = {
+  cabeca: (t) => ({ left: "50%", top: -t * 0.2, transform: "translateX(-50%)", fontSize: t * 0.42 }),
+  rosto: (t) => ({ left: "50%", top: t * 0.2, transform: "translateX(-50%)", fontSize: t * 0.3 }),
+  pescoco: (t) => ({ left: "50%", top: t * 0.56, transform: "translateX(-50%)", fontSize: t * 0.28 }),
+  costas: (t) => ({ right: -t * 0.14, bottom: -t * 0.04, fontSize: t * 0.32 }),
+};
+export function MiniAvatar({ boneco, roupa, tamanho = 40, acessorios }: { boneco: string; roupa: string; tamanho?: number; acessorios?: string[] }) {
+  const usados = (acessorios ?? []).map((i) => ACESSORIO_POR_ID[i]).filter(Boolean);
+  const avatar = <AvatarCss boneco={boneco} roupa={roupa} tamanho={tamanho} />;
+  if (!usados.length) return avatar;
+  return (
+    <span className="relative inline-block shrink-0" style={{ width: tamanho, height: tamanho }}>
+      {avatar}
+      {usados.map((a) => <span key={a.id} aria-hidden className="pointer-events-none absolute select-none leading-none" style={POS_ICONE[a.lugar](tamanho)}>{a.icone}</span>)}
+    </span>
+  );
+}
+function AvatarCss({ boneco, roupa, tamanho }: { boneco: string; roupa: string; tamanho: number }) {
   const b = TODOS_BONECOS[boneco] ?? TODOS_BONECOS.classico;
   const semCamisa = b.traje === "semCamisa" || b.traje === "biquini";
   return (
@@ -87,7 +107,8 @@ export function PainelPersonagem() {
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
-        <div className="flex items-center gap-3 rounded-2xl bg-[#F1F3F6] p-3"><MiniAvatar boneco={tipo.boneco} roupa={tipo.roupa} tamanho={56} /><div><div className="font-bold">{tipo.nome}</div><div className="text-xs text-[#5B6472]">{tipo.genero} · {tipo.estilo}</div></div></div>
+        <div className="flex items-center gap-3 rounded-2xl bg-[#F1F3F6] p-3"><MiniAvatar boneco={tipo.boneco} roupa={tipo.roupa} tamanho={56} acessorios={meu?.acessorios} /><div><div className="font-bold">{tipo.nome}</div><div className="text-xs text-[#5B6472]">{tipo.genero} · {tipo.estilo}</div></div></div>
+        {meu && <MeusSelos />}
         <label className="mt-3 block text-xs font-semibold text-[#5B6472]">Nome no balãozinho<input value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value.slice(0, 24) })} placeholder="Ex.: Bia" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal outline-none focus:border-[#1D4ED8]" /></label>
         <div className="mt-3 text-xs font-semibold text-[#5B6472]">Gênero</div>
         <div className="mt-1 flex gap-1.5">{(["todos", "feminino", "masculino", "neutro"] as const).map((g) => <button key={g} onClick={() => setGenero(g)} className={`rounded-full px-3 py-1 text-xs font-semibold ${genero === g ? "bg-[#1D4ED8] text-white" : "bg-[#F1F3F6] text-[#5B6472]"}`}>{g === "todos" ? "Todos" : g[0].toUpperCase() + g.slice(1)}</button>)}</div>
@@ -104,6 +125,7 @@ export function PainelPersonagem() {
         </div>
         <label className="mt-2 flex items-center gap-2 text-xs text-[#5B6472]"><input type="checkbox" checked={f.mostrarRedes} onChange={(e) => setF({ ...f, mostrarRedes: e.target.checked })} /> Mostrar minhas redes pra todo mundo (senão só pra quem eu aceitar)</label>
         <CamposPerfil perfil={f.perfil} aberto={abrirPerfil} abrir={() => setAbrirPerfil(true)} mudar={(p) => setF({ ...f, perfil: { ...f.perfil, ...p } })} />
+        {meu && <LojaAcessorios boneco={tipo.boneco} roupa={tipo.roupa} />}
         {!ativo && (
           <div className="mt-3 rounded-2xl border border-[#16A34A]/30 bg-[#F3FBF5] p-3">
             <div className="text-sm"><span className="text-[#5B6472] line-through">{brl(precoCheio)}</span> <b className="text-lg text-[#166534]">{brl(preco)}</b><span className="text-xs text-[#5B6472]">/mês · promoção de lançamento</span></div>
@@ -164,9 +186,10 @@ export function FichaPersonagem() {
   return (
     <div className={`${FLUTUANTE} ${ESTREITO} painel-entra overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3"><MiniAvatar boneco={p.boneco} roupa={p.roupa} tamanho={48} /><div><div className="text-lg font-bold leading-tight">{p.nome}</div><div className="text-xs text-[#5B6472]">{p.online ? <span className="text-[#16A34A]">● online agora</span> : "offline"}{souEu && " · você"}{rel === "amigos" && <span className="ml-1.5 rounded-full bg-[#FDE8F3] px-1.5 py-0.5 text-[10px] font-bold text-[#9D174D]">amigos</span>}</div></div></div>
+        <div className="flex items-center gap-3"><MiniAvatar boneco={p.boneco} roupa={p.roupa} tamanho={48} acessorios={p.acessorios} /><div><div className="text-lg font-bold leading-tight">{p.nome}</div><div className="text-xs text-[#5B6472]">{p.online ? <span className="text-[#16A34A]">● online agora</span> : "offline"}{souEu && " · você"}{rel === "amigos" && <span className="ml-1.5 rounded-full bg-[#FDE8F3] px-1.5 py-0.5 text-[10px] font-bold text-[#9D174D]">amigos</span>}</div></div></div>
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
       </div>
+      {ficha?.selos && ficha.selos.length > 0 && <Selos ids={ficha.selos} />}
       {ficha?.perfil && <PerfilNaFicha perfil={ficha.perfil} reputacao={ficha.reputacao} />}
       {!ficha?.perfil && ficha?.reputacao && ficha.reputacao.n > 0 && <div className="mt-1 text-xs font-semibold text-[#7A5A00]">★ {ficha.reputacao.media?.toFixed(1).replace(".", ",")} · {ficha.reputacao.n} {ficha.reputacao.n === 1 ? "avaliação" : "avaliações"}</div>}
       {p.bio && <p className="mt-2 text-sm text-[#1D2128]">{p.bio}</p>}
@@ -193,6 +216,108 @@ export function FichaPersonagem() {
 }
 
 const PERFIL_VAZIO: Perfil = { profissao: "", nicho: "", servicos: "", preco: "", local: "", portfolio: [], disponivel: true };
+
+// Selos das missões de visitante (12/11/2026): medalhas com o nome, na ficha de quem conquistou
+export function Selos({ ids }: { ids: string[] }) {
+  const lista = ids.map((i) => MISSAO_POR_ID[i]).filter(Boolean);
+  if (!lista.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1" aria-label="Selos conquistados">
+      {lista.map((m) => <span key={m.id} title={`${m.nome}: ${m.desc}`} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm" style={{ background: m.cor }}><span className="text-[11px]">{m.selo}</span>{m.nome}</span>)}
+    </div>
+  );
+}
+
+// Meus selos no painel do personagem: os conquistados coloridos, os outros apagados com o progresso
+type MissaoProgresso = Missao & { feito: number; completa: boolean };
+function MeusSelos() {
+  const [lista, setLista] = useState<MissaoProgresso[] | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/workend/missoes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).then((j) => { if (vivo && Array.isArray(j)) setLista(j as MissaoProgresso[]); }).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+  if (!lista?.length) return null;
+  const feitas = lista.filter((m) => m.completa).length;
+  const proxima = lista.find((m) => !m.completa);
+  return (
+    <div className="mt-2 rounded-2xl bg-[#F7F8FA] p-3">
+      <div className="flex items-center justify-between"><div className="text-xs font-semibold text-[#5B6472]">Meus selos</div><div className="text-[11px] font-semibold text-[#5B6472]">{feitas} de {lista.length}</div></div>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {lista.map((m) => <span key={m.id} title={`${m.nome}: ${m.desc} (${m.feito}/${m.meta})`} className={`flex h-9 w-9 items-center justify-center rounded-full text-base ${m.completa ? "shadow-sm" : "opacity-40 grayscale"}`} style={{ background: m.completa ? m.cor : "#E3E6EA" }}>{m.selo}</span>)}
+      </div>
+      <div className="mt-1.5 text-[11px] text-[#5B6472]">{proxima ? <>Próximo: <b className="text-[#1D2128]">{proxima.nome}</b> · {proxima.desc} ({proxima.feito}/{proxima.meta})</> : "Você conquistou todos os selos! 🎉"} Os selos aparecem na sua ficha para todo mundo.</div>
+    </div>
+  );
+}
+
+// Loja de roupas e acessórios do personagem (12/11/2026): um item por lugar; comprado fica na conta para sempre
+const LUGARES: [LugarAcessorio, string][] = [["cabeca", "Cabeça"], ["rosto", "Rosto"], ["costas", "Costas"], ["pescoco", "Pescoço"]];
+function LojaAcessorios({ boneco, roupa }: { boneco: string; roupa: string }) {
+  const itens = usePersonagem((s) => s.itens);
+  const carregarItens = usePersonagem((s) => s.carregarItens);
+  const vestir = usePersonagem((s) => s.vestir);
+  const comprar = usePersonagem((s) => s.comprarItem);
+  const ativo = usePersonagem((s) => s.ativo);
+  const pagamentoLigado = usePersonagem((s) => s.pagamentoLigado);
+  const pix = useMundo((s) => s.pix);
+  const [aberto, setAberto] = useState(false);
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  useEffect(() => { void carregarItens(); }, [carregarItens]);
+  const comprados = itens?.comprados ?? [], usando = itens?.usando ?? [];
+  const pixItem = pix?.tipo === "item" ? pix.lote : null;
+  const mostrar = aberto || (!!pixItem && pix?.status === "pendente");
+  const precoMin = Math.min(...ACESSORIOS.map((a) => a.preco));
+  const agir = async (id: string) => {
+    setErro(null); setOcupado(id);
+    const a = ACESSORIO_POR_ID[id];
+    let e: string | null;
+    if (!comprados.includes(id)) e = pagamentoLigado ? await comprar(id) : "Pagamento em instantes: estamos ligando o Mercado Pago.";
+    else if (usando.includes(id)) e = await vestir(usando.filter((x) => x !== id));
+    else e = await vestir([id, ...usando.filter((x) => ACESSORIO_POR_ID[x]?.lugar !== a.lugar)]);
+    setOcupado(null); if (e) setErro(e);
+  };
+  return (
+    <div className="mt-3 rounded-2xl border border-[#7C3AED]/20 bg-[#FAF7FF] p-3">
+      <button type="button" onClick={() => setAberto(!mostrar)} className="flex w-full items-center gap-3 text-left">
+        <MiniAvatar boneco={boneco} roupa={roupa} tamanho={44} acessorios={usando} />
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-[#7C3AED]">Roupas e acessórios</div>
+          <div className="text-xs text-[#5B6472]">{comprados.length ? `${comprados.length} na sua conta · ${usando.length} em uso` : `Boné, óculos, mochila, coroa… a partir de ${brl(precoMin)}, no Pix`}</div>
+        </div>
+        <span className="text-sm text-[#7C3AED]">{mostrar ? "▴" : "▾"}</span>
+      </button>
+      {mostrar && (
+        <div className="mt-2 space-y-2">
+          {LUGARES.map(([lugar, nome]) => (
+            <div key={lugar}>
+              <div className="text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">{nome} <span className="font-normal normal-case">· um por vez</span></div>
+              <div className="mt-1 grid grid-flow-row-dense grid-cols-2 gap-1.5">
+                {ACESSORIOS.filter((a) => a.lugar === lugar).map((a) => {
+                  const tem = comprados.includes(a.id), uso = usando.includes(a.id), chave = `item:${a.id}`;
+                  return (
+                    <Fragment key={a.id}>
+                    <div className={`flex items-center gap-2 rounded-xl border-2 p-1.5 ${uso ? "border-[#7C3AED] bg-white" : "border-transparent bg-white/70"}`}>
+                      <span className="text-2xl leading-none">{a.icone}</span>
+                      <div className="min-w-0 flex-1"><div className="truncate text-[11px] font-bold">{a.nome}</div><div className="text-[10px] text-[#5B6472]">{uso ? "usando ✓" : tem ? "na sua conta" : brl(a.preco)}</div></div>
+                      <button type="button" onClick={() => agir(a.id)} disabled={ocupado === a.id || (pixItem === chave && pix?.status === "pendente")} className={`rounded-lg px-2 py-1 text-[10px] font-bold disabled:opacity-50 ${tem ? (uso ? "bg-[#F1F3F6] text-[#5B6472]" : "bg-[#7C3AED] text-white") : "bg-[#16A34A] text-white"}`}>{ocupado === a.id ? "…" : tem ? (uso ? "Tirar" : "Usar") : "Comprar"}</button>
+                    </div>
+                    {pixItem === chave && <div className="col-span-2"><PixAberto chave={chave} /></div>}
+                    </Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {!ativo && <div className="rounded-xl bg-[#FFF4D6] px-3 py-2 text-[11px] text-[#7A5A00]">Você já pode comprar; os itens aparecem no mapa quando o seu personagem estiver ativo.</div>}
+          <div className="text-[11px] text-[#5B6472]">Comprou, é seu para sempre: troque quando quiser, sem pagar de novo. Quem passa por você no mapa vê o visual novo.</div>
+        </div>
+      )}
+      {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
+    </div>
+  );
+}
 
 // Perfil profissional no formulário do personagem (11/11/2026): quem procura profissionais acha você em /encontrar
 function CamposPerfil({ perfil, aberto, abrir, mudar }: { perfil: Perfil; aberto: boolean; abrir: () => void; mudar: (p: Partial<Perfil>) => void }) {

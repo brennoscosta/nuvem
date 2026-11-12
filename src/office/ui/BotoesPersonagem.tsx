@@ -19,7 +19,7 @@ export function BotoesPersonagem() {
     <div className="flex items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0">
       {ativo && meu ? (
         <>
-          <button onClick={irCamera} title="Centralizar em mim" className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white"><MiniAvatar boneco={meu.boneco} roupa={meu.roupa} tamanho={18} />{meu.nome}</button>
+          <button onClick={irCamera} title="Centralizar em mim" className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white"><MiniAvatar boneco={meu.boneco} roupa={meu.roupa} tamanho={18} acessorios={meu.acessorios} />{meu.nome}</button>
           <button onClick={() => abrir("caixa")} className="relative rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">Conversas{naoLidas > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-[#E2575B] px-1.5 text-[10px] font-bold text-white">{naoLidas}</span>}</button>
           <a href="/app/rede" className="relative rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">Minha rede{pedidos > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-[#DB2777] px-1.5 text-[10px] font-bold text-white">{pedidos}</span>}</a>
           <button onClick={() => abrir("montar")} className="rounded-full bg-white/10 px-2.5 py-1.5 text-xs text-white/60" title="Editar personagem">✎</button>

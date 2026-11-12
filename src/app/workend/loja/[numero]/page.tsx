@@ -1,11 +1,14 @@
 // Página pública da loja (11/11/2026): o endereço da empresa no WorkEnd para divulgar (workend.online/loja/N). Mostra o
 // que a empresa faz, contatos, equipe, avaliações de quem já negociou e a conversa com a atendente de IA.
+// Desde 12/11/2026 mostra também as vagas abertas ("Estamos contratando", com candidatura).
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
 import { lojaPublica } from "@/server/equipeCliente";
 import { avaliacoesRecebidas } from "@/server/rede";
+import { vagasAbertas } from "@/server/cidade";
+import { ListaVagas, type VagaLista } from "../../_vagas";
 import { Topo, Rodape } from "../../_partes";
 import { meta } from "../../seo";
 import { ConversaDaLoja } from "./_conversa";
@@ -28,7 +31,8 @@ export default async function Loja({ params }: Props) {
   const l = await carregar(numero);
   if (!l) notFound();
   const u = await usuarioAtual().catch(() => null);
-  const avals = await avaliacoesRecebidas(l.donoId, 6).catch(() => []);
+  const [avals, vagasBrutas] = await Promise.all([avaliacoesRecebidas(l.donoId, 6).catch(() => []), vagasAbertas({ donoId: l.donoId }).catch(() => [])]);
+  const vagas: VagaLista[] = vagasBrutas.map((v) => ({ ...v, criadoEm: new Date(v.criadoEm).toISOString() }));
   const ehDono = u?.id === l.donoId;
   return (
     <>
@@ -46,6 +50,7 @@ export default async function Loja({ params }: Props) {
           </div>
           <div className="relative mt-6 flex flex-wrap gap-2">
             <Link href={`/mundo?lote=${encodeURIComponent(l.chave)}`} className="btn" style={{ background: "#fff", color: "var(--ink)" }}>Ver no mapa 3D</Link>
+            {vagas.length > 0 && <a href="#vagas" className="btn border-white/40 bg-white/10" style={{ color: "#fff" }}><span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-[#FFD24A]" aria-hidden="true" />Estamos contratando · {vagas.length} {vagas.length === 1 ? "vaga" : "vagas"}</a>}
             {ehDono && <Link href="/app/equipe" className="btn border-white/40 bg-white/10" style={{ color: "#fff" }}>Esta é a sua loja · Minha equipe</Link>}
           </div>
         </section>
@@ -56,6 +61,15 @@ export default async function Loja({ params }: Props) {
               <h2 className="text-[1.5rem]">O que a {l.nome} faz</h2>
               {l.sobre ? <p className="mt-3 max-w-[62ch] whitespace-pre-line text-[17px] leading-relaxed">{l.sobre}</p> : <p className="mt-3 text-[var(--tinta-2)]">A empresa ainda não escreveu a apresentação. Pergunte à atendente ao lado.</p>}
             </section>
+            {vagas.length > 0 && (
+              <section id="vagas" className="scroll-mt-6">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="text-[1.5rem]">Estamos contratando</h2>
+                  <span className="text-sm text-[var(--tinta-2)]">{vagas.length} {vagas.length === 1 ? "vaga aberta" : "vagas abertas"} · <a href="/encontrar?tipo=vagas" className="font-semibold text-[var(--azul)] hover:underline">ver vagas de outras empresas</a></span>
+                </div>
+                <ListaVagas vagas={vagas} logado={!!u} destino={`/loja/${l.numero}#vagas`} mostrarEmpresa={false} ehDono={ehDono} />
+              </section>
+            )}
             {l.equipe.length > 0 && (
               <section>
                 <h2 className="text-[1.3rem]">Quem trabalha aqui</h2>

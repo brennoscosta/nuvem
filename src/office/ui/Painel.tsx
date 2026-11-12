@@ -16,6 +16,8 @@ import { MenuAgente } from "./MenuAgente";
 import { Mural } from "./Mural";
 import { ModalLogin, CartaoPublico } from "./Login";
 import { CartaoLote, PainelEmpresa, ContaWorkend, AvisoPagamento } from "./Lote";
+import { CartaoPraca, AvisoEventos } from "./Praca";
+import { MiniMapa } from "./MiniMapa";
 import { useMundo, modoMundo } from "../mundoStore";
 import Link from "next/link";
 import { Logotipo } from "@/app/workend/_marca";
@@ -270,6 +272,7 @@ export function Painel() {
       <MuralSeNuvem />
       <PainelOuCartao />
       <CartaoLote />
+      <CartaoPraca />
       <CartaoOutdoor />
       <PainelEmpresa />
       <PainelEscritorio />
@@ -279,6 +282,8 @@ export function Painel() {
       <CaixaPersonagem />
       <JanelaChamada />
       <AvisoPagamento />
+      <AvisoEventos />
+      <MiniMapa />
       <ModalLogin />
       <ModalContratar />
       <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2">

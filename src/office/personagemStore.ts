@@ -10,9 +10,9 @@ import { useChamada, type ChamadaInfo } from "./chamadaStore";
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
 // perfil profissional (11/11/2026): aparece na ficha e na busca de profissionais
 export interface Perfil { profissao: string; nicho: string; servicos: string; preco: string; local: string; portfolio: { titulo: string; url: string }[]; disponivel: boolean }
-export interface MeuPersonagem extends Partial<Perfil> { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: string | null; x: number; z: number; rot: number }
+export interface MeuPersonagem extends Partial<Perfil> { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: string | null; x: number; z: number; rot: number; acessorios?: string[] }
 export type StatusRelacao = "nenhuma" | "pedi" | "pediram" | "amigos" | "recusada";
-export interface Outro { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number; redes?: Redes; online: boolean; relacao?: { status: StatusRelacao; id: string | null }; perfil?: Perfil | null; reputacao?: { media: number | null; n: number } }
+export interface Outro { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number; redes?: Redes; online: boolean; relacao?: { status: StatusRelacao; id: string | null }; perfil?: Perfil | null; reputacao?: { media: number | null; n: number }; acessorios?: string[]; selos?: string[] }
 export interface Amigo { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; redes: Redes; online: boolean; desde: string }
 export interface Pedido { id: string; usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; criadoEm: string; direcao: "recebido" | "enviado" }
 export interface Negociacao { id: string; deId: string; paraId: string; titulo: string; texto: string; valor: number | null; status: string; criadoEm: string; respondidoEm: string | null; outroId: string; outroNome: string; outroBoneco: string; outroRoupa: string; concluidaPor?: string | null; minhaNota?: number | null }
@@ -36,6 +36,11 @@ interface Estado {
   mensagens: Mensagem[];
   conversas: Conversa[];
   erro: string | null;
+  // roupas e acessórios (12/11/2026): o que comprei e o que estou usando (um por lugar)
+  itens: { comprados: string[]; usando: string[] } | null;
+  carregarItens: () => Promise<void>;
+  vestir: (usando: string[]) => Promise<string | null>;
+  comprarItem: (id: string) => Promise<string | null>;
   carregar: () => Promise<void>;
   salvar: (d: { nome: string; tipo: string; bio: string; redes: Redes; mostrarRedes: boolean; perfil?: Perfil }) => Promise<string | null>;
   pagar: (meses?: number) => Promise<string | null>;
@@ -65,7 +70,30 @@ export const minhaPos = { x: 0, z: 21.3, rot: 0, vel: 0 };
 let batidaPendente: ReturnType<typeof setTimeout> | null = null;
 
 export const usePersonagem = create<Estado>((set, get) => ({
-  carregado: false, meu: null, ativo: false, preco: 5.9, precoCheio: 19.9, pagamentoLigado: false, outros: [], naoLidas: 0, pedidos: 0, amigos: [], listaPedidos: [], negociacoes: [], destino: null, passeio: false, posicao: [0, 21.3, 0], painel: null, outroSelecionado: null, mensagens: [], conversas: [], erro: null,
+  carregado: false, meu: null, ativo: false, preco: 5.9, precoCheio: 19.9, pagamentoLigado: false, outros: [], naoLidas: 0, pedidos: 0, amigos: [], listaPedidos: [], negociacoes: [], destino: null, passeio: false, posicao: [0, 21.3, 0], painel: null, outroSelecionado: null, mensagens: [], conversas: [], erro: null, itens: null,
+
+  carregarItens: async () => {
+    const r = await fetch("/api/workend/itens", { cache: "no-store" }).catch(() => null);
+    const j = r?.ok ? await r.json().catch(() => null) : null;
+    if (j) set({ itens: { comprados: j.comprados ?? [], usando: j.usando ?? [] } });
+  },
+  vestir: async (usando) => {
+    const r = await fetch("/api/workend/itens", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ usando }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return j.erro ?? `Erro ${r.status}`;
+    const lista: string[] = j.usando ?? [];
+    const { meu, itens } = get();
+    set({ meu: meu ? { ...meu, acessorios: lista } : meu, itens: { comprados: itens?.comprados ?? [], usando: lista } });
+    return null;
+  },
+  // Pix da roupa: reaproveita o painel de Pix do mapa (chave "item:<id>"); aprovado, o servidor já veste o item
+  comprarItem: async (id) => {
+    const r = await fetch("/api/workend/itens", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ comprar: id }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return j.erro ?? `Erro ${r.status}`;
+    useMundo.getState().abrirPix({ id: j.id, lote: `item:${id}`, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: "pendente", tipo: "item" });
+    return null;
+  },
 
   carregar: async () => {
     try {
@@ -170,4 +198,11 @@ export const usePersonagem = create<Estado>((set, get) => ({
 }));
 
 export type { TipoAvatar };
-if (typeof window !== "undefined") (window as unknown as { __personagem: typeof usePersonagem }).__personagem = usePersonagem;
+if (typeof window !== "undefined") {
+  (window as unknown as { __personagem: typeof usePersonagem }).__personagem = usePersonagem;
+  // Pix de roupa aprovado (em qualquer tela do mapa): recarrega o personagem, que já vem vestido com o item novo
+  useMundo.subscribe((s, antes) => {
+    const p = s.pix;
+    if (p?.tipo === "item" && p.status === "aprovado" && !(antes.pix?.id === p.id && antes.pix.status === "aprovado")) { void usePersonagem.getState().carregar(); void usePersonagem.getState().carregarItens(); }
+  });
+}

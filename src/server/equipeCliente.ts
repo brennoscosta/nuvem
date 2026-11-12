@@ -285,7 +285,8 @@ export async function conversaDeVisitante(u: Usuario, chave: string | null, visi
 async function lojaPorNumero(numero: number) {
   const l = LOTES.find((x) => x.numero === numero);
   if (!l) throw new ErroHttp("Loja não encontrada.", 404);
-  const t = await obterTerreno(l.chave);
+  let t = await obterTerreno(l.chave);
+  if (t?.anexoDe) t = await obterTerreno(t.anexoDe); // lote duplo: a ampliação mostra a loja principal
   if (!t || t.status !== "ativo") throw new ErroHttp("Esta loja não está aberta agora.", 404);
   const empId = await garantirEmpresaDoLote(t);
   return { t, empId, numero };
@@ -352,7 +353,7 @@ export async function buscarEmpresas(f: { q?: string | null; nicho?: string | nu
   const lotes = await sql<{ chave: string; usuarioId: string; empresaNome: string; cor: string; nicho: string; temLogo: boolean; email: string; papel: Usuario["papel"]; escritorio: Terreno["escritorio"] }[]>`
     SELECT t.chave, t.usuario_id, t.empresa_nome, t.cor, t.nicho, (t.logo IS NOT NULL) AS tem_logo, t.escritorio, u.email, u.papel
     FROM terreno t JOIN usuario u ON u.id = t.usuario_id
-    WHERE t.status = 'ativo' AND u.banido_em IS NULL AND (${f.nicho ?? null}::text IS NULL OR t.nicho = ${f.nicho ?? null})`;
+    WHERE t.status = 'ativo' AND t.anexo_de IS NULL AND u.banido_em IS NULL AND (${f.nicho ?? null}::text IS NULL OR t.nicho = ${f.nicho ?? null})`;
   if (!lotes.length) return [];
   const empIds = lotes.map((l) => empresaIdDe(l.usuarioId, l.chave, ehAdmin({ email: l.email, papel: l.papel } as Usuario)));
   const emps = await sql<{ id: string; sobre: string; contatos: Contatos }[]>`SELECT id, sobre, contatos FROM empresa WHERE id = ANY(${sql.array(empIds)})`;

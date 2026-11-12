@@ -2,8 +2,10 @@
 // Minha equipe (11/11/2026): o dono conversa com cada pessoa da equipe de IA do lote, aprova ou corrige as respostas
 // (a correção vira regra), pede o relatório da semana ao CEO, lê as conversas dos visitantes da loja e escreve o
 // "Sobre a empresa" que a equipe e a página pública usam. Dados: /api/workend/equipe* (src/server/equipeCliente.ts).
+// Aba Vagas (12/11/2026): o dono abre vagas e lê as candidaturas (src/server/cidade.ts).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { VagasDono } from "./_vagas-dono";
 
 type Regra = { id: string; texto: string };
 type Membro = {
@@ -69,10 +71,11 @@ function Texto({ t }: { t: string }) {
   );
 }
 
-export function EquipePainel({ chaveInicial, membroInicial }: { chaveInicial: string | null; membroInicial: string | null }) {
+type AbaEquipe = "conversas" | "visitantes" | "vagas" | "sobre";
+export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chaveInicial: string | null; membroInicial: string | null; abaInicial?: AbaEquipe }) {
   const [p, setP] = useState<Painel | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [aba, setAba] = useState<"conversas" | "visitantes" | "sobre">("conversas");
+  const [aba, setAba] = useState<AbaEquipe>(abaInicial ?? "conversas");
   const [sel, setSel] = useState<string | null>(membroInicial);
   const lote = p?.lote.chave ?? chaveInicial;
   const q = lote ? `lote=${encodeURIComponent(lote)}` : "";
@@ -120,9 +123,9 @@ export function EquipePainel({ chaveInicial, membroInicial }: { chaveInicial: st
         </button>
       </section>
 
-      <nav className="mt-7 flex gap-1 rounded-xl bg-[var(--surface-dim)] p-1 text-sm font-semibold sm:w-max" aria-label="Seções da equipe">
-        {([["conversas", "Conversas com a equipe"], ["visitantes", `Visitantes (${p.visitantes.total})`], ["sobre", "Sobre a empresa"]] as const).map(([k, t]) => (
-          <button key={k} type="button" onClick={() => setAba(k)} className={`flex-1 rounded-lg px-3 py-2 transition sm:flex-none ${aba === k ? "bg-[var(--surface)] shadow" : "text-[var(--tinta-2)] hover:text-[var(--tinta)]"}`}>{t}</button>
+      <nav className="sem-barra mt-7 flex gap-1 overflow-x-auto rounded-xl bg-[var(--surface-dim)] p-1 text-sm font-semibold sm:w-max" aria-label="Seções da equipe">
+        {([["conversas", "Conversas com a equipe"], ["visitantes", `Visitantes (${p.visitantes.total})`], ["vagas", "Vagas"], ["sobre", "Sobre a empresa"]] as const).map(([k, t]) => (
+          <button key={k} type="button" onClick={() => setAba(k)} className={`flex-1 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 transition sm:flex-none ${aba === k ? "bg-[var(--surface)] shadow" : "text-[var(--tinta-2)] hover:text-[var(--tinta)]"}`}>{t}</button>
         ))}
       </nav>
 
@@ -134,6 +137,7 @@ export function EquipePainel({ chaveInicial, membroInicial }: { chaveInicial: st
 
       {aba === "conversas" && membro && <Conversas p={p} membro={membro} q={q} selecionar={setSel} recarregar={carregar} />}
       {aba === "visitantes" && <Visitantes q={q} />}
+      {aba === "vagas" && <VagasDono empresa={p.lote.empresaNome} numero={p.lote.numero} />}
       {aba === "sobre" && <Sobre p={p} lote={p.lote.chave} salvo={carregar} />}
     </div>
   );

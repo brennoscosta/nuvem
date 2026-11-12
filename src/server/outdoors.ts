@@ -17,7 +17,7 @@ export async function listarOutdoors(euId: string | null): Promise<OutdoorPublic
       (o.pago_ate > now()) AS ativo, (o.reservado_ate > now()) AS reservado,
       t.empresa_nome, t.cor, t.nicho, t.chave, (t.logo IS NOT NULL) AS tem_logo
     FROM outdoor o
-    LEFT JOIN LATERAL (SELECT * FROM terreno x WHERE x.usuario_id = o.usuario_id AND x.status = 'ativo' ORDER BY (x.chave = o.terreno_chave) DESC LIMIT 1) t ON true`;
+    LEFT JOIN LATERAL (SELECT * FROM terreno x WHERE x.usuario_id = o.usuario_id AND x.status = 'ativo' AND x.anexo_de IS NULL ORDER BY (x.chave = o.terreno_chave) DESC LIMIT 1) t ON true`;
   return OUTDOORS.map((v) => {
     const o = linhas.find((l) => l.slot === v.id);
     const ativo = !!o?.ativo && !!o.chave;

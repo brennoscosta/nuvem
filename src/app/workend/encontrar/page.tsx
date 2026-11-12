@@ -6,7 +6,7 @@ import { CabecalhoApp } from "../_cabecalho";
 import { meta } from "../seo";
 import { Busca } from "./_busca";
 
-export const metadata = meta({ titulo: "Encontrar profissionais e empresas — WorkEnd", descricao: "Ache profissionais disponíveis e empresas com endereço no mapa 3D do WorkEnd. Converse, peça orçamento e feche negócio com avaliação dos dois lados.", caminho: "/encontrar" });
+export const metadata = meta({ titulo: "Encontrar profissionais e empresas — WorkEnd", descricao: "Ache profissionais disponíveis, empresas com endereço no mapa 3D do WorkEnd e vagas abertas. Converse, peça orçamento, candidate-se e feche negócio com avaliação dos dois lados.", caminho: "/encontrar" });
 export const dynamic = "force-dynamic";
 
 export default async function Encontrar({ searchParams }: { searchParams: Promise<{ tipo?: string; nicho?: string; q?: string }> }) {
@@ -15,7 +15,7 @@ export default async function Encontrar({ searchParams }: { searchParams: Promis
   return (
     <>
       {u ? <CabecalhoApp atual="encontrar" email={u.email} admin={ehAdmin(u)} /> : <Topo />}
-      <Busca logado={!!u} euId={u?.id ?? null} inicial={{ tipo: sp.tipo === "empresas" ? "empresas" : "profissionais", nicho: sp.nicho ?? "", q: sp.q ?? "" }} />
+      <Busca logado={!!u} euId={u?.id ?? null} inicial={{ tipo: sp.tipo === "empresas" ? "empresas" : sp.tipo === "vagas" ? "vagas" : "profissionais", nicho: sp.nicho ?? "", q: sp.q ?? "" }} />
       <div className="h-16" />
       <Rodape />
     </>

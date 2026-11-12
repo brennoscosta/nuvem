@@ -10,6 +10,7 @@ import type { Usuario } from "./usuarios";
 import { enviarEmail, brl, dataBR } from "./email";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
 import { ativarOutdoor, reverterOutdoor } from "./outdoors";
+import { ativarBarraca, reverterBarraca, ativarItem, reverterItem } from "./cidade";
 
 const API = "https://api.mercadopago.com";
 export const pagamentoLigado = () => !!process.env.MP_ACCESS_TOKEN;
@@ -31,7 +32,7 @@ async function mp<T>(caminho: string, init: RequestInit = {}): Promise<T> {
 export interface CobrancaPix { id: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; pagamentoId: string }
 const PAGADOR_RESERVA = (uid: string) => `pagador-${uid.replace(/[^a-z0-9]/gi, "").toLowerCase()}@workend.online`;
 
-async function criarPix(u: Usuario, base: string, o: { valor: number; descricao: string; tipo: "lote" | "layout" | "personagem" | "outdoor"; chave: string; meses: number; metadata: Record<string, unknown> }): Promise<CobrancaPix> {
+async function criarPix(u: Usuario, base: string, o: { valor: number; descricao: string; tipo: "lote" | "layout" | "personagem" | "outdoor" | "barraca" | "item"; chave: string; meses: number; metadata: Record<string, unknown> }): Promise<CobrancaPix> {
   const pid = id("pag");
   const expira = new Date(Date.now() + 60 * 60 * 1000); // o QR vale 1 hora
   const expiraMP = expira.toISOString().replace("Z", "-00:00");
@@ -80,6 +81,10 @@ export async function criarCobrancaPersonagem(u: Usuario, base: string, meses = 
 export async function criarCobrancaOutdoor(u: Usuario, base: string, slot: string, valor: number, descricao: string): Promise<CobrancaPix> {
   return criarPix(u, base, { valor, tipo: "outdoor", chave: slot, meses: 1, metadata: { outdoor: slot }, descricao });
 }
+// Barraca da feira e roupas do personagem (12/11/2026): a reserva/o item já foi conferido em src/server/cidade.ts
+export async function criarCobrancaGenerica(u: Usuario, base: string, o: { tipo: "barraca" | "item"; chave: string; valor: number; descricao: string; metadata: Record<string, unknown> }): Promise<CobrancaPix> {
+  return criarPix(u, base, { ...o, meses: 1 });
+}
 interface PagamentoMP { id: number; status: string; status_detail?: string; external_reference?: string; payment_method_id?: string; payment_type_id?: string; transaction_amount?: number; date_approved?: string; metadata?: Record<string, unknown>; point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } } }
 
 // Aplica um pagamento vindo da API do Mercado Pago (webhook ou conferência). A linha do pagamento fica travada na transação:
@@ -99,11 +104,15 @@ async function aplicar(p: PagamentoMP) {
     if (status === "aprovado" && !aprovadoAntes) {
       if (reg.tipo === "personagem") { await ativarPersonagem(reg.usuarioId, 30 * reg.meses, db); efeito = "liberou"; }
       else if (reg.tipo === "outdoor") efeito = (await ativarOutdoor(reg.terrenoChave, reg.usuarioId, reg.meses, db)) ? "liberou" : "sem_lote";
+      else if (reg.tipo === "barraca") efeito = (await ativarBarraca(reg.terrenoChave, reg.usuarioId, db)) ? "liberou" : "sem_lote";
+      else if (reg.tipo === "item") efeito = (await ativarItem(reg.terrenoChave, reg.usuarioId, db)) ? "liberou" : "sem_lote";
       else if (reg.tipo === "layout") efeito = (await creditarTrocaLayout(reg.terrenoChave, reg.usuarioId, db)) ? "liberou" : "sem_lote";
       else efeito = (await ativarTerreno(reg.terrenoChave, reg.meses, reg.usuarioId, db)) ? "liberou" : "sem_lote";
     } else if (status === "estornado" && aprovadoAntes) {
       if (reg.tipo === "personagem") await reverterPersonagem(reg.usuarioId, 30 * reg.meses, db);
       else if (reg.tipo === "outdoor") await reverterOutdoor(reg.terrenoChave, reg.usuarioId, reg.meses, db);
+      else if (reg.tipo === "barraca") await reverterBarraca(reg.terrenoChave, reg.usuarioId, db);
+      else if (reg.tipo === "item") await reverterItem(reg.terrenoChave, reg.usuarioId, db);
       else if (reg.tipo === "layout") await retirarCreditoLayout(reg.terrenoChave, reg.usuarioId, db);
       else await reverterTerreno(reg.terrenoChave, reg.meses, reg.usuarioId, db);
       efeito = "estornou";
@@ -114,10 +123,13 @@ async function aplicar(p: PagamentoMP) {
   const { reg, status, efeito } = feito;
   const valor = brl(Number(reg.valor));
   // e-mails e registros só depois de gravar
-  if (efeito === "sem_lote" && reg.tipo === "outdoor") void registrar("pagamento", `ATENÇÃO: Pix de ${valor} aprovado sem o outdoor`, { usuarioId: reg.usuarioId, dados: { detalhes: `A vaga ${reg.terrenoChave} passou para outra empresa antes do pagamento chegar. Devolva o valor ou realoque. Pagamento ${reg.id}.` } });
+  if (efeito === "sem_lote" && (reg.tipo === "barraca" || reg.tipo === "item")) void registrar("pagamento", `ATENÇÃO: Pix de ${valor} aprovado sem ${reg.tipo === "barraca" ? "a barraca" : "o item"}`, { usuarioId: reg.usuarioId, dados: { detalhes: `${reg.terrenoChave} não pôde ser liberado (reserva vencida ou item desconhecido). Devolva o valor. Pagamento ${reg.id}.` } });
+  else if (efeito === "sem_lote" && reg.tipo === "outdoor") void registrar("pagamento", `ATENÇÃO: Pix de ${valor} aprovado sem o outdoor`, { usuarioId: reg.usuarioId, dados: { detalhes: `A vaga ${reg.terrenoChave} passou para outra empresa antes do pagamento chegar. Devolva o valor ou realoque. Pagamento ${reg.id}.` } });
   else if (efeito === "sem_lote") void registrar("pagamento", `ATENÇÃO: Pix de ${valor} aprovado sem lote`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: `O lote não está mais com quem pagou. Devolva o valor ou realoque pelo painel. Pagamento ${reg.id}.` } });
   else if (efeito === "estornou") void registrar("pagamento", `Pagamento estornado (${valor})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: `Os dias ou o crédito desse pagamento foram retirados. Pagamento ${reg.id}.` } });
   else if (efeito === "liberou" && reg.tipo === "personagem") void registrar("pagamento", `Personagem pago (${valor})`, { usuarioId: reg.usuarioId, dados: { detalhes: `Personagem ativo por ${30 * reg.meses} dias.` } });
+  else if (efeito === "liberou" && reg.tipo === "barraca") void registrar("pagamento", `Barraca da feira paga (${valor})`, { usuarioId: reg.usuarioId, dados: { detalhes: `Barraca ${reg.terrenoChave}.` }, avisarDono: true });
+  else if (efeito === "liberou" && reg.tipo === "item") void registrar("pagamento", `Item do personagem pago (${valor})`, { usuarioId: reg.usuarioId, dados: { detalhes: reg.terrenoChave } });
   else if (efeito === "liberou" && reg.tipo === "outdoor") void registrar("pagamento", `Outdoor pago (${valor})`, { usuarioId: reg.usuarioId, dados: { detalhes: `Anúncio no outdoor ${reg.terrenoChave} por 30 dias.` }, avisarDono: true });
   else if (efeito === "liberou" && reg.tipo === "layout") void registrar("pagamento", `Troca de prédio paga (${valor})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: "Crédito de 1 troca de prédio liberado." }, avisarDono: true });
   else if (efeito === "liberou") {

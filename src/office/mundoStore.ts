@@ -5,17 +5,22 @@ import { create } from "zustand";
 
 
 import type { Escritorio } from "./data/escritorio";
-export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null; escritorio: Escritorio | null; nicho?: string }
+export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null; escritorio: Escritorio | null; nicho?: string; anexoDe?: string | null }
 export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
 export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null; ceoNome: string; atendenteNome: string; nicho: string }
-export type AbaEscritorio = "predio" | "visual" | "setores" | "equipe" | "contratar" | "treinar";
-export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" | "personagem" | "outdoor" }
+export type AbaEscritorio = "predio" | "visual" | "interior" | "setores" | "equipe" | "contratar" | "treinar";
+export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" | "personagem" | "outdoor" | "barraca" | "item" }
+// praça de eventos e feira de sábado (12/11/2026)
+export interface EventoPraca { id: string; titulo: string; descricao: string; link: string; inicio: string; fim: string; meu: boolean; empresa: { nome: string; cor: string; numero: number | null; chave: string | null; logo: string | null } }
+export interface BarracaFeira { vaga: number; status: "livre" | "reservada" | "paga"; meu: boolean; nome: string; descricao: string; cor: string; tipo: string; contato: { whatsapp?: string; instagram?: string } }
+export interface Praca { agenda: EventoPraca[]; feira: { dia: string; barracas: BarracaFeira[]; preco: number }; agora: string }
 
 export const CORES_EMPRESA = ["#1D4ED8", "#0EA5A4", "#16A34A", "#D97706", "#DC2626", "#DB2777", "#7C3AED", "#1F2937"];
 
 export { LOTES, LOTE_POR_CHAVE, NOME_CONSTRUCAO, descricaoLote, type LoteInfo } from "./data/mundo";
 import { LOTE_POR_CHAVE } from "./data/mundo";
 import { OUTDOOR_POR_ID, type OutdoorPublico } from "./data/outdoors";
+import { PRACA_CHAVE } from "./data/praca";
 
 // Estamos no mapa do WorkEnd (workend.online/mundo)? Aí o login é o do WorkEnd, não o do admin da Nuvem.
 export const modoMundo = () => typeof window !== "undefined" && (window.location.pathname.startsWith("/mundo") || new URLSearchParams(window.location.search).has("mundo"));
@@ -46,6 +51,9 @@ interface Estado {
   painelEmpresa: boolean; // painel "Montar minha empresa" aberto
   rascunho: Rascunho | null; // o que está sendo editado (a cena mostra ao vivo)
   alvoCamera: [number, number, number] | null; // a câmera desliza até aqui
+  vagas: Record<string, number>; // vagas abertas por lote (placa "Estamos contratando")
+  praca: Praca | null; carregarPraca: () => Promise<void>;
+  abrirPix: (p: Pix) => void; // Pix de barraca e de roupa do personagem (criados fora do cartão do lote)
   // outdoors nas avenidas (12/11/2026)
   outdoors: OutdoorPublico[]; precoOutdoor: number; outdoorSelecionado: string | null;
   carregarOutdoors: () => Promise<void>;
@@ -72,6 +80,9 @@ interface Estado {
 }
 
 export const useMundo = create<Estado>((set, get) => ({
+  vagas: {}, praca: null,
+  carregarPraca: async () => { const j = await fetch("/api/workend/praca", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null); if (j?.agenda) set({ praca: j as Praca }); },
+  abrirPix: (p) => set({ pix: p }),
   outdoors: [], precoOutdoor: 29.9, outdoorSelecionado: null,
   carregarOutdoors: async () => { const j = await fetch("/api/outdoors", { cache: "no-store" }).then((r) => r.json()).catch(() => null); if (j?.vagas) set({ outdoors: j.vagas, precoOutdoor: j.preco ?? 29.9 }); },
   abrirOutdoor: (slot) => { const v = slot ? OUTDOOR_POR_ID[slot] : null; set({ outdoorSelecionado: v ? slot : null, loteSelecionado: v ? null : get().loteSelecionado, painelEmpresa: false, painelEscritorio: false, alvoCamera: v ? [v.pos[0] * 0.82, 0.5, v.pos[1] * 0.82] : get().alvoCamera }); },
@@ -96,22 +107,29 @@ export const useMundo = create<Estado>((set, get) => ({
       ]);
       const terrenos: Record<string, Terreno> = {};
       for (const x of (t.terrenos ?? []) as Terreno[]) terrenos[x.chave] = x;
-      set({ terrenos, meu: t.meu ?? null, usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? 99, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
+      set({ terrenos, vagas: t.vagas ?? {}, meu: t.meu ?? null, usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? 99, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
       // veio do cadastro com ?lote=: já abre o lote escolhido
       const busca = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
       const pedido = busca?.get("lote") ?? null;
-      if (pedido && LOTE_POR_CHAVE[pedido] && !get().loteSelecionado) { get().selecionarLote(pedido); if (u && u.id && !terrenos[pedido] && !busca?.get("pagamento")) get().abrirPainel(); }
+      if (pedido && LOTE_POR_CHAVE[pedido] && !get().loteSelecionado) { get().selecionarLote(pedido); if (u && u.id && !terrenos[pedido] && pedido !== PRACA_CHAVE && !busca?.get("pagamento")) get().abrirPainel(); }
     } catch (e) { console.warn("[mundo] sem servidor:", e); set({ carregado: true }); }
   },
 
   selecionarLote: (chave) => {
     const l = chave ? LOTE_POR_CHAVE[chave] : null;
-    set({ outdoorSelecionado: null, loteSelecionado: l ? chave : null, painelEmpresa: false, rascunho: null, painelEscritorio: false, rascunhoEscritorio: null, alvoCamera: l ? [l.centro[0], 0.5, l.centro[1]] : null });
+    // lote duplo ativo: a câmera vai para o meio dos dois terrenos, onde fica o prédio
+    let alvo: [number, number, number] | null = l ? [l.centro[0], 0.5, l.centro[1]] : null;
+    if (l && chave) {
+      const ts = get().terrenos; const t = ts[chave];
+      const par = t?.anexoDe ? (t.status === "ativo" ? t.anexoDe : null) : Object.values(ts).find((x) => x.anexoDe === chave && x.status === "ativo")?.chave ?? null;
+      const lp = par ? LOTE_POR_CHAVE[par] : null; if (lp) alvo = [(l.centro[0] + lp.centro[0]) / 2, 0.5, l.centro[1]];
+    }
+    set({ outdoorSelecionado: null, loteSelecionado: l ? chave : null, painelEmpresa: false, rascunho: null, painelEscritorio: false, rascunhoEscritorio: null, alvoCamera: alvo });
   },
   setLoteHover: (chave) => set({ loteHover: chave }),
 
   abrirPainel: () => {
-    const { loteSelecionado, terrenos, usuario } = get(); if (!loteSelecionado) return;
+    const { loteSelecionado, terrenos, usuario } = get(); if (!loteSelecionado || loteSelecionado === PRACA_CHAVE) return; // a praça não está à venda
     const t = terrenos[loteSelecionado];
     const ceo = t?.escritorio?.equipe.find((m) => m.papel === "ceo")?.nome ?? "";
     const atendente = t?.escritorio?.equipe.find((m) => m.papel === "atendente")?.nome ?? "";
@@ -165,6 +183,7 @@ export const useMundo = create<Estado>((set, get) => ({
       if (status === "aprovado") {
         set({ pix: { ...pix, status: "aprovado" } }); await get().carregar();
         if (pix.tipo === "outdoor") await get().carregarOutdoors();
+        if (pix.tipo === "barraca") await get().carregarPraca();
         if (pix.tipo === "personagem") { const { usePersonagem } = await import("./personagemStore"); await usePersonagem.getState().carregar(); }
         // crédito de troca de prédio comprado com o painel aberto: atualiza os contadores do rascunho
         const t = get().terrenos[pix.lote]; const r = get().rascunhoEscritorio;

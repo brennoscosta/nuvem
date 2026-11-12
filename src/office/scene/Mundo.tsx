@@ -18,6 +18,7 @@ import { Semaforos, Trafego, Passantes, PontosOnibus } from "./Transito";
 import { LuzesPostes } from "./CicloDia";
 import { natalAtivo, ArvoreNatal, LuzesNatalPostes } from "./Natal";
 import { Outdoors } from "./Anuncios";
+import { Praca } from "./Praca";
 import { QUARTEIROES, centroQuarteirao, centroLote, EIXOS_RUA, COMPRIMENTO_RUA, RUA, CALCADA, MEIO_Q, BORDA_CALCADA, MUNDO, PASSO, N, EIXO_RUA } from "../data/mundo";
 
 const ASFALTO = "#4A4E55", FAIXA = "#E8E4D8", CALC = "#D9D5CC";
@@ -155,7 +156,9 @@ export function Mundo() {
       <GentePraia />
       <Personagens />
       <Perto cx={0} cz={0} raio={raio + 100}><Lotes />
-      <EscritoriosClientes /></Perto>
+      <EscritoriosClientes />
+      {/* praça de eventos e feira de sábado no lote 0,1,1 (12/11/2026) */}
+      <Praca /></Perto>
     </group>
   );
 }

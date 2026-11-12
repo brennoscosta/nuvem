@@ -1,7 +1,8 @@
 "use client";
 // Personagens dos visitantes no mapa: o meu (ando clicando no chão; mando a posição a cada 3 s) e os outros online
 // (chegam na batida; deslizam até a posição nova). Todo personagem tem um balãozinho com o nome; clicar num outro
-// abre a ficha com as opções (conversa, chat ao vivo, negócios, redes sociais).
+// abre a ficha com as opções (conversa, chat ao vivo, negócios, redes sociais). Desde 12/11/2026 cada um aparece com as
+// roupas e acessórios que comprou (boné, óculos, mochila…), desenhados em scene/Boneco.tsx.
 import * as THREE from "three";
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -74,7 +75,7 @@ function Meu() {
   const b = def(meu.boneco);
   return (
     <group ref={g}>{/* posição só via ref: passar position= aqui faria o boneco pular de volta a cada re-render */}
-      <BonecoProcedural ref={h} def={b} camisa={meu.roupa} cracha="#FFD166" />
+      <BonecoProcedural ref={h} def={b} camisa={meu.roupa} cracha="#FFD166" acessorios={meu.acessorios} />
       <SombraContato r={0.36} />
       <Nome nome={meu.nome} cor={meu.roupa} eu />
     </group>
@@ -115,7 +116,7 @@ function OutroBoneco({ o }: { o: Outro }) {
   useEffect(() => { const w = window as unknown as { __outros?: () => number[] }; w.__outros = () => (g.current ? [g.current.position.x, g.current.position.z] : []); }, []);
   return (
     <group ref={g}>{/* posição só via ref (ver Meu) */}
-      <BonecoProcedural ref={h} def={def(o.boneco)} camisa={o.roupa} cracha="#B8C0CC" />
+      <BonecoProcedural ref={h} def={def(o.boneco)} camisa={o.roupa} cracha="#B8C0CC" acessorios={o.acessorios} />
       <SombraContato r={0.36} />
       {/* área de clique (invisível) em volta do boneco */}
       <mesh position={[0, 0.6, 0]} onClick={(e) => { e.stopPropagation(); selecionar(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = ""; }}>

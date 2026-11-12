@@ -1,13 +1,16 @@
 "use client";
-// A busca de /encontrar: profissionais (personagens com perfil profissional) e empresas (lojas abertas no mapa).
+// A busca de /encontrar: profissionais (personagens com perfil profissional), empresas (lojas abertas no mapa) e,
+// desde 12/11/2026, as vagas abertas das empresas (a placa "Estamos contratando" do mapa leva para cá).
 import { useEffect, useMemo, useState } from "react";
+import { ListaVagas, type VagaLista } from "../_vagas";
 import { NICHOS } from "@/office/data/mundo";
 import { MiniAvatar } from "@/office/ui/Personagem";
 import type { Perfil, Redes } from "@/office/personagemStore";
 
 type Prof = { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; redes?: Redes; online: boolean; perfil: Perfil; nichoNome: string | null; reputacao: { media: number | null; n: number } };
 type Emp = { numero: number; chave: string; nome: string; cor: string; nicho: string; nichoNome: string; logo: string | null; sobre: string; contatos: { whatsapp?: string; instagram?: string; site?: string; email?: string }; equipe: number; atendente: string | null; reputacao: { media: number | null; n: number } };
-type Tipo = "profissionais" | "empresas";
+type Tipo = "profissionais" | "empresas" | "vagas";
+const ROTULO: Record<Tipo, string> = { profissionais: "Profissionais", empresas: "Empresas", vagas: "Vagas" };
 
 function Nota({ r }: { r: { media: number | null; n: number } }) {
   if (!r.n || r.media == null) return <span className="text-[12px] text-[var(--tinta-2)]">sem avaliações</span>;
@@ -24,12 +27,14 @@ export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string
   useEffect(() => { const t = setTimeout(() => setTermo(q), 300); return () => clearTimeout(t); }, [q]);
   // o resultado fica guardado com a busca que o gerou: mudar o filtro mostra "buscando" sem limpar o estado no efeito
   const busca = useMemo(() => { const p = new URLSearchParams({ tipo }); if (termo.trim()) p.set("q", termo.trim()); if (nicho) p.set("nicho", nicho); if (tipo === "profissionais" && disp) p.set("disponivel", "1"); if (tipo === "profissionais" && online) p.set("online", "1"); return p.toString(); }, [tipo, termo, nicho, disp, online]);
-  const [resDe, setResDe] = useState<{ de: string; res: (Prof | Emp)[] } | null>(null);
+  const [resDe, setResDe] = useState<{ de: string; res: (Prof | Emp | VagaLista)[] } | null>(null);
   const res = resDe?.de === busca ? resDe.res : null;
   useEffect(() => {
     let vivo = true;
-    fetch(`/api/workend/encontrar?${busca}`, { cache: "no-store" }).then((r) => r.json()).then((j) => vivo && setResDe({ de: busca, res: Array.isArray(j) ? j : [] })).catch(() => vivo && setResDe({ de: busca, res: [] }));
-    const url = new URLSearchParams(); if (tipo === "empresas") url.set("tipo", "empresas"); if (nicho) url.set("nicho", nicho); if (termo.trim()) url.set("q", termo.trim());
+    // vagas vêm da rota das vagas (mesmos filtros de texto e área)
+    const p = new URLSearchParams(busca); p.delete("tipo");
+    fetch(tipo === "vagas" ? `/api/workend/vagas?${p}` : `/api/workend/encontrar?${busca}`, { cache: "no-store" }).then((r) => r.json()).then((j) => vivo && setResDe({ de: busca, res: Array.isArray(j) ? j : [] })).catch(() => vivo && setResDe({ de: busca, res: [] }));
+    const url = new URLSearchParams(); if (tipo !== "profissionais") url.set("tipo", tipo); if (nicho) url.set("nicho", nicho); if (termo.trim()) url.set("q", termo.trim());
     window.history.replaceState(null, "", `/encontrar${url.size ? `?${url}` : ""}`);
     return () => { vivo = false; };
   }, [busca, tipo, termo, nicho]);
@@ -42,14 +47,14 @@ export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string
         <div className="busca-grade" aria-hidden="true" />
         <div className="relative">
           <h1 className="text-[2.1rem] sm:text-[3rem]" style={{ color: "#fff" }}>Encontre quem resolve.</h1>
-          <p className="mt-2 max-w-[56ch] text-white/75">Profissionais que atendem pelo WorkEnd e empresas com endereço no mapa 3D. Converse, peça orçamento e feche negócio com avaliação dos dois lados.</p>
+          <p className="mt-2 max-w-[56ch] text-white/75">{tipo === "vagas" ? "Empresas do mapa 3D que estão contratando agora. Candidate-se em um minuto: a empresa recebe sua mensagem e responde pelo seu contato." : "Profissionais que atendem pelo WorkEnd e empresas com endereço no mapa 3D. Converse, peça orçamento e feche negócio com avaliação dos dois lados."}</p>
           <div className="mt-6 inline-flex rounded-xl bg-white/10 p-1 text-sm font-semibold">
-            {(["profissionais", "empresas"] as Tipo[]).map((t) => <button key={t} type="button" onClick={() => setTipo(t)} className={`rounded-lg px-4 py-2 transition ${tipo === t ? "bg-white text-[var(--tinta)]" : "text-white/80 hover:text-white"}`}>{t === "profissionais" ? "Profissionais" : "Empresas"}</button>)}
+            {(["profissionais", "empresas", "vagas"] as Tipo[]).map((t) => <button key={t} type="button" onClick={() => setTipo(t)} className={`rounded-lg px-4 py-2 transition ${tipo === t ? "bg-white text-[var(--tinta)]" : "text-white/80 hover:text-white"}`}>{ROTULO[t]}</button>)}
           </div>
           <label className="mt-3 flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-[var(--tinta)] shadow-xl">
             <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-[var(--tinta-2)]" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
             <span className="sr-only">Buscar</span>
-            <input value={q} onChange={(e) => setQ(e.target.value.slice(0, 60))} placeholder={tipo === "profissionais" ? "Fotógrafo, designer, contador, Aracaju…" : "Padaria, estúdio, consultoria…"} className="min-w-0 flex-1 bg-transparent text-[16px] outline-none" />
+            <input value={q} onChange={(e) => setQ(e.target.value.slice(0, 60))} placeholder={tipo === "profissionais" ? "Fotógrafo, designer, contador, Aracaju…" : tipo === "vagas" ? "Atendente, vendedor, designer, remoto…" : "Padaria, estúdio, consultoria…"} className="min-w-0 flex-1 bg-transparent text-[16px] outline-none" />
           </label>
         </div>
       </section>
@@ -60,22 +65,24 @@ export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm text-[var(--tinta-2)]">{res === null ? "Buscando…" : `${res.length} ${tipo === "profissionais" ? (res.length === 1 ? "profissional" : "profissionais") : res.length === 1 ? "empresa" : "empresas"}${nomeNicho ? ` em ${nomeNicho}` : ""}`}</span>
+        <span className="text-sm text-[var(--tinta-2)]">{res === null ? "Buscando…" : `${res.length} ${tipo === "profissionais" ? (res.length === 1 ? "profissional" : "profissionais") : tipo === "vagas" ? (res.length === 1 ? "vaga aberta" : "vagas abertas") : res.length === 1 ? "empresa" : "empresas"}${nomeNicho ? ` em ${nomeNicho}` : ""}`}</span>
         {tipo === "profissionais" ? (
           <span className="flex gap-3 text-sm">
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={disp} onChange={(e) => setDisp(e.target.checked)} /> Disponíveis</label>
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={online} onChange={(e) => setOnline(e.target.checked)} /> Online agora</label>
           </span>
-        ) : res && res.length > 0 && <a href={`/mundo${nicho ? `?nicho=${nicho}` : ""}`} className="btn btn-claro !py-2 text-sm">{nicho ? `Acender ${res.length === 1 ? "esta" : `estas ${res.length}`} no mapa` : "Ver todas no mapa"}</a>}
+        ) : tipo === "empresas" && res && res.length > 0 && <a href={`/mundo${nicho ? `?nicho=${nicho}` : ""}`} className="btn btn-claro !py-2 text-sm">{nicho ? `Acender ${res.length === 1 ? "esta" : `estas ${res.length}`} no mapa` : "Ver todas no mapa"}</a>}
       </div>
 
       {res && res.length === 0 && (
         <div className="mt-6 rounded-2xl bg-[var(--cinza)] p-8 text-center">
-          <b className="text-[1.1rem]">{tipo === "profissionais" ? "Nenhum profissional com esse perfil ainda." : "Nenhuma empresa com esse perfil no mapa ainda."}</b>
-          <p className="mt-1 text-[var(--tinta-2)]">{tipo === "profissionais" ? "Você é profissional? Monte o seu personagem e preencha o perfil profissional para aparecer aqui." : "Tem uma empresa? Escolha um lote no mapa e ela aparece aqui, com atendente de IA."}</p>
-          <a href={tipo === "profissionais" ? "/mundo?personagem=1" : "/mundo"} className="btn btn-azul mt-4">{tipo === "profissionais" ? "Montar meu perfil" : "Escolher meu lote"}</a>
+          <b className="text-[1.1rem]">{tipo === "profissionais" ? "Nenhum profissional com esse perfil ainda." : tipo === "vagas" ? "Nenhuma vaga aberta com esse perfil agora." : "Nenhuma empresa com esse perfil no mapa ainda."}</b>
+          <p className="mt-1 text-[var(--tinta-2)]">{tipo === "profissionais" ? "Você é profissional? Monte o seu personagem e preencha o perfil profissional para aparecer aqui." : tipo === "vagas" ? "Tem uma empresa no mapa? Abra vagas em Minha equipe: elas aparecem aqui e acendem a placa “Estamos contratando” na fachada do seu prédio." : "Tem uma empresa? Escolha um lote no mapa e ela aparece aqui, com atendente de IA."}</p>
+          <a href={tipo === "profissionais" ? "/mundo?personagem=1" : tipo === "vagas" ? (logado ? "/app/equipe?aba=vagas" : "/mundo") : "/mundo"} className="btn btn-azul mt-4">{tipo === "profissionais" ? "Montar meu perfil" : tipo === "vagas" ? (logado ? "Abrir uma vaga" : "Ver o mapa") : "Escolher meu lote"}</a>
         </div>
       )}
+
+      {tipo === "vagas" && res && res.length > 0 && <ListaVagas vagas={res as VagaLista[]} logado={logado} destino="/encontrar?tipo=vagas" />}
 
       <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {tipo === "profissionais" && (res as Prof[] | null)?.map((p, i) => (

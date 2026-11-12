@@ -34,6 +34,7 @@ function listar(comEscritorio: Set<string>) {
       const frente = k >= 2 ? 1 : -1; // lado da rua
       const chave = `${q.i},${q.j},${k}`;
       // placa perto da calçada, num canto do lote
+      if (l.tipo === "praca") return; // a praça tem a cena dela (scene/Praca.tsx), sem placa de venda
       placas.push({ chave, pos: [x + (k % 2 ? 6.5 : -6.5), 0, z + frente * (LOTE / 2 - 1.6)], rot });
       if (comEscritorio.has(chave)) return; // o escritório do cliente ocupa o lote: a casa/terreno original some
       if (l.tipo === "casa") casas.push({ modelo: l.modelo, pos: [x, 0, z - frente * 1.2], rot, escala: l.escala ?? 1 });
@@ -111,6 +112,9 @@ export function Lotes() {
   const hover = useMundo((s) => s.loteHover);
   const rascunho = useMundo((s) => s.rascunho);
   const chavesReservadas = Object.keys(reservados).sort().join("|");
+  const vagas = useMundo((s) => s.vagas);
+  // lote duplo: o balão do principal vai para o meio dos dois terrenos; a ampliação em obras mostra o tapume com a marca do principal
+  const anexoAtivo = useMemo(() => { const m: Record<string, string> = {}; for (const t of Object.values(reservados)) if (t.anexoDe && t.status === "ativo") m[t.anexoDe] = t.chave; return m; }, [reservados]);
   // placas "À venda" só nos lotes livres (o lote reservado ganha a placa da empresa). O lote em rascunho também perde a placa.
   const emRascunho = rascunho && selecionado ? selecionado : null;
   const livres = placas.filter((p) => !reservados[p.chave] && p.chave !== emRascunho);
@@ -131,7 +135,13 @@ export function Lotes() {
         const t = reservados[l.chave];
         const r: Rascunho | null = l.chave === emRascunho ? rascunho : null;
         if (!t && !r) return null;
-        return <LoteReservado key={l.chave} chave={l.chave} nome={r?.empresaNome ?? t?.empresaNome ?? ""} cor={r?.cor ?? t?.cor ?? "#1D4ED8"} logo={r ? r.logoDataUrl : t?.temLogo ? `/api/terrenos/${encodeURIComponent(l.chave)}/logo` : null} nicho={r?.nicho ?? t?.nicho} ativo={t?.status === "ativo"} comEscritorio={comEscritorio.has(l.chave)} />;
+        if (t?.anexoDe) {
+          const p = reservados[t.anexoDe];
+          if (t.status === "ativo" && comEscritorio.has(l.chave)) return null; // o prédio do principal já ocupa este terreno
+          return <LoteReservado key={l.chave} chave={l.chave} nome={p?.empresaNome ?? t.empresaNome} cor={p?.cor ?? t.cor} logo={p?.temLogo ? `/api/terrenos/${encodeURIComponent(p.chave)}/logo` : null} nicho={p?.nicho} ativo={false} comEscritorio={false} semBalao />;
+        }
+        const anexo = anexoAtivo[l.chave]; const meio = anexo && LOTE_POR_CHAVE[anexo] ? (LOTE_POR_CHAVE[anexo].centro[0] - l.centro[0]) / 2 : 0;
+        return <LoteReservado key={l.chave} chave={l.chave} nome={r?.empresaNome ?? t?.empresaNome ?? ""} cor={r?.cor ?? t?.cor ?? "#1D4ED8"} logo={r ? r.logoDataUrl : t?.temLogo ? `/api/terrenos/${encodeURIComponent(l.chave)}/logo` : null} nicho={r?.nicho ?? t?.nicho} ativo={t?.status === "ativo"} comEscritorio={comEscritorio.has(l.chave)} meio={meio} vagas={t?.status === "ativo" ? vagas[l.chave] ?? 0 : 0} />;
       })}
       {/* caixas de clique + contorno do lote sob o mouse / selecionado */}
       {LOTES.map((l) => <AlvoLote key={l.chave} chave={l.chave} centro={l.centro} estado={selecionado === l.chave ? "sel" : hover === l.chave ? "hover" : null} />)}
@@ -197,10 +207,12 @@ function texturaEmpresa(nome: string, cor: string, logo: string | null, ativo = 
 // as dos clientes, a Nuvem e a lanchonete.
 // destaque (11/11/2026, vindo de /encontrar com ?nicho=): as lojas da área pulsam e as outras ficam apagadas
 export function nichoDestacado(): string | null { return typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("nicho"); }
-export function Balao({ position, nome, cor, logo, subtitulo, onClick, apagado = false, destaque = false }: { position: [number, number, number]; nome: string; cor: string; logo?: string | null; subtitulo: string; onClick?: () => void; apagado?: boolean; destaque?: boolean }) {
+export function Balao({ position, nome, cor, logo, subtitulo, onClick, apagado = false, destaque = false, selo = null }: { position: [number, number, number]; nome: string; cor: string; logo?: string | null; subtitulo: string; onClick?: () => void; apagado?: boolean; destaque?: boolean; selo?: string | null }) {
   return (
     <Html position={position} zIndexRange={[4, 0]} style={{ pointerEvents: "none", transform: "translate(-50%, -100%)" }}>
       <div className={`flex w-max select-none flex-col items-center transition-[opacity,transform] duration-500 ${apagado ? "scale-75 opacity-25" : ""} ${destaque ? "balao-destaque" : ""}`}>
+        {/* selo em cima do balão (ex.: "Estamos contratando", 12/11/2026) */}
+        {selo && <div className="-mb-1.5 rounded-full bg-[#FACC15] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#1D2128] shadow-md ring-2 ring-white">{selo}</div>}
         <div className={`pointer-events-auto flex items-center gap-2.5 rounded-2xl px-4 py-2 shadow-xl ${onClick ? "cursor-pointer" : ""}`} style={{ background: cor }} onClick={(e) => { e.stopPropagation(); onClick?.(); }}>
           {logo && <img src={logo} alt="" className="h-9 w-9 rounded-lg bg-white/95 object-contain p-0.5" />}
           <div className="leading-tight">
@@ -215,7 +227,7 @@ export function Balao({ position, nome, cor, logo, subtitulo, onClick, apagado =
 }
 
 // Lote reservado: tapume baixo em volta (branco com faixa na cor da empresa) e placa grande na frente (enquanto não paga)
-function LoteReservado({ chave, nome, cor, logo, nicho, ativo = false, comEscritorio = false }: { chave: string; nome: string; cor: string; logo: string | null; nicho?: string; ativo?: boolean; comEscritorio?: boolean }) {
+function LoteReservado({ chave, nome, cor, logo, nicho, ativo = false, comEscritorio = false, semBalao = false, meio = 0, vagas = 0 }: { chave: string; nome: string; cor: string; logo: string | null; nicho?: string; ativo?: boolean; comEscritorio?: boolean; semBalao?: boolean; meio?: number; vagas?: number }) {
   const l = LOTE_POR_CHAVE[chave];
   const tex = useMemo(() => texturaEmpresa(nome, cor, logo, ativo), [nome, cor, logo, ativo]);
   const filtro = useMemo(() => nichoDestacado(), []);
@@ -231,7 +243,7 @@ function LoteReservado({ chave, nome, cor, logo, nicho, ativo = false, comEscrit
           <mesh geometry={caixa(w + (w > d ? 0 : 0.02), 0.3, d + (w > d ? 0.02 : 0))} material={mat(cor, { rough: 0.7 })} position={[lx, 1.45, lz]} />
         </group>
       ))}
-      <Balao position={[0, comEscritorio ? 10.5 : 7.5, 0]} nome={nome} cor={cor} logo={logo} subtitulo={ativo ? nomeNicho(nicho) : "Reservado · em obras"} onClick={() => useMundo.getState().selecionarLote(chave)} apagado={!!filtro && (!ativo || nicho !== filtro)} destaque={!!filtro && ativo && nicho === filtro} />
+      {!semBalao && <Balao position={[meio, comEscritorio ? (meio ? 12.4 : 10.5) : 7.5, 0]} nome={nome} cor={cor} logo={logo} subtitulo={ativo ? nomeNicho(nicho) : "Reservado · em obras"} onClick={() => useMundo.getState().selecionarLote(chave)} apagado={!!filtro && (!ativo || nicho !== filtro)} destaque={!!filtro && ativo && nicho === filtro} selo={vagas > 0 ? `Estamos contratando · ${vagas}` : null} />}
       {/* placa na frente só enquanto está reservado: comprou, a placa sai e fica o prédio com o letreiro */}
       {!ativo && <group position={[l.k % 2 ? -3.5 : 3.5, 0, frente * (m - 0.2)]} rotation={[0, rot, 0]}>
         {[-1.3, 1.3].map((px) => <mesh key={px} geometry={caixa(0.12, 2.6, 0.12)} material={mat("#3A3F47")} position={[px, 1.3, 0]} castShadow />)}

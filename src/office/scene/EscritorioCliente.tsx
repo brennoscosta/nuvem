@@ -16,7 +16,7 @@ import { Mesa, Sofa, Planta, Balcao, MesaBaixa, Quadro, Cafe } from "./Moveis";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle, type Pose } from "./Boneco";
 import { BONECO } from "../data/bonecos";
 import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
-import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote } from "../data/escritorio";
+import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, INTERIOR_PADRAO, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote } from "../data/escritorio";
 import { useMundo } from "../mundoStore";
 import { useEscritorio } from "../store";
 
@@ -26,20 +26,65 @@ const LARG = X1 - X0, PROF = Z1 - Z0;
 
 // ---------- lado de fora ----------
 // Prédio gerado no Higgsfield (GLB normalizado: altura 1, base em y=0; frente do Tripo olha pra +x → giramos pra -z)
-function Exterior({ e, cor, nome, logo }: { e: Escritorio; cor: string; nome: string; logo: string | null }) {
+// Lote duplo (12/11/2026): o prédio fica 60% mais largo e 20% mais alto (a profundidade não muda, então a frente do lote
+// continua no mesmo lugar) e o letreiro acompanha a largura.
+export const DUPLO = { x: 1.6, y: 1.2 };
+function Exterior({ e, cor, nome, logo, duplo = false, contratando = false }: { e: Escritorio; cor: string; nome: string; logo: string | null; duplo?: boolean; contratando?: boolean }) {
   const L = LAYOUT[e.layout];
   const d = e.decor ?? DECOR_PADRAO;
+  const sx = duplo ? DUPLO.x : 1, sy = duplo ? DUPLO.y : 1;
+  const ly = L.letreiro.y * sy, larg = L.letreiro.largura * (duplo ? 1.35 : 1);
   return (
     <group>
-      <mesh geometry={caixa(LARG + 1.2, 0.16, PROF + 1.2)} material={mat("#D8D4CC", { rough: 0.95 })} position={[0, 0.08, 0]} receiveShadow />
-      <ComFallback fallback={<mesh geometry={caixa(LARG, L.altura * 0.8, PROF)} material={mat("#F1EFEA", { rough: 0.9 })} position={[0, L.altura * 0.4 + 0.16, 0]} />}>
-        <Modelo nome={L.modelo as NomeModelo} position={[0, 0.16, 0]} rotation={Math.PI / 2} altura={L.altura} />
-      </ComFallback>
-      <Letreiro nome={nome} cor={cor} logo={logo} y={L.letreiro.y} z={L.letreiro.z} largura={L.letreiro.largura} estilo={d.letreiro} />
+      <mesh geometry={caixa(LARG * sx + 1.2, 0.16, PROF + 1.2)} material={mat("#D8D4CC", { rough: 0.95 })} position={[0, 0.08, 0]} receiveShadow />
+      <group scale={[sx, sy, 1]}>
+        <ComFallback fallback={<mesh geometry={caixa(LARG, L.altura * 0.8, PROF)} material={mat("#F1EFEA", { rough: 0.9 })} position={[0, L.altura * 0.4 + 0.16, 0]} />}>
+          <Modelo nome={L.modelo as NomeModelo} position={[0, 0.16, 0]} rotation={Math.PI / 2} altura={L.altura} />
+        </ComFallback>
+      </group>
+      <Letreiro nome={nome} cor={cor} logo={logo} y={ly} z={L.letreiro.z} largura={larg} estilo={d.letreiro} />
+      {contratando && <PlacaContratando x={larg / 2 - 1.15} y={ly + 0.98} z={L.letreiro.z} />}
       {/* a Loja de rua já vem com toldo listrado no modelo */}
-      {d.toldo && e.layout !== "loja" && <Toldo cor={d.toldo} y={L.letreiro.y - 1.05} z={L.letreiro.z} largura={L.letreiro.largura} />}
-      {d.extras.includes("natal") && natalAtivo() && <NatalLetreiro y={L.letreiro.y} z={L.letreiro.z} largura={L.letreiro.largura} />}
+      {d.toldo && e.layout !== "loja" && <Toldo cor={d.toldo} y={ly - 1.05} z={L.letreiro.z} largura={larg} />}
+      {d.extras.includes("natal") && natalAtivo() && <NatalLetreiro y={ly} z={L.letreiro.z} largura={larg} />}
     </group>
+  );
+}
+
+// "Estamos contratando" (12/11/2026): plaquinha amarela em cima da ponta do letreiro enquanto a empresa tem vaga aberta
+let TEX_CONTRATANDO: THREE.CanvasTexture | null = null;
+function texturaContratando() {
+  if (TEX_CONTRATANDO || typeof document === "undefined") return TEX_CONTRATANDO;
+  const c = document.createElement("canvas"); c.width = 512; c.height = 144; const g = c.getContext("2d")!;
+  g.fillStyle = "#FACC15"; g.fillRect(0, 0, 512, 144); g.fillStyle = "#1D2128"; g.fillRect(0, 0, 512, 10); g.fillRect(0, 134, 512, 10);
+  g.textAlign = "center"; g.textBaseline = "middle"; g.font = "900 52px Inter, Arial, sans-serif"; g.fillText("ESTAMOS", 256, 48); g.fillText("CONTRATANDO", 256, 100, 480);
+  TEX_CONTRATANDO = new THREE.CanvasTexture(c); TEX_CONTRATANDO.colorSpace = THREE.SRGBColorSpace; TEX_CONTRATANDO.anisotropy = 4;
+  return TEX_CONTRATANDO;
+}
+function PlacaContratando({ x, y, z }: { x: number; y: number; z: number }) {
+  const tex = useMemo(() => texturaContratando(), []);
+  return (
+    <group position={[x, y, z]}>
+      <mesh geometry={caixa(2.1, 0.66, 0.1)} material={mat("#1D2128", { rough: 0.6 })} castShadow />
+      {tex && <mesh geometry={plano(2.0, 0.56)} position={[0, 0, -0.06]} rotation={[0, Math.PI, 0]}><meshBasicMaterial map={tex} toneMapped={false} /></mesh>}
+    </group>
+  );
+}
+
+// Quadros com a logo da empresa (interior personalizável): recepção, sala do CEO e o fundo do hall
+function QuadrosLogo({ logo, cor }: { logo: string | null; cor: string }) {
+  const lugares: { pos: [number, number, number]; rot: number; tam: number }[] = [
+    { pos: [X0 + 0.07, 1.0, -4.6], rot: Math.PI / 2, tam: 0.95 }, { pos: [X1 - 0.07, 1.0, -4.4], rot: -Math.PI / 2, tam: 0.95 },
+  ];
+  return (
+    <>
+      {lugares.map((q, i) => logo ? (
+        <group key={i} position={q.pos} rotation={[0, q.rot - Math.PI, 0]}>
+          <mesh geometry={caixa(q.tam + 0.34, q.tam + 0.34, 0.05)} material={mat("#2B2F36", { rough: 0.5 })} position={[0, 0, 0.02]} />
+          <LogoPlano url={logo} position={[0, 0, -0.01]} tamanho={q.tam} />
+        </group>
+      ) : <Quadro key={i} position={q.pos} rotation={q.rot} largura={1.4} cor={cor} />)}
+    </>
   );
 }
 
@@ -93,14 +138,14 @@ function ParedeBaixa({ de, ate, cor = "#F4F1EB", altura = ALT_PAREDE_CLIENTE }: 
   return <mesh geometry={caixa(0.12, altura, len)} material={mat(cor, { rough: 0.9 })} position={[(de[0] + ate[0]) / 2, altura / 2, (de[1] + ate[1]) / 2]} rotation={[0, Math.atan2(dx, dz), 0]} castShadow receiveShadow />;
 }
 // Parede com um vão (porta) no meio
-function ParedeComPorta({ de, ate, vao = 1.6 }: { de: [number, number]; ate: [number, number]; vao?: number }) {
+function ParedeComPorta({ de, ate, vao = 1.6, cor }: { de: [number, number]; ate: [number, number]; vao?: number; cor?: string }) {
   const dx = ate[0] - de[0], dz = ate[1] - de[1]; const len = Math.hypot(dx, dz);
-  if (len <= vao + 0.4) return <ParedeBaixa de={de} ate={ate} />;
+  if (len <= vao + 0.4) return <ParedeBaixa de={de} ate={ate} cor={cor} />;
   const ux = dx / len, uz = dz / len; const a = (len - vao) / 2;
   return (
     <>
-      <ParedeBaixa de={de} ate={[de[0] + ux * a, de[1] + uz * a]} />
-      <ParedeBaixa de={[ate[0] - ux * a, ate[1] - uz * a]} ate={ate} />
+      <ParedeBaixa de={de} ate={[de[0] + ux * a, de[1] + uz * a]} cor={cor} />
+      <ParedeBaixa de={[ate[0] - ux * a, ate[1] - uz * a]} ate={ate} cor={cor} />
     </>
   );
 }
@@ -108,44 +153,50 @@ function ParedeComPorta({ de, ate, vao = 1.6 }: { de: [number, number]; ate: [nu
 export function InteriorFixo({ e, cor }: { e: Escritorio; cor: string }) {
   const planta = useMemo(() => plantaCliente(e), [e]);
   const zMeio = planta.salas[0].z1;
+  // interior personalizável (12/11/2026): cor das paredes, piso único, tampo das mesas e plantas
+  const it = e.decor?.interior ?? INTERIOR_PADRAO;
+  const pisoUnico = PISOS_INTERIOR.find((p) => p.id === it.piso)?.cor ?? null;
+  const tampo = MOVEIS_INTERIOR.find((m) => m.id === it.moveis)?.tampo;
+  const P = (p: Omit<Parameters<typeof ParedeBaixa>[0], "cor">) => <ParedeBaixa {...p} cor={it.parede} />;
+  const PP = (p: Parameters<typeof ParedeComPorta>[0]) => <ParedeComPorta {...p} cor={it.parede} />;
   return (
     <group>
       {/* pisos por sala */}
       {planta.salas.map((s) => (
-        <mesh key={s.id} geometry={plano(s.x1 - s.x0, s.z1 - s.z0)} material={mat(s.cor, { rough: 0.95 })} position={[(s.x0 + s.x1) / 2, 0.06, (s.z0 + s.z1) / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow />
+        <mesh key={s.id} geometry={plano(s.x1 - s.x0, s.z1 - s.z0)} material={mat(pisoUnico ?? s.cor, { rough: it.piso === "porcelanato" ? 0.45 : 0.95 })} position={[(s.x0 + s.x1) / 2, 0.06, (s.z0 + s.z1) / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow />
       ))}
       <mesh geometry={caixa(LARG + 0.6, 0.1, PROF + 0.6)} material={mat("#D8D4CC", { rough: 0.95 })} position={[0, 0, 0]} receiveShadow />
       {/* paredes externas (frente com a porta) */}
-      <ParedeComPorta de={[X0, Z0]} ate={[X1, Z0]} vao={2.2} />
-      <ParedeBaixa de={[X0, Z1]} ate={[X1, Z1]} />
-      <ParedeBaixa de={[X0, Z0]} ate={[X0, Z1]} />
-      <ParedeBaixa de={[X1, Z0]} ate={[X1, Z1]} />
+      {PP({ de: [X0, Z0], ate: [X1, Z0], vao: 2.2 })}
+      {P({ de: [X0, Z1], ate: [X1, Z1] })}
+      {P({ de: [X0, Z0], ate: [X0, Z1] })}
+      {P({ de: [X1, Z0], ate: [X1, Z1] })}
       {/* divisórias da frente: recepção | hall | CEO (vidro na do CEO) */}
-      <ParedeBaixa de={[-2.2, Z0]} ate={[-2.2, zMeio]} />
+      {P({ de: [-2.2, Z0], ate: [-2.2, zMeio] })}
       <ParedeBaixa de={[2.2, Z0]} ate={[2.2, zMeio]} cor="#CFE6EE" />
       {/* divisa frente/fundo com porta pra cada sala do fundo */}
       {planta.salas.filter((s) => s.tipo === "setor").map((s) => (
         <group key={s.id}>
-          {s.z0 === zMeio && <ParedeComPorta de={[s.x0, zMeio]} ate={[s.x1, zMeio]} />}
-          {s.z0 !== zMeio && <ParedeComPorta de={[s.x0, s.z0]} ate={[s.x1, s.z0]} />}
-          {s.x0 !== X0 && <ParedeComPorta de={[s.x0, s.z0]} ate={[s.x0, s.z1]} vao={1.2} />}
+          {s.z0 === zMeio && PP({ de: [s.x0, zMeio], ate: [s.x1, zMeio] })}
+          {s.z0 !== zMeio && PP({ de: [s.x0, s.z0], ate: [s.x1, s.z0] })}
+          {s.x0 !== X0 && PP({ de: [s.x0, s.z0], ate: [s.x0, s.z1], vao: 1.2 })}
         </group>
       ))}
       {/* recepção: balcão, sofá, mesinha, planta, quadro com a cor da empresa */}
       <Balcao position={[planta.balcao[0], 0, planta.balcao[1]]} />
       <Sofa position={[X0 + 1.0, 0, -2.6]} rotation={Math.PI / 2} cor={cor} largura={1.8} />
       <MesaBaixa position={[X0 + 2.2, 0, -2.6]} />
-      <Planta position={[X0 + 0.6, 0, Z0 + 0.7]} />
-      <Quadro position={[X0 + 0.07, 1.0, -4.6]} rotation={Math.PI / 2} largura={1.4} cor={cor} />
+      {it.plantas && <Planta position={[X0 + 0.6, 0, Z0 + 0.7]} />}
+      {!it.quadros && <Quadro position={[X0 + 0.07, 1.0, -4.6]} rotation={Math.PI / 2} largura={1.4} cor={cor} />}
       {/* hall: café */}
       <Cafe position={[0, 0, zMeio - 0.6]} rotation={Math.PI} />
       {/* sala do CEO */}
-      <Planta position={[X1 - 0.7, 0, Z0 + 0.7]} />
-      <Quadro position={[X1 - 0.07, 1.0, -4.4]} rotation={-Math.PI / 2} largura={1.6} cor="#F6EEDF" />
+      {it.plantas && <Planta position={[X1 - 0.7, 0, Z0 + 0.7]} />}
+      {!it.quadros && <Quadro position={[X1 - 0.07, 1.0, -4.4]} rotation={-Math.PI / 2} largura={1.6} cor="#F6EEDF" />}
       {/* mesas de todas as salas */}
-      {planta.salas.flatMap((s) => s.mesas.map((m, i) => <Mesa key={`${s.id}-${i}`} def={{ id: `${s.id}-${i}`, sala: s.id, pos: m.pos, rot: m.rot, tipo: m.tipo }} cor={s.setor?.cor ?? cor} />))}
+      {planta.salas.flatMap((s) => s.mesas.map((m, i) => <Mesa key={`${s.id}-${i}`} def={{ id: `${s.id}-${i}`, sala: s.id, pos: m.pos, rot: m.rot, tipo: m.tipo }} cor={s.setor?.cor ?? cor} tampoCor={tampo} />))}
       {/* plantinhas nos setores */}
-      {planta.salas.filter((s) => s.tipo === "setor").map((s) => <Planta key={s.id} position={[s.x1 - 0.6, 0, s.z1 - 0.6]} pequena />)}
+      {it.plantas && planta.salas.filter((s) => s.tipo === "setor").map((s) => <Planta key={s.id} position={[s.x1 - 0.6, 0, s.z1 - 0.6]} pequena />)}
     </group>
   );
 }
@@ -186,24 +237,30 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
 }
 
 // ---------- um escritório no lote ----------
-function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho }: { chave: string; e: Escritorio; cor: string; nome: string; logo: string | null; fora: boolean; nicho: string }) {
+function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, contratando = false }: { chave: string; e: Escritorio; cor: string; nome: string; logo: string | null; fora: boolean; nicho: string; anexo?: string | null; contratando?: boolean }) {
   const l = LOTE_POR_CHAVE[chave]; if (!l) return null;
-  const [x, z] = l.centro;
-  // nossa frente local é -z; frenteDoLote usa rot 0 = frente pra +z. O dono pode girar o prédio em quartos de volta (decor.giro)
-  const rot = frenteDoLote(l.k) + Math.PI + (e.decor?.giro ?? 0) * (Math.PI / 2);
+  // lote duplo: o prédio vai para o meio dos dois terrenos (o vizinho do lado, mesma rua)
+  const la = anexo ? LOTE_POR_CHAVE[anexo] : null; const dx = la ? (la.centro[0] - l.centro[0]) / 2 : 0;
+  const [x, z] = [l.centro[0] + dx, l.centro[1]];
+  // nossa frente local é -z; frenteDoLote usa rot 0 = frente pra +z. O dono pode girar o prédio em quartos de volta (decor.giro);
+  // no lote duplo o prédio largo só fica de frente ou de costas para a rua (meia volta)
+  const giro = e.decor?.giro ?? 0; const giroEf = la ? giro - (giro % 2) : giro;
+  const rot = frenteDoLote(l.k) + Math.PI + giroEf * (Math.PI / 2);
+  const it = e.decor?.interior;
   const planta = plantaCliente(e);
   const assinatura = JSON.stringify(e) + cor + nome + (logo ?? "");
   // a placa de esquina fica na ponta do lote virada para o cruzamento (não gira com o prédio)
   const placa = (e.decor?.extras ?? []).includes("placa");
   return (
     <group position={[x, 0, z]}>
-    {placa && <PlacaEsquina d={{ nome, cor, nicho: nomeNicho(nicho), numero: l.numero, logo }} sx={l.k % 2 ? 1 : -1} sz={l.k >= 2 ? 1 : -1} />}
+    {placa && <group position={[-dx, 0, 0]}><PlacaEsquina d={{ nome, cor, nicho: nomeNicho(nicho), numero: l.numero, logo }} sx={l.k % 2 ? 1 : -1} sz={l.k >= 2 ? 1 : -1} /></group>}
     <group rotation={[0, rot, 0]}>
-      <group visible={fora}><Exterior e={e} cor={cor} nome={nome} logo={logo} /></group>
-      <DecorLote d={e.decor ?? DECOR_PADRAO} cor={cor} logo={logo} />
+      <group visible={fora}><Exterior e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} /></group>
+      <DecorLote d={e.decor ?? DECOR_PADRAO} cor={cor} logo={logo} duplo={!!la} />
       {!fora && (
         <>
           <Estatico key={"d" + assinatura}><InteriorFixo e={e} cor={cor} /></Estatico>
+          {it?.quadros && <QuadrosLogo logo={logo} cor={cor} />}
           {planta.salas.filter((s) => s.tipo !== "hall").map((s) => <NomeSala key={s.id} s={s} />)}
           {e.equipe.map((m) => { const lugar = planta.lugares[m.id]; return lugar ? <MembroCena key={m.id} m={m} lugar={lugar} chave={chave} /> : null; })}
         </>
@@ -219,14 +276,16 @@ export function EscritoriosClientes() {
   const rascunho = useMundo((s) => s.rascunhoEscritorio);
   const rascunhoPlaca = useMundo((s) => s.rascunho);
   const fora = useEscritorio((s) => s.vista === "fora");
+  const vagas = useMundo((s) => s.vagas);
+  const anexos = useMemo(() => { const m: Record<string, string> = {}; for (const t of Object.values(terrenos)) if (t.anexoDe && t.status === "ativo") m[t.anexoDe] = t.chave; return m; }, [terrenos]);
   return (
     <group>
       {Object.values(terrenos).map((t) => {
         const e = t.chave === selecionado && rascunho ? rascunho : t.escritorio;
-        if (t.status !== "ativo" || !e) return null;
+        if (t.status !== "ativo" || !e || t.anexoDe) return null; // a ampliação não tem prédio próprio: o principal cresce
         const placa = t.chave === selecionado && rascunhoPlaca ? rascunhoPlaca : null;
         const logo = placa ? placa.logoDataUrl : t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null;
-        return <EscritorioLote key={t.chave} chave={t.chave} e={e} cor={placa?.cor ?? t.cor} nome={placa?.empresaNome ?? t.empresaNome} logo={logo} fora={fora} nicho={placa?.nicho ?? t.nicho ?? "negocios"} />;
+        return <EscritorioLote key={t.chave} chave={t.chave} e={e} cor={placa?.cor ?? t.cor} nome={placa?.empresaNome ?? t.empresaNome} logo={logo} fora={fora} nicho={placa?.nicho ?? t.nicho ?? "negocios"} anexo={anexos[t.chave] ?? null} contratando={(vagas[t.chave] ?? 0) > 0} />;
       })}
     </group>
   );
@@ -235,7 +294,8 @@ export function EscritoriosClientes() {
 // Lotes que têm escritório montado (a casa original some e o tapume não aparece)
 export function useLotesComEscritorio() {
   const terrenos = useMundo((s) => s.terrenos);
-  return useMemo(() => new Set(Object.values(terrenos).filter((t) => t.status === "ativo" && t.escritorio).map((t) => t.chave)), [terrenos]);
+  // a ampliação ativa (lote duplo) também perde a casa/terreno original: o prédio do principal ocupa os dois
+  return useMemo(() => new Set(Object.values(terrenos).filter((t) => t.status === "ativo" && (t.anexoDe ? terrenos[t.anexoDe]?.status === "ativo" && !!terrenos[t.anexoDe]?.escritorio : !!t.escritorio)).map((t) => t.chave)), [terrenos]);
 }
 
 // ---------- decoração do lote (11/11/2026) ----------
@@ -307,25 +367,27 @@ function Toldo({ cor, y, z, largura }: { cor: string; y: number; z: number; larg
 }
 
 // Piso, cerca, árvores e itens da frente. Coordenadas locais do lote: frente da loja para -z; lote de 20 × 20.
-export function DecorLote({ d, cor, logo }: { d: Decoracao; cor: string; logo: string | null }) {
+export function DecorLote({ d, cor, logo, duplo = false }: { d: Decoracao; cor: string; logo: string | null; duplo?: boolean }) {
   const H = 9.62; // meio lado do lote (menos o meio-fio)
+  // lote duplo: o piso e a cerca cobrem os dois terrenos (40 × 20) e o que fica na frente da porta abre junto com o prédio
+  const hx = duplo ? H + 10 : H, sx = duplo ? DUPLO.x : 1;
   const tex = typeof document !== "undefined" ? texturaPiso(d.piso) : null;
   const tem = (x: ExtraLote) => d.extras.includes(x);
   const madeira = mat("#A0703C", { rough: 0.9 }), metal = mat("#2B2F36", { metal: 0.4, rough: 0.5 });
   // árvores: primeiro nos fundos, depois na frente
-  const arvores: [number, number][] = [[-8.5, 8.5], [8.5, 8.5], [-9.0, -9.0], [9.0, -9.0]].slice(0, d.arvores) as [number, number][];
+  const arvores: [number, number][] = [[-hx + 1.12, 8.5], [hx - 1.12, 8.5], [-hx + 0.62, -9.0], [hx - 0.62, -9.0]].slice(0, d.arvores) as [number, number][];
   const lados: { de: [number, number]; ate: [number, number] }[] = [
-    { de: [-H, -H], ate: [-2.1, -H] }, { de: [2.1, -H], ate: [H, -H] }, // frente, com a passagem da entrada
-    { de: [-H, H], ate: [H, H] }, { de: [-H, -H], ate: [-H, H] }, { de: [H, -H], ate: [H, H] },
+    { de: [-hx, -H], ate: [-2.1 * sx, -H] }, { de: [2.1 * sx, -H], ate: [hx, -H] }, // frente, com a passagem da entrada
+    { de: [-hx, H], ate: [hx, H] }, { de: [-hx, -H], ate: [-hx, H] }, { de: [hx, -H], ate: [hx, H] },
   ];
   return (
     <group>
       {tex && (
-        <mesh geometry={plano(2 * H, 2 * H)} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]} receiveShadow>
+        <mesh geometry={plano(2 * hx, 2 * H)} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]} receiveShadow>
           <meshStandardMaterial map={tex} roughness={0.92} />
         </mesh>
       )}
-      <Estatico key={JSON.stringify(d) + cor}>
+      <Estatico key={JSON.stringify(d) + cor + (duplo ? "2" : "")}>
         {/* cerca */}
         {d.cerca !== "nenhuma" && lados.map(({ de, ate }, i) => {
           const dx = ate[0] - de[0], dz = ate[1] - de[1], len = Math.hypot(dx, dz), ang = Math.atan2(dx, dz);
@@ -346,14 +408,14 @@ export function DecorLote({ d, cor, logo }: { d: Decoracao; cor: string; logo: s
           );
         })}
         {/* vasos com plantas ao lado da porta */}
-        {tem("vasos") && [-1.9, 1.9].map((x) => (
+        {tem("vasos") && [-1.9 * sx, 1.9 * sx].map((x) => (
           <group key={x} position={[x, 0, -8.25]}>
             <mesh geometry={cilindro(0.34, 0.26, 0.6, 14)} material={mat("#C0663E", { rough: 0.85 })} position={[0, 0.3, 0]} castShadow />
             <mesh geometry={esfera(0.48, 12)} material={mat("#4E9B47", { rough: 1 })} position={[0, 0.95, 0]} castShadow />
           </group>
         ))}
         {/* bancos de praça */}
-        {tem("bancos") && [-5, 5].map((x) => (
+        {tem("bancos") && (duplo ? [-8, 8] : [-5, 5]).map((x) => (
           <group key={x} position={[x, 0, -9.0]}>
             <mesh geometry={caixa(1.6, 0.07, 0.46)} material={madeira} position={[0, 0.46, 0]} castShadow />
             <mesh geometry={caixa(1.6, 0.42, 0.06)} material={madeira} position={[0, 0.74, 0.22]} />
@@ -361,7 +423,7 @@ export function DecorLote({ d, cor, logo }: { d: Decoracao; cor: string; logo: s
           </group>
         ))}
         {/* mesas com guarda-sol na cor da marca */}
-        {tem("mesas") && [-7.3, 7.3].map((x) => (
+        {tem("mesas") && [-(hx - 2.32), hx - 2.32].map((x) => (
           <group key={x} position={[x, 0, -8.7]}>
             <mesh geometry={cilindro(0.48, 0.48, 0.05, 18)} material={mat("#F4F1EA", { rough: 0.6 })} position={[0, 0.76, 0]} castShadow />
             <mesh geometry={cilindro(0.04, 0.04, 2.3, 6)} material={metal} position={[0, 1.15, 0]} />
@@ -371,13 +433,13 @@ export function DecorLote({ d, cor, logo }: { d: Decoracao; cor: string; logo: s
         ))}
         {/* totem na calçada com a cor (a logo vai por cima, fora do Estatico) */}
         {tem("totem") && (
-          <group position={[-3.2, 0, -9.25]}>
+          <group position={[-3.2 * sx, 0, -9.25]}>
             <mesh geometry={caixa(0.8, 2.4, 0.3)} material={mat("#1F2630", { rough: 0.6 })} position={[0, 1.2, 0]} castShadow />
             <mesh geometry={caixa(0.84, 0.12, 0.34)} material={mat(cor, { emissive: cor, ei: 0.6 })} position={[0, 2.35, 0]} />
           </group>
         )}
         {/* bandeiras nos cantos da frente */}
-        {tem("bandeiras") && [-9.2, 9.2].map((x) => (
+        {tem("bandeiras") && [-(hx - 0.42), hx - 0.42].map((x) => (
           <group key={x} position={[x, 0, -6.2]}>
             <mesh geometry={cilindro(0.04, 0.05, 5, 6)} material={mat("#D9DDE3", { metal: 0.6, rough: 0.35 })} position={[0, 2.5, 0]} />
             <mesh geometry={caixa(0.02, 0.85, 1.4)} material={mat(cor, { rough: 0.8 })} position={[0, 4.45, -0.72]} castShadow />
@@ -387,20 +449,20 @@ export function DecorLote({ d, cor, logo }: { d: Decoracao; cor: string; logo: s
         {/* varal de luzinhas: postes na frente e fios até a fachada */}
         {tem("luzes") && (
           <>
-            {[-8.6, 8.6].map((x) => <mesh key={x} geometry={cilindro(0.04, 0.05, 3.2, 6)} material={metal} position={[x, 1.6, -9.3]} />)}
-            <Varal de={[-8.6, 3.15, -9.3]} ate={[8.6, 3.15, -9.3]} />
-            <Varal de={[-8.6, 3.15, -9.3]} ate={[-4, 3.7, -7.6]} n={6} flecha={0.3} />
-            <Varal de={[8.6, 3.15, -9.3]} ate={[4, 3.7, -7.6]} n={6} flecha={0.3} />
+            {[-(hx - 1.02), hx - 1.02].map((x) => <mesh key={x} geometry={cilindro(0.04, 0.05, 3.2, 6)} material={metal} position={[x, 1.6, -9.3]} />)}
+            <Varal de={[-(hx - 1.02), 3.15, -9.3]} ate={[hx - 1.02, 3.15, -9.3]} n={duplo ? 20 : 11} />
+            <Varal de={[-(hx - 1.02), 3.15, -9.3]} ate={[-4 * sx, 3.7, -7.6]} n={6} flecha={0.3} />
+            <Varal de={[hx - 1.02, 3.15, -9.3]} ate={[4 * sx, 3.7, -7.6]} n={6} flecha={0.3} />
           </>
         )}
         {/* bicicletário na lateral */}
         {tem("bicicletario") && [-4.8, -3.6, -2.4].map((z) => (
-          <mesh key={z} geometry={toro(0.36, 0.035, 12, Math.PI)} material={metal} position={[9.1, 0, z]} rotation={[0, Math.PI / 2, 0]} />
+          <mesh key={z} geometry={toro(0.36, 0.035, 12, Math.PI)} material={metal} position={[hx - 0.52, 0, z]} rotation={[0, Math.PI / 2, 0]} />
         ))}
       </Estatico>
-      {tem("totem") && logo && <LogoPlano url={logo} position={[-3.2, 1.45, -9.42]} tamanho={0.62} />}
+      {tem("totem") && logo && <LogoPlano url={logo} position={[-3.2 * sx, 1.45, -9.42]} tamanho={0.62} />}
       {arvores.map(([x, z]) => <Arvore key={`${x},${z}`} position={[x, 0, z]} escala={1.15} />)}
-      {tem("natal") && natalAtivo() && <NatalLote />}
+      {tem("natal") && natalAtivo() && <NatalLote x={duplo ? 4.7 : 3.1} />}
     </group>
   );
 }

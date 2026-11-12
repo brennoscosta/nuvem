@@ -20,6 +20,7 @@ export interface Terreno {
   reservadoEm: Date; reservadoAte: Date | null; pagoAte: Date | null;
   escritorio: Escritorio | null; // layout, setores e equipe (só quando ativo)
   nicho: string; // id em NICHOS (vai no balão)
+  anexoDe: string | null; // lote duplo (12/11/2026): este lote é a ampliação do lote principal indicado
 }
 export interface TerrenoAdmin extends Terreno { email: string; usuarioNome: string; banidoEm: Date | null }
 
@@ -41,11 +42,11 @@ export const ehAdmin = (u: Usuario | null | undefined) => !!u && (u.papel === "a
 export function loteAVenda(chave: string) {
   const m = /^(-?\d+),(-?\d+),([0-3])$/.exec(chave); if (!m) return false;
   const q = QUARTEIROES.find((x) => x.i === +m[1] && x.j === +m[2]);
-  return !!q?.lotes;
+  return !!q?.lotes && q.lotes[+m[3]]?.tipo !== "praca"; // a praça de eventos não está à venda
 }
 
 // trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
-const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio, t.nicho`;
+const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio, t.nicho, t.anexo_de`;
 
 // Limpa o que venceu: reserva sem pagamento depois de 1 h é apagada; chão pago sai do mapa depois do vencimento + tolerância,
 // mas a marca e a equipe vão pro arquivo e voltam na próxima reserva do mesmo dono
@@ -56,6 +57,8 @@ async function limparVencidos() {
       RETURNING chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, escritorio, pago_ate)
     INSERT INTO terreno_arquivo (chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, escritorio, pago_ate)
     SELECT chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, escritorio, pago_ate FROM saiu`;
+  // lote duplo: se o principal saiu do mapa, a ampliação vira um lote normal do mesmo dono (os dias pagos continuam)
+  await sql`UPDATE terreno SET anexo_de = NULL WHERE anexo_de IS NOT NULL AND anexo_de NOT IN (SELECT chave FROM terreno WHERE status = 'ativo')`;
   void avisarVencimentos();
 }
 
@@ -75,12 +78,12 @@ export async function listarTerrenos(): Promise<Terreno[]> {
   await migrar(); await limparVencidos();
   const lista = await sql<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t ORDER BY t.reservado_em`;
   // lotes ativados antes do escritório existir (build 34) ganham o padrão na primeira leitura
-  for (const t of lista) if (t.status === "ativo" && !t.escritorio) t.escritorio = await garantirEscritorio(t.chave);
+  for (const t of lista) if (t.status === "ativo" && !t.escritorio && !t.anexoDe) t.escritorio = await garantirEscritorio(t.chave);
   return lista;
 }
 export async function terrenoDoUsuario(usuarioId: string): Promise<Terreno | null> {
   await migrar(); await limparVencidos();
-  const [t] = await sql<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.usuario_id = ${usuarioId} ORDER BY t.status = 'ativo' DESC, t.reservado_em DESC LIMIT 1`;
+  const [t] = await sql<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.usuario_id = ${usuarioId} AND t.anexo_de IS NULL ORDER BY t.status = 'ativo' DESC, t.reservado_em DESC LIMIT 1`;
   return t ?? null;
 }
 export async function obterTerreno(chave: string): Promise<Terreno | null> {
@@ -122,7 +125,7 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
         WHERE p.usuario_id = ${u.id} AND p.terreno_chave <> ${chave} AND p.tipo = 'lote' AND p.status = 'pendente' AND p.criado_em > now() - interval '1 hour' LIMIT 1`;
       if (pix) throw new Error(ERRO_PIX_ABERTO);
       // libera uma reserva anterior (não paga) do mesmo usuário
-      await tx`DELETE FROM terreno WHERE usuario_id = ${u.id} AND chave <> ${chave} AND status = 'reservado'`;
+      await tx`DELETE FROM terreno WHERE usuario_id = ${u.id} AND chave <> ${chave} AND status = 'reservado' AND anexo_de IS NULL`;
     }
     if (dono) {
       if (d.manterLogo && !logo) await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, nicho = ${nicho}, atualizado_em = now() WHERE chave = ${chave}`;
@@ -173,8 +176,8 @@ export async function reverterTerreno(chave: string, meses: number, usuarioId: s
 }
 // Todo escritório nasce com atendente + CEO (nome do dono) e um setor de atendimento; só cria se ainda não tem
 export async function garantirEscritorio(chave: string, db: Db = sql) {
-  const [t] = await db<{ empresaNome: string; cor: string; escritorio: Escritorio | null }[]>`SELECT t.empresa_nome, t.cor, t.escritorio FROM terreno t WHERE t.chave = ${chave}`;
-  if (!t || t.escritorio) return t?.escritorio ?? null;
+  const [t] = await db<{ empresaNome: string; cor: string; escritorio: Escritorio | null; anexoDe: string | null }[]>`SELECT t.empresa_nome, t.cor, t.escritorio, t.anexo_de FROM terreno t WHERE t.chave = ${chave}`;
+  if (!t || t.escritorio || t.anexoDe) return t?.escritorio ?? null; // a ampliação usa o escritório do lote principal
   const e = escritorioPadrao(t.empresaNome, t.cor);
   await db`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
   return e;
@@ -272,3 +275,30 @@ export async function adminBanir(chave: string, motivo: string) {
   });
 }
 export async function adminDesbanir(usuarioId: string) { await migrar(); await sql`UPDATE usuario SET banido_em = NULL, banido_motivo = NULL WHERE id = ${usuarioId}`; }
+
+// ---------- lote duplo (12/11/2026) ----------
+// Quem tem lote ativo pode alugar UM lote vizinho do mesmo quarteirão (que divide um lado com o seu) como ampliação: o
+// prédio fica maior e passa a ocupar os dois. A ampliação tem o preço de um lote e é paga e renovada à parte.
+export function vizinhosDoLote(chave: string): string[] {
+  const m = /^(-?\d+),(-?\d+),([0-3])$/.exec(chave); if (!m) return [];
+  // só o vizinho do lado (0↔1 e 2↔3: mesma rua). Um atrás do outro (0↔2) daria um lote de fundo, com a frente no meio.
+  const lado = +m[3] ^ 1;
+  return [`${m[1]},${m[2]},${lado}`].filter((c) => loteAVenda(c));
+}
+export async function reservarAnexo(u: Usuario, anexo: string) {
+  await migrar(); await limparVencidos();
+  if (u.banidoEm) throw new Error("Conta suspensa.");
+  const principal = await terrenoDoUsuario(u.id);
+  if (!principal || principal.status !== "ativo") throw new Error("Para ampliar, o seu lote precisa estar ativo.");
+  if (!vizinhosDoLote(principal.chave).includes(anexo)) throw new Error("A ampliação precisa ser num lote vizinho do seu, no mesmo quarteirão.");
+  return sql.begin(async (tx) => {
+    const [ja] = await tx`SELECT chave FROM terreno WHERE anexo_de = ${principal.chave} AND chave <> ${anexo}`;
+    if (ja) throw new Error("O seu lote já tem uma ampliação.");
+    const [dono] = await tx<{ usuarioId: string }[]>`SELECT usuario_id FROM terreno WHERE chave = ${anexo} FOR UPDATE`;
+    if (dono && dono.usuarioId !== u.id) throw new Error("Esse lote já tem dono.");
+    if (!dono) await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, nicho, status, reservado_ate, anexo_de) VALUES (${anexo}, ${u.id}, ${principal.empresaNome}, ${principal.cor}, ${principal.nicho}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${principal.chave})`;
+    void registrar("reserva", `${principal.empresaNome} reservou a ampliação do lote`, { usuarioId: u.id, terrenoChave: anexo, dados: { detalhes: `Lote duplo com ${principal.chave}.` } });
+    const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${anexo}`;
+    return t;
+  });
+}
