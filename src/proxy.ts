@@ -7,6 +7,14 @@ import { ehHostWorkend } from "@/server/hosts";
 export function proxy(req: NextRequest) {
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
   if (!ehHostWorkend(host, req.nextUrl.searchParams)) return NextResponse.next();
+  const r = rotaWorkend(req);
+  // "Indique um vizinho" (12/11/2026): ?ind=CODIGO guarda por 30 dias quem indicou; vale no 1º pagamento do lote
+  const ind = req.nextUrl.searchParams.get("ind");
+  if (ind && /^[A-Z0-9]{4,10}$/i.test(ind)) r.cookies.set("we_ind", ind.toUpperCase(), { maxAge: 30 * 86400, httpOnly: true, sameSite: "lax", secure: true, path: "/" });
+  return r;
+}
+
+function rotaWorkend(req: NextRequest) {
   const p = req.nextUrl.pathname;
   const url = req.nextUrl.clone();
   const noindex = (r: NextResponse) => { r.headers.set("x-robots-tag", "noindex, nofollow"); return r; };

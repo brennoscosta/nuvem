@@ -3,6 +3,7 @@
 import { sql, id, migrar } from "./db";
 import { TIPOS_AVATAR, TODOS_BONECOS } from "@/office/data/bonecos";
 import { ehAdmin } from "./terrenos";
+import { avisarRecado } from "./avisos";
 import type { Usuario } from "./usuarios";
 import { registrar } from "./eventos";
 import { NICHOS, nomeNicho } from "@/office/data/mundo";
@@ -127,6 +128,7 @@ export async function enviarMensagem(de: Usuario, paraId: string, tipo: string, 
   const [alvo] = await sql<{ usuarioId: string }[]>`SELECT usuario_id FROM personagem WHERE usuario_id = ${paraId}`;
   if (!alvo) throw new Error("Esse personagem não existe mais.");
   const [m] = await sql<Mensagem[]>`INSERT INTO recado (id, de_id, para_id, tipo, texto) VALUES (${id("msg")}, ${de.id}, ${paraId}, ${tp}, ${t}) RETURNING id, de_id, para_id, tipo, texto, lida_em, criado_em`;
+  void avisarRecado(de.id, paraId, tp, t); // sino de quem recebe (12/11/2026)
   return m;
 }
 // Conversa entre dois (as últimas 80), marcando como lidas as recebidas

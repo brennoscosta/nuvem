@@ -46,7 +46,7 @@ export function ControlesCamera() {
   if (!noMundo) return null;
   const sep = <span className="mx-0.5 h-5 w-px bg-white/15" aria-hidden="true" />;
   return (
-    <div className="pointer-events-auto absolute bottom-14 left-3 z-10 hidden items-center gap-0.5 rounded-2xl bg-[#111418]/75 p-1 shadow-xl backdrop-blur sm:flex" role="toolbar" aria-label="Câmera">
+    <div data-tour="camera" className="pointer-events-auto absolute bottom-14 left-3 z-10 hidden items-center gap-0.5 rounded-2xl bg-[#111418]/75 p-1 shadow-xl backdrop-blur sm:flex" role="toolbar" aria-label="Câmera">
       <Botao tipo="girarEsq" rotulo="Girar para a esquerda (Q)" />
       <Botao tipo="girarDir" rotulo="Girar para a direita (E)" />
       {sep}

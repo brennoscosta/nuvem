@@ -2,6 +2,7 @@
 // A loja vista por quem chega (11/11/2026): resumo (nicho, sobre, contatos, nota) e a conversa com a atendente de IA,
 // que responde só sobre a empresa e anota o contato para o dono. Usado no cartão do lote no mapa e na página /loja/N.
 import { useEffect, useRef, useState } from "react";
+import { avisarClique, type TipoClique } from "./LinkRastreado";
 
 export type LojaInfo = {
   numero: number; chave: string; nome: string; cor: string; nicho: string; logo: string | null; donoId: string; sobre: string;
@@ -26,15 +27,15 @@ export function useLoja(numero: number | null) {
 }
 
 export const linkZap = (n: string) => `https://wa.me/${n.length <= 11 ? `55${n}` : n}`;
-export function Contatos({ c, claro = false }: { c: LojaInfo["contatos"]; claro?: boolean }) {
+export function Contatos({ c, claro = false, numero }: { c: LojaInfo["contatos"]; claro?: boolean; numero?: number }) {
   const itens = [
-    c.whatsapp && { href: linkZap(c.whatsapp), t: "WhatsApp" },
-    c.instagram && { href: `https://instagram.com/${c.instagram}`, t: `@${c.instagram}` },
-    c.site && { href: c.site, t: c.site.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "") },
-    c.email && { href: `mailto:${c.email}`, t: c.email },
-  ].filter(Boolean) as { href: string; t: string }[];
+    c.whatsapp && { href: linkZap(c.whatsapp), t: "WhatsApp", tipo: "whatsapp" },
+    c.instagram && { href: `https://instagram.com/${c.instagram}`, t: `@${c.instagram}`, tipo: "instagram" },
+    c.site && { href: c.site, t: c.site.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""), tipo: "site" },
+    c.email && { href: `mailto:${c.email}`, t: c.email, tipo: "email" },
+  ].filter(Boolean) as { href: string; t: string; tipo: TipoClique }[];
   if (!itens.length) return null;
-  return <div className="flex flex-wrap gap-1.5">{itens.map((i) => <a key={i.href} href={i.href} target="_blank" rel="noreferrer nofollow" className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${claro ? "bg-white/15 text-white" : "bg-[#EEF3FF] text-[#1D4ED8]"} hover:underline`}>{i.t}</a>)}</div>;
+  return <div className="flex flex-wrap gap-1.5">{itens.map((i) => <a key={i.href} href={i.href} target="_blank" rel="noreferrer nofollow" onClick={() => { if (numero) avisarClique(numero, i.tipo); }} className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${claro ? "bg-white/15 text-white" : "bg-[#EEF3FF] text-[#1D4ED8]"} hover:underline`}>{i.t}</a>)}</div>;
 }
 
 export function Estrelas({ media, n }: { media: number | null; n: number }) {

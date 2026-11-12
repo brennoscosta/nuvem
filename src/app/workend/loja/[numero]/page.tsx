@@ -12,6 +12,12 @@ import { ListaVagas, type VagaLista } from "../../_vagas";
 import { Topo, Rodape } from "../../_partes";
 import { meta } from "../../seo";
 import { ConversaDaLoja } from "./_conversa";
+import { headers } from "next/headers";
+import { registrarVisitaDia } from "@/server/resultados";
+import { obterTerreno } from "@/server/terrenos";
+import { LinkRastreado, type TipoClique } from "@/office/ui/LinkRastreado";
+import { AgendarLoja } from "@/office/ui/AgendarLoja";
+import { VitrineLoja } from "@/office/ui/VitrineLoja";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ numero: string }> };
@@ -31,9 +37,12 @@ export default async function Loja({ params }: Props) {
   const l = await carregar(numero);
   if (!l) notFound();
   const u = await usuarioAtual().catch(() => null);
+  // painel de resultados do dono: uma visita por pessoa por dia (o próprio dono não conta)
+  void registrarVisitaDia(await headers(), { chave: l.chave, donoId: l.donoId }, u?.id ?? null, "pagina");
   const [avals, vagasBrutas] = await Promise.all([avaliacoesRecebidas(l.donoId, 6).catch(() => []), vagasAbertas({ donoId: l.donoId }).catch(() => [])]);
   const vagas: VagaLista[] = vagasBrutas.map((v) => ({ ...v, criadoEm: new Date(v.criadoEm).toISOString() }));
   const ehDono = u?.id === l.donoId;
+  const promo = (await obterTerreno(l.chave).catch(() => null))?.promocao ?? null; // promoção na fachada (12/11/2026)
   return (
     <>
       <Topo logado={!!u} nome={u?.nome} />
@@ -48,6 +57,7 @@ export default async function Loja({ params }: Props) {
               <span className="mt-1 inline-block rounded-full bg-white/90 px-3 py-1"><EstrelasTexto media={l.avaliacao.media} n={l.avaliacao.n} /></span>
             </div>
           </div>
+          {promo && <p className="relative mt-5 inline-flex flex-wrap items-center gap-2 rounded-full bg-[#E11D48] px-4 py-1.5 text-[15px] font-bold shadow-lg">🏷️ {promo.texto}<span className="font-semibold text-white/80">· até {new Date(promo.ate).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></p>}
           <div className="relative mt-6 flex flex-wrap gap-2">
             <Link href={`/mundo?lote=${encodeURIComponent(l.chave)}`} className="btn" style={{ background: "#fff", color: "var(--ink)" }}>Ver no mapa 3D</Link>
             {vagas.length > 0 && <a href="#vagas" className="btn border-white/40 bg-white/10" style={{ color: "#fff" }}><span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-[#FFD24A]" aria-hidden="true" />Estamos contratando · {vagas.length} {vagas.length === 1 ? "vaga" : "vagas"}</a>}
@@ -61,6 +71,7 @@ export default async function Loja({ params }: Props) {
               <h2 className="text-[1.5rem]">O que a {l.nome} faz</h2>
               {l.sobre ? <p className="mt-3 max-w-[62ch] whitespace-pre-line text-[17px] leading-relaxed">{l.sobre}</p> : <p className="mt-3 text-[var(--tinta-2)]">A empresa ainda não escreveu a apresentação. Pergunte à atendente ao lado.</p>}
             </section>
+            <VitrineLoja numero={l.numero} />
             {vagas.length > 0 && (
               <section id="vagas" className="scroll-mt-6">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -99,8 +110,9 @@ export default async function Loja({ params }: Props) {
             </section>
           </div>
           <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+            <AgendarLoja numero={l.numero} cor={l.cor} />
             <ConversaDaLoja loja={l} logado={!!u} />
-            <ContatosBloco c={l.contatos} />
+            <ContatosBloco c={l.contatos} numero={l.numero} />
           </aside>
         </div>
       </main>
@@ -114,13 +126,13 @@ function EstrelasTexto({ media, n }: { media: number | null; n: number }) {
   if (!n || media == null) return <span className="text-[13px] font-semibold text-[var(--tinta-2)]">Sem avaliações ainda</span>;
   return <span className="text-[13px] font-bold text-[#7A5A00]">★ {media.toFixed(1).replace(".", ",")} <span className="font-normal text-[var(--tinta-2)]">· {n} {n === 1 ? "avaliação" : "avaliações"}</span></span>;
 }
-function ContatosBloco({ c }: { c: { whatsapp?: string; instagram?: string; site?: string; email?: string } }) {
-  const itens = [c.whatsapp && ["WhatsApp", `https://wa.me/${c.whatsapp.length <= 11 ? `55${c.whatsapp}` : c.whatsapp}`, c.whatsapp], c.instagram && ["Instagram", `https://instagram.com/${c.instagram}`, `@${c.instagram}`], c.site && ["Site", c.site, c.site.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")], c.email && ["E-mail", `mailto:${c.email}`, c.email]].filter(Boolean) as string[][];
+function ContatosBloco({ c, numero }: { c: { whatsapp?: string; instagram?: string; site?: string; email?: string }; numero: number }) {
+  const itens = [c.whatsapp && ["WhatsApp", `https://wa.me/${c.whatsapp.length <= 11 ? `55${c.whatsapp}` : c.whatsapp}`, c.whatsapp, "whatsapp"], c.instagram && ["Instagram", `https://instagram.com/${c.instagram}`, `@${c.instagram}`, "instagram"], c.site && ["Site", c.site, c.site.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""), "site"], c.email && ["E-mail", `mailto:${c.email}`, c.email, "email"]].filter(Boolean) as string[][];
   if (!itens.length) return null;
   return (
     <div className="rounded-2xl border border-[var(--linha)] p-5">
       <b>Contatos</b>
-      <ul className="mt-2 space-y-1.5">{itens.map(([t, href, rot]) => <li key={t} className="flex justify-between gap-3 text-[15px]"><span className="text-[var(--tinta-2)]">{t}</span><a href={href} target="_blank" rel="noreferrer nofollow" className="truncate font-semibold text-[var(--azul)] hover:underline">{rot}</a></li>)}</ul>
+      <ul className="mt-2 space-y-1.5">{itens.map(([t, href, rot, tipo]) => <li key={t} className="flex justify-between gap-3 text-[15px]"><span className="text-[var(--tinta-2)]">{t}</span><LinkRastreado numero={numero} tipo={tipo as TipoClique} href={href} target="_blank" rel="noreferrer nofollow" className="truncate font-semibold text-[var(--azul)] hover:underline">{rot}</LinkRastreado></li>)}</ul>
     </div>
   );
 }

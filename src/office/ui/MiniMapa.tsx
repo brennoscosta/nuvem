@@ -3,7 +3,7 @@
 // cinza, em obras em amarelo), a praça, a Nuvem e a lanchonete; filtro por área; o triângulo mostra para onde a câmera
 // olha e o ponto azul é o meu personagem. Clicar num lote voa até ele e abre o cartão.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useMundo, modoMundo, LOTES } from "../mundoStore";
+import { useMundo, modoMundo, LOTES, useAgora, promocaoAtiva } from "../mundoStore";
 import { NICHOS, nomeNicho, centroQuarteirao, QUARTEIRAO, CALCADA, LOTE } from "../data/mundo";
 import { PRACA_CHAVE } from "../data/praca";
 import { cameraInfo } from "../scene/CameraMundo";
@@ -26,6 +26,7 @@ export function MiniMapa() {
   const sel = useMundo((s) => s.loteSelecionado);
   const praca = useMundo((s) => s.praca);
   const temPersonagem = usePersonagem((s) => !!s.meu);
+  const agora = useAgora();
   const [nicho, setNicho] = useState("");
   const [abertoCel, setAbertoCel] = useState(false);
   const [minimizado, setMin] = useState(false);
@@ -50,14 +51,16 @@ export function MiniMapa() {
     const ehPraca = l.chave === PRACA_CHAVE;
     const cor = ehPraca ? (vivo ? "#E11D48" : "#0F766E") : !t ? "#3A4452" : t.status === "ativo" ? t.cor : "#E0A91B";
     const area = principal?.nicho ?? "negocios";
-    const apagado = !!nicho && (ehPraca || !t || t.status !== "ativo" || area !== nicho);
-    const nome = ehPraca ? `Praça de Eventos${vivo ? " · ao vivo agora" : ""}` : !t ? `Lote ${l.numero} · à venda` : `${principal?.empresaNome ?? t.empresaNome} · Lote ${l.numero}${t.status === "ativo" ? ` · ${nomeNicho(area)}` : " · em obras"}`;
-    return { l, t, cor, apagado, nome, ehPraca, contratando: !!t && !t.anexoDe && (vagas[l.chave] ?? 0) > 0 };
+    const promo = t && !t.anexoDe && t.status === "ativo" ? promocaoAtiva(t, agora) : null; // promoção na fachada (12/11/2026)
+    const apagado = nicho === "__promo" ? !promo : !!nicho && (ehPraca || !t || t.status !== "ativo" || area !== nicho);
+    const nome = ehPraca ? `Praça de Eventos${vivo ? " · ao vivo agora" : ""}` : !t ? `Lote ${l.numero} · à venda` : `${principal?.empresaNome ?? t.empresaNome} · Lote ${l.numero}${t.status === "ativo" ? ` · ${nomeNicho(area)}` : " · em obras"}${promo ? ` · 🏷️ ${promo.texto}` : ""}`;
+    return { l, t, cor, apagado, nome, ehPraca, promo: !!promo, contratando: !!t && !t.anexoDe && (vagas[l.chave] ?? 0) > 0 };
   });
+  const algumaPromo = lotes.some((x) => x.promo);
   return (
     <>
-      <button onClick={() => { setAbertoCel(true); setMin(false); }} className={`pointer-events-auto absolute right-2 top-[4.4rem] z-10 items-center gap-1.5 rounded-full bg-[#111418]/85 px-3 py-1.5 text-xs font-semibold text-white shadow-xl backdrop-blur sm:left-3 sm:right-auto sm:top-20 ${abertoCel ? "hidden" : "flex"} ${minimizado ? "sm:flex" : "sm:hidden"}`}>🗺️ Mapa da cidade</button>
-      <div className={`pointer-events-auto absolute right-2 top-[4.4rem] z-10 w-[11.5rem] rounded-2xl bg-[#111418]/88 p-2 text-white shadow-2xl backdrop-blur sm:left-3 sm:right-auto sm:top-20 sm:w-[13.5rem] ${abertoCel ? "block" : "hidden"} ${minimizado ? "sm:hidden" : "sm:block"}`}>
+      <button data-tour="mapa" onClick={() => { setAbertoCel(true); setMin(false); }} className={`pointer-events-auto absolute right-2 top-[4.4rem] z-10 items-center gap-1.5 rounded-full bg-[#111418]/85 px-3 py-1.5 text-xs font-semibold text-white shadow-xl backdrop-blur sm:left-3 sm:right-auto sm:top-20 ${abertoCel ? "hidden" : "flex"} ${minimizado ? "sm:flex" : "sm:hidden"}`}>🗺️ Mapa da cidade</button>
+      <div data-tour="mapa" className={`pointer-events-auto absolute right-2 top-[4.4rem] z-10 w-[11.5rem] rounded-2xl bg-[#111418]/88 p-2 text-white shadow-2xl backdrop-blur sm:left-3 sm:right-auto sm:top-20 sm:w-[13.5rem] ${abertoCel ? "block" : "hidden"} ${minimizado ? "sm:hidden" : "sm:block"}`}>
         <div className="mb-1.5 flex items-center justify-between gap-1 px-0.5">
           <span className="text-[10px] font-bold uppercase tracking-wide text-white/60">Mapa da cidade</span>
           <button onClick={() => { setAbertoCel(false); setMin(true); }} aria-label="Fechar o mapa" className="rounded-full px-1.5 text-white/60 hover:bg-white/10">✕</button>
@@ -74,7 +77,7 @@ export function MiniMapa() {
               </g>}
             </g>
           ); })}
-          {lotes.map(({ l, t, cor, apagado, nome, ehPraca, contratando }) => {
+          {lotes.map(({ l, t, cor, apagado, nome, ehPraca, contratando, promo }) => {
             const [x, z] = l.centro; const s = LOTE - 1.6; const eMeu = !!meu && (l.chave === meu || t?.anexoDe === meu);
             return (
               <g key={l.chave} className="cursor-pointer" onClick={() => ir(l.chave)} opacity={apagado ? 0.22 : 1}>
@@ -83,6 +86,7 @@ export function MiniMapa() {
                 {ehPraca && <text x={x} y={z + 3.2} textAnchor="middle" fontSize={9} style={{ pointerEvents: "none" }}>🎤</text>}
                 {!t && !ehPraca && <text x={x} y={z + 2.6} textAnchor="middle" fontSize={6.5} fontWeight={700} fill="#9AA6B4" style={{ pointerEvents: "none" }}>{l.numero}</text>}
                 {contratando && <circle cx={x + s / 2 - 2.6} cy={z - s / 2 + 2.6} r={2.4} fill="#FACC15" stroke="#111418" strokeWidth={0.8} />}
+                {promo && <g style={{ pointerEvents: "none" }}><circle cx={x - s / 2 + 3} cy={z + s / 2 - 3} r={3.4} fill="#E11D48" stroke="#fff" strokeWidth={0.9} /><text x={x - s / 2 + 3} y={z + s / 2 - 1.2} textAnchor="middle" fontSize={5} fontWeight={900} fill="#fff">%</text></g>}
               </g>
             );
           })}
@@ -92,12 +96,14 @@ export function MiniMapa() {
         </svg>
         <select value={nicho} onChange={(e) => setNicho(e.target.value)} aria-label="Filtrar por área" className="mt-1.5 w-full rounded-lg bg-white/10 px-2 py-1 text-[11px] font-semibold text-white outline-none [&>option]:text-[#1D2128]">
           <option value="">Todas as áreas</option>
+          {algumaPromo && <option value="__promo">🏷️ Com promoção agora</option>}
           {nichosPresentes.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}
         </select>
         <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 px-0.5 text-[9.5px] text-white/60">
           <span><i className="mr-1 inline-block h-2 w-2 rounded-sm border border-dashed border-white/50 align-middle" />à venda</span>
           <span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-[#E0A91B] align-middle" />em obras</span>
           <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#FACC15] align-middle" />contratando</span>
+          {algumaPromo && <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#E11D48] align-middle" />promoção</span>}
         </div>
       </div>
     </>

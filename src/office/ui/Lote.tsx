@@ -2,12 +2,14 @@
 // Cartão do lote (o que tem ali, status, "Quero esse chão") e o painel "Montar minha empresa" (nome, logo, cor),
 // que reflete ao vivo na placa e no tapume do lote. Reservar precisa da conta do WorkEnd.
 import { useEffect, useRef, useState } from "react";
-import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES_EMPRESA } from "../mundoStore";
+import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES_EMPRESA, useAgora, promocaoAtiva } from "../mundoStore";
 import { NICHOS } from "../data/mundo";
 import { useEscritorio } from "../store";
 import { BotoesPersonagem } from "./BotoesPersonagem";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 import { ChatLoja, Contatos, Estrelas, useLoja } from "./ChatLoja";
+import { AgendarLoja } from "./AgendarLoja";
+import { VitrineLoja } from "./VitrineLoja";
 import { PRACA_CHAVE } from "../data/praca";
 
 // Contagem regressiva da reserva (usa o relógio do servidor); quando zera, recarrega (o lote volta a ficar livre)
@@ -31,6 +33,55 @@ function useContagem(ate: string | null | undefined) {
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+// Cotação do Pix do meu lote (12/11/2026): oferta de entrada (fundador, feira, indicação) e crédito de indicação
+interface Cotacao { valor: number; base: number; primeiroMes: number | null; oferta: { id: string; nome: string; desconto: number; detalhe: string } | null; creditoUsado: number; creditoDisponivel: number; admin: boolean }
+function useCotacao(chave: string | null, ligado: boolean, versao: string) {
+  const [cot, setCot] = useState<{ k: string; c: Cotacao } | null>(null);
+  const k = `${chave}|${versao}`;
+  useEffect(() => {
+    if (!ligado || !chave) return;
+    let vivo = true;
+    fetch(`/api/terrenos/${encodeURIComponent(chave)}/pagar`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((j) => { if (vivo && j) setCot({ k, c: j as Cotacao }); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [chave, ligado, k]);
+  return ligado && cot?.k === k ? cot.c : null;
+}
+function ResumoPreco({ cot, preco }: { cot: Cotacao | null; preco: number }) {
+  if (!cot || (!cot.oferta && !cot.creditoUsado)) return null;
+  const cheio = cot.admin ? preco : cot.base;
+  return (
+    <div className="mt-2 rounded-2xl bg-[#EAF7EE] px-3 py-2 text-xs text-[#166534]">
+      {cot.oferta && <div><b>🎉 {cot.oferta.nome}:</b> 1º mês de <s>{brl(cheio)}</s> por <b>{brl(cot.valor + (cot.admin ? 0 : cot.creditoUsado))}</b>. <span className="opacity-80">{cot.oferta.detalhe}</span></div>}
+      {cot.creditoUsado > 0 && <div className={cot.oferta ? "mt-1" : ""}><b>Desconto de indicação:</b> − {brl(cot.creditoUsado)}{cot.creditoDisponivel > cot.creditoUsado ? ` (sobram ${brl(cot.creditoDisponivel - cot.creditoUsado)} para as próximas)` : ""}.</div>}
+    </div>
+  );
+}
+// quem abriu o link de indicação em outro aparelho digita o código aqui
+function CodigoIndicacao({ aoAplicar }: { aoAplicar: () => void }) {
+  const [aberto, setAberto] = useState(false);
+  const [codigo, setCodigo] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  if (!aberto) return <button onClick={() => setAberto(true)} className="mt-2 w-full text-center text-[11px] font-semibold text-[#1D4ED8] hover:underline">Uma empresa do mapa te indicou? Use o código dela</button>;
+  const aplicar = async () => {
+    setEnviando(true); setMsg(null);
+    try {
+      const r = await fetch("/api/workend/indicacao", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ codigo }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) setMsg({ ok: false, t: j.erro ?? `Erro ${r.status}` }); else { setMsg({ ok: true, t: `Indicação de ${j.empresa} aplicada.` }); aoAplicar(); }
+    } finally { setEnviando(false); }
+  };
+  return (
+    <div className="mt-2 rounded-2xl bg-[#F1F3F6] p-2">
+      <div className="flex gap-1.5">
+        <input value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10))} placeholder="Código (ex.: K7Q2MX)" aria-label="Código de indicação" className="min-w-0 flex-1 rounded-lg border border-black/10 bg-white px-2 py-1.5 text-base sm:text-xs" />
+        <button onClick={aplicar} disabled={enviando || codigo.length < 4} className="rounded-lg bg-[#1D4ED8] px-3 text-xs font-bold text-white disabled:opacity-50">{enviando ? "…" : "Aplicar"}</button>
+      </div>
+      {msg && <div className={`mt-1 text-[11px] font-semibold ${msg.ok ? "text-[#166534]" : "text-[#B42318]"}`}>{msg.t}</div>}
+    </div>
+  );
+}
 
 // Pix aberto no cartão: QR Code, copia e cola, relógio e conferência automática a cada 4 s
 export function PixAberto({ chave }: { chave: string }) {
@@ -78,9 +129,13 @@ export function CartaoLote() {
   const usuario = useMundo((s) => s.usuario);
   const admin = useMundo((s) => s.admin);
   const preco = useMundo((s) => s.preco);
+  const fundador = useMundo((s) => s.fundador);
   const minutos = useMundo((s) => s.minutosReserva);
   const pagamentoLigado = useMundo((s) => s.pagamentoLigado);
   const pagando = useMundo((s) => s.pagando);
+  const [recargaCot, setRecargaCot] = useState(0);
+  const meuCedo = !!chave && !!terreno && (meu === chave || (!!usuario && terreno.usuarioId === usuario.id));
+  const cot = useCotacao(chave, meuCedo && pagamentoLigado, `${terreno?.status}|${terreno?.pagoAte}|${recargaCot}`);
   const painel = useMundo((s) => s.painelEmpresa);
   const painelEsc = useMundo((s) => s.painelEscritorio);
   const abrirEscritorio = useMundo((s) => s.abrirEscritorio);
@@ -114,7 +169,7 @@ export function CartaoLote() {
   const diasRestantes = terreno?.pagoAte ? Math.ceil((new Date(terreno.pagoAte).getTime() - agora) / 86400000) : null;
   const clicarPagar = async (meses = 1) => { setErro(null); const e = await pagar(meses); if (e) setErro(e); };
   return (
-    <div className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
+    <div data-tour="cartao-loja" className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · Lote {l.numero}</div>
@@ -128,6 +183,7 @@ export function CartaoLote() {
         <>
           <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm">
             <div className="flex items-center justify-between"><span className="text-[#5B6472]">Mensalidade</span><span className="font-semibold">{brl(preco)}/mês</span></div>
+            {!!fundador && fundador.restam > 0 && <div className="mt-1.5 rounded-xl bg-[#EAF7EE] px-2 py-1.5 text-xs font-semibold text-[#166534]">🎉 Preço de fundador: 1º mês por {brl(fundador.valor)} · restam {fundador.restam} de {fundador.vagas} vagas</div>}
             <div className="mt-1 text-xs text-[#5B6472]">Você reserva por {minutos >= 60 ? `${Math.round(minutos / 60)} hora${minutos >= 120 ? "s" : ""}` : `${minutos} minutos`}, coloca o nome e a logo na placa e paga no Pix, direto aqui no mapa (QR Code, sem cadastro no Mercado Pago). Sem pagamento, o lote volta a ficar livre.</div>
           </div>
           {usuario?.banidoEm ? (
@@ -159,16 +215,19 @@ export function CartaoLote() {
             <>
               <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">Garanta o chão pagando o 1º mês agora. Sem pagamento, a reserva some em {resta != null ? mmss(resta) : `${minutos} min`}.</div>
               {pagamentoLigado
-                ? <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Pagar ${brl(preco)} no Pix · 1º mês`}</button>
+                ? <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Pagar ${brl(cot?.valor ?? preco)} no Pix · 1º mês`}</button>
                 : <div className="mt-2 rounded-xl bg-[#F1F3F6] px-3 py-2 text-center text-xs text-[#5B6472]">Pagamento em instantes: estamos ligando o Mercado Pago.</div>}
+              {pagamentoLigado && <ResumoPreco cot={cot} preco={preco} />}
+              {pagamentoLigado && cot?.primeiroMes != null && cot.oferta?.id !== "indicado" && !cot.admin && <CodigoIndicacao aoAplicar={() => setRecargaCot((n) => n + 1)} />}
             </>
           )}
           {ehMeu && ativo && diasRestantes != null && diasRestantes <= 7 && (
             <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">{diasRestantes > 0 ? `Vence em ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"}.` : "Vencido: você tem 5 dias de tolerância antes de o lote ficar livre."}</div>
           )}
           {ehMeu && ativo && pagamentoLigado && !pixAberto && (
-            <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Renovar +30 dias · ${brl(preco)} no Pix`}</button>
+            <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Renovar +30 dias · ${brl(cot?.valor ?? preco)} no Pix`}</button>
           )}
+          {ehMeu && ativo && pagamentoLigado && !pixAberto && <ResumoPreco cot={cot} preco={preco} />}
           {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
           {ehMeu && ativo && !ehAnexo && (
             // a equipe de IA do lote trabalha de verdade desde 11/11/2026 (tela Minha equipe)
@@ -186,10 +245,14 @@ export function CartaoLote() {
                 <button onClick={() => abrirEscritorio("treinar")} className="rounded-xl bg-[#FFF4D6] px-2 py-2 text-[#7A5A00] hover:bg-[#ffeab8]"><div className="text-base">🎓</div>Treinar</button>
                 <button onClick={abrirPainel} className="rounded-xl bg-[#F1F3F6] px-2 py-2 text-[#1D2128] hover:bg-[#e6e9ee]"><div className="text-base">🎨</div>Marca e logo</button>
               </div>
-              <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-center text-[11px] font-semibold">
+              <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-center text-[11px] font-semibold">
                 <button onClick={() => abrirEscritorio("interior")} className="rounded-xl bg-[#F6EEDF] px-2 py-2 text-[#7A4E1F] hover:bg-[#efe3cc]">🛋️ Interior</button>
                 <a href="/app/equipe?aba=vagas" className="rounded-xl bg-[#FFF8D6] px-2 py-2 text-[#7A5A00] hover:bg-[#fff0b3]">📋 Vagas{vagasDoLote > 0 ? ` · ${vagasDoLote}` : ""}</a>
+                <a href="/app/agenda" className="rounded-xl bg-[#EAF7EE] px-2 py-2 text-[#166534] hover:bg-[#d8f0e0]">📅 Agenda</a>
+                <a href="/app/vitrine" className="rounded-xl bg-[#FCE7F3] px-2 py-2 text-[#9D174D] hover:bg-[#fbd5ea]">🛍️ Vitrine</a>
+                <a href="/app/resultados" className="col-span-2 rounded-xl bg-[#1D2128] px-2 py-2 text-white hover:bg-black">📈 Resultados da loja</a>
               </div>
+              <PromocaoDono chave={chave} />
               {/* lote duplo: o vizinho do lado vira ampliação e o prédio cresce */}
               {anexoDeste ? (
                 <button onClick={() => selecionarLote(anexoDeste.chave)} className="mt-2 w-full rounded-xl bg-[#EEF3FF] px-3 py-2 text-left text-xs text-[#1D4ED8]"><b>Lote duplo</b> com o Lote {LOTE_POR_CHAVE[anexoDeste.chave]?.numero} · {anexoDeste.status === "ativo" ? "ativo" : "reservado, falta pagar"} →</button>
@@ -221,9 +284,58 @@ export function CartaoLote() {
 }
 
 // A loja de outra empresa (11/11/2026): o que ela faz, contatos, nota e a conversa com a atendente de IA
+// Promoção na fachada (12/11/2026): o dono liga uma frase curta com hora para acabar
+const SUGESTOES_PROMO = ["20% hoje", "Frete grátis", "Leve 3, pague 2", "Novidade", "Queima de estoque"];
+const DURACOES_PROMO: [string, string][] = [["2h", "2 horas"], ["4h", "4 horas"], ["hoje", "Até o fim do dia"], ["24h", "24 horas"], ["3d", "3 dias"], ["7d", "7 dias"]];
+const horaPromo = (iso: string, agora: number) => { const TZ = { timeZone: "America/Sao_Paulo" } as const; const d = new Date(iso); const dia = (x: Date) => x.toLocaleDateString("pt-BR", TZ); const h = d.toLocaleTimeString("pt-BR", { ...TZ, hour: "2-digit", minute: "2-digit" }); return dia(d) === dia(new Date(agora)) ? `até ${h}` : `até ${d.toLocaleDateString("pt-BR", { ...TZ, day: "2-digit", month: "2-digit" })} às ${h}`; };
+function PromocaoDono({ chave }: { chave: string }) {
+  const terreno = useMundo((s) => s.terrenos[chave]);
+  const carregar = useMundo((s) => s.carregar);
+  const agora = useAgora();
+  const promo = promocaoAtiva(terreno, agora);
+  const [aberto, setAberto] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [duracao, setDuracao] = useState("hoje");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const chamar = async (metodo: "POST" | "DELETE") => {
+    setEnviando(true); setErro(null);
+    try {
+      const r = await fetch(`/api/terrenos/${encodeURIComponent(chave)}/promocao`, { method: metodo, headers: { "content-type": "application/json" }, body: metodo === "POST" ? JSON.stringify({ texto, duracao }) : undefined });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setErro(j.erro ?? `Erro ${r.status}`); return; }
+      setAberto(false); setTexto(""); await carregar();
+    } finally { setEnviando(false); }
+  };
+  if (promo && !aberto) return (
+    <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl bg-[#FFE4E9] px-3 py-2 text-xs text-[#9F1239]">
+      <span><b>🏷️ {promo.texto}</b> · na fachada {horaPromo(promo.ate, agora)}</span>
+      <span className="flex shrink-0 gap-1"><button onClick={() => { setTexto(promo.texto); setAberto(true); }} className="rounded-lg bg-white/70 px-2 py-1 font-semibold">Trocar</button><button onClick={() => chamar("DELETE")} disabled={enviando} className="rounded-lg bg-[#E11D48] px-2 py-1 font-bold text-white disabled:opacity-50">Encerrar</button></span>
+    </div>
+  );
+  if (!aberto) return <button onClick={() => setAberto(true)} className="mt-1.5 w-full rounded-xl bg-[#FFE4E9] px-3 py-2 text-[11px] font-bold text-[#9F1239] hover:bg-[#ffd3dc]">🏷️ Ligar uma promoção na fachada</button>;
+  return (
+    <div className="mt-2 rounded-2xl border border-[#E11D48]/30 bg-[#FFF5F7] p-2.5">
+      <div className="text-xs font-bold text-[#9F1239]">Promoção na fachada</div>
+      <div className="mt-0.5 text-[11px] text-[#5B6472]">Aparece numa faixa na frente do prédio, no balão e no mini-mapa até a hora que você escolher.</div>
+      <input value={texto} onChange={(e) => setTexto(e.target.value.slice(0, 28))} placeholder="Ex.: 20% hoje" aria-label="Texto da promoção" className="mt-2 w-full rounded-lg border border-black/10 bg-white px-2 py-1.5 text-base sm:text-xs" />
+      <div className="mt-1.5 flex flex-wrap gap-1">{SUGESTOES_PROMO.map((s) => <button key={s} onClick={() => setTexto(s)} className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#9F1239] ring-1 ring-[#E11D48]/25">{s}</button>)}</div>
+      <select value={duracao} onChange={(e) => setDuracao(e.target.value)} aria-label="Por quanto tempo" className="mt-2 w-full rounded-lg border border-black/10 bg-white px-2 py-1.5 text-base sm:text-xs">{DURACOES_PROMO.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select>
+      {erro && <div className="mt-1 text-[11px] font-semibold text-[#B42318]">{erro}</div>}
+      <div className="mt-2 flex gap-1.5">
+        <button onClick={() => chamar("POST")} disabled={enviando || texto.trim().length < 3} className="flex-1 rounded-xl bg-[#E11D48] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{enviando ? "Ligando…" : promo ? "Trocar a promoção" : "Ligar promoção"}</button>
+        <button onClick={() => { setAberto(false); setErro(null); }} className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[#5B6472]">Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 function LojaNoMapa({ numero, ativo, chave }: { numero: number; ativo: boolean; chave: string }) {
   const usuario = useMundo((s) => s.usuario);
   const vagas = useMundo((s) => s.vagas[chave] ?? 0);
+  const terrenoLoja = useMundo((s) => s.terrenos[chave]);
+  const agora = useAgora();
+  const promo = promocaoAtiva(terrenoLoja, agora);
   const { loja, erro } = useLoja(ativo ? numero : null);
   const [conversa, setConversa] = useState(false);
   if (!ativo) return <div className="mt-3 text-xs text-[#5B6472]">Esta empresa está montando o escritório. A loja abre quando o 1º mês for pago.</div>;
@@ -231,10 +343,13 @@ function LojaNoMapa({ numero, ativo, chave }: { numero: number; ativo: boolean; 
   if (!loja) return <div className="mt-3 text-xs text-[#5B6472]">Abrindo a loja…</div>;
   return (
     <div className="mt-3 space-y-2">
+      {promo && <div className="flex items-center justify-between gap-2 rounded-xl bg-[#E11D48] px-3 py-2 text-xs font-bold text-white"><span>🏷️ {promo.texto}</span><span className="font-semibold text-white/80">{horaPromo(promo.ate, agora)}</span></div>}
       <div className="flex items-center justify-between gap-2"><span className="rounded-full bg-[#EEF3FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">{loja.nicho}</span><Estrelas media={loja.avaliacao.media} n={loja.avaliacao.n} /></div>
       {loja.sobre ? <p className="line-clamp-4 whitespace-pre-line text-xs text-[#1D2128]">{loja.sobre}</p> : <p className="text-xs text-[#5B6472]">A empresa ainda não contou o que faz. Pergunte à atendente.</p>}
-      <Contatos c={loja.contatos} />
+      <Contatos c={loja.contatos} numero={numero} />
       {vagas > 0 && <a href={`/loja/${numero}#vagas`} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-[#FFF8D6] px-3 py-2 text-xs font-bold text-[#7A5A00] hover:bg-[#fff0b3]"><span>📋 Estamos contratando · {vagas} {vagas === 1 ? "vaga" : "vagas"}</span><span>Ver e me candidatar ↗</span></a>}
+      <VitrineLoja numero={numero} compacto />
+      <AgendarLoja numero={numero} cor={loja.cor} compacto />
       {conversa
         ? <ChatLoja loja={loja} logado={!!usuario} linkEntrar={`/entrar?destino=${encodeURIComponent(`/loja/${numero}`)}`} alto={240} />
         : loja.atendente && <button onClick={() => setConversa(true)} className="w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d]">💬 Conversar com {loja.atendente.nome}</button>}
@@ -308,6 +423,7 @@ async function prepararLogo(f: File): Promise<string> {
 export function PainelEmpresa() {
   const aberto = useMundo((s) => s.painelEmpresa);
   const preco = useMundo((s) => s.preco);
+  const fundador = useMundo((s) => s.fundador);
   const chave = useMundo((s) => s.loteSelecionado);
   const rascunho = useMundo((s) => s.rascunho);
   const setRascunho = useMundo((s) => s.setRascunho);
@@ -371,7 +487,7 @@ export function PainelEmpresa() {
         </div>
       </div>
 
-      <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Reservar segura o lote por 1 hora pra você pagar o 1º mês ({brl(preco)}, Pix, direto no mapa). Ao reservar você concorda com as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros na placa.</div>
+      <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Reservar segura o lote por 1 hora pra você pagar o 1º mês ({fundador && fundador.restam > 0 ? <><b>{brl(fundador.valor)}</b> com o preço de fundador, depois {brl(preco)}/mês</> : brl(preco)}, Pix, direto no mapa). Ao reservar você concorda com as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros na placa.</div>
       {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
       <div className="mt-3 flex justify-end gap-2">
         <button onClick={fechar} className="rounded-xl px-4 py-2 text-sm text-[#5B6472]">Cancelar</button>

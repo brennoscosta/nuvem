@@ -108,3 +108,8 @@
 .we .selo-ganho::after { content: ""; position: absolute; inset: -30%; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.75) 50%, transparent 60%); animation: selo-brilho 3.6s ease-in-out infinite; }
 @keyframes selo-brilho { 0%, 55% { transform: translateX(-70%); } 100% { transform: translateX(70%); } }
 @media (prefers-reduced-motion: reduce) { .we .missao-barra, .we .selo-ganho::after { animation: none; } }
+
+/* painel de resultados (12/11/2026): as barras crescem da base ao trocar de métrica */
+.barra-cresce { transform-box: fill-box; transform-origin: 50% 100%; animation: barra-cresce .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes barra-cresce { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .barra-cresce { animation: none; } }

@@ -11,6 +11,8 @@ import { enviarEmail, brl, dataBR } from "./email";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
 import { ativarOutdoor, reverterOutdoor } from "./outdoors";
 import { ativarBarraca, reverterBarraca, ativarItem, reverterItem } from "./cidade";
+import { cotacaoLote, liberarIndicacao, estornarIndicacao } from "./ofertas";
+import { avisar } from "./avisos";
 
 const API = "https://api.mercadopago.com";
 export const pagamentoLigado = () => !!process.env.MP_ACCESS_TOKEN;
@@ -61,9 +63,13 @@ export async function criarCobranca(u: Usuario, chave: string, numeroLote: numbe
   const t = await obterTerreno(chave);
   if (!t || t.usuarioId !== u.id) throw new Error("Reserve o lote antes de pagar.");
   meses = Math.max(1, Math.min(12, meses | 0));
-  const unit = precoPara(u); // admin paga R$ 0,99 (teste real sem gastar)
-  const valor = tipo === "layout" ? PRECO_TROCA_LAYOUT : Math.round(unit * meses * 100) / 100;
-  const r = await criarPix(u, base, { valor, tipo, chave, meses, metadata: { terreno: chave, meses }, descricao: tipo === "layout" ? `WorkEnd · troca de prédio · Lote ${numeroLote} (${t.empresaNome})` : `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"} (${t.empresaNome})` });
+  // lote: oferta de entrada (fundador, feira, indicação) e crédito de indicação entram aqui (src/server/ofertas.ts);
+  // a conta admin paga 1/100 do valor final (teste real sem gastar)
+  const cot = tipo === "lote" ? await cotacaoLote(u, chave, meses) : null;
+  const valor = tipo === "layout" ? PRECO_TROCA_LAYOUT : cot ? cot.valor : Math.round(precoPara(u) * meses * 100) / 100;
+  const extra = cot?.oferta ? ` · ${cot.oferta.nome}` : cot?.creditoUsado ? " · desconto de indicação" : "";
+  const r = await criarPix(u, base, { valor, tipo, chave, meses, metadata: { terreno: chave, meses, oferta: cot?.oferta?.id ?? null }, descricao: tipo === "layout" ? `WorkEnd · troca de prédio · Lote ${numeroLote} (${t.empresaNome})` : `WorkEnd · Lote ${numeroLote} · ${meses} ${meses === 1 ? "mês" : "meses"} (${t.empresaNome})${extra}` });
+  if (cot) await sql`UPDATE pagamento SET oferta = ${cot.oferta?.id ?? null}, desconto = ${cot.oferta?.desconto ?? 0}, credito_usado = ${cot.creditoUsado} WHERE id = ${r.id}`;
   if (tipo === "lote") await estenderReserva(chave, 70); // ele está pagando: a reserva dura mais que o QR (60 min)
   return r;
 }
@@ -126,7 +132,11 @@ async function aplicar(p: PagamentoMP) {
   if (efeito === "sem_lote" && (reg.tipo === "barraca" || reg.tipo === "item")) void registrar("pagamento", `ATENÇÃO: Pix de ${valor} aprovado sem ${reg.tipo === "barraca" ? "a barraca" : "o item"}`, { usuarioId: reg.usuarioId, dados: { detalhes: `${reg.terrenoChave} não pôde ser liberado (reserva vencida ou item desconhecido). Devolva o valor. Pagamento ${reg.id}.` } });
   else if (efeito === "sem_lote" && reg.tipo === "outdoor") void registrar("pagamento", `ATENÇÃO: Pix de ${valor} aprovado sem o outdoor`, { usuarioId: reg.usuarioId, dados: { detalhes: `A vaga ${reg.terrenoChave} passou para outra empresa antes do pagamento chegar. Devolva o valor ou realoque. Pagamento ${reg.id}.` } });
   else if (efeito === "sem_lote") void registrar("pagamento", `ATENÇÃO: Pix de ${valor} aprovado sem lote`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: `O lote não está mais com quem pagou. Devolva o valor ou realoque pelo painel. Pagamento ${reg.id}.` } });
-  else if (efeito === "estornou") void registrar("pagamento", `Pagamento estornado (${valor})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: `Os dias ou o crédito desse pagamento foram retirados. Pagamento ${reg.id}.` } });
+  // sino: quem pagou vê a confirmação; indicação: o 1º lote pago libera o crédito de quem indicou
+  if (efeito === "liberou") void avisar(reg.usuarioId, { tipo: "pagamento", ref: `pagamento:${reg.id}`, titulo: `Pagamento confirmado · ${valor}`, texto: TEXTO_PAGO[reg.tipo ?? "lote"] ?? "Pagamento aprovado no Pix.", link: reg.tipo === "lote" || reg.tipo === "layout" ? `/mundo?lote=${encodeURIComponent(reg.terrenoChave)}` : "/mundo" });
+  if (efeito === "liberou" && reg.tipo === "lote") void liberarIndicacao(reg.id, reg.usuarioId);
+  if (efeito === "estornou") void estornarIndicacao(reg.id);
+  if (efeito === "estornou") void registrar("pagamento", `Pagamento estornado (${valor})`, { usuarioId: reg.usuarioId, terrenoChave: reg.terrenoChave, dados: { detalhes: `Os dias ou o crédito desse pagamento foram retirados. Pagamento ${reg.id}.` } });
   else if (efeito === "liberou" && reg.tipo === "personagem") void registrar("pagamento", `Personagem pago (${valor})`, { usuarioId: reg.usuarioId, dados: { detalhes: `Personagem ativo por ${30 * reg.meses} dias.` } });
   else if (efeito === "liberou" && reg.tipo === "barraca") void registrar("pagamento", `Barraca da feira paga (${valor})`, { usuarioId: reg.usuarioId, dados: { detalhes: `Barraca ${reg.terrenoChave}.` }, avisarDono: true });
   else if (efeito === "liberou" && reg.tipo === "item") void registrar("pagamento", `Item do personagem pago (${valor})`, { usuarioId: reg.usuarioId, dados: { detalhes: reg.terrenoChave } });
@@ -139,6 +149,11 @@ async function aplicar(p: PagamentoMP) {
   }
   return { ...reg, status };
 }
+
+const TEXTO_PAGO: Record<string, string> = {
+  lote: "O seu lote está ativo. Os dias pagos já contam.", layout: "Você ganhou 1 troca de prédio.", personagem: "O seu personagem está ativo por 30 dias.",
+  outdoor: "O seu anúncio já está no outdoor por 30 dias.", barraca: "A sua barraca está garantida na feira de sábado.", item: "A roupa nova já está no seu personagem.",
+};
 
 // Webhook: o Mercado Pago manda só o id; buscamos o pagamento na API (assim ninguém forja uma confirmação)
 export async function tratarWebhook(tipo: string | null, idPagamento: string | null) {

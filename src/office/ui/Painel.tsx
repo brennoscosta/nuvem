@@ -18,6 +18,8 @@ import { ModalLogin, CartaoPublico } from "./Login";
 import { CartaoLote, PainelEmpresa, ContaWorkend, AvisoPagamento } from "./Lote";
 import { CartaoPraca, AvisoEventos } from "./Praca";
 import { MiniMapa } from "./MiniMapa";
+import { Sino } from "./Sino";
+import { VisitaGuiada } from "./VisitaGuiada";
 import { useMundo, modoMundo } from "../mundoStore";
 import Link from "next/link";
 import { Logotipo } from "@/app/workend/_marca";
@@ -50,7 +52,7 @@ export function BarraTopo() {
   const gasto = ordem.reduce((a, id) => a + (agentes[id]?.gastoHoje ?? 0), 0);
   // No mundo do WorkEnd a barra é enxuta (sem os agentes nem o estado do servidor da Nuvem) e rola de lado no celular
   if (mundo) return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-2 sm:p-3">
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-2 sm:p-3">
       <div className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-[#111418]/85 px-3 py-2 text-white shadow-xl backdrop-blur sm:gap-3 sm:px-4">
         <div className="flex shrink-0 items-center gap-2 border-r border-white/10 pr-2 sm:pr-3">
           <Link href="/" aria-label="WorkEnd, início" className="py-1.5"><Logotipo altura={18} claro /></Link>
@@ -62,6 +64,7 @@ export function BarraTopo() {
             <ContaWorkend />
           </div>
         </div>
+        <Sino tema="escuro" />
       </div>
     </div>
   );
@@ -284,6 +287,7 @@ export function Painel() {
       <AvisoPagamento />
       <AvisoEventos />
       <MiniMapa />
+      <VisitaGuiada />
       <ModalLogin />
       <ModalContratar />
       <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2">

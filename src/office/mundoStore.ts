@@ -2,10 +2,22 @@
 // Estado do mundo WorkEnd: lotes reservados, lote selecionado, usuário do WorkEnd (sessão própria, separada do admin
 // da Nuvem) e o rascunho da empresa enquanto o usuário monta a placa dele.
 import { create } from "zustand";
+import { useSyncExternalStore } from "react";
 
 
 import type { Escritorio } from "./data/escritorio";
-export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null; escritorio: Escritorio | null; nicho?: string; anexoDe?: string | null }
+export interface Terreno { chave: string; usuarioId: string; status: "reservado" | "ativo"; empresaNome: string; cor: string; temLogo: boolean; reservadoEm: string; reservadoAte: string | null; pagoAte: string | null; escritorio: Escritorio | null; nicho?: string; anexoDe?: string | null; promocao?: Promocao | null }
+// promoção na fachada (12/11/2026): faixa no prédio, selo no balão e no mini-mapa até a hora marcada
+export interface Promocao { texto: string; ate: string; desde?: string }
+export const promocaoAtiva = (t: Terreno | null | undefined, agora: number) => (t?.promocao && new Date(t.promocao.ate).getTime() > agora ? t.promocao : null);
+// relógio de 30 em 30 s para o que vence sozinho (promoção): a tela some com a faixa sem recarregar
+let agoraRel = 0; const ouvintesRel = new Set<() => void>(); let timerRel: ReturnType<typeof setInterval> | null = null;
+function assinarRelogio(cb: () => void) {
+  ouvintesRel.add(cb);
+  if (!timerRel) { agoraRel = Date.now(); timerRel = setInterval(() => { agoraRel = Date.now(); ouvintesRel.forEach((f) => f()); }, 30_000); queueMicrotask(cb); }
+  return () => { ouvintesRel.delete(cb); if (!ouvintesRel.size && timerRel) { clearInterval(timerRel); timerRel = null; } };
+}
+export const useAgora = () => useSyncExternalStore(assinarRelogio, () => agoraRel, () => 0);
 export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
 export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null; ceoNome: string; atendenteNome: string; nicho: string }
 export type AbaEscritorio = "predio" | "visual" | "interior" | "setores" | "equipe" | "contratar" | "treinar";
@@ -37,6 +49,7 @@ interface Estado {
   admin: boolean; // admin do WorkEnd (vê tudo, libera e bane)
   pagamentoLigado: boolean; // MP_ACCESS_TOKEN configurado no servidor
   preco: number; // R$ por lote por mês
+  fundador: { valor: number; restam: number; vagas: number } | null; // oferta de entrada (src/server/ofertas.ts)
   minutosReserva: number;
   desvioRelogio: number; // servidor - navegador (ms), pra contagem regressiva certa
   pagando: boolean;
@@ -96,7 +109,7 @@ export const useMundo = create<Estado>((set, get) => ({
       void get().carregarOutdoors(); return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },
-  terrenos: {}, meu: null, usuario: null, admin: false, pagamentoLigado: false, preco: 99, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
+  terrenos: {}, meu: null, usuario: null, admin: false, pagamentoLigado: false, preco: 99, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
 
   carregar: async () => {
     void get().carregarOutdoors();
@@ -107,7 +120,7 @@ export const useMundo = create<Estado>((set, get) => ({
       ]);
       const terrenos: Record<string, Terreno> = {};
       for (const x of (t.terrenos ?? []) as Terreno[]) terrenos[x.chave] = x;
-      set({ terrenos, vagas: t.vagas ?? {}, meu: t.meu ?? null, usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? 99, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
+      set({ terrenos, vagas: t.vagas ?? {}, meu: t.meu ?? null, usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? 99, fundador: t.fundador ?? null, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
       // veio do cadastro com ?lote=: já abre o lote escolhido
       const busca = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
       const pedido = busca?.get("lote") ?? null;

@@ -40,6 +40,15 @@ export default async function App() {
                 <Link href={`/mundo?lote=${encodeURIComponent(chao.chave)}`} className="btn btn-azul">Ver meu chão no mapa</Link>
                 {chao.status === "ativo" && <Link href="/app/equipe" className="btn btn-tinta">Falar com a minha equipe</Link>}
               </div>
+              {/* a loja no dia a dia (12/11/2026): resultados, agenda, vitrine */}
+              {chao.status === "ativo" && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link href="/app/resultados" className="btn btn-claro !py-2 text-sm">📈 Resultados da loja</Link>
+                  <Link href="/app/agenda" className="btn btn-claro !py-2 text-sm">📅 Agenda</Link>
+                  <Link href="/app/vitrine" className="btn btn-claro !py-2 text-sm">🛍️ Vitrine</Link>
+                  <Link href="/app/equipe?aba=vagas" className="btn btn-claro !py-2 text-sm">📋 Vagas</Link>
+                </div>
+              )}
             </>
           ) : (
             <>

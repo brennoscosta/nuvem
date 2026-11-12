@@ -419,3 +419,6 @@
 .wi #preco .wfim-texto { margin-top: clamp(4rem, 8vw, 6.5rem); }
 .wi .wfim-marca { display: flex; justify-content: center; margin-top: clamp(3rem, 6vw, 5rem); padding: 0 1.25rem; overflow: hidden; }
 .wi .wfim-marca .logo { height: auto !important; width: min(1180px, 100%); }
+
+/* preço de fundador (12/11/2026) */
+.wi-fundador { margin: .4rem 0 .2rem; padding: .55rem .8rem; border-radius: 14px; background: #EAF7EE; color: #166534; font-size: 14px; line-height: 1.4; }

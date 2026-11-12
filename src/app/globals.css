@@ -21,3 +21,12 @@ html, body { height: 100%; background: var(--background); color: var(--foregroun
 .balao-destaque { animation: balao-destaque 1.6s ease-in-out infinite; }
 @keyframes balao-destaque { 0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 0 0 rgba(91,157,255,0)); } 50% { transform: translateY(-6px) scale(1.06); filter: drop-shadow(0 0 14px rgba(91,157,255,.9)); } }
 @media (prefers-reduced-motion: reduce) { .balao-destaque { animation: none; } }
+/* promoção na fachada (12/11/2026): o selo do balão balança de leve, como etiqueta de preço */
+.balao-promo { transform-origin: 50% 0; animation: balao-promo 2.4s ease-in-out infinite; }
+@keyframes balao-promo { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg) scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { .balao-promo { animation: none; } }
+
+/* sino de avisos (12/11/2026): balança quando tem aviso novo */
+.sino-balanca { display: inline-block; transform-origin: 50% 10%; animation: sino-balanca 2.8s ease-in-out infinite; }
+@keyframes sino-balanca { 0%, 70%, 100% { transform: rotate(0); } 76% { transform: rotate(14deg); } 82% { transform: rotate(-12deg); } 88% { transform: rotate(8deg); } 94% { transform: rotate(-4deg); } }
+@media (prefers-reduced-motion: reduce) { .sino-balanca { animation: none; } }

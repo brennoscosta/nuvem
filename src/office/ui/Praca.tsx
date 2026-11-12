@@ -37,7 +37,7 @@ export function CartaoPraca() {
   const { vivo } = eventosDoMomento(praca?.agenda ?? [], agora);
   const fechar = () => useMundo.getState().selecionarLote(null);
   return (
-    <div className={`${FLUTUANTE} ${LARGO} painel-entra !z-10 overflow-y-auto p-4`}>
+    <div data-tour="praca" className={`${FLUTUANTE} ${LARGO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-wide text-[#0F766E]">WorkEnd · praça da cidade</div>
@@ -61,6 +61,21 @@ export function CartaoPraca() {
 function Agenda({ agenda, agora, podeMarcar, logado, temLote, aoMudar }: { agenda: EventoPraca[]; agora: number; podeMarcar: boolean; logado: boolean; temLote: boolean; aoMudar: () => Promise<void> }) {
   const [form, setForm] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // "Me avise" (12/11/2026): o aviso sai no sino 10 minutos antes do evento
+  const [lembretes, setLembretes] = useState<string[]>([]);
+  useEffect(() => {
+    if (!logado) return;
+    let vivo = true;
+    fetch("/api/workend/praca/lembrete", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (vivo) setLembretes(j.lembretes ?? []); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [logado]);
+  const lembrar = async (id: string) => {
+    setErro(null);
+    const r = await fetch("/api/workend/praca/lembrete", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ eventoId: id }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { setErro(j.erro ?? `Erro ${r.status}`); return; }
+    setLembretes((l) => (j.lembrete ? [...l, id] : l.filter((x) => x !== id)));
+  };
   const cancelar = async (id: string) => { setErro(null); const r = await fetch(`/api/workend/praca?evento=${encodeURIComponent(id)}`, { method: "DELETE" }); if (!r.ok) { const j = await r.json().catch(() => ({})); setErro(j.erro ?? "Não deu para cancelar."); } await aoMudar(); };
   return (
     <div className="mt-3">
@@ -73,7 +88,8 @@ function Agenda({ agenda, agora, podeMarcar, logado, temLote, aoMudar }: { agend
               <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: e.empresa.cor }} />
               <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#5B6472]">
                 <span>{aoVivo ? <span className="mr-1 rounded-full bg-[#E11D48] px-1.5 py-0.5 text-[9px] font-black uppercase text-white">ao vivo</span> : null}{quando(e)}</span>
-                {e.meu && <button onClick={() => cancelar(e.id)} className="text-[11px] font-semibold text-[#E2575B]">Cancelar</button>}
+                {e.meu ? <button onClick={() => cancelar(e.id)} className="text-[11px] font-semibold text-[#E2575B]">Cancelar</button>
+                  : !aoVivo && logado && <button onClick={() => lembrar(e.id)} aria-pressed={lembretes.includes(e.id)} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${lembretes.includes(e.id) ? "bg-[#0F766E] text-white" : "bg-[#E6F4F1] text-[#0F766E]"}`}>{lembretes.includes(e.id) ? "🔔 Vou ser avisado" : "🔔 Me avise"}</button>}
               </div>
               <div className="mt-0.5 font-bold leading-snug">{e.titulo}</div>
               {e.descricao && <div className="mt-0.5 text-xs text-[#5B6472]">{e.descricao}</div>}
@@ -91,7 +107,7 @@ function Agenda({ agenda, agora, podeMarcar, logado, temLote, aoMudar }: { agend
       )) : (
         <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">{!logado ? <>Empresas com lote no mapa marcam lives e lançamentos aqui de graça. <a href="/entrar?destino=/mundo?lote=0,1,1" className="font-semibold text-[#1D4ED8]">Entrar</a></> : temLote ? "Assim que o 1º mês do seu lote for pago, você marca eventos aqui de graça (até 2 por vez)." : "Marcar eventos é para empresas com lote no mapa. Sem lote? A feira de sábado é para você."}</div>
       )}
-      <div className="mt-2 text-center text-[10px] text-[#5B6472]">Quem está no mapa recebe um aviso 10 minutos antes de cada evento.</div>
+      <div className="mt-2 text-center text-[10px] text-[#5B6472]">Quem está no mapa vê um aviso 10 minutos antes de cada evento. Com “Me avise”, ele chega também no sino 🔔.</div>
     </div>
   );
 }
@@ -242,11 +258,14 @@ export function AvisoEventos() {
     const primeiro = setTimeout(conferir, 1500); const t = setInterval(conferir, 20_000);
     return () => { clearTimeout(primeiro); clearInterval(t); };
   }, [praca]);
+  // some sozinho depois de 20 s (o sino guarda o aviso de quem tocou em "Me avise"); no celular não cobre o cartão aberto
+  useEffect(() => { if (!aviso) return; const t = setTimeout(() => setAviso(null), 20_000); return () => clearTimeout(t); }, [aviso]);
+  const cartaoAberto = useMundo((s) => !!s.loteSelecionado);
   if (!aviso) return null;
   const { e, comecou } = aviso;
   const hora = new Date(e.inicio).toLocaleTimeString("pt-BR", { ...TZ, hour: "2-digit", minute: "2-digit" });
   return (
-    <div className="pointer-events-auto absolute bottom-[4.6rem] left-1/2 z-30 w-[min(26rem,calc(100%-1rem))] sm:bottom-auto sm:top-[4.6rem] -translate-x-1/2 rounded-2xl bg-[#111418]/95 p-3 text-white shadow-2xl backdrop-blur painel-entra">
+    <div className={`pointer-events-auto absolute bottom-[4.6rem] left-1/2 z-30 w-[min(26rem,calc(100%-1rem))] ${cartaoAberto ? "hidden sm:block" : ""} sm:bottom-auto sm:top-[4.6rem] -translate-x-1/2 rounded-2xl bg-[#111418]/95 p-3 text-white shadow-2xl backdrop-blur painel-entra`}>
       <div className="flex items-start gap-3">
         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${comecou ? "animate-pulse bg-[#E11D48]" : "bg-[#FACC15]"}`} />
         <div className="min-w-0 flex-1">

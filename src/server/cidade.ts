@@ -4,6 +4,7 @@ import { sql, migrar, id } from "./db";
 import type { Usuario } from "./usuarios";
 import { ehAdmin, terrenoDoUsuario } from "./terrenos";
 import { criarCobrancaGenerica, type CobrancaPix } from "./mercadopago";
+import { avisar } from "./avisos";
 import { LOTE_POR_CHAVE, nomeNicho, NICHOS } from "@/office/data/mundo";
 import { MISSOES } from "@/office/data/missoes";
 import { ACESSORIO_POR_ID, limparEquipados } from "@/office/data/acessorios";
@@ -75,7 +76,7 @@ export async function vagasPorLote(): Promise<Record<string, number>> {
 export async function candidatar(u: Usuario, vagaId: string, d: { mensagem?: unknown; contato?: unknown }) {
   await migrar();
   if (u.banidoEm) throw new Error("Conta suspensa.");
-  const [v] = await sql<{ usuarioId: string; aberta: boolean }[]>`SELECT usuario_id, aberta FROM vaga WHERE id = ${vagaId}`;
+  const [v] = await sql<{ usuarioId: string; aberta: boolean; cargo: string }[]>`SELECT usuario_id, aberta, cargo FROM vaga WHERE id = ${vagaId}`;
   if (!v || !v.aberta) throw new Error("Essa vaga não está mais aberta.");
   if (v.usuarioId === u.id) throw new Error("Essa vaga é da sua empresa.");
   const mensagem = texto(d.mensagem, 600), contato = texto(d.contato, 80);
@@ -83,6 +84,10 @@ export async function candidatar(u: Usuario, vagaId: string, d: { mensagem?: unk
   if (contato.length < 6) throw new Error("Deixe um WhatsApp ou e-mail para a empresa responder.");
   const r = await sql`INSERT INTO candidatura (id, vaga_id, usuario_id, mensagem, contato) VALUES (${id("cd")}, ${vagaId}, ${u.id}, ${mensagem}, ${contato}) ON CONFLICT (vaga_id, usuario_id) DO NOTHING`;
   if (!r.count) throw new Error("Você já se candidatou a essa vaga.");
+  // sino do dono da vaga: um aviso por vaga, que volta para o topo a cada candidatura nova
+  const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM candidatura WHERE vaga_id = ${vagaId}`;
+  const [p] = await sql<{ nome: string }[]>`SELECT COALESCE((SELECT nome FROM personagem WHERE usuario_id = ${u.id}), split_part(${u.nome}, ' ', 1)) AS nome`;
+  void avisar(v.usuarioId, { tipo: "candidatura", ref: `cand:${vagaId}`, renovar: true, titulo: `Nova candidatura: ${v.cargo}`, texto: `${p?.nome ?? "Alguém"} se candidatou${n > 1 ? ` · ${n} candidaturas nesta vaga` : ""}.`, link: "/app/equipe?aba=vagas" });
   return { ok: true };
 }
 

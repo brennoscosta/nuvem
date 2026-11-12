@@ -21,7 +21,9 @@ export interface Terreno {
   escritorio: Escritorio | null; // layout, setores e equipe (só quando ativo)
   nicho: string; // id em NICHOS (vai no balão)
   anexoDe: string | null; // lote duplo (12/11/2026): este lote é a ampliação do lote principal indicado
+  promocao: Promocao | null; // promoção na fachada (12/11/2026); só vem enquanto vale
 }
+export interface Promocao { texto: string; ate: string; desde: string }
 export interface TerrenoAdmin extends Terreno { email: string; usuarioNome: string; banidoEm: Date | null }
 
 export const PRECO_LOTE = 99; // R$ por lote por mês
@@ -46,7 +48,8 @@ export function loteAVenda(chave: string) {
 }
 
 // trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
-const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio, t.nicho, t.anexo_de`;
+const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio, t.nicho, t.anexo_de,
+  CASE WHEN (t.promocao->>'ate')::timestamptz > now() THEN t.promocao END AS promocao`;
 
 // Limpa o que venceu: reserva sem pagamento depois de 1 h é apagada; chão pago sai do mapa depois do vencimento + tolerância,
 // mas a marca e a equipe vão pro arquivo e voltam na próxima reserva do mesmo dono
@@ -275,6 +278,37 @@ export async function adminBanir(chave: string, motivo: string) {
   });
 }
 export async function adminDesbanir(usuarioId: string) { await migrar(); await sql`UPDATE usuario SET banido_em = NULL, banido_motivo = NULL WHERE id = ${usuarioId}`; }
+
+// ---------- promoção na fachada (12/11/2026) ----------
+// O dono liga uma frase curta ("20% hoje") com hora para acabar: faixa na frente do prédio, selo no balão e no mini-mapa.
+export const DURACOES_PROMO: Record<string, { nome: string; horas: number }> = {
+  "2h": { nome: "2 horas", horas: 2 }, "4h": { nome: "4 horas", horas: 4 }, "hoje": { nome: "Até o fim do dia", horas: 0 },
+  "24h": { nome: "24 horas", horas: 24 }, "3d": { nome: "3 dias", horas: 72 }, "7d": { nome: "7 dias", horas: 168 },
+};
+export async function salvarPromocao(u: Usuario, chave: string, d: { texto?: unknown; duracao?: unknown }) {
+  await migrar();
+  const t = await obterTerreno(chave);
+  const alvo = t?.anexoDe ? await obterTerreno(t.anexoDe) : t; // na ampliação, vale para o lote principal
+  if (!alvo || (alvo.usuarioId !== u.id && !ehAdmin(u))) throw new Error("Esse lote não é seu.");
+  if (alvo.status !== "ativo") throw new Error("A promoção é para lojas abertas no mapa.");
+  const texto = (typeof d.texto === "string" ? d.texto : "").replace(/[<>{}\[\]\\]/g, "").replace(/\s+/g, " ").trim().slice(0, 28);
+  if (texto.length < 3) throw new Error("Escreva a promoção (ex.: 20% hoje, Frete grátis, Leve 3 pague 2).");
+  const dur = DURACOES_PROMO[String(d.duracao ?? "")] ?? DURACOES_PROMO["hoje"];
+  // "até o fim do dia" = 23h59 no horário de Brasília (sem horário de verão desde 2019)
+  const diaBR = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const ate = dur.horas ? new Date(Date.now() + dur.horas * 3600_000) : new Date(`${diaBR}T23:59:00-03:00`);
+  const p: Promocao = { texto, ate: ate.toISOString(), desde: new Date().toISOString() };
+  await sql`UPDATE terreno SET promocao = ${sql.json(p as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${alvo.chave}`;
+  void registrar("escritorio", `Promoção na fachada: ${texto}`, { usuarioId: u.id, terrenoChave: alvo.chave, dados: { detalhes: `Até ${ate.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.` } });
+  return p;
+}
+export async function encerrarPromocao(u: Usuario, chave: string) {
+  await migrar();
+  const t = await obterTerreno(chave);
+  const alvo = t?.anexoDe ? await obterTerreno(t.anexoDe) : t;
+  if (!alvo || (alvo.usuarioId !== u.id && !ehAdmin(u))) throw new Error("Esse lote não é seu.");
+  await sql`UPDATE terreno SET promocao = NULL WHERE chave = ${alvo.chave}`;
+}
 
 // ---------- lote duplo (12/11/2026) ----------
 // Quem tem lote ativo pode alugar UM lote vizinho do mesmo quarteirão (que divide um lado com o seu) como ampliação: o

@@ -17,7 +17,8 @@ import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle, type Pose } fro
 import { BONECO } from "../data/bonecos";
 import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
 import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, INTERIOR_PADRAO, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote } from "../data/escritorio";
-import { useMundo } from "../mundoStore";
+import { useMundo, useAgora, promocaoAtiva } from "../mundoStore";
+import { useFrame } from "@react-three/fiber";
 import { useEscritorio } from "../store";
 
 const FONTE = "/fonts/inter-700.woff";
@@ -67,6 +68,38 @@ function PlacaContratando({ x, y, z }: { x: number; y: number; z: number }) {
     <group position={[x, y, z]}>
       <mesh geometry={caixa(2.1, 0.66, 0.1)} material={mat("#1D2128", { rough: 0.6 })} castShadow />
       {tex && <mesh geometry={plano(2.0, 0.56)} position={[0, 0, -0.06]} rotation={[0, Math.PI, 0]}><meshBasicMaterial map={tex} toneMapped={false} /></mesh>}
+    </group>
+  );
+}
+
+// Promoção na fachada (12/11/2026): faixa vermelha entre dois postes na frente do prédio, com a frase do dono.
+// Lida dos dois lados (um plano para cada lado) e acesa à noite (sem tom de luz). Balança de leve com o vento.
+const TEX_PROMO = new Map<string, THREE.CanvasTexture>();
+function texturaPromo(texto: string) {
+  const t = texto.toUpperCase();
+  if (TEX_PROMO.has(t) || typeof document === "undefined") return TEX_PROMO.get(t) ?? null;
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 168; const g = c.getContext("2d")!;
+  g.fillStyle = "#E11D48"; g.fillRect(0, 0, 1024, 168);
+  g.fillStyle = "#FACC15"; g.fillRect(0, 0, 1024, 9); g.fillRect(0, 159, 1024, 9);
+  // etiqueta "PROMOÇÃO" à esquerda
+  g.fillStyle = "#FACC15"; g.beginPath(); g.moveTo(22, 30); g.lineTo(250, 30); g.lineTo(282, 84); g.lineTo(250, 138); g.lineTo(22, 138); g.closePath(); g.fill();
+  g.fillStyle = "#7F1D1D"; g.textAlign = "center"; g.textBaseline = "middle"; g.font = "900 40px Inter, Arial, sans-serif"; g.fillText("PROMOÇÃO", 140, 86, 210);
+  g.fillStyle = "#FFFFFF"; g.font = "900 76px Inter, Arial, sans-serif"; g.fillText(t, 650, 88, 700);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  TEX_PROMO.set(t, tex); return tex;
+}
+function FaixaPromo({ texto, duplo }: { texto: string; duplo: boolean }) {
+  const tex = useMemo(() => texturaPromo(texto), [texto]);
+  const pano = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => { if (pano.current) pano.current.rotation.x = Math.sin(clock.elapsedTime * 1.4) * 0.05; });
+  const px = duplo ? 5.4 : 3.7, z = -9.62, larg = 2 * px - 0.18; // na frente do varal de luzinhas (postes em z = -9,3)
+  return (
+    <group position={[0, 0, z]}>
+      {[-px, px].map((x) => <mesh key={x} geometry={cilindro(0.06, 0.07, 3.4, 8)} material={mat("#3A3F47", { metal: 0.4, rough: 0.5 })} position={[x, 1.7, 0]} castShadow />)}
+      <group ref={pano} position={[0, 3.18, 0]}>
+        {tex && <mesh geometry={plano(larg, larg * 168 / 1024)} position={[0, -larg * 84 / 1024, -0.01]} rotation={[0, Math.PI, 0]}><meshBasicMaterial map={tex} toneMapped={false} /></mesh>}
+        {tex && <mesh geometry={plano(larg, larg * 168 / 1024)} position={[0, -larg * 84 / 1024, 0.01]}><meshBasicMaterial map={tex} toneMapped={false} /></mesh>}
+      </group>
     </group>
   );
 }
@@ -237,7 +270,7 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
 }
 
 // ---------- um escritório no lote ----------
-function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, contratando = false }: { chave: string; e: Escritorio; cor: string; nome: string; logo: string | null; fora: boolean; nicho: string; anexo?: string | null; contratando?: boolean }) {
+function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, contratando = false, promo = null }: { chave: string; e: Escritorio; cor: string; nome: string; logo: string | null; fora: boolean; nicho: string; anexo?: string | null; contratando?: boolean; promo?: string | null }) {
   const l = LOTE_POR_CHAVE[chave]; if (!l) return null;
   // lote duplo: o prédio vai para o meio dos dois terrenos (o vizinho do lado, mesma rua)
   const la = anexo ? LOTE_POR_CHAVE[anexo] : null; const dx = la ? (la.centro[0] - l.centro[0]) / 2 : 0;
@@ -257,6 +290,7 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
     <group rotation={[0, rot, 0]}>
       <group visible={fora}><Exterior e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} /></group>
       <DecorLote d={e.decor ?? DECOR_PADRAO} cor={cor} logo={logo} duplo={!!la} />
+      {promo && <FaixaPromo texto={promo} duplo={!!la} />}
       {!fora && (
         <>
           <Estatico key={"d" + assinatura}><InteriorFixo e={e} cor={cor} /></Estatico>
@@ -277,6 +311,7 @@ export function EscritoriosClientes() {
   const rascunhoPlaca = useMundo((s) => s.rascunho);
   const fora = useEscritorio((s) => s.vista === "fora");
   const vagas = useMundo((s) => s.vagas);
+  const agora = useAgora();
   const anexos = useMemo(() => { const m: Record<string, string> = {}; for (const t of Object.values(terrenos)) if (t.anexoDe && t.status === "ativo") m[t.anexoDe] = t.chave; return m; }, [terrenos]);
   return (
     <group>
@@ -285,7 +320,7 @@ export function EscritoriosClientes() {
         if (t.status !== "ativo" || !e || t.anexoDe) return null; // a ampliação não tem prédio próprio: o principal cresce
         const placa = t.chave === selecionado && rascunhoPlaca ? rascunhoPlaca : null;
         const logo = placa ? placa.logoDataUrl : t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null;
-        return <EscritorioLote key={t.chave} chave={t.chave} e={e} cor={placa?.cor ?? t.cor} nome={placa?.empresaNome ?? t.empresaNome} logo={logo} fora={fora} nicho={placa?.nicho ?? t.nicho ?? "negocios"} anexo={anexos[t.chave] ?? null} contratando={(vagas[t.chave] ?? 0) > 0} />;
+        return <EscritorioLote key={t.chave} chave={t.chave} e={e} cor={placa?.cor ?? t.cor} nome={placa?.empresaNome ?? t.empresaNome} logo={logo} fora={fora} nicho={placa?.nicho ?? t.nicho ?? "negocios"} anexo={anexos[t.chave] ?? null} contratando={(vagas[t.chave] ?? 0) > 0} promo={promocaoAtiva(t, agora)?.texto ?? null} />;
       })}
     </group>
   );

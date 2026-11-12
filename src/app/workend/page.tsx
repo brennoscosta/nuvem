@@ -16,6 +16,7 @@ import { GaleriaPredios } from "./_inicio/GaleriaPredios";
 import { VideoExplica } from "./_inicio/VideoExplica";
 import { CenaLote, CenaFachada, CenaEquipe } from "./_inicio/CenasPassos";
 import { Revelar, Contador, Rolagem } from "./_inicio/efeitos";
+import { vagasFundador, FUNDADOR } from "@/server/ofertas";
 import "./inicio.css";
 
 export const dynamic = "force-dynamic";
@@ -85,6 +86,8 @@ function CenaRede() {
 export default async function Inicio() {
   const u = await usuarioAtual().catch(() => null);
   const livres = await lotesLivres();
+  // oferta de entrada (12/11/2026): as 10 primeiras empresas pagam R$ 49,90 no 1º mês
+  const restamFundador = temBanco() ? await vagasFundador().catch(() => 0) : 0;
   const lote = livres.length ? LOTES.find((l) => l.chave === livres[0]) ?? null : null;
   const crachas = ESPECIALISTAS_IA.map((e) => ({ id: e.id, nome: e.nome, cargo: e.cargo, cor: AREAS[e.area].cor, skill: e.skills[0]?.nome ?? "" }));
   const filas = [crachas.filter((_, i) => i % 2 === 0), crachas.filter((_, i) => i % 2 === 1)];
@@ -186,6 +189,7 @@ export default async function Inicio() {
               <Revelar className="wi-plano wi-plano-forte">
                 <h3>Lote no mapa</h3>
                 <p className="wi-valor"><b>R$ 99</b><span>por mês</span></p>
+                {restamFundador > 0 && <p className="wi-fundador"><b>Preço de fundador:</b> 1º mês por R$ {FUNDADOR.valor.toFixed(2).replace(".", ",")} para as {FUNDADOR.vagas} primeiras empresas · <b>restam {restamFundador}</b></p>}
                 <ul className="wi-lista">
                   <li>Seu endereço com placa, nome, logomarca e cor da marca</li>
                   <li>6 tipos de prédio e 3 trocas de prédio grátis</li>
