@@ -28,6 +28,19 @@ import { CalcadaBairro, ArvoresDeRua, Galhardetes, PlacasBairro, HalosPostes } f
 import { PlacasDeRua } from "./RuasPlacas";
 import { Rio } from "./Rio";
 import { Parque, ParqueChao, LAGO } from "./Parque";
+import { useMundo, type Terreno } from "../mundoStore";
+import { ehKit } from "../data/predios";
+
+// Lotes com prédio do kit modular (v66, 13/11/2026), inclusive o rascunho aberto no painel e a ampliação do lote duplo:
+// a árvore do terreno vazio ou do quintal da casa antiga ficaria dentro do prédio novo (mais baixo ou mais largo que os
+// modelos). Ela fica com tamanho zero, sem mudar a quantidade de árvores (a malha instanciada não é recriada).
+function lotesComKit(terrenos: Record<string, Terreno>, sel: string | null, rascunho: { layout: string } | null) {
+  const kit = (t: Terreno | undefined) => !!t && t.status === "ativo" && !!t.escritorio && ehKit(t.escritorio.layout);
+  const out: string[] = [];
+  for (const t of Object.values(terrenos)) if (kit(t) || (t.anexoDe && kit(terrenos[t.anexoDe]))) out.push(t.chave);
+  if (sel && rascunho && ehKit(rascunho.layout)) { out.push(sel); for (const t of Object.values(terrenos)) if (t.anexoDe === sel) out.push(t.chave); }
+  return out.sort().join("|");
+}
 import { QUARTEIROES, centroQuarteirao, centroLote, EIXOS_RUA, COMPRIMENTO_RUA, RUA, CALCADA, MEIO_Q, BORDA_CALCADA, MUNDO, PASSO, N, EIXO_RUA, NORTE, BAIRRO_DO_QUARTEIRAO } from "../data/mundo";
 
 const ASFALTO = "#4A4E55", FAIXA = "#E8E4D8", CALC = "#D9D5CC";
@@ -98,6 +111,7 @@ function Perto({ cx, cz, raio, children }: { cx: number; cz: number; raio: numbe
 export function Mundo() {
   const poucos = leve();
   const natal = useMemo(() => natalAtivo(), []);
+  const lotesKit = useMundo((s) => lotesComKit(s.terrenos, s.loteSelecionado, s.rascunhoEscritorio));
   const raio = poucos ? 150 : 220;
   const calcadas = useMemo(() => QUARTEIROES.map((q) => centroQuarteirao(q.i, q.j)), []);
   // postes nas esquinas e no meio de cada lado dos quarteirões, do lado de fora da calçada
@@ -112,14 +126,14 @@ export function Mundo() {
   }, [calcadas, poucos]);
   // árvores: nos terrenos vazios marcados, nos fundos dos lotes com casa e na borda do mundo
   const arvores: ItemInstancia[] = useMemo(() => {
-    const lista: ItemInstancia[] = []; let n = 0;
+    const lista: ItemInstancia[] = []; let n = 0; const comKit = new Set(lotesKit.split("|"));
     const add = (x: number, z: number, h = 4.5) => lista.push({ pos: [x, 0, z], rot: (n++ * 1.7) % (Math.PI * 2), altura: h });
     for (const q of QUARTEIROES) {
       if (!q.lotes) continue;
       q.lotes.forEach((l, k) => {
-        const [x, z] = centroLote(q.i, q.j, k); const fundo = k >= 2 ? -1 : 1;
-        if (l.tipo === "vazio" && l.arvore) add(x + 1.5, z - fundo * 1, 6.5);
-        else if (l.tipo === "casa") { add(x - 7, z + fundo * 7, 4.8); if (!poucos) add(x + 7.5, z + fundo * 6, 4.2); }
+        const [x, z] = centroLote(q.i, q.j, k); const fundo = k >= 2 ? -1 : 1, kit = comKit.has(`${q.i},${q.j},${k}`);
+        if (l.tipo === "vazio" && l.arvore) add(x + 1.5, z - fundo * 1, kit ? 0 : 6.5);
+        else if (l.tipo === "casa") { add(x - 7, z + fundo * 7, kit ? 0 : 4.8); if (!poucos) add(x + 7.5, z + fundo * 6, kit ? 0 : 4.2); }
       });
     }
     // cantos verdes do quarteirão do restaurante
@@ -129,7 +143,7 @@ export function Mundo() {
     // (a fileira do norte agora fica no calçadão da beira-rio, em Rio.tsx)
     for (let s = -B + 6; s <= B - 6; s += poucos ? 24 : 14) { add(s, B, 5 + (n % 3)); add(-B, s, 5 + (n % 3)); add(B, s, 5 + (n % 3)); }
     return lista;
-  }, [poucos]);
+  }, [poucos, lotesKit]);
   const [arvoresPraia, arvoresRua] = useMemo(() => {
     const B = N * PASSO + EIXO_RUA + 7, praia = (a: ItemInstancia) => a.pos[2] >= B - 1 || a.pos[0] >= B - 1;
     return [arvores.filter(praia), arvores.filter((a) => !praia(a))];

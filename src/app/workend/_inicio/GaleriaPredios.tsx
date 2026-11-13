@@ -1,5 +1,5 @@
 "use client";
-// Galeria arrastável dos 6 prédios (renders claros sobre cartões em tons pastel), com inércia e encaixe no centro.
+// Galeria arrastável dos prédios (os 6 modelos e os 8 do kit modular) (renders claros sobre cartões em tons pastel), com inércia e encaixe no centro.
 // O nome digitado aparece aceso numa placa (HTML) sobre o prédio do meio. Teclado (setas) e botões também giram.
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";

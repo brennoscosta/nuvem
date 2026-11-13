@@ -118,7 +118,8 @@ function montarCartaz(img: HTMLImageElement | null, p: ProdutoVitrine, cor: stri
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 // onde os cartazes ficam no vidro de cada prédio (x ao longo da fachada, y do centro do cartaz), medido nas fotos
-export const CARTAZES: Record<LayoutId, { x: number; y: number }[]> = {
+// (os tipos do kit modular passam os lugares deles: medidasKit().vitrine)
+export const CARTAZES: Partial<Record<LayoutId, { x: number; y: number }[]>> = {
   // x local positivo = à esquerda de quem olha a fachada (a frente aponta para -z)
   moderno: [{ x: 5.0, y: 3.25 }, { x: 3.6, y: 3.25 }, { x: 2.2, y: 3.25 }],
   vidro: [{ x: -4.0, y: 1.8 }, { x: -2.6, y: 1.8 }, { x: 2.8, y: 1.8 }, { x: 4.2, y: 1.8 }],
@@ -130,13 +131,14 @@ export const CARTAZES: Record<LayoutId, { x: number; y: number }[]> = {
 // conferência: ?vitrineTeste=1 põe cartazes de mentira em todos os prédios (para medir as posições nas fotos)
 const VITRINE_TESTE = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("vitrineTeste");
 const FALSOS: ProdutoVitrine[] = [{ id: "t1", nome: "Produto um", preco: 1290, foto: null }, { id: "t2", nome: "Produto dois", preco: 4990, foto: null }, { id: "t3", nome: "Produto três", preco: null, foto: null }, { id: "t4", nome: "Produto quatro", preco: 990, foto: null }];
-export function VitrineJanela({ numero, layout, z, sx, sy = 1, cor }: { numero: number | null; layout: LayoutId; z: number; sx: number; sy?: number; cor: string }) {
+export function VitrineJanela({ numero, layout, z, sx, sy = 1, cor, lugares: lugaresKit }: { numero: number | null; layout: LayoutId; z: number; sx: number; sy?: number; cor: string; lugares?: { x: number; y: number }[] }) {
+  const lugares = lugaresKit ?? CARTAZES[layout] ?? [];
   const [itens, setItens] = useState<{ n: number; texs: THREE.Texture[] } | null>(null);
   useEffect(() => {
     if (!numero) return;
     let vivo = true;
     void (VITRINE_TESTE ? Promise.resolve(FALSOS) : produtosDaLoja(numero)).then((lista) => {
-      const max = CARTAZES[layout].length;
+      const max = lugares.length;
       const escolhidos = lista.slice(0, max);
       Promise.all(escolhidos.map((p) => new Promise<THREE.Texture>((ok) => {
         const img = new Image(); img.crossOrigin = "anonymous";
@@ -146,10 +148,9 @@ export function VitrineJanela({ numero, layout, z, sx, sy = 1, cor }: { numero: 
       }))).then((texs) => { if (vivo) setItens({ n: numero, texs }); });
     });
     return () => { vivo = false; };
-  }, [numero, layout, cor]);
+  }, [numero, layout, cor, lugares.length]);
   const texs = itens?.n === numero ? itens.texs : [];
   if (!texs.length) return null;
-  const lugares = CARTAZES[layout];
   return (
     <group>
       {texs.map((t, i) => (

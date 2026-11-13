@@ -35,6 +35,27 @@ function Casa({ x, z, cor = "#C0623A" }: { x: number; z: number; cor?: string })
   );
 }
 
+// Ícone do tipo de prédio no canto do prédio (13/11/2026): desenho de traço numa caixa de 10 × 10
+const ICONE_PREDIO: Record<string, string> = {
+  vidro: "M2 1h6v8H2z M4 1v8 M6 1v8", moderno: "M1 4h8v5H1z M3 1.5h4v2.5", sobrado: "M1 5L5 1.5L9 5V9H1z M4 9V6.5h2V9",
+  loja: "M1 2.5h8l-1 2.2H2z M2 4.7V9h6V4.7", galpao: "M1 9V5a4 4 0 0 1 8 0v4z", container: "M1 3h8v5H1z M3.6 3v5 M6.4 3v5",
+  comercial: "M2 1h6v8H2z M2 3.7h6 M2 6.3h6 M5 6.3V9", torre: "M3 0.5h4v9H3z M5 0.5v9 M3 3.5h4 M3 6.5h4", esquina: "M1 9V2h5l3 3v4z M6 2v7",
+  logistico: "M1 2.5h5v4.5H1z M6 4h2l1 1.5V7H6z M2.5 8.2a0.8 0.8 0 1 0 0.01 0 M7.3 8.2a0.8 0.8 0 1 0 0.01 0",
+  industrial: "M1 9V5.5l2-1.5v1.5l2-1.5v1.5l2-1.5V9z M7.6 9V1h1.2v8", coworking: "M1 2h8v7H1z M1 4.3h8 M1 6.6h8 M4 2v2.3 M6.5 4.3v2.3 M4 6.6V9",
+  cafeteria: "M2 3h5v3.6a2.2 2.2 0 0 1-2.2 2.2H4.2A2.2 2.2 0 0 1 2 6.6z M7 3.8h0.8a1.4 1.4 0 0 1 0 2.8H7 M3.5 1v1 M5.5 1v1",
+  consultorio: "M4 1.5h2v3h3v2H6v3H4v-3H1v-2h3z",
+};
+function IconePredio({ id, x, z }: { id: string; x: number; z: number }) {
+  const d = ICONE_PREDIO[id]; if (!d) return null;
+  return (
+    <g style={{ pointerEvents: "none" }}>
+      <circle cx={x + 0.25} cy={z + 0.3} r={2.1} fill="#000" opacity={0.18} />
+      <circle cx={x} cy={z} r={2.1} fill="#FFFFFF" />
+      <path d={d} transform={`translate(${x - 1.4} ${z - 1.4}) scale(0.28)`} fill={id === "consultorio" ? "#1F8A64" : "none"} stroke="#1D2128" strokeWidth={id === "consultorio" ? 0 : 0.95} strokeLinejoin="round" strokeLinecap="round" />
+    </g>
+  );
+}
+
 // lote da cidade: loja aberta (prédio na cor da empresa), em obras, à venda (casa ou terreno) ou a praça
 function Lote2D({ l, t, principal, anexoMeio, sel, vagas, promo, vivo }: { l: LoteInfo; t?: Terreno; principal?: Terreno; anexoMeio: number | null; sel: boolean; vagas: number; promo: string | null; vivo: boolean }) {
   const [x, z] = l.centro, s = LOTE - 1.6;
@@ -68,6 +89,7 @@ function Lote2D({ l, t, principal, anexoMeio, sel, vagas, promo, vivo }: { l: Lo
         <rect x={cx - larg / 2} y={z - prof / 2} width={larg} height={prof} rx={1.4} fill={t.cor} />
         <rect x={cx - larg / 2 + 1} y={z - prof / 2 + 1} width={larg - 2} height={prof - 2} rx={1} fill="#FFFFFF" opacity={0.12} />
         {logo ? <image href={logo} x={cx - 3.6} y={z - 3.6} width={7.2} height={7.2} preserveAspectRatio="xMidYMid meet" style={{ pointerEvents: "none" }} /> : <text x={cx} y={z + 1.6} textAnchor="middle" fontSize={4.4} fontWeight={900} fill="#fff" style={{ pointerEvents: "none" }}>{t.empresaNome.slice(0, 2).toUpperCase()}</text>}
+        {t.escritorio && <IconePredio id={t.escritorio.layout} x={cx - larg / 2 + 2.4} z={z - prof / 2 + 2.4} />}
         <Rotulo x={cx} z={z - prof / 2 - 1.6} texto={t.empresaNome} sub={nomeNicho(t.nicho)} cor={t.cor} />
         {vagas > 0 && <g style={{ pointerEvents: "none" }}><circle cx={cx + larg / 2 - 1} cy={z + prof / 2 - 1} r={1.6} fill="#FACC15" stroke="#1D2128" strokeWidth={0.3} /></g>}
         {promo && <g style={{ pointerEvents: "none" }}><rect x={cx - larg / 2 - 0.6} y={z + prof / 2 - 2.6} width={Math.min(14, promo.length * 1.25 + 4)} height={3.4} rx={1.7} fill="#E11D48" /><text x={cx - larg / 2 + 1.1} y={z + prof / 2 - 0.25} fontSize={2.2} fontWeight={900} fill="#fff">% {promo.slice(0, 12)}</text></g>}

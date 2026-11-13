@@ -3,11 +3,14 @@
 // Compartilhado por servidor (validação) e cliente (painel e cena). Unidade: metros, no sistema local do lote
 // (origem no centro do lote, frente = -z; a cena gira pela rua mais próxima).
 import { BONECOS } from "./bonecos";
+import { KIT_ANDARES, ehKit, medidasKit, type KitId } from "./predios";
 
 // Prédios gerados no Higgsfield (imagem → 3D), em public/modelos/escritorio-*.glb. Todos têm um quadro escuro em
 // branco acima da entrada: é onde entra o letreiro com o nome e a logo da empresa (posição em `letreiro`).
-export type LayoutId = "vidro" | "moderno" | "sobrado" | "loja" | "galpao" | "container";
-export interface LayoutInfo { id: LayoutId; nome: string; descricao: string; altura: number; andares: 1 | 2; modelo: string; letreiro: { y: number; z: number; largura: number } }
+// v66 (13/11/2026): mais 8 tipos montados em código com o kit modular (data/predios.ts e scene/KitPredio.tsx). kit = true
+// nesses: andares de verdade (mín. e máx. por tipo), revestimento aplicado direto e medidas em medidasKit().
+export type LayoutId = "vidro" | "moderno" | "sobrado" | "loja" | "galpao" | "container" | KitId;
+export interface LayoutInfo { id: LayoutId; nome: string; descricao: string; altura: number; andares: number; modelo: string; letreiro: { y: number; z: number; largura: number }; kit?: boolean }
 export const LAYOUTS: LayoutInfo[] = [
   // altura = escala do GLB (normalizado com altura 1); letreiro fica sobre o quadro em branco de cada prédio (medido nas imagens;
   // moderno, loja, galpão e contêiner reajustados em 11/11/2026 com fotos de frente: estavam 1 a 2 m abaixo do quadro)
@@ -17,7 +20,22 @@ export const LAYOUTS: LayoutInfo[] = [
   { id: "loja", nome: "Loja de rua", descricao: "Telhadinho de barro, vitrine com toldo listrado e vaso na porta.", altura: 11, andares: 1, modelo: "escritorioLoja", letreiro: { y: 7.85, z: -5.4, largura: 4.5 } },
   { id: "galpao", nome: "Galpão de tijolinho", descricao: "Antigo galpão industrial com janelas em arco e claraboias. Cara de estúdio criativo.", altura: 10.5, andares: 1, modelo: "escritorioGalpao", letreiro: { y: 7.95, z: -7.1, largura: 4.6 } },
   { id: "container", nome: "Contêineres", descricao: "Três contêineres empilhados com frente de vidro, deck de madeira e escada externa.", altura: 9.2, andares: 2, modelo: "escritorioContainer", letreiro: { y: 4.9, z: -5.35, largura: 4 } },
+  ...([
+    ["comercial", "Prédio comercial", "De 3 a 5 andares de salas, com recepção de vidro no térreo, marquise e ar-condicionado nas laterais."],
+    ["torre", "Torre corporativa", "Sede de empresa grande: pele de vidro, saguão de pé-direito duplo e de 6 a 12 andares."],
+    ["esquina", "Loja de esquina", "Vitrine em L com a porta no canto chanfrado, marquise contornando e sobreloja com sacadinhas."],
+    ["logistico", "Galpão logístico", "Galpão de chapa com doca, portão de enrolar e caminhão encostado, e escritório na frente."],
+    ["industrial", "Galpão industrial", "Telhado em dente de serra com claraboias, chaminé de tijolo, tanques e escritório na frente."],
+    ["coworking", "Coworking de tijolinho", "Estúdio criativo de tijolo aparente com janelões de ferro, marquise metálica e escada externa."],
+    ["cafeteria", "Café com varanda", "Telhado de barro, portas de vidro abertas para a varanda com pérgola, mesinhas e plantas."],
+    ["consultorio", "Clínica", "Toda clara, com rampa de acesso, marquise, jardim na frente e brises nas janelas."],
+  ] as [KitId, string, string][]).map(([id, nome, descricao]): LayoutInfo => {
+    const m = medidasKit(id, KIT_ANDARES[id].base, false);
+    return { id, nome, descricao, altura: m.altura, andares: KIT_ANDARES[id].base, modelo: "", letreiro: { y: m.letreiro.y, z: m.letreiro.z, largura: m.letreiro.largura }, kit: true };
+  }),
 ];
+// andares que o dono pode escolher em cada tipo (nos modelos antigos, do nativo até 5)
+export const limitesAndares = (layout: LayoutId) => (ehKit(layout) ? KIT_ANDARES[layout] : { base: LAYOUT[layout].andares, min: LAYOUT[layout].andares, max: MAX_ANDARES });
 // Profissionais prontos pra contratar (vêm com cargo e treino); o dono também pode criar do zero
 export interface Pronto { id: string; nome: string; cargo: string; setor: string; boneco: string; camisa: string; treino: Treino }
 export const CATALOGO_PROFISSIONAIS: Pronto[] = [
@@ -73,6 +91,7 @@ export type ModoLed = "texto" | "promocao" | "horario";
 export interface Led { ligado: boolean; modo: ModoLed; texto: string; cor: CorLed; abre: string; fecha: string; dias: number[] }
 export type PecaArea = "auto" | "nenhuma" | "barbearia" | "cafe" | "clinica" | "academia" | "tecnologia" | "estudio" | "megafone" | "lousa" | "balanca" | "cofrinho" | "relogio" | "ferramentas" | "arara" | "imobiliaria" | "baloes" | "malas" | "pneus";
 export const MAX_ANDARES = 5;
+export const MAX_ANDARES_KIT = 12; // a torre corporativa vai até 12
 export const COBERTURAS: { id: CoberturaId; nome: string; icone: string }[] = [
   { id: "nenhuma", nome: "Só a laje", icone: "▭" }, { id: "terraco", nome: "Terraço com mesas", icone: "⛱️" }, { id: "jardim", nome: "Jardim no teto", icone: "🌿" },
   { id: "letreiro", nome: "Letreiro no teto", icone: "🔠" }, { id: "solar", nome: "Painel solar", icone: "☀️" },
@@ -135,7 +154,7 @@ export function limparDecor(x: unknown, base: Decoracao = DECOR_PADRAO): Decorac
   const toldo = o.toldo === null ? null : typeof o.toldo === "string" && /^#[0-9a-fA-F]{6}$/.test(o.toldo) ? o.toldo : o.toldo === undefined ? base.toldo : null;
   const extras = Array.isArray(o.extras) ? [...new Set(o.extras.filter((e): e is ExtraLote => EXTRAS.some((x) => x.id === e)))] : base.extras;
   const andaresIn = o.andares === undefined ? base.andares ?? 0 : Math.round(Number(o.andares)) || 0;
-  const andares = Math.max(0, Math.min(MAX_ANDARES, andaresIn));
+  const andares = Math.max(0, Math.min(MAX_ANDARES_KIT, andaresIn));
   const corFachada = o.corFachada === null ? null : typeof o.corFachada === "string" && /^#[0-9a-fA-F]{6}$/.test(o.corFachada) ? o.corFachada.toUpperCase() : o.corFachada === undefined ? base.corFachada ?? null : null;
   const peca: PecaArea = o.peca === "auto" || o.peca === "nenhuma" || PECAS.some((p) => p.id === o.peca) ? (o.peca as PecaArea) : base.peca ?? "auto";
   return {
@@ -157,13 +176,19 @@ export function limparLed(x: unknown, base: Led = LED_PADRAO): Led {
 export const DIM_LAYOUT: Record<LayoutId, { largura: number; prof: number }> = {
   vidro: { largura: 11.5, prof: 11.2 }, moderno: { largura: 14.0, prof: 13.2 }, sobrado: { largura: 11.7, prof: 12.4 },
   loja: { largura: 11.2, prof: 10.3 }, galpao: { largura: 12.9, prof: 13.7 }, container: { largura: 12.5, prof: 10.2 },
+  // kit: largura do corpo e profundidade da frente mais avançada (anexo) até os fundos
+  comercial: { largura: 15, prof: 12.2 }, torre: { largura: 13, prof: 12.8 }, esquina: { largura: 15, prof: 12.2 }, logistico: { largura: 18, prof: 14.4 },
+  industrial: { largura: 17, prof: 14.6 }, coworking: { largura: 15, prof: 12.2 }, cafeteria: { largura: 14, prof: 12.2 }, consultorio: { largura: 15, prof: 11.6 },
 };
 // altura de cada andar a mais: proporcional ao modelo (os modelos têm pé-direito alto), entre 3,4 e 4,4 m
 export const andarAltura = (layout: LayoutId) => Math.max(3.4, Math.min(4.4, (LAYOUT[layout].altura / LAYOUT[layout].andares) * 0.55));
-export const andaresDoPredio = (e: Escritorio) => { const n = LAYOUT[e.layout].andares; const a = e.decor?.andares ?? 0; return Math.max(n, Math.min(MAX_ANDARES, a || n)); };
+export const andaresDoPredio = (e: Escritorio) => { const lim = limitesAndares(e.layout); const a = e.decor?.andares ?? 0; return a ? Math.max(lim.min, Math.min(lim.max, a)) : lim.base; };
 // altura do topo do prédio (m), para o balão e a câmera
 export function alturaPredio(e: Escritorio, duplo = false) {
-  const L = LAYOUT[e.layout]; const extra = andaresDoPredio(e) - L.andares; const cob = e.decor?.cobertura ?? "nenhuma";
+  const cob = e.decor?.cobertura ?? "nenhuma";
+  // kit: altura de verdade (andares, telhado e caixa d'água), sem esticar no lote duplo
+  if (ehKit(e.layout)) return medidasKit(e.layout, andaresDoPredio(e), duplo, cob !== "nenhuma").altura + (cob === "letreiro" ? 3.2 : cob === "terraco" ? 2.6 : cob === "jardim" ? 1.6 : cob === "solar" ? 1.2 : 0);
+  const L = LAYOUT[e.layout]; const extra = andaresDoPredio(e) - L.andares;
   return L.altura * (duplo ? 1.2 : 1) + extra * andarAltura(e.layout) + (cob === "letreiro" ? 3.2 : cob === "terraco" ? 2.6 : cob === "jardim" ? 1.6 : cob === "solar" ? 1.2 : 0.4);
 }
 export const TROCAS_LAYOUT_GRATIS = 3;

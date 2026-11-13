@@ -17,11 +17,13 @@ import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle, type Pose } fro
 import { BONECO } from "../data/bonecos";
 import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
 import { ModeloPredio, RelogioPredios, FACHADA_TESTE } from "./PredioMaterial";
-import { Torre } from "./PredioTopo";
+import { Torre, Cobertura } from "./PredioTopo";
+import { PredioKit, RelogioKit } from "./KitPredio";
+import { ehKit, medidasKit, KIT_ANDARES, KIT_TOLDO, type KitId } from "../data/predios";
 import { LetreiroLed, VitrineJanela } from "./PredioFrente";
 import { PecaArea } from "./PecasArea";
 import { Inauguracao, LOTES_EM_OBRA_VISTOS, INAUGURAR_TESTE, easeSubida } from "./ObraFesta";
-import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, andaresDoPredio, alturaPredio, pecaEfetiva, LED_PADRAO, type Led, MAX_ANDARES, COBERTURAS, DIM_LAYOUT, type CoberturaId, INTERIOR_PADRAO, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote } from "../data/escritorio";
+import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, andaresDoPredio, alturaPredio, pecaEfetiva, LED_PADRAO, type Led, MAX_ANDARES, MAX_ANDARES_KIT, COBERTURAS, DIM_LAYOUT, type CoberturaId, INTERIOR_PADRAO, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote } from "../data/escritorio";
 import { useMundo, useAgora, promocaoAtiva } from "../mundoStore";
 import { useFrame } from "@react-three/fiber";
 import { useEscritorio } from "../store";
@@ -31,13 +33,38 @@ const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = PREDIO_CLIENTE;
 const LARG = X1 - X0, PROF = Z1 - Z0;
 
 // ---------- lado de fora ----------
+// Prédios do kit modular (v66, 13/11/2026): montados em código (KitPredio), com andares de verdade, sem esticar no lote
+// duplo (sai mais largo) e com letreiro, vitrine e cobertura nos lugares de cada tipo (data/predios.ts).
+function ExteriorKit({ chave, e, cor, nome, logo, duplo = false, contratando = false, numero = null, promo = null }: { chave: string; e: Escritorio; cor: string; nome: string; logo: string | null; duplo?: boolean; contratando?: boolean; numero?: number | null; promo?: string | null }) {
+  const id = e.layout as KitId, d = e.decor ?? DECOR_PADRAO, lim = KIT_ANDARES[id];
+  const material = FACHADA_TESTE ?? d.material ?? "original";
+  const corF = d.corFachada ?? cor;
+  const andares = ANDARES_TESTE ? Math.max(lim.min, Math.min(lim.max, ANDARES_TESTE)) : andaresDoPredio(e);
+  const cobertura = COBERTURA_TESTE ?? d.cobertura ?? "nenhuma", plana = cobertura !== "nenhuma";
+  const m = medidasKit(id, andares, duplo, plana), lt = m.letreiro;
+  const led = LED_TESTE ?? d.led;
+  return (
+    <group>
+      <PredioKit id={id} andares={andares} duplo={duplo} material={material} corFachada={corF} corMarca={cor} semente={chave} plana={plana} />
+      {plana && <group position={[m.topo.x, 0, 0]}><Cobertura tipo={cobertura} w={m.topo.w} d={m.topo.d} y={m.topo.y} cz={m.topo.cz} nome={nome} cor={cor} logo={logo} /></group>}
+      <group position={[lt.x, 0, 0]}>
+        <Letreiro nome={nome} cor={cor} logo={logo} y={lt.y} z={lt.z} largura={lt.largura} estilo={d.letreiro} />
+        {led?.ligado && <LetreiroLed led={led} numero={numero} promo={promo} nome={nome} y={lt.y + 1.0} z={lt.z - 0.02} largura={lt.largura} />}
+        {contratando && <PlacaContratando x={lt.largura / 2 - 1.15} y={lt.y + (led?.ligado ? 1.78 : 0.98)} z={lt.z} />}
+        {d.toldo && KIT_TOLDO[id] && <Toldo cor={d.toldo} y={lt.y - 1.05} z={lt.z} largura={lt.largura} />}
+        {d.extras.includes("natal") && natalAtivo() && <NatalLetreiro y={lt.y} z={lt.z} largura={lt.largura} />}
+      </group>
+      {(d.vitrineJanela ?? true) && <VitrineJanela numero={numero} layout={e.layout} lugares={m.vitrine} z={m.vidroZ + 0.1} sx={1} sy={1} cor={cor} />}
+    </group>
+  );
+}
 // Prédio gerado no Higgsfield (GLB normalizado: altura 1, base em y=0; frente do Tripo olha pra +x → giramos pra -z)
 // Lote duplo (12/11/2026): o prédio fica 60% mais largo e 20% mais alto (a profundidade não muda, então a frente do lote
 // continua no mesmo lugar) e o letreiro acompanha a largura.
 export const DUPLO = { x: 1.6, y: 1.2 };
 // parâmetros de conferência (fotos): ?andaresTeste=4 e ?coberturaTeste=terraco valem para todos os prédios
 const PARAM = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
-const ANDARES_TESTE = PARAM?.get("andaresTeste") ? Math.max(1, Math.min(MAX_ANDARES, Number(PARAM.get("andaresTeste")) || 0)) : null;
+const ANDARES_TESTE = PARAM?.get("andaresTeste") ? Math.max(1, Math.min(MAX_ANDARES_KIT, Number(PARAM.get("andaresTeste")) || 0)) : null;
 const LED_TESTE = PARAM?.get("ledTeste") ? { ...LED_PADRAO, ligado: true, modo: (PARAM.get("ledTeste") === "horario" ? "horario" : "texto") as Led["modo"], texto: "Teste do letreiro de LED", cor: "ambar" as const } : null;
 const COBERTURA_TESTE = (() => { const c = PARAM?.get("coberturaTeste"); return c && COBERTURAS.some((x) => x.id === c) ? (c as CoberturaId) : null; })();
 // onde fica a fachada (z) de cada modelo: a medida do GLB inclui floreiras e degraus na frente, então vem das fotos
@@ -52,7 +79,7 @@ function Exterior({ e, cor, nome, logo, duplo = false, contratando = false, nume
   // revestimento, andares a mais e cobertura (12/11/2026)
   const material = FACHADA_TESTE ?? d.material ?? "original";
   const corF = d.corFachada ?? cor;
-  const andares = ANDARES_TESTE ? Math.max(L.andares, ANDARES_TESTE) : andaresDoPredio(e);
+  const andares = ANDARES_TESTE ? Math.max(L.andares, Math.min(MAX_ANDARES, ANDARES_TESTE)) : andaresDoPredio(e);
   const cobertura = COBERTURA_TESTE ?? d.cobertura ?? "nenhuma";
   const led = LED_TESTE ?? d.led;
   return (
@@ -321,15 +348,18 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
   // a placa de esquina fica na ponta do lote virada para o cruzamento (não gira com o prédio)
   const placa = (e.decor?.extras ?? []).includes("placa");
   const peca = pecaEfetiva(e.decor, nicho);
+  // onde fica a fachada (peça da área, inauguração): nos tipos do kit vem das medidas de cada um
+  const mk = ehKit(e.layout) ? medidasKit(e.layout, andaresDoPredio(e), !!la, (e.decor?.cobertura ?? "nenhuma") !== "nenhuma") : null;
+  const zFrente = mk?.frenteZ ?? FRENTE_Z[e.layout] ?? -DIM_LAYOUT[e.layout].prof / 2, zVidro = mk?.vidroZ ?? FACHADA_Z[e.layout];
   return (
     <group position={[x, 0, z]}>
     {placa && <group position={[-dx, 0, 0]}><PlacaEsquina d={{ nome, cor, nicho: nomeNicho(nicho), numero: l.numero, logo }} sx={l.k % 2 ? 1 : -1} sz={l.k >= 2 ? 1 : -1} /></group>}
     <group rotation={[0, rot, 0]}>
-      <group ref={sobe}><group visible={fora}><Exterior e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} numero={l.numero} promo={promo} /></group></group>
+      <group ref={sobe}><group visible={fora}>{mk ? <ExteriorKit chave={chave} e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} numero={l.numero} promo={promo} /> : <Exterior e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} numero={l.numero} promo={promo} />}</group></group>
       <DecorLote d={e.decor ?? DECOR_PADRAO} cor={cor} logo={logo} duplo={!!la} />
       {promo && <FaixaPromo texto={promo} duplo={!!la} />}
-      {peca && <PecaArea tipo={peca} cor={cor} zf={FRENTE_Z[e.layout] ?? -DIM_LAYOUT[e.layout].prof / 2} zw={FACHADA_Z[e.layout]} sx={la ? DUPLO.x : 1} />}
-      {(festa || INAUGURAR_TESTE === chave) && <Inauguracao cor={cor} zf={FRENTE_Z[e.layout] ?? -DIM_LAYOUT[e.layout].prof / 2} sx={la ? DUPLO.x : 1} topo={alturaPredio(e, !!la)} />}
+      {peca && <PecaArea tipo={peca} cor={cor} zf={zFrente} zw={zVidro} sx={la ? DUPLO.x : 1} />}
+      {(festa || INAUGURAR_TESTE === chave) && <Inauguracao cor={cor} zf={zFrente} sx={la ? DUPLO.x : 1} topo={alturaPredio(e, !!la)} />}
       {!fora && (
         <>
           <Estatico key={"d" + assinatura}><InteriorFixo e={e} cor={cor} /></Estatico>
@@ -358,6 +388,7 @@ export function EscritoriosClientes() {
   return (
     <group>
       <RelogioPredios />
+      <RelogioKit />
       {Object.values(terrenos).map((t) => {
         const e = t.chave === selecionado && rascunho ? rascunho : t.escritorio;
         if (t.status !== "ativo" || !e || t.anexoDe) return null; // a ampliação não tem prédio próprio: o principal cresce

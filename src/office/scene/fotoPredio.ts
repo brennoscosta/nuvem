@@ -6,12 +6,15 @@ import * as THREE from "three";
 import { useMundo } from "../mundoStore";
 import { useHora, type ModoHora } from "../cameraStore";
 import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
-import { LAYOUT } from "../data/escritorio";
+import { LAYOUT, alturaPredio } from "../data/escritorio";
+import { ehKit } from "../data/predios";
 import { ceu } from "./CicloDia";
 
 interface Ponte { gl: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controles: { target: THREE.Vector3; update(): void }; pararModos: () => void }
 let ponte: Ponte | null = null;
-export function registrarPonte(p: Ponte | null) { ponte = p; }
+// ?medir=1: a ponte também fica em window.__ponte (scripts de conferência movem a câmera sem recarregar a página)
+const MEDIR = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("medir");
+export function registrarPonte(p: Ponte | null) { ponte = p; if (MEDIR) (window as unknown as { __ponte?: Ponte | null }).__ponte = p; }
 export type HoraFoto = "agora" | "dia" | "noite";
 export const LARGURA_FOTO = 1920, ALTURA_FOTO = 1080;
 const DUPLO_ALTURA = 1.2; // o prédio do lote duplo é 20% mais alto (scene/EscritorioCliente)
@@ -30,7 +33,8 @@ export function enquadramento(chave: string) {
   const cx = la ? (l.centro[0] + la.centro[0]) / 2 : l.centro[0], cz = l.centro[1];
   const giro = t?.escritorio?.decor?.giro ?? 0, giroEf = la ? giro - (giro % 2) : giro;
   const rot = frenteDoLote(l.k) + Math.PI + giroEf * (Math.PI / 2);
-  const altura = (t?.escritorio ? LAYOUT[t.escritorio.layout]?.altura ?? 9 : 7) * (la ? DUPLO_ALTURA : 1);
+  const e = t?.escritorio;
+  const altura = e && ehKit(e.layout) ? alturaPredio(e, !!la) : (e ? LAYOUT[e.layout]?.altura ?? 9 : 7) * (la ? DUPLO_ALTURA : 1);
   // a frente local do prédio é -z: girada por rot, vira (-sen rot, -cos rot) no mapa; a foto vem de três quartos (28°)
   const a = rot + 0.49, dist = Math.max(27, altura * 2.5) * (la ? 1.4 : 1);
   const alvo = new THREE.Vector3(cx, altura * 0.42, cz);

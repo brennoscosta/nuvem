@@ -38,7 +38,12 @@ async function lotesLivres() {
 const CORES_PREDIO: Record<LayoutId, [string, string]> = {
   vidro: ["#DCEBFF", "#8FBDF4"], moderno: ["#F6EBDD", "#DDB893"], sobrado: ["#E7F0DA", "#A6C98A"],
   loja: ["#FFE5DB", "#F1A487"], galpao: ["#E8E4F8", "#ADA4E6"], container: ["#D8F2EB", "#84CEBB"],
+  // kit modular (13/11/2026)
+  comercial: ["#EEF0F3", "#AEB7C4"], torre: ["#DDEAF6", "#7FA4C9"], esquina: ["#FBF0D9", "#E2BE73"], logistico: ["#E6ECF1", "#9BAFC0"],
+  industrial: ["#F6E3DA", "#D4937A"], coworking: ["#F4E1D8", "#C98468"], cafeteria: ["#F7EBDD", "#CFA27A"], consultorio: ["#E1F3EC", "#8CCFB6"],
 };
+const EXTENSO = ["", "Um", "Dois", "Três", "Quatro", "Cinco", "Seis", "Sete", "Oito", "Nove", "Dez", "Onze", "Doze", "Treze", "Catorze", "Quinze", "Dezesseis", "Dezessete", "Dezoito", "Dezenove", "Vinte"];
+const porExtenso = (n: number) => EXTENSO[n] ?? String(n);
 
 const PERGUNTAS: [string, string][] = [
   ["Preciso pagar para criar a conta?", "Não. A conta é grátis. Você só paga quando reserva um lote (R$ 99 por mês) ou quando ativa o seu personagem (R$ 5,90 por mês)."],
@@ -96,7 +101,7 @@ export default async function Inicio() {
   const passos = [
     { cena: <CenaLote />, titulo: "Escolha o seu lote", texto: `São ${LOTES.length} lotes espalhados pela cidade. Clique num livre e ele fica reservado por 1 hora enquanto você paga no Pix.` },
     { cena: <CenaFachada />, titulo: "Ponha a sua marca na fachada", texto: "Nome, logomarca e cor no letreiro e na placa, à vista de todo mundo que passa pela rua." },
-    { cena: <CenaEquipe />, titulo: "Monte a sua equipe", texto: "Escolha entre 6 prédios, crie a sala de cada setor e dê nome e rosto a cada pessoa." },
+    { cena: <CenaEquipe />, titulo: "Monte a sua equipe", texto: `Escolha entre ${LAYOUTS.length} prédios, crie a sala de cada setor e dê nome e rosto a cada pessoa.` },
   ];
   return (
     <div className="wi">
@@ -140,7 +145,7 @@ export default async function Inicio() {
 
         {/* 3 ---------- prédios: galeria e o nome aceso na placa ---------- */}
         <section id="predios" className="ws ws-predios">
-          <Revelar className="faixa ws-cab"><h2>Seis prédios. <em>Um deles é o seu.</em></h2><p>Arraste para o lado, escreva o nome da sua empresa e veja a placa acender. Trocar de prédio não custa nada nas três primeiras vezes.</p></Revelar>
+          <Revelar className="faixa ws-cab"><h2>{porExtenso(LAYOUTS.length)} prédios. <em>Um deles é o seu.</em></h2><p>Arraste para o lado, escreva o nome da sua empresa e veja a placa acender. Trocar de prédio não custa nada nas três primeiras vezes.</p></Revelar>
           <Revelar className="faixa"><GaleriaPredios predios={predios} lote={lote ? { chave: lote.chave, numero: lote.numero } : null} logado={!!u} /></Revelar>
         </section>
 
@@ -192,7 +197,7 @@ export default async function Inicio() {
                 {restamFundador > 0 && <p className="wi-fundador"><b>Preço de fundador:</b> 1º mês por R$ {FUNDADOR.valor.toFixed(2).replace(".", ",")} para as {FUNDADOR.vagas} primeiras empresas · <b>restam {restamFundador}</b></p>}
                 <ul className="wi-lista">
                   <li>Seu endereço com placa, nome, logomarca e cor da marca</li>
-                  <li>6 tipos de prédio e 3 trocas de prédio grátis</li>
+                  <li>{LAYOUTS.length} tipos de prédio e 3 trocas de prédio grátis</li>
                   <li>Equipe de IA que trabalha: CEO, atendente e os especialistas que você contratar</li>
                   <li>R$ 10 de IA por mês incluídos e página própria da loja</li>
                   <li>Pagamento por Pix, direto no mapa</li>

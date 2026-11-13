@@ -5,8 +5,9 @@ import { FLUTUANTE, LARGO } from "./estilo";
 import { useEffect, useState } from "react";
 import { PixAberto } from "./Lote";
 import { useMundo } from "../mundoStore";
-import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, vagasLivres, DECOR_PADRAO, ESTILOS_LETREIRO, PISOS, CERCAS, EXTRAS, CORES_TOLDO, INTERIOR_PADRAO, CORES_PAREDE, PISOS_INTERIOR, MOVEIS_INTERIOR, LAYOUT, MAX_ANDARES, COBERTURAS, MATERIAIS, CORES_LED, LED_PADRAO, PECAS, PECA_POR_NICHO, andaresDoPredio, type Led, type Escritorio, type Setor, type Membro, type Pronto, type Decoracao, type Interior } from "../data/escritorio";
+import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, vagasLivres, DECOR_PADRAO, ESTILOS_LETREIRO, PISOS, CERCAS, EXTRAS, CORES_TOLDO, INTERIOR_PADRAO, CORES_PAREDE, PISOS_INTERIOR, MOVEIS_INTERIOR, COBERTURAS, MATERIAIS, CORES_LED, LED_PADRAO, PECAS, PECA_POR_NICHO, andaresDoPredio, limitesAndares, type Led, type Escritorio, type Setor, type Membro, type Pronto, type Decoracao, type Interior } from "../data/escritorio";
 import { useEscritorio } from "../store";
+import { ehKit, KIT_TOLDO } from "../data/predios";
 import { frenteDoLote, LOTE_POR_CHAVE } from "../data/mundo";
 import { natalAtivo } from "../scene/Natal";
 
@@ -122,10 +123,11 @@ export function PainelEscritorio() {
           <div className="space-y-2">
             {LOTE_POR_CHAVE[vista] && <PosicaoPredio k={LOTE_POR_CHAVE[vista].k} e={e} set={set} />}
             <AlturaFachada e={e} set={set} corMarca={terrenoAtual?.cor ?? "#1D4ED8"} />
-            {LAYOUTS.map((L) => (
+            {/* os 8 tipos novos (kit modular, 13/11/2026) primeiro, com o selo "Novo"; depois os 6 de sempre */}
+            {[...LAYOUTS.filter((L) => L.kit), ...LAYOUTS.filter((L) => !L.kit)].map((L) => (
               <button key={L.id} type="button" onClick={() => set({ ...e, layout: L.id })} className={`flex w-full items-center gap-3 rounded-xl border-2 p-2 text-left ${e.layout === L.id ? "border-[#1D4ED8] bg-[#EEF3FF]" : "border-black/10 hover:bg-black/[0.03]"}`}>
                 <MiniLayout id={L.id} />
-                <div className="min-w-0"><div className="text-sm font-bold">{L.nome}</div><div className="text-[11px] leading-snug text-[#5B6472]">{L.descricao}</div></div>
+                <div className="min-w-0"><div className="flex items-center gap-1.5 text-sm font-bold">{L.nome}{L.kit && <span className="rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#166534]">Novo</span>}</div><div className="text-[11px] leading-snug text-[#5B6472]">{L.descricao}</div></div>
               </button>
             ))}
             <div className={`rounded-xl px-3 py-2 text-[11px] ${restantes > 0 ? "bg-[#F1F3F6] text-[#5B6472]" : "bg-[#FFF4D6] text-[#7A5A00]"}`}>
@@ -278,7 +280,7 @@ function AbaInterior({ e, set, temLogo }: { e: Escritorio; set: (e: Escritorio) 
 function AlturaFachada({ e, set, corMarca }: { e: Escritorio; set: (e: Escritorio) => void; corMarca: string }) {
   const d = e.decor ?? DECOR_PADRAO;
   const muda = (p: Partial<Decoracao>) => set({ ...e, decor: { ...d, ...p } });
-  const nativo = LAYOUT[e.layout].andares, atual = andaresDoPredio(e);
+  const lim = limitesAndares(e.layout), nativo = lim.base, atual = andaresDoPredio(e), kit = ehKit(e.layout);
   const material = d.material ?? "original", cobertura = d.cobertura ?? "nenhuma";
   const corF = d.corFachada ?? corMarca;
   const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">{t}</div>;
@@ -286,11 +288,11 @@ function AlturaFachada({ e, set, corMarca }: { e: Escritorio; set: (e: Escritori
     <div className="rounded-xl border border-black/10 p-2.5">
       {titulo("Andares")}
       <div className="flex flex-wrap gap-1.5">
-        {Array.from({ length: MAX_ANDARES - nativo + 1 }, (_, i) => nativo + i).map((n) => (
-          <Opcao key={n} ativo={atual === n} onClick={() => muda({ andares: n === nativo ? 0 : n })}>{n === nativo ? `${n} · como o modelo` : `${n} andares`}</Opcao>
+        {Array.from({ length: lim.max - lim.min + 1 }, (_, i) => lim.min + i).map((n) => (
+          <Opcao key={n} ativo={atual === n} onClick={() => muda({ andares: n === nativo ? 0 : n })}>{n === nativo ? `${n} · como o modelo` : `${n} ${n === 1 ? "andar" : "andares"}`}</Opcao>
         ))}
       </div>
-      <div className="mt-1 text-[11px] text-[#5B6472]">Os andares a mais sobem atrás da fachada, com o mesmo revestimento; à noite as janelas acendem.</div>
+      <div className="mt-1 text-[11px] text-[#5B6472]">{!kit ? "Os andares a mais sobem atrás da fachada, com o mesmo revestimento; à noite as janelas acendem." : e.layout === "logistico" || e.layout === "industrial" ? "No galpão, os andares são do escritório da frente; o galpão continua com o pé-direito alto." : "Os andares são de verdade: o prédio inteiro sobe, com janelas dos quatro lados; à noite elas acendem."}</div>
       {titulo("No topo")}
       <div className="grid grid-cols-2 gap-1.5">
         {COBERTURAS.map((c) => <Opcao key={c.id} ativo={cobertura === c.id} onClick={() => muda({ cobertura: c.id })}><span className="mr-1">{c.icone}</span>{c.nome}</Opcao>)}
@@ -368,7 +370,7 @@ function AbaVisual({ e, set, corMarca, nicho }: { e: Escritorio; set: (e: Escrit
         ))}
       </div>
       {titulo("Toldo na entrada")}
-      {e.layout === "loja" ? <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A Loja de rua já vem com o toldo listrado dela.</div> : <div className="flex flex-wrap items-center gap-1.5">
+      {e.layout === "loja" ? <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A Loja de rua já vem com o toldo listrado dela.</div> : ehKit(e.layout) && !KIT_TOLDO[e.layout] ? <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">Este prédio já tem marquise na entrada, então o toldo não entra.</div> : <div className="flex flex-wrap items-center gap-1.5">
         <Opcao ativo={!d.toldo} onClick={() => muda({ toldo: null })}>Sem toldo</Opcao>
         {[corMarca, ...CORES_TOLDO.filter((c) => c.toLowerCase() !== corMarca.toLowerCase())].map((c) => (
           <button key={c} type="button" onClick={() => muda({ toldo: c })} aria-label={`Toldo ${c}`} className={`h-8 w-8 rounded-full border-2 ${d.toldo === c ? "border-[#1D2128]" : "border-transparent"}`} style={{ background: `repeating-linear-gradient(90deg, ${c} 0 6px, #fff 6px 12px)` }} />

@@ -14,8 +14,9 @@ import { LAYOUT, DIM_LAYOUT, andarAltura, type CoberturaId, type LayoutId, type 
 const FONTE = "/fonts/inter-700.woff";
 // revestimento "original" do bloco: o que combina com cada modelo
 // altura (fração do modelo) onde começa o telhado: o bloco começa um pouco abaixo dela, escondido pelo telhado
-const TETO: Record<LayoutId, number> = { vidro: 0.92, moderno: 0.88, sobrado: 0.88, loja: 0.6, galpao: 0.62, container: 0.9 };
-const ORIGINAL_TORRE: Record<LayoutId, { material: MaterialFachada | "container"; cor: string }> = {
+const TETO: Partial<Record<LayoutId, number>> = { vidro: 0.92, moderno: 0.88, sobrado: 0.88, loja: 0.6, galpao: 0.62, container: 0.9 };
+// (os prédios do kit modular não usam o bloco: os andares são de verdade, ver KitPredio)
+const ORIGINAL_TORRE: Partial<Record<LayoutId, { material: MaterialFachada | "container"; cor: string }>> = {
   vidro: { material: "vidro", cor: "#FFFFFF" }, moderno: { material: "pintura", cor: "#F1EFEA" }, sobrado: { material: "pintura", cor: "#E9E4DA" },
   loja: { material: "pintura", cor: "#F0D9B5" }, galpao: { material: "tijolinho", cor: "#FFFFFF" }, container: { material: "container", cor: "#3B4A5A" },
 };
@@ -55,13 +56,13 @@ export function medidasBloco(layout: LayoutId, extra: number, cobertura: Cobertu
   const andar = andarAltura(layout);
   const yBase = 0.16 + L.altura * sy; // onde começam os andares a mais
   const yTopo = yBase + (extra > 0 ? extra * andar : 0.9);
-  const y0 = 0.16 + L.altura * sy * (TETO[layout] - 0.05);
+  const y0 = 0.16 + L.altura * sy * ((TETO[layout] ?? 0.9) - 0.05);
   return { largura: D.largura * sx * 0.74, prof: D.prof * 0.52, cz: D.prof * 0.2, y0, yBase, yTopo, extra, andar };
 }
 
 export function Torre({ layout, extra, cobertura, material, corFachada, duplo, nome, cor, logo }: { layout: LayoutId; extra: number; cobertura: CoberturaId; material: MaterialFachada; corFachada: string; duplo: boolean; nome: string; cor: string; logo: string | null }) {
   const b = useMemo(() => medidasBloco(layout, extra, cobertura, duplo), [layout, extra, cobertura, duplo]);
-  const orig = ORIGINAL_TORRE[layout];
+  const orig = ORIGINAL_TORRE[layout] ?? { material: "pintura" as const, cor: "#F1EFEA" };
   const matEf = material === "original" ? orig.material : material;
   const corEf = material === "original" ? orig.cor : corFachada;
   const ehConteiner = layout === "container" && material === "original";
