@@ -6,10 +6,12 @@ import * as THREE from "three";
 import { Balao } from "./Lotes";
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { caixa, cilindro, esfera, mat, plano, COR } from "./geo";
+import { caixa, esfera, mat, plano, COR } from "./geo";
 import { BonecoProcedural, HIPS, useAnimacao, type BonecoHandle } from "./Boneco";
 import { BONECOS, TODOS_BONECOS } from "../data/bonecos";
 import { ComFallback, ModeloInstanciado } from "./Modelos";
+import { ArvoreAvulsa, ArvoresMistas, type Mistura } from "./Arvores";
+const MISTURA_NUVEM: Mistura = { oiti: 0.45, frondosa: 0.4, ipeAmarelo: 0.15 };
 import { Estatico } from "./Estatico";
 import { SombraContato } from "./SombraContato";
 import { leve } from "./qualidade";
@@ -23,15 +25,10 @@ const BANCOS = [
   { pos: [-12.4, 0, 2.5], rot: Math.PI / 2 }, { pos: [12.3, 0, -2], rot: -Math.PI / 2 },
 ].map((b) => ({ ...b, pos: b.pos as [number, number, number], altura: 0.95 }));
 
+// Árvore avulsa (decoração do lote do cliente, praça). Desde a v63 é a árvore em código de scene/Arvores.tsx
+// (frondosa ou oiti, sorteada pela posição); escala 1 ≈ 3,8 m, como a árvore antiga.
 export function Arvore({ position, escala = 1 }: { position: [number, number, number]; escala?: number }) {
-  return (
-    <group position={position} scale={escala}>
-      <mesh geometry={cilindro(0.12, 0.18, 1.6, 8)} material={mat("#7A5A3A", { rough: 0.95 })} position={[0, 0.8, 0]} castShadow />
-      <mesh geometry={esfera(1.1, 12)} material={mat("#3E9B5B")} position={[0, 2.1, 0]} castShadow />
-      <mesh geometry={esfera(0.8, 10)} material={mat("#58B06A")} position={[0.6, 2.5, 0.3]} castShadow />
-      <mesh geometry={esfera(0.7, 10)} material={mat("#2F8A4C")} position={[-0.6, 2.4, -0.3]} castShadow />
-    </group>
-  );
+  return <ArvoreAvulsa position={position} altura={3.8 * escala} />;
 }
 
 function Banco({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
@@ -150,10 +147,8 @@ export function Entorno() {
     <group>
       <Estatico><EntornoFixo /></Estatico>
       <Balao position={[0, 11, 0]} nome="Nuvem" cor="#1D4ED8" logo="/brand/nuvem-branco.png" subtitulo="Tecnologia" />
-      {/* árvores e bancos: modelos do Higgsfield instanciados (um draw call por modelo); procedural se o GLB faltar */}
-      <ComFallback fallback={<Estatico>{(poucos ? ARVORES.slice(0, 9) : ARVORES).map((a, i) => <Arvore key={i} position={a.pos} escala={a.altura / 4.2} />)}</Estatico>}>
-        <ModeloInstanciado nome="arvore" itens={poucos ? ARVORES.slice(0, 9) : ARVORES} />
-      </ComFallback>
+      {/* árvores da quadra da Nuvem (v63): oitis, frondosas e um ipê amarelo, em código; bancos do Higgsfield */}
+      <ArvoresMistas itens={poucos ? ARVORES.slice(0, 9) : ARVORES} mistura={MISTURA_NUVEM} />
       <ComFallback fallback={<Estatico>{BANCOS.map((b, i) => <Banco key={i} position={b.pos} rotation={b.rot} />)}</Estatico>}>
         <ModeloInstanciado nome="banco" itens={BANCOS} />
       </ComFallback>

@@ -4,12 +4,13 @@
 // Distrito Tech acende as linhas. Tudo instanciado ou estático; texturas desenhadas em canvas uma vez só.
 import { registrarMolhavel } from "./Clima";
 import * as THREE from "three";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { mat, cilindro, caixa } from "./geo";
 import { leve } from "./qualidade";
 import { ceu, texturaLuz } from "./CicloDia";
-import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
+import { type ItemInstancia } from "./Modelos";
+import { ArvoresInstanciadas, type Especie } from "./Arvores";
 import { BAIRROS, BAIRRO_DO_QUARTEIRAO, MEIO_Q, CALCADA, BORDA_CALCADA, PASSO, type Bairro, type PisoBairro } from "../data/mundo";
 
 // ---------- texturas de piso (cada uma representa `metros` de chão e repete) ----------
@@ -109,10 +110,10 @@ export function CalcadaBairro({ cx, cz, b }: { cx: number; cz: number; b: Bairro
 
 // ---------- árvores de rua ----------
 // Duas por lado do quarteirão, no canteiro junto ao meio-fio (longe dos semáforos, que ficam perto das esquinas).
-const COPA: Record<string, string[]> = {
-  ipeAmarelo: ["#F2C230", "#FFD95A", "#E5A920"], ipeRosa: ["#E86AA6", "#F39BC4", "#D24F8E"], jacaranda: ["#8E6BE0", "#A98AF0", "#7452C9"],
-  copaVerde: ["#3E9B5B", "#58B06A", "#2F8A4C"], oiti: ["#2F8A4C", "#3E9B5B", "#24733E"],
-};
+// Desde a v63 (12/11/2026) cada bairro tem a sua espécie desenhada em código (scene/Arvores.tsx): ipê amarelo, ipê rosa,
+// ipê roxo (o "jacarandá" do bairro), oiti, frondosa, topiária aparada e palmeira imperial. A grade de ferro continua.
+const ESPECIE_DO_BAIRRO: Record<string, Especie> = { ipeAmarelo: "ipeAmarelo", ipeRosa: "ipeRosa", jacaranda: "ipeRoxo", copaVerde: "frondosa", oiti: "oiti", topiaria: "topiaria", palmeiraImperial: "palmeiraImperial" };
+const ALTURA_DA_ESPECIE: Partial<Record<Especie, number>> = { palmeiraImperial: 10, topiaria: 2.6, oiti: 5.6, frondosa: 6.2, ipeAmarelo: 6, ipeRosa: 6, ipeRoxo: 6.2 };
 interface PosArvore { x: number; z: number; b: Bairro; n: number }
 function posicoesArvores(): PosArvore[] {
   const out: PosArvore[] = []; const off = BORDA_CALCADA - 0.6; let n = 0;
@@ -122,47 +123,31 @@ function posicoesArvores(): PosArvore[] {
   }
   return out;
 }
-const MAT_INST = new THREE.MeshStandardMaterial({ color: "#FFFFFF", roughness: 0.85 });
-const MAT_TRONCO = new THREE.MeshStandardMaterial({ color: "#7A5A3A", roughness: 0.95 });
 const MAT_GRADE = new THREE.MeshStandardMaterial({ color: "#3A3F47", roughness: 0.6, metalness: 0.3 });
+const GEO_GRADE = caixa(1.1, 0.06, 1.1);
 function preencher(im: THREE.InstancedMesh | null, lista: { m: THREE.Matrix4; c?: THREE.Color }[]) {
   if (!im) return;
   lista.forEach((x, i) => { im.setMatrixAt(i, x.m); if (x.c) im.setColorAt(i, x.c); });
   im.count = lista.length; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.computeBoundingSphere();
 }
-// geometrias fixas (12/11/2026, integração): criar "new THREE..." dentro do args faz o React trocar a malha a cada
-// renderização, e a malha nova nascia sem as posições (o efeito que preenche não roda de novo) → copas sumiam
-const GEO_COPA = new THREE.SphereGeometry(1, 12, 9), GEO_CONE = new THREE.ConeGeometry(1, 2, 10);
 export function ArvoresDeRua() {
   const todas = useMemo(() => posicoesArvores(), []);
-  const palmeiras: ItemInstancia[] = useMemo(() => todas.filter((p) => p.b.arvore === "palmeiraImperial").map((p) => ({ pos: [p.x, 0, p.z], rot: p.n * 1.3, altura: 9 + (p.n % 3) })), [todas]);
-  const tronco = useRef<THREE.InstancedMesh>(null), copa = useRef<THREE.InstancedMesh>(null), cone = useRef<THREE.InstancedMesh>(null), grade = useRef<THREE.InstancedMesh>(null);
-  const comuns = useMemo(() => todas.filter((p) => p.b.arvore !== "palmeiraImperial"), [todas]);
-  useEffect(() => {
-    const M = (x: number, y: number, z: number, s = 1, sy = s) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(s, sy, s));
-    const tr: { m: THREE.Matrix4 }[] = [], cp: { m: THREE.Matrix4; c: THREE.Color }[] = [], cn: { m: THREE.Matrix4; c: THREE.Color }[] = [], gr: { m: THREE.Matrix4 }[] = [];
-    for (const p of todas) gr.push({ m: M(p.x, 0.03, p.z) });
-    for (const p of comuns) {
-      const h = 1 + (p.n % 3) * 0.08;
-      if (p.b.arvore === "topiaria") { // cone aparado em dois andares
-        tr.push({ m: M(p.x, 0.7, p.z, 1, 0.9) });
-        cn.push({ m: M(p.x, 2.2 * h, p.z, 1.05, 1.1 * h), c: new THREE.Color("#2F7D4A") }, { m: M(p.x, 3.5 * h, p.z, 0.72, 0.85 * h), c: new THREE.Color("#3A8F57") });
-      } else {
-        const cores = COPA[p.b.arvore] ?? COPA.copaVerde;
-        tr.push({ m: M(p.x, 1.1 * h, p.z, 1, 1.4 * h) });
-        cp.push({ m: M(p.x, 3.3 * h, p.z, 1.25 * h), c: new THREE.Color(cores[0]) }, { m: M(p.x + 0.65, 3.75 * h, p.z + 0.3, 0.9 * h), c: new THREE.Color(cores[1]) }, { m: M(p.x - 0.6, 3.6 * h, p.z - 0.35, 0.85 * h), c: new THREE.Color(cores[2]) });
-      }
+  const porEspecie = useMemo(() => {
+    const g = new Map<Especie, ItemInstancia[]>();
+    for (const p of todas) {
+      const e = ESPECIE_DO_BAIRRO[p.b.arvore] ?? "frondosa", h = ALTURA_DA_ESPECIE[e] ?? 6;
+      let l = g.get(e); if (!l) { l = []; g.set(e, l); }
+      l.push({ pos: [p.x, 0, p.z], rot: p.n * 1.3, altura: h * (0.92 + (p.n % 3) * 0.07) });
     }
-    preencher(tronco.current, tr); preencher(copa.current, cp); preencher(cone.current, cn); preencher(grade.current, gr);
-  }, [todas, comuns]);
-  const n = todas.length;
+    return [...g.entries()];
+  }, [todas]);
+  // grade de ferro no pé de cada árvore (ref de callback: se a malha for recriada, preenche de novo)
+  const grades = useMemo(() => todas.map((p) => ({ m: new THREE.Matrix4().makeTranslation(p.x, 0.03, p.z) })), [todas]);
+  const refGrade = useCallback((im: THREE.InstancedMesh | null) => preencher(im, grades), [grades]);
   return (
     <group>
-      <instancedMesh ref={grade} args={[caixa(1.1, 0.06, 1.1), MAT_GRADE, n]} receiveShadow />
-      <instancedMesh ref={tronco} args={[cilindro(0.11, 0.16, 1.6, 7), MAT_TRONCO, n]} castShadow />
-      <instancedMesh ref={copa} args={[GEO_COPA, MAT_INST, n * 3]} castShadow />
-      <instancedMesh ref={cone} args={[GEO_CONE, MAT_INST, n * 2]} castShadow />
-      {palmeiras.length > 0 && <ComFallback fallback={null}><ModeloInstanciado nome="palmeira" itens={palmeiras} /></ComFallback>}
+      <instancedMesh ref={refGrade} args={[GEO_GRADE, MAT_GRADE, grades.length]} receiveShadow />
+      {porEspecie.map(([e, itens]) => <ArvoresInstanciadas key={e} especie={e} itens={itens} />)}
     </group>
   );
 }

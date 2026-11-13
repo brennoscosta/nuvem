@@ -15,6 +15,7 @@ import { Fachada } from "./Fachada";
 import { CameraMundo } from "./CameraMundo";
 import { CicloDia } from "./CicloDia";
 import { Acabamento } from "./Acabamento";
+import { MiniMapaRender } from "./MiniMapaRender";
 import { Agente, handlers } from "./Agente";
 import { qualidade, qualidadeManual, lembrarLeveAuto, escolherQualidade, escolherMapa } from "./qualidade";
 import { useEscritorio } from "../store";
@@ -296,6 +297,7 @@ export function Cena3D() {
       <MapControls ref={controles} target={cam.alvo} minDistance={4} maxDistance={RETRATO ? 138 : 119} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
       <FocoCamera controles={controles} />
       {modoMundo() && <CameraMundo controles={controles} inicio={CAM_MUNDO} />}
+      {modoMundo() && <MiniMapaRender />}
     </Canvas>
     {modoMundo() && <Progresso />}
     {aviso && <AvisoQualidade tipo={aviso} aoFechar={fecharAviso} />}

@@ -1,55 +1,27 @@
 "use client";
-// Horizonte fechado: quatro painéis grandes nas bordas do mundo com arte panorâmica (praia ao sul e leste,
-// cidade ao norte e oeste) e palmeiras na faixa de areia pra dar profundidade quando a câmera gira.
-// As artes (geradas no Higgsfield, 07/11) ficam no site em JPG leve: public/horizonte.
-// 12/11/2026: o mundo cresceu para o norte (rio e Parque da Cidade): o painel da cidade foi para depois do parque, os
-// painéis dos lados ficaram mais compridos, a areia abre para a foz do rio e entrou um contorno de prédios em 3D
-// (instanciado) na frente dos painéis da cidade, com janelas que acendem à noite.
+// Bordas do mapa (v63, 12/11/2026, pedido do dono: "a parte que fica nas laterais do mapa, quero algo melhor, mais
+// original e realista"). Saíram os quatro painéis pintados. Agora a cidade fica num lugar de verdade:
+//  - leste e sul: orla com calçadão, areia e mar de verdade (Praia.tsx e Mar.tsx);
+//  - oeste: serra verde com mata e o vale de onde o rio desce (Serra.tsx);
+//  - norte, depois do parque: a cidade continua em várias fileiras de prédios que somem na névoa (aqui);
+//  - céu: nuvens em duas camadas que acompanham dia, noite, chuva e neblina (Nuvens.tsx).
+// A névoa do CicloDia apaga a distância, então não existe "parede" nem borda à vista.
 import * as THREE from "three";
-import { useEffect, useMemo, useRef } from "react";
-import { useFrame, useLoader } from "@react-three/fiber";
-import { cilindro, caixa, esfera, mat, plano } from "./geo";
-import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
-import { Estatico } from "./Estatico";
+import { useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
 import { MUNDO, NORTE } from "../data/mundo";
 import { leve } from "./qualidade";
-import { registrarHorizonte, ceu } from "./CicloDia";
+import { ceu } from "./CicloDia";
+import { Mar } from "./Mar";
+import { Serra, alturaTerreno, criarArvoretas, VERDES_MATA, type Arvoreta } from "./Serra";
+import { Praia } from "./Praia";
+import { Nuvens } from "./Nuvens";
 
-const R = MUNDO.x + 6; // distância dos painéis ao centro (leste e oeste)
-const RZ = MUNDO.z + 6; // painel sul
-const RN = -(NORTE.fim - 6); // painel norte (depois do parque)
-const LARG = 2 * R + 20; // largura dos painéis norte e sul (sobra nos cantos)
-const REPETE = 2; // a arte repete 2x na largura (foi gerada pra emendar)
-const ALT = (LARG / REPETE) * (9 / 16); // altura mantém a proporção 16:9 de cada repetição
-const Y0 = -0.6;
-// painéis dos lados: do norte (RN) ao sul (RZ), com a mesma altura dos outros (a arte repete mais vezes)
-const LARG_LADO = RN + RZ + 20, Z_LADO = (RZ - RN) / 2, REPETE_LADO = (LARG_LADO / LARG) * REPETE;
-const RIO = NORTE.rio;
-
-function Painel({ textura, position, rotation, largura = LARG }: { textura: THREE.Texture; position: [number, number, number]; rotation: number; largura?: number }) {
-  // registrado no ciclo de dia e noite: a foto escurece à noite
-  const m = useMemo(() => { const mm = new THREE.MeshBasicMaterial({ map: textura, fog: false, toneMapped: false }); registrarHorizonte(mm); return mm; }, [textura]);
-  return <mesh geometry={plano(largura, ALT)} material={m} position={position} rotation={[0, rotation, 0]} />;
-}
-
-function Palmeira({ position, escala = 1 }: { position: [number, number, number]; escala?: number }) {
-  return (
-    <group position={position} scale={escala}>
-      <mesh geometry={cilindro(0.18, 0.3, 7, 8)} material={mat("#9A7B52", { rough: 0.95 })} position={[0, 3.5, 0]} rotation={[0, 0, 0.06]} castShadow />
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <mesh key={i} geometry={caixa(4.2, 0.12, 0.9)} material={mat(i % 2 ? "#3E9B5B" : "#58B06A")} position={[Math.cos((i / 6) * Math.PI * 2) * 1.9, 7.1 - (i % 2) * 0.2, Math.sin((i / 6) * Math.PI * 2) * 1.9]} rotation={[0.25 * Math.sin((i / 6) * Math.PI * 2), -(i / 6) * Math.PI * 2, -0.35]} />
-      ))}
-      <mesh geometry={esfera(0.5, 8)} material={mat("#6B4F2A")} position={[0, 6.9, 0]} />
-    </group>
-  );
-}
-
-// ---------- contorno de prédios (3D baixo custo) ----------
-// 5 tipos de prédio, cada um com a sua geometria (as janelas não esticam), instanciados ao longo do norte e do oeste.
-// A fachada é uma textura de janelas; outra textura diz quais janelas acendem à noite (sempre as mesmas: sem sorteio na tela).
-// rasos de propósito (4,5 m): ficam entre o fim do chão e o painel, só a frente aparece
-const TIPOS = [{ w: 9, h: 22, d: 4.5 }, { w: 12, h: 34, d: 4.5 }, { w: 7, h: 46, d: 4.5 }, { w: 14, h: 18, d: 4.5 }, { w: 10, h: 58, d: 4.5 }];
-const ENCOSTO = 6 - 2.25 - 0.6; // do painel até o centro do prédio (a frente fica 0,6 m antes do fim do chão)
+// ---------- a cidade que continua ao norte ----------
+// 6 tipos de prédio (cada um com a sua geometria, para as janelas não esticarem), instanciados em fileiras cada vez mais
+// espaçadas e mais altas para o fundo (o "centro" da cidade grande fica longe). A fachada é uma textura de janelas; outra
+// textura diz quais janelas acendem à noite (sempre as mesmas: sem sorteio na tela).
+const TIPOS = [{ w: 12, h: 20, d: 12 }, { w: 16, h: 32, d: 14 }, { w: 10, h: 48, d: 10 }, { w: 20, h: 15, d: 16 }, { w: 14, h: 64, d: 14 }, { w: 9, h: 27, d: 9 }];
 const ANDAR = 3.4, VAO = 3.2; // altura de um andar e largura de uma janela + parede (m)
 function texturaFachada(acesas: boolean) {
   const W = 128, H = 128, c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d")!;
@@ -73,71 +45,75 @@ function geoPredio(w: number, h: number, d: number) {
   }
   return g;
 }
-interface Pred { tipo: number; x: number; z: number; rot: number; tom: number }
-function posicoesPredios(): Pred[] {
+const GEOS = TIPOS.map((t) => geoPredio(t.w, t.h, t.d));
+let MAT_PREDIO: THREE.MeshStandardMaterial | null = null;
+function materialPredio() {
+  if (MAT_PREDIO) return MAT_PREDIO;
+  MAT_PREDIO = new THREE.MeshStandardMaterial({ map: texturaFachada(false), emissiveMap: texturaFachada(true), emissive: "#FFFFFF", emissiveIntensity: 0, roughness: 0.7, metalness: 0.15 });
+  return MAT_PREDIO;
+}
+interface Pred { tipo: number; x: number; z: number; rot: number; cor: number; esc: number; y: number }
+// fachadas: branco, areia, bege, terracota clara, cinza-claro, verde-água e vidro azulado (a textura de janelas é tingida)
+const FACHADAS = ["#F4F1EA", "#EADCC0", "#E3CFAE", "#E8B99A", "#D9DEE4", "#BFE0D8", "#A9C6E8", "#F2E2C9"].map((h) => new THREE.Color(h));
+function posicoesPredios(poucos: boolean): Pred[] {
   const out: Pred[] = []; let s = 91; const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  const passo = leve() ? 15 : 10;
-  // norte: atrás do parque, entre o fim do chão e o painel
-  for (let x = -R + 4; x <= R - 4; x += passo + r() * 4) out.push({ tipo: Math.floor(r() * TIPOS.length), x, z: -RN + ENCOSTO + r() * 0.4, rot: 0, tom: r() });
-  // oeste: depois da última fileira de árvores; mais baixos (tipos 0, 1 e 3) e com folga na altura do rio
-  for (let z = NORTE.fim + 8; z <= RZ - 10; z += passo + 2 + r() * 5) { if (z > RIO.z1 - 3 && z < NORTE.calcadao.z0 + 4) continue; out.push({ tipo: [0, 1, 3][Math.floor(r() * 3)], x: -R + ENCOSTO + r() * 0.4, z, rot: Math.PI / 2, tom: r() }); }
+  // depois da faixa de mata do parque: fileiras cada vez mais espaçadas; a leste para antes da areia, a oeste antes da serra
+  let k = 0;
+  for (let z = NORTE.fim - 30; z > -600; z -= 22 + k * 3.2, k++) {
+    const passo = (poucos ? 30 : 21) + k * 1.6, fundo = Math.min(1, (NORTE.fim - 30 - z) / 320);
+    const xMin = -MUNDO.x + 8 - fundo * 60; // perto do parque o canto noroeste fica para a mata e a serra
+    for (let x = xMin + r() * 8; x < 74; x += passo + r() * passo * 0.5) {
+      const zz = z + (r() - 0.5) * 8, y = alturaTerreno(x, zz);
+      if (y > 9 && z > -380) continue; // encosta da serra: sem prédio
+      // primeiras fileiras: prédios baixos (tipos 0, 3 e 5, encolhidos); torres só ao fundo (o centro da cidade grande)
+      const tipo = fundo < 0.3 ? [0, 3, 5][Math.floor(r() * 3)] : Math.floor(r() * TIPOS.length);
+      const esc = fundo < 0.3 ? 0.55 + r() * 0.35 + fundo : 0.8 + r() * 0.4 + fundo * 0.35;
+      out.push({ tipo, x, z: zz, rot: Math.floor(r() * 4) * (Math.PI / 2), cor: Math.floor(r() * FACHADAS.length), esc, y: Math.max(-0.6, y - 0.6) });
+    }
+  }
   return out;
 }
-const MAT_PREDIO: { m: THREE.MeshStandardMaterial | null } = { m: null };
-function materialPredio() {
-  if (MAT_PREDIO.m) return MAT_PREDIO.m;
-  if (typeof document === "undefined") return new THREE.MeshStandardMaterial({ color: "#7D8796" });
-  MAT_PREDIO.m = new THREE.MeshStandardMaterial({ map: texturaFachada(false), emissiveMap: texturaFachada(true), emissive: "#FFFFFF", emissiveIntensity: 0, roughness: 0.7, metalness: 0.15 });
-  return MAT_PREDIO.m;
-}
-function Skyline() {
-  const lista = useMemo(() => posicoesPredios(), []);
-  const geos = useMemo(() => TIPOS.map((t) => geoPredio(t.w, t.h, t.d)), []);
-  const material = useMemo(() => materialPredio(), []);
-  const refs = useRef<(THREE.InstancedMesh | null)[]>([]);
-  useEffect(() => {
-    const M = new THREE.Matrix4(), q = new THREE.Quaternion(), um = new THREE.Vector3(1, 1, 1), c = new THREE.Color();
-    TIPOS.forEach((_, k) => {
-      const im = refs.current[k]; if (!im) return; const meus = lista.filter((p) => p.tipo === k);
-      meus.forEach((p, i) => { q.setFromEuler(new THREE.Euler(0, p.rot, 0)); im.setMatrixAt(i, M.compose(new THREE.Vector3(p.x, Y0, p.z), q, um)); im.setColorAt(i, c.setHSL(0.57 + p.tom * 0.06, 0.08 + p.tom * 0.08, 0.82 + p.tom * 0.14)); });
-      im.count = meus.length; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.computeBoundingSphere();
+function criarCidade(poucos: boolean) {
+  const lista = posicoesPredios(poucos), mat = materialPredio();
+  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), c = new THREE.Color(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+  return TIPOS.map((_, k) => {
+    const meus = lista.filter((x) => x.tipo === k);
+    const im = new THREE.InstancedMesh(GEOS[k], mat, Math.max(1, meus.length));
+    meus.forEach((b, i) => {
+      e.set(0, b.rot, 0); q.setFromEuler(e);
+      im.setMatrixAt(i, M.compose(p.set(b.x, b.y, b.z), q, sc.set(b.esc, b.esc, b.esc)));
+      im.setColorAt(i, c.copy(FACHADAS[b.cor]).multiplyScalar(1.12)); // a textura é cinza: a cor tinge a fachada
     });
-  }, [lista]);
-  useFrame(() => { if (MAT_PREDIO.m) MAT_PREDIO.m.emissiveIntensity = Math.max(0, ceu.noite - 0.2) / 0.8 * 0.95; });
-  return <group>{geos.map((g, k) => <instancedMesh key={k} ref={(im) => { refs.current[k] = im; }} args={[g, material, lista.length]} frustumCulled={false} />)}</group>;
+    im.count = meus.length; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+    im.computeBoundingSphere(); im.castShadow = false; im.receiveShadow = false;
+    return im;
+  });
+}
+// faixa de mata entre o parque e a cidade do norte (ninguém vê o parque "grudado" nos prédios)
+function faixaNorte(poucos: boolean): Arvoreta[] {
+  let s = 313; const r = () => ((s = (s * 16807) % 2147483647) / 2147483647); const out: Arvoreta[] = [];
+  for (let i = 0; i < (poucos ? 70 : 190); i++) {
+    const x = -MUNDO.x - 4 + r() * (MUNDO.x + 78), z = NORTE.fim - 1.5 - r() * 22;
+    out.push({ x, z, y: alturaTerreno(x, z), raio: 1.6 + r() * 1.6, cor: VERDES_MATA[Math.floor(r() * VERDES_MATA.length)].clone().multiplyScalar(0.9 + r() * 0.2), tronco: true });
+  }
+  return out;
+}
+function CidadeNorte() {
+  const poucos = leve();
+  const malhas = useMemo(() => [...criarCidade(poucos), ...criarArvoretas(faixaNorte(poucos))], [poucos]);
+  // janelas acendem à noite
+  useFrame(() => { if (MAT_PREDIO) MAT_PREDIO.emissiveIntensity = (Math.max(0, ceu.noite - 0.2) / 0.8) * 0.95; });
+  return <group>{malhas.map((im, k) => <primitive key={k} object={im} />)}</group>;
 }
 
 export function Horizonte() {
-  const [praia, cidade] = useLoader(THREE.TextureLoader, ["/horizonte/praia.jpg", "/horizonte/cidade.jpg"]);
-  useMemo(() => { for (const t of [praia, cidade]) { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.wrapS = THREE.RepeatWrapping; t.repeat.set(REPETE, 1); } }, [praia, cidade]);
-  // os painéis dos lados repetem mais vezes a arte (são mais compridos): cópias da textura com outra repetição
-  const [praiaLado, cidadeLado] = useMemo(() => [praia, cidade].map((t) => { const c = t.clone(); c.repeat.set(REPETE_LADO, 1); c.needsUpdate = true; return c; }), [praia, cidade]);
-  const palmeiras = useMemo(() => {
-    const lista: [number, number, number][] = [];
-    const passo = leve() ? 16 : 11;
-    for (let x = -R + 8; x <= R - 6; x += passo) lista.push([x + ((x * 7) % 5) - 2, 0, RZ - 7 - ((x * 3) % 4)]);
-    for (let z = -RN + 10; z <= RZ - 10; z += passo) { if (z > RIO.z1 - 4 && z < RIO.z0 + 4) continue; lista.push([R - 7 - ((z * 5) % 4), 0, z + ((z * 3) % 5) - 2]); }
-    return lista;
-  }, []);
-  const palmeirasInst: ItemInstancia[] = useMemo(() => palmeiras.map((p, i) => ({ pos: p, rot: (i * 2.1) % (Math.PI * 2), altura: 7 + (i % 3) * 1.2 })), [palmeiras]);
-  // faixa de areia do leste em dois pedaços: o rio passa no meio e chega ao mar
-  const areiaSul = RZ - RIO.z0, areiaNorte = RIO.z1 - -RN;
   return (
     <group>
-      <Painel textura={praia} position={[0, Y0 + ALT / 2, RZ]} rotation={Math.PI} />
-      <Painel textura={praiaLado} position={[R, Y0 + ALT / 2, Z_LADO]} rotation={-Math.PI / 2} largura={LARG_LADO} />
-      <Painel textura={cidade} position={[0, Y0 + ALT / 2, -RN]} rotation={0} />
-      <Painel textura={cidadeLado} position={[-R, Y0 + ALT / 2, Z_LADO]} rotation={Math.PI / 2} largura={LARG_LADO} />
-      {/* faixa de areia junto aos painéis da praia */}
-      <Estatico>
-        <mesh geometry={plano(LARG, 12)} material={mat("#EFE3C2", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, RZ - 6]} />
-        <mesh geometry={plano(12, areiaSul)} material={mat("#EFE3C2", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[R - 6, -0.04, RIO.z0 + areiaSul / 2]} />
-        <mesh geometry={plano(12, areiaNorte)} material={mat("#EFE3C2", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[R - 6, -0.04, RIO.z1 - areiaNorte / 2]} />
-      </Estatico>
-      <ComFallback fallback={<Estatico>{palmeiras.map((p, i) => <Palmeira key={i} position={p} escala={0.9 + (i % 3) * 0.15} />)}</Estatico>}>
-        <ModeloInstanciado nome="palmeira" itens={palmeirasInst} sombra={false} />
-      </ComFallback>
-      <Skyline />
+      <Mar />
+      <Serra />
+      <Praia />
+      <CidadeNorte />
+      <Nuvens />
     </group>
   );
 }

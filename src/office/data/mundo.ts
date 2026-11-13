@@ -159,3 +159,20 @@ export function ruaDaFrente(chave: string | null | undefined): RuaInfo | null {
   const z = l.j * PASSO + (l.k >= 2 ? EIXO_RUA : -EIXO_RUA);
   return RUA_POR_ID[`z${z}`] ?? null;
 }
+
+// ================= bordas do mapa (v63, 12/11/2026) =================
+// No lugar dos painéis pintados: orla com calçadão, areia e mar de verdade a leste e ao sul; serra verde a oeste (o rio
+// desce dela); ao norte, depois do parque, a cidade continua e some na névoa. Tudo é cenário (nenhum lote novo).
+export const BORDAS = {
+  orla: 7, // calçadão da orla, logo depois da grama (leste e sul)
+  costa: 118, // linha média da água, a partir do centro (a linha ondula: costaLeste/costaSul)
+  nivelMar: -0.46, // um pouco abaixo da água do rio (-0.42), para o rio "cair" no mar sem emenda
+  extensao: 900, // até onde vão o chão, a serra e o mar (a névoa apaga bem antes)
+  rioZ: (NORTE.rio.z0 + NORTE.rio.z1) / 2, // eixo do rio (o vale da serra segue daqui)
+  rioMeia: (NORTE.rio.z0 - NORTE.rio.z1) / 2,
+};
+// linha da água: ondula um pouco para não parecer régua (o sombreador do mar usa a mesma conta)
+export const costaLeste = (z: number) => BORDAS.costa + 3 * Math.sin(z * 0.06) + 1.6 * Math.sin(z * 0.17 + 1.3);
+export const costaSul = (x: number) => BORDAS.costa + 3 * Math.sin(x * 0.05 + 0.7) + 1.6 * Math.sin(x * 0.19);
+// eixo do rio no vale da serra (a oeste da cidade ele faz curvas)
+export const rioNoVale = (x: number) => BORDAS.rioZ + (x < -98 ? 12 * Math.sin((x + 98) / 75) * Math.min(1, (-98 - x) / 60) : 0);

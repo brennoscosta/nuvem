@@ -63,6 +63,9 @@ const U = {
   uNevoa: { value: 0 }, uNevoaCor: { value: new THREE.Color("#D5DBE0") },
 };
 
+// bordas do mapa (v63): o mar reflete e as nuvens tingem com as mesmas cores do céu (somente leitura)
+export const UNIFORMES_CEU = U;
+
 // painéis do horizonte (fotos de dia): escurecem à noite e o céu da foto troca de cor com a hora e o clima
 const horizonte = new Set<THREE.MeshBasicMaterial>();
 export function registrarHorizonte(m: THREE.MeshBasicMaterial) {

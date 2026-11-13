@@ -12,9 +12,17 @@ const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-
 
 function Previa({ nome, cor, frase, nicho, logo }: { nome: string; cor: string; frase: string; nicho: string; logo: string | null }) {
   return (
-    <div className="mt-3 flex aspect-[2/1] items-center gap-3 overflow-hidden rounded-xl p-3 text-white shadow-inner" style={{ background: `linear-gradient(135deg, ${cor}, #161C25 160%)` }}>
-      <span className="grid aspect-square h-[62%] shrink-0 place-items-center overflow-hidden rounded-xl bg-white">{logo ? <img src={logo} alt="" className="h-[86%] w-[86%] object-contain" /> : <b className="text-xl" style={{ color: cor }}>{nome.slice(0, 2).toUpperCase()}</b>}</span>
-      <span className="min-w-0"><b className="block truncate text-lg leading-tight">{nome}</b><span className="line-clamp-2 text-[12px] opacity-90">{frase || "Sua frase aparece aqui"}</span><span className="mt-1 block text-[10px] font-semibold opacity-75">{nicho}</span></span>
+    // v63: a prévia tem a moldura, a passarela e as colunas do outdoor de verdade (face 2:1, 14,4 × 7,2 m)
+    <div className="mt-3">
+      <div className="rounded-lg bg-[#1D2128] p-[5px] shadow-md">
+      <div className="flex aspect-[2/1] items-center gap-3 overflow-hidden rounded-xl p-3 text-white shadow-inner" style={{ background: `linear-gradient(135deg, ${cor}, #161C25 160%)` }}>
+        <span className="grid aspect-square h-[62%] shrink-0 place-items-center overflow-hidden rounded-xl bg-white">{logo ? <img src={logo} alt="" className="h-[86%] w-[86%] object-contain" /> : <b className="text-xl" style={{ color: cor }}>{nome.slice(0, 2).toUpperCase()}</b>}</span>
+        <span className="min-w-0"><b className="block truncate text-lg leading-tight">{nome}</b><span className="line-clamp-2 text-[12px] opacity-90">{frase || "Sua frase aparece aqui"}</span><span className="mt-1 block text-[10px] font-semibold opacity-75">{nicho}</span></span>
+      </div>
+      </div>
+      <div className="mx-auto -mt-px h-1.5 w-[104%] -translate-x-[2%] rounded-sm bg-[#4B5563]" aria-hidden />
+      <div className="flex justify-center gap-[34%]" aria-hidden><i className="block h-5 w-2 rounded-b bg-[#3A3F47]" /><i className="block h-5 w-2 rounded-b bg-[#3A3F47]" /></div>
+      <div className="text-center text-[10px] text-[#5B6472]">Prévia do outdoor · 14,4 × 7,2 m</div>
     </div>
   );
 }
@@ -40,7 +48,7 @@ export function CartaoOutdoor() {
   return (
     <div className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
-        <div><div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · Outdoor</div><div className="text-lg font-bold">{vaga.nome}</div><div className="text-xs text-[#5B6472]">8 × 4 m, aceso à noite · {brl(preco)} por {DIAS_OUTDOOR} dias</div></div>
+        <div><div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · Outdoor</div><div className="text-lg font-bold">{vaga.nome}</div><div className="text-xs text-[#5B6472]">14,4 × 7,2 m, com refletores à noite · {brl(preco)} por {DIAS_OUTDOOR} dias</div></div>
         <button onClick={() => abrir(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
       </div>
 

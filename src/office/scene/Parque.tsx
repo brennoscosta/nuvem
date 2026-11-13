@@ -10,6 +10,7 @@ import { leve } from "./qualidade";
 import { ceu } from "./CicloDia";
 import { Estatico } from "./Estatico";
 import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
+import { ArvoresInstanciadas, ArvoresMistas, MISTURA_PARQUE } from "./Arvores";
 import { MAT_AGUA, MAT_BRILHO_LAGO, texturaBrilhoLago, animarAgua, PostesClassicos, X_OESTE, X_LESTE } from "./Rio";
 import { HalosPostes } from "./Bairros";
 import { NORTE } from "../data/mundo";
@@ -24,9 +25,6 @@ function anelEliptico(rx0: number, rz0: number, rx1: number, rz1: number) {
   const s = new THREE.Shape(elipse(rx1, rz1)); s.holes.push(new THREE.Path(elipse(rx0, rz0).reverse()));
   const g = new THREE.ShapeGeometry(s, 1); g.rotateX(-Math.PI / 2); return g;
 }
-
-// geometria fixa (ver Bairros.tsx: "new" dentro do args recriava a malha sem posições)
-const GEO_COPA_PARQUE = new THREE.SphereGeometry(1, 12, 9);
 
 // ---------- chão (sempre visível: sem ele, apareceria o fundo do céu atrás do rio) ----------
 export function ParqueChao() {
@@ -127,12 +125,22 @@ function Quiosque() {
   );
 }
 const GEO_COCO = new THREE.PlaneGeometry(2.4, 0.6);
+// canteiros redondos em volta do lago; as plantas são desenhadas à parte (v63: azaleias floridas e arbustos de folha)
+function posCanteiros() { return [0.62, 1.12, 1.95, 2.6, 3.6, 4.35, 5.1, 5.75].map((a) => { const [x, z] = pontoNaBeira(a * 1, 3.6); return { x, z }; }); }
+function PlantasDosCanteiros() {
+  const { flores, folhas } = useMemo(() => {
+    const flores: ItemInstancia[] = [], folhas: ItemInstancia[] = [];
+    posCanteiros().forEach((c, i) => [0, 1, 2, 3, 4, 5].forEach((k) => (k % 2 ? flores : folhas).push({ pos: [c.x + Math.cos(k + i) * 1.05, 0.36, c.z + Math.sin(k + i) * 1.05], rot: k * 1.3 + i, altura: k % 2 ? 0.95 : 0.85 })));
+    return { flores, folhas };
+  }, []);
+  return <group><ArvoresInstanciadas especie="azaleia" itens={flores} /><ArvoresInstanciadas especie="arbusto" itens={folhas} /></group>;
+}
 function ParqueFixo() {
   const lista = useMemo(() => caminhos(), []);
   const anel = useMemo(() => anelEliptico(LAGO.rx + 1.4, LAGO.rz + 1.4, BEIRA.rx, BEIRA.rz), []);
   const borda = useMemo(() => anelEliptico(LAGO.rx, LAGO.rz, LAGO.rx + 0.7, LAGO.rz + 0.7), []);
   const pedra = mat(PEDRA, { rough: 0.95 });
-  const canteiros = useMemo(() => [0.62, 1.12, 1.95, 2.6, 3.6, 4.35, 5.1, 5.75].map((a, i) => { const [x, z] = pontoNaBeira(a * 1, 3.6); return { x, z, cor: ["#EC6B8D", "#FFD166", "#8B6CF0", "#F28C38"][i % 4] }; }), []);
+  const canteiros = useMemo(() => posCanteiros(), []);
   return (
     <group>
       {lista.map((c, i) => <mesh key={i} geometry={new THREE.PlaneGeometry(c.larg, c.len)} material={pedra} rotation={[-Math.PI / 2, 0, c.rot]} position={c.pos} receiveShadow />)}
@@ -144,7 +152,7 @@ function ParqueFixo() {
         <group key={i} position={[c.x, 0, c.z]}>
           <mesh geometry={cilindro(2.0, 2.1, 0.3, 20)} material={mat("#D8D3CA")} position={[0, 0.15, 0]} />
           <mesh geometry={cilindro(1.8, 1.8, 0.1, 20)} material={mat("#5C4634", { rough: 1 })} position={[0, 0.32, 0]} />
-          {[0, 1, 2, 3, 4, 5].map((k) => <mesh key={k} geometry={esfera(0.38, 8)} material={mat(k % 2 ? c.cor : "#58B06A")} position={[Math.cos(k) * 1.1, 0.55, Math.sin(k) * 1.1]} />)}
+          {/* as plantas do canteiro (azaleias e arbustos) balançam com o vento: ficam fora do Estatico (PlantasDosCanteiros) */}
         </group>
       ))}
       <Portal />
@@ -271,27 +279,20 @@ function itensParque() {
   postes.push({ pos: [CORETO.x + 5.6, 0, CORETO.z + 2.2], rot: 0, altura: 4.2 }, { pos: [QUIOSQUE.x - 4, 0, QUIOSQUE.z - 4], rot: 0, altura: 4.2 });
   return { arvores, ipes, bancos, postes };
 }
+// ipês floridos (v63): a mesma árvore em código das ruas, com tapete de flores caídas no chão
 function Ipes({ lista }: { lista: { x: number; z: number; cor: string }[] }) {
-  const tronco = useRef<THREE.InstancedMesh>(null), copa = useRef<THREE.InstancedMesh>(null);
-  useEffect(() => {
-    const M = (x: number, y: number, z: number, s: number, sy = s) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(s, sy, s));
-    let k = 0;
-    lista.forEach((p, i) => {
-      tronco.current?.setMatrixAt(i, M(p.x, 1.3, p.z, 1, 1.6));
-      for (const [dx, dy, dz, s] of [[0, 3.8, 0, 1.7], [0.9, 4.4, 0.4, 1.2], [-0.9, 4.2, -0.5, 1.15], [0.2, 4.9, -0.6, 0.9]]) {
-        copa.current?.setMatrixAt(k, M(p.x + dx, dy, p.z + dz, s)); copa.current?.setColorAt(k, new THREE.Color(p.cor).offsetHSL(0, 0, (k % 3) * 0.04 - 0.03)); k++;
-      }
-    });
-    for (const r of [tronco, copa]) if (r.current) { r.current.instanceMatrix.needsUpdate = true; if (r.current.instanceColor) r.current.instanceColor.needsUpdate = true; r.current.computeBoundingSphere(); }
+  const grupos = useMemo(() => {
+    const amarelos: ItemInstancia[] = [], rosas: ItemInstancia[] = [];
+    lista.forEach((p, i) => (p.cor === "#F2C230" ? amarelos : rosas).push({ pos: [p.x, 0, p.z], rot: i * 1.7, altura: 6.4 + (i % 3) * 0.5 }));
+    return { amarelos, rosas };
   }, [lista]);
   return (
     <group>
-      <instancedMesh ref={tronco} args={[cilindro(0.14, 0.2, 1.6, 7), mat("#6E5034", { rough: 0.95 }), lista.length]} castShadow />
-      <instancedMesh ref={copa} args={[GEO_COPA_PARQUE, MAT_COPA, lista.length * 4]} castShadow />
+      <ArvoresInstanciadas especie="ipeAmarelo" itens={grupos.amarelos} />
+      <ArvoresInstanciadas especie="ipeRosa" itens={grupos.rosas} />
     </group>
   );
 }
-const MAT_COPA = new THREE.MeshStandardMaterial({ color: "#FFFFFF", roughness: 0.85 });
 
 export function Parque() {
   const { arvores, ipes, bancos, postes } = useMemo(() => itensParque(), []);
@@ -299,10 +300,11 @@ export function Parque() {
   return (
     <group>
       <Estatico><ParqueFixo /></Estatico>
+      <PlantasDosCanteiros />
       <Lago />
       <Cisne fase={0} cor="#F2C230" />
       <Cisne fase={Math.PI} cor="#5FB4E8" />
-      <ComFallback fallback={null}><ModeloInstanciado nome="arvore" itens={arvores} /></ComFallback>
+      <ArvoresMistas itens={arvores} mistura={MISTURA_PARQUE} />
       <ComFallback fallback={null}><ModeloInstanciado nome="banco" itens={bancos} /></ComFallback>
       <Ipes lista={ipes} />
       <PostesClassicos itens={postes} />

@@ -11,6 +11,7 @@ import { Html } from "@react-three/drei";
 import { caixa, cilindro, esfera, mat, plano } from "./geo";
 import { ComFallback, type ItemInstancia } from "./Modelos";
 import { ModeloInstanciadoNoite } from "./PredioMaterial";
+import { ArvoresInstanciadas } from "./Arvores";
 import { Estatico } from "./Estatico";
 import { QUARTEIROES, centroLote, frenteDoLote, LOTE, nomeNicho, type ModeloCasa } from "../data/mundo";
 import { useMundo, LOTES, LOTE_POR_CHAVE, useAgora, promocaoAtiva, type Rascunho } from "../mundoStore";
@@ -88,13 +89,19 @@ function Terreno({ pos }: { pos: [number, number, number] }) {
   );
 }
 
+// Azaleias floridas nos canteiros das casas (v63): instanciadas, na mesma posição do canteiro do Jardim (-5,5 ; 6,5 no lote)
+function AzaleiasDosJardins({ casas }: { casas: { pos: [number, number, number]; rot: number }[] }) {
+  const itens: ItemInstancia[] = useMemo(() => casas.map((c) => { const lx = -5.5, lz = 6.5, cs = Math.cos(c.rot), sn = Math.sin(c.rot); return { pos: [c.pos[0] + lx * cs + lz * sn, 0.22, c.pos[2] - lx * sn + lz * cs] as [number, number, number], rot: c.rot, altura: 1.15 }; }), [casas]);
+  return <ArvoresInstanciadas especie="azaleia" itens={itens} />;
+}
+
 // Caminho da calçada até a porta da casa e um canteiro na frente
 function Jardim({ pos, rot }: { pos: [number, number, number]; rot: number }) {
   return (
     <group position={pos} rotation={[0, rot, 0]}>
       <mesh geometry={plano(1.4, 6)} material={mat("#D9D5CC", { rough: 0.95 })} rotation={[-Math.PI / 2, 0, 0]} position={[1.2, -0.01, 6.5]} receiveShadow />
       <mesh geometry={cilindro(0.9, 1.1, 0.25, 12)} material={mat("#5C4634", { rough: 1 })} position={[-5.5, 0.12, 6.5]} />
-      <mesh geometry={esfera(0.7, 8)} material={mat("#EC6B8D")} position={[-5.5, 0.6, 6.5]} />
+      {/* a azaleia florida do canteiro fica fora do Estatico (ela balança com o vento): ver AzaleiasDosJardins */}
     </group>
   );
 }
@@ -133,6 +140,7 @@ export function Lotes() {
         {casas.map((c, i) => <Jardim key={i} pos={c.pos} rot={c.rot} />)}
         {livres.map((p) => <Placa key={p.chave} pos={p.pos} rot={p.rot} />)}
       </Estatico>
+      <AzaleiasDosJardins casas={casas} />
       {porModelo.map(([modelo, itens]) => (
         <ComFallback key={modelo} fallback={<Estatico>{itens.map((it, i) => <CasaProcedural key={i} pos={it.pos} rot={it.rot ?? 0} altura={it.altura ?? 5} />)}</Estatico>}>
           <ModeloInstanciadoNoite nome={modelo} itens={itens} />

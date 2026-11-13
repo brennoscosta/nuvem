@@ -18,7 +18,7 @@ export class ComFallback extends Component<{ fallback: ReactNode; children: Reac
 
 export const MODELO = {
   // cidade (20/10)
-  arvore: "/modelos/arvore.glb",
+  // arvore.glb saiu na v63 (12/11/2026): as árvores agora são desenhadas em código (scene/Arvores.tsx)
   palmeira: "/modelos/palmeira.glb",
   banco: "/modelos/banco.glb",
   poste: "/modelos/poste.glb",

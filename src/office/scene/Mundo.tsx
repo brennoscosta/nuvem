@@ -10,7 +10,9 @@ import { caixa, cilindro, mat, plano } from "./geo";
 import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
 import { Estatico } from "./Estatico";
 import { leve } from "./qualidade";
-import { Entorno, Arvore, GentePraia } from "./Entorno";
+import { Entorno, GentePraia } from "./Entorno";
+import { ArvoresMistas, MISTURA_RUA, type Mistura } from "./Arvores";
+const MISTURA_PRAIA: Mistura = { coqueiro: 0.62, palmeiraImperial: 0.2, frondosa: 0.18 };
 import { Restaurante } from "./Restaurante";
 import { Lotes } from "./Lotes";
 import { Horizonte } from "./Horizonte";
@@ -128,6 +130,10 @@ export function Mundo() {
     for (let s = -B + 6; s <= B - 6; s += poucos ? 24 : 14) { add(s, B, 5 + (n % 3)); add(-B, s, 5 + (n % 3)); add(B, s, 5 + (n % 3)); }
     return lista;
   }, [poucos]);
+  const [arvoresPraia, arvoresRua] = useMemo(() => {
+    const B = N * PASSO + EIXO_RUA + 7, praia = (a: ItemInstancia) => a.pos[2] >= B - 1 || a.pos[0] >= B - 1;
+    return [arvores.filter(praia), arvores.filter((a) => !praia(a))];
+  }, [arvores]);
 
   return (
     <group>
@@ -155,14 +161,10 @@ export function Mundo() {
       <Perto cx={LAGO.x} cz={LAGO.z} raio={raio + 10}><Parque /></Perto>
       {/* Natal (1º/12 a 6/1): árvore na praça da Nuvem e pisca-pisca nos postes */}
       {natal && <><ArvoreNatal /><LuzesNatalPostes itens={postes} /></>}
-      {/* árvores do mundo: modelo do Higgsfield (5 mil triângulos cada) no modo completo; no leve, a árvore desenhada em código (600) juntada num lote só */}
-      {poucos ? (
-        <Estatico>{arvores.map((a, i) => <Arvore key={i} position={a.pos} escala={(a.altura ?? 4.5) / 4.2} />)}</Estatico>
-      ) : (
-        <ComFallback fallback={<Estatico>{arvores.map((a, i) => <Arvore key={i} position={a.pos} escala={(a.altura ?? 4.5) / 4.2} />)}</Estatico>}>
-          <ModeloInstanciado nome="arvore" itens={arvores} />
-        </ComFallback>
-      )}
+      {/* árvores do mundo (v63): espécies brasileiras desenhadas em código (scene/Arvores.tsx), sorteadas pela posição;
+          na borda da praia (sul e leste) entram coqueiros e palmeiras imperiais */}
+      <ArvoresMistas itens={arvoresPraia} mistura={MISTURA_PRAIA} />
+      <ArvoresMistas itens={arvoresRua} mistura={MISTURA_RUA} />
       {/* trânsito: semáforos, faixas de pedestre e carros que obedecem (11/11/2026) */}
       <Semaforos />
       <Trafego />

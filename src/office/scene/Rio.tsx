@@ -10,6 +10,8 @@ import { leve } from "./qualidade";
 import { ceu } from "./CicloDia";
 import { Estatico } from "./Estatico";
 import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
+import { ArvoresMistas, type Mistura } from "./Arvores";
+const MISTURA_BEIRA_RIO: Mistura = { frondosa: 0.28, oiti: 0.22, ipeRoxo: 0.2, ipeAmarelo: 0.18, ipeRosa: 0.12 };
 import { planoMetros, materialPiso, metrosDoPiso, HalosPostes } from "./Bairros";
 import { NORTE, MUNDO } from "../data/mundo";
 import { OUTDOORS } from "../data/outdoors";
@@ -78,7 +80,8 @@ function CalcadaoFixo() {
 
 // água do rio e os riscos de correnteza (animados)
 function Agua() {
-  const L = X_LESTE - X_OESTE + 12, cx = (X_LESTE + X_OESTE) / 2 + 6, w = RZ0 - RZ1;
+  // v63: a água do rio vai até a ponta do calçadão (+2 m); dali até a praia quem desenha é o mar (Mar.tsx), sem emenda
+  const L = X_LESTE - X_OESTE + 2, cx = (X_LESTE + X_OESTE) / 2 + 1, w = RZ0 - RZ1;
   const geoBrilho = useMemo(() => { const g = new THREE.PlaneGeometry(L, w); const uv = g.attributes.uv as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (L / 14), uv.getY(i) * (w / 14)); return g; }, [L, w]);
   const geoAgua = useMemo(() => new THREE.PlaneGeometry(L, w), [L, w]);
   useEffect(() => { const t = texturaBrilho(); if (t) { MAT_BRILHO.map = t; MAT_BRILHO.needsUpdate = true; } }, []);
@@ -209,7 +212,8 @@ export function Rio() {
       </Estatico>
       <Agua />
       <Barquinho />
-      <ComFallback fallback={null}><ModeloInstanciado nome="arvore" itens={arvores} /></ComFallback>
+      {/* árvores do calçadão (v63): espécies em código, com ipês na beira do rio */}
+      <ArvoresMistas itens={arvores} mistura={MISTURA_BEIRA_RIO} />
       <ComFallback fallback={null}><ModeloInstanciado nome="banco" itens={bancos} /></ComFallback>
       <PostesClassicos itens={postes} />
       <HalosPostes postes={halos} />
