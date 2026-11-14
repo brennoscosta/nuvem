@@ -4,10 +4,12 @@
 import * as THREE from "three";
 import { Personagens } from "./Personagens";
 import { EscritoriosClientes } from "./EscritorioCliente";
-import { useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import { caixa, cilindro, mat, plano } from "./geo";
-import { ComFallback, ModeloInstanciado, type ItemInstancia } from "./Modelos";
+import { ComFallback, ModeloInstanciado, precarregarModelo, type ItemInstancia } from "./Modelos";
+import { Depois, Isolado, MarcadorEtapas } from "./etapas";
+import { LAYOUT } from "../data/escritorio";
 import { Estatico } from "./Estatico";
 import { leve } from "./qualidade";
 import { Entorno, GentePraia } from "./Entorno";
@@ -149,11 +151,16 @@ export function Mundo() {
     return [arvores.filter(praia), arvores.filter((a) => !praia(a))];
   }, [arvores]);
 
+  // os prédios GLB que os lotes ativos usam começam a baixar já (os do kit são feitos em código)
+  const terrenosUsados = useMundo((s) => Object.values(s.terrenos).map((t) => (t.status === "ativo" && t.escritorio ? t.escritorio.layout : "")).join("|"));
+  useEffect(() => { for (const id of terrenosUsados.split("|")) { const m = (LAYOUT as Record<string, { modelo?: string }>)[id]?.modelo; if (m) precarregarModelo(m); } }, [terrenosUsados]);
+
   return (
     <group>
-      <Horizonte />
-      <Clima />
-      <SomCena />
+      {/* v67: abertura em etapas (scene/etapas.tsx). 0 = perto (ruas, calçadas, postes, Nuvem, lanchonete, lotes, prédios);
+          1 = logo depois (árvores, luzes, trânsito, gente); 2 = longe (mar, serra, praia, nuvens, rio, parque, bichos, som) */}
+      <MarcadorEtapas />
+      <Depois etapa={2}><Horizonte /><Clima /><SomCena /></Depois>
       <Estatico>
         <Ruas />
         {calcadas.map(([cx, cz], i) => { const b = BAIRRO_DO_QUARTEIRAO[`${Math.round(cx / PASSO)},${Math.round(cz / PASSO)}`]; return b ? <CalcadaBairro key={i} cx={cx} cz={cz} b={b} /> : <Calcada key={i} cx={cx} cz={cz} />; })}
@@ -162,41 +169,36 @@ export function Mundo() {
         <ModeloInstanciado nome="poste" itens={postes} />
       </ComFallback>
       {/* à noite os postes acendem (luz no chão e lâmpada) e ganham um halo na cor do bairro */}
-      <LuzesPostes itens={postes} />
-      <HalosPostes postes={postes} />
+      <Depois etapa={1}><LuzesPostes itens={postes} /><HalosPostes postes={postes} /></Depois>
       {/* bairros com identidade (12/11/2026): galhardetes, árvores de rua e a placa de cada bairro; placas com o nome das ruas */}
-      <Galhardetes postes={postes} />
-      <ArvoresDeRua />
-      <PlacasBairro />
-      <PlacasDeRua />
+      <Depois etapa={1}><Galhardetes postes={postes} /><ArvoresDeRua /></Depois>
+      <Isolado><PlacasBairro /></Isolado>
+      <Isolado><PlacasDeRua /></Isolado>
       {/* além da Avenida Beira-Rio: calçadão, rio, pontes e o Parque da Cidade (o chão aparece sempre; o resto, de perto) */}
-      <Rio />
-      <ParqueChao />
-      <Perto cx={LAGO.x} cz={LAGO.z} raio={raio + 10}><Parque /></Perto>
+      <Depois etapa={2}><Rio /><ParqueChao /><Perto cx={LAGO.x} cz={LAGO.z} raio={raio + 10}><Parque /></Perto></Depois>
       {/* Natal (1º/12 a 6/1): árvore na praça da Nuvem e pisca-pisca nos postes */}
       {natal && <><ArvoreNatal /><LuzesNatalPostes itens={postes} /></>}
       {/* árvores do mundo (v63): espécies brasileiras desenhadas em código (scene/Arvores.tsx), sorteadas pela posição;
           na borda da praia (sul e leste) entram coqueiros e palmeiras imperiais */}
-      <ArvoresMistas itens={arvoresPraia} mistura={MISTURA_PRAIA} />
-      <ArvoresMistas itens={arvoresRua} mistura={MISTURA_RUA} />
+      <Depois etapa={2}><ArvoresMistas itens={arvoresPraia} mistura={MISTURA_PRAIA} /></Depois>
+      <Depois etapa={1}><ArvoresMistas itens={arvoresRua} mistura={MISTURA_RUA} /></Depois>
       {/* trânsito: semáforos, faixas de pedestre e carros que obedecem (11/11/2026) */}
       <Semaforos />
-      <Trafego />
+      <Depois etapa={1}><Trafego /></Depois>
       {/* vida na rua (12/11/2026): pedestres que atravessam na faixa e o ônibus com pontos */}
-      <Passantes />
-      <Fauna />
-      <PontosOnibus />
+      <Depois etapa={1}><Passantes /><PontosOnibus /></Depois>
+      <Depois etapa={2}><Fauna /></Depois>
       {/* outdoors nas avenidas da borda (aluguel de 30 dias) */}
-      <Outdoors />
+      <Depois etapa={2}><Outdoors /></Depois>
       {/* quarteirões */}
-      <Perto cx={0} cz={0} raio={raio + 60}><Entorno /></Perto>
-      <Perto cx={PASSO} cz={0} raio={raio}><Restaurante /></Perto>
-      <GentePraia />
-      <Personagens />
-      <Perto cx={0} cz={0} raio={raio + 100}><Lotes />
-      <EscritoriosClientes />
+      <Perto cx={0} cz={0} raio={raio + 60}><Isolado><Entorno /></Isolado></Perto>
+      <Perto cx={PASSO} cz={0} raio={raio}><Isolado><Restaurante /></Isolado></Perto>
+      <Depois etapa={2}><GentePraia /></Depois>
+      <Depois etapa={1}><Personagens /></Depois>
+      <Perto cx={0} cz={0} raio={raio + 100}><Isolado><Lotes /></Isolado>
+      <Isolado><EscritoriosClientes /></Isolado>
       {/* praça de eventos e feira de sábado no lote 0,1,1 (12/11/2026) */}
-      <Praca /></Perto>
+      <Isolado><Praca /></Isolado></Perto>
     </group>
   );
 }

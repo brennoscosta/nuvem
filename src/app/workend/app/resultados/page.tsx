@@ -7,10 +7,12 @@ import { usuarioAtual } from "@/server/usuarios";
 import { terrenoDoUsuario, ehAdmin } from "@/server/terrenos";
 import { resultadosDoDono } from "@/server/resultados";
 import { meuCodigo, minhasIndicacoes, CREDITO_INDICACAO } from "@/server/ofertas";
+import { seguidoresDe } from "@/server/seguir";
 import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { meta } from "../../seo";
 import { GraficoResultados, CompartilharIndicacao, type Metrica } from "./_grafico";
+import { resumoCupons } from "@/server/cupons";
 
 export const metadata = meta({ titulo: "Resultados da loja — WorkEnd", caminho: "/app/resultados", indexar: false });
 export const dynamic = "force-dynamic";
@@ -25,7 +27,8 @@ export default async function Resultados({ searchParams }: Props) {
   const dias = Number((await searchParams).dias) || 30;
   const chao = await terrenoDoUsuario(u.id).catch(() => null);
   const ativo = chao?.status === "ativo" ? chao : null;
-  const [r, codigo, ind] = await Promise.all([resultadosDoDono(u, ativo, dias), meuCodigo(u).catch(() => null), minhasIndicacoes(u).catch(() => ({ lista: [], credito: 0 }))]);
+  const [r, codigo, ind, seguidores] = await Promise.all([resultadosDoDono(u, ativo, dias), meuCodigo(u).catch(() => null), minhasIndicacoes(u).catch(() => ({ lista: [], credito: 0 })), seguidoresDe(u.id, dias).catch(() => ({ total: 0, novos: 0 }))]);
+  const cupons = ativo ? await resumoCupons(u.id, r.desde).catch(() => ({ pegos: 0, usados: 0 })) : null; // cupons da loja (13/11/2026)
   const metricas: Metrica[] = [
     { id: "visitas", nome: "Visitas", total: r.visitas.total, anterior: r.visitas.anterior, cor: "#1D4ED8", serie: r.visitas.serie, explica: "Pessoas que abriram o cartão da loja no mapa ou a página da loja (cada pessoa conta uma vez por dia)." },
     { id: "conversas", nome: "Conversas", total: r.conversas.total, anterior: r.conversas.anterior, cor: "#16A34A", serie: r.conversas.serie, explica: "Visitantes que escreveram para a sua atendente de IA (cada pessoa, uma vez por dia)." },
@@ -58,6 +61,7 @@ export default async function Resultados({ searchParams }: Props) {
             {[7, 30, 90].map((d) => <Link key={d} href={`/app/resultados?dias=${d}`} className={`btn !px-4 !py-2 text-sm ${r.dias === d ? "btn-tinta" : "btn-claro"}`}>{d} dias</Link>)}
           </nav>
         </div>
+        {ativo && <p className="mt-3 text-[15px] text-[var(--tinta-2)]"><b className="text-[var(--tinta)]">⭐ {seguidores.total} {seguidores.total === 1 ? "pessoa segue" : "pessoas seguem"} a sua loja</b>{seguidores.novos > 0 ? ` · ${seguidores.novos} ${seguidores.novos === 1 ? "nova" : "novas"} em ${r.dias} dias` : ""}. Quem segue recebe um aviso quando você liga uma promoção, marca um evento ou põe um produto novo.</p>}
         {!ativo && <p className="mt-4 max-w-[60ch] rounded-2xl bg-[#FFF4DB] px-4 py-3 text-[#7A5200]">Você ainda não tem uma loja aberta no mapa. Os números começam a contar quando o 1º mês do lote for pago. <Link href="/mundo" className="font-semibold underline">Escolher meu lote</Link></p>}
       </section>
 
@@ -111,6 +115,20 @@ export default async function Resultados({ searchParams }: Props) {
               </li>
             ))}
           </ol>
+        </section>
+      )}
+
+      {/* cupons e divulgação (13/11/2026) */}
+      {ativo && cupons && (
+        <section className="faixa mt-6 grid gap-3 sm:grid-cols-2">
+          <Link href="/app/cupons" className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-[#E11D48]/50 bg-[#FFF5F7] p-5 hover:bg-[#ffe9ee]">
+            <span><b className="text-[17px] text-[#9F1239]">🎟️ Cupons</b><span className="mt-0.5 block text-[14px] text-[var(--tinta-2)]"><b className="text-[var(--tinta)] tabular-nums">{cupons.pegos}</b> pegos · <b className="text-[var(--tinta)] tabular-nums">{cupons.usados}</b> usados no período</span></span>
+            <span className="text-[14px] font-semibold text-[#9F1239]">Criar e validar →</span>
+          </Link>
+          <Link href="/app/divulgar" className="flex items-center justify-between gap-3 rounded-2xl bg-[#1D2128] p-5 text-white hover:bg-black">
+            <span><b className="text-[17px]">📣 Divulgar a loja</b><span className="mt-0.5 block text-[14px] text-white/70">Imagem para Stories e adesivo com QR Code</span></span>
+            <span className="text-[14px] font-semibold">Abrir →</span>
+          </Link>
         </section>
       )}
 

@@ -8,7 +8,68 @@ import { usePersonagem } from "../personagemStore";
 import { PRACA_CHAVE } from "../data/praca";
 
 interface Aviso { id: string; tipo: string; titulo: string; texto: string; link: string; lidoEm: string | null; criadoEm: string }
-const ICONE: Record<string, string> = { candidatura: "📋", evento: "🎤", mensagem: "💬", loja: "🛎️", pagamento: "✅", indicacao: "🤝", agendamento: "📅", amizade: "👋", negociacao: "🤝", sistema: "ℹ️" };
+const ICONE: Record<string, string> = { candidatura: "📋", evento: "🎤", mensagem: "💬", loja: "🛎️", pagamento: "✅", indicacao: "🤝", agendamento: "📅", amizade: "👋", negociacao: "🤝", seguindo: "⭐", resumo: "📈", sistema: "ℹ️" };
+
+// ---------- avisos no celular (web push, 13/11/2026) ----------
+// O push chega sem conteúdo e o service worker (public/sw.js) busca o aviso mais recente. A permissão só é pedida no toque.
+// No iPhone só funciona com o WorkEnd adicionado à Tela de Início (e aberto por lá).
+type EstadoPush = "carregando" | "sem-suporte" | "iphone-tela" | "negado" | "desligado" | "ligado" | "ligando";
+const ehIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const instalado = () => window.matchMedia?.("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+const chaveBytes = (s: string) => { const r = atob((s + "=".repeat((4 - (s.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(r, (c) => c.charCodeAt(0)); };
+const enviarInscricao = (sub: PushSubscription) => fetch("/api/workend/push", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(sub.toJSON()) });
+async function lerEstadoPush(): Promise<EstadoPush> {
+  if (ehIOS() && !instalado()) return "iphone-tela";
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "sem-suporte";
+  if (Notification.permission === "denied") return "negado";
+  const reg = await navigator.serviceWorker.getRegistration("/");
+  const sub = await reg?.pushManager.getSubscription();
+  if (!sub) return "desligado";
+  const r = await enviarInscricao(sub).catch(() => null); // regrava (pode ter trocado de conta neste aparelho)
+  return r?.ok ? "ligado" : "desligado";
+}
+async function ligarPush(): Promise<EstadoPush> {
+  const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  await navigator.serviceWorker.ready;
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") return perm === "denied" ? "negado" : "desligado";
+  const { chave } = await fetch("/api/workend/push", { cache: "no-store" }).then((r) => r.json());
+  const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveBytes(chave) }));
+  const r = await enviarInscricao(sub);
+  return r.ok ? "ligado" : "desligado";
+}
+async function desligarPush(): Promise<EstadoPush> {
+  const reg = await navigator.serviceWorker.getRegistration("/");
+  const sub = await reg?.pushManager.getSubscription();
+  if (sub) { await fetch("/api/workend/push", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }).catch(() => {}); await sub.unsubscribe().catch(() => false); }
+  return "desligado";
+}
+function AvisosNoCelular() {
+  const [estado, setEstado] = useState<EstadoPush>("carregando");
+  const [erro, setErro] = useState<string | null>(null);
+  useEffect(() => { let vivo = true; lerEstadoPush().then((e) => { if (vivo) setEstado(e); }).catch(() => { if (vivo) setEstado("sem-suporte"); }); return () => { vivo = false; }; }, []);
+  if (estado === "carregando" || estado === "sem-suporte") return null;
+  const agir = (f: () => Promise<EstadoPush>) => { setErro(null); setEstado("ligando"); f().then(setEstado).catch((e: Error) => { setErro(e.message || "Não deu para ligar agora."); setEstado("desligado"); }); };
+  return (
+    <div className="border-t border-black/5 bg-[#F7F9FC] px-4 py-3 text-[12px] text-[#3D4552]" data-push={estado}>
+      {estado === "iphone-tela" && <p><b>📲 Avisos no iPhone:</b> toque em Compartilhar <span aria-hidden>⎋</span> › <b>Adicionar à Tela de Início</b> e abra o WorkEnd por lá. Aí este sino passa a avisar no celular.</p>}
+      {estado === "negado" && <p><b>📲 Avisos no celular bloqueados</b> neste navegador. Para liberar, toque no cadeado ao lado do endereço › Notificações › Permitir.</p>}
+      {(estado === "desligado" || estado === "ligando") && (
+        <div className="flex items-center justify-between gap-3">
+          <p><b>📲 Receber os avisos no celular,</b> mesmo com o site fechado.</p>
+          <button onClick={() => agir(ligarPush)} disabled={estado === "ligando"} className="shrink-0 rounded-full bg-[#1D4ED8] px-3 py-1.5 text-[12px] font-bold text-white disabled:opacity-60">{estado === "ligando" ? "Ligando…" : "Ligar"}</button>
+        </div>
+      )}
+      {estado === "ligado" && (
+        <div className="flex items-center justify-between gap-3">
+          <p><b>📲 Avisos no celular ligados</b> neste aparelho.</p>
+          <button onClick={() => agir(desligarPush)} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-[#5B6472] ring-1 ring-black/10">Desligar</button>
+        </div>
+      )}
+      {erro && <p className="mt-1 font-semibold text-[#B42318]">{erro}</p>}
+    </div>
+  );
+}
 const ha = (iso: string, agora: number) => {
   const s = Math.max(0, (agora - new Date(iso).getTime()) / 1000);
   if (s < 60) return "agora"; if (s < 3600) return `há ${Math.floor(s / 60)} min`; if (s < 86400) return `há ${Math.floor(s / 3600)} h`;
@@ -91,6 +152,7 @@ export function Sino({ tema = "escuro" }: { tema?: "escuro" | "claro" }) {
               </li>
             ))}
           </ul>
+          <AvisosNoCelular />
         </div>
       )}
     </div>

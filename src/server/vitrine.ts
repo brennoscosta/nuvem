@@ -2,6 +2,7 @@
 // cartão do lote no mapa e na página /loja/N — com o botão "Pedir no WhatsApp" que abre a conversa com o próprio dono.
 // O WorkEnd não passa dinheiro adiante (isso exigiria repasse e nota fiscal). A vitrine é da conta, como a equipe:
 // aparece no lote principal ativo do dono. Fotos no banco (até 200 KB), já reduzidas no navegador.
+import { avisarSeguidores } from "./seguir";
 import { sql, id, migrar } from "./db";
 import type { Usuario } from "./usuarios";
 import { terrenoDoUsuario, obterTerreno, ehAdmin } from "./terrenos";
@@ -107,6 +108,7 @@ export async function salvarProduto(u: Usuario, d: { id?: unknown; nome?: unknow
     const pid = id("prd");
     await tx`INSERT INTO produto (id, usuario_id, nome, preco_centavos, descricao, foto, foto_tipo, ordem, ativo) VALUES (${pid}, ${u.id}, ${nome}, ${preco}, ${descricao}, ${foto?.dados ?? null}, ${foto?.tipo ?? null}, ${maior + 1}, ${ativo})`;
     const [p] = await tx<Linha[]>`SELECT ${CAMPOS()} FROM produto WHERE id = ${pid}`;
+    if (ativo) void avisarSeguidores(u.id, "produto", { texto: nome, ref: pid }); // quem segue a loja (no máximo 1 aviso a cada 6 h)
     return { ...paraPublico(p), ativo: p.ativo, ordem: p.ordem };
   });
 }

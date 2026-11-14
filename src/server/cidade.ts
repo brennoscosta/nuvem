@@ -4,6 +4,7 @@ import { sql, migrar, id } from "./db";
 import type { Usuario } from "./usuarios";
 import { ehAdmin, terrenoDoUsuario } from "./terrenos";
 import { criarCobrancaGenerica, type CobrancaPix } from "./mercadopago";
+import { avisarSeguidores } from "./seguir";
 import { avisar } from "./avisos";
 import { LOTE_POR_CHAVE, nomeNicho, NICHOS } from "@/office/data/mundo";
 import { MISSOES } from "@/office/data/missoes";
@@ -144,7 +145,7 @@ export async function marcarEvento(u: Usuario, d: { titulo?: unknown; descricao?
   if (inicio.getTime() > Date.now() + 30 * 86400_000) throw new Error("Marque eventos para os próximos 30 dias.");
   const dur = DURACOES_EVENTO.includes(Number(d.duracao)) ? Number(d.duracao) : 60;
   const fim = new Date(inicio.getTime() + dur * 60_000);
-  return sql.begin(async (tx) => {
+  const ev = await sql.begin(async (tx) => {
     const db = tx as unknown as typeof sql;
     await db`SELECT pg_advisory_xact_lock(hashtext('evento_praca'))`;
     const [{ n }] = await db<{ n: number }[]>`SELECT count(*)::int AS n FROM evento_praca WHERE usuario_id = ${u.id} AND NOT cancelado AND fim > now()`;
@@ -154,6 +155,8 @@ export async function marcarEvento(u: Usuario, d: { titulo?: unknown; descricao?
     const [e] = await db`INSERT INTO evento_praca (id, usuario_id, terreno_chave, titulo, descricao, link, inicio, fim) VALUES (${id("evp")}, ${u.id}, ${t.chave}, ${titulo}, ${texto(d.descricao, 300)}, ${urlSegura(d.link)}, ${inicio}, ${fim}) RETURNING id`;
     return e;
   });
+  void avisarSeguidores(u.id, "evento", { texto: `${titulo} · ${inicio.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`, ref: String((ev as { id?: string }).id ?? titulo) }); // quem segue a loja
+  return ev;
 }
 export async function cancelarEvento(u: Usuario, eventoId: string) {
   await migrar();

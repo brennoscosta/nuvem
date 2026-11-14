@@ -47,6 +47,8 @@ export default async function App() {
                   <Link href="/app/agenda" className="btn btn-claro !py-2 text-sm">📅 Agenda</Link>
                   <Link href="/app/vitrine" className="btn btn-claro !py-2 text-sm">🛍️ Vitrine</Link>
                   <Link href="/app/equipe?aba=vagas" className="btn btn-claro !py-2 text-sm">📋 Vagas</Link>
+                  <Link href="/app/cupons" className="btn btn-claro !py-2 text-sm">🎟️ Cupons</Link>
+                  <Link href="/app/divulgar" className="btn btn-claro !py-2 text-sm">📣 Divulgar</Link>
                 </div>
               )}
             </>

@@ -15,6 +15,14 @@ export function linkPedido(whatsapp: string, p: ProdutoVitrine) {
   const preco = p.preco == null ? "sob consulta" : precoBR(p.preco).replace(/\s/g, " ");
   return `https://wa.me/${numeroZap(whatsapp)}?text=${encodeURIComponent(`Olá! Vi o produto ${p.nome} (${preco}) na sua loja do WorkEnd.`)}`;
 }
+// pedido com vários produtos (13/11/2026): uma mensagem só, com itens, quantidades e total (sob consulta entra sem preço)
+export type Pedido = Record<string, number>;
+export function textoPedido(d: DadosVitrine, pedido: Pedido) {
+  const itens = d.produtos.filter((p) => (pedido[p.id] ?? 0) > 0);
+  const linhas = itens.map((p) => { const q = pedido[p.id]; return `• ${q}× ${p.nome} — ${p.preco == null ? "sob consulta" : precoBR(p.preco * q).replace(/\s/g, " ")}`; });
+  const total = itens.reduce((a, p) => a + (p.preco ?? 0) * pedido[p.id], 0), consulta = itens.some((p) => p.preco == null);
+  return `Olá! Quero fazer um pedido pela sua loja do WorkEnd:\n${linhas.join("\n")}\nTotal: ${total ? precoBR(total).replace(/\s/g, " ") : "a combinar"}${consulta && total ? " (+ itens sob consulta)" : ""}`;
+}
 function contarClique(numero: number, produtoId: string) {
   avisarClique(numero, "produto", produtoId); // conta no painel e faz sair o motoboy da loja na cena
 }
@@ -62,8 +70,41 @@ function BotaoPedido({ d, p, previa, pequeno }: { d: DadosVitrine; p: ProdutoVit
 }
 
 // Só o desenho (usado na loja e na prévia do dono em /app/vitrine). previa = botões que não abrem nada.
+function Contador({ q, mudar, pequeno }: { q: number; mudar: (n: number) => void; pequeno?: boolean }) {
+  const alto = pequeno ? "h-7 text-[12px]" : "h-9 text-sm";
+  if (!q) return <button type="button" onClick={() => mudar(1)} className={`${pequeno ? "mt-1.5" : "mt-2"} ${alto} w-full rounded-lg border border-[#16A34A] font-bold text-[#15803d] hover:bg-[#EAF7EE]`}>+ Adicionar ao pedido</button>;
+  return (
+    <div className={`${pequeno ? "mt-1.5" : "mt-2"} ${alto} flex w-full items-center justify-between rounded-lg bg-[#EAF7EE] font-bold text-[#166534]`} role="group" aria-label="Quantidade">
+      <button type="button" onClick={() => mudar(q - 1)} aria-label="Tirar um" className="h-full w-9 rounded-l-lg hover:bg-[#d8f0e0]">−</button>
+      <span className="tabular-nums">{q}</span>
+      <button type="button" onClick={() => mudar(Math.min(99, q + 1))} aria-label="Pôr mais um" className="h-full w-9 rounded-r-lg hover:bg-[#d8f0e0]">+</button>
+    </div>
+  );
+}
+function BarraPedido({ d, pedido, limpar, pequeno }: { d: DadosVitrine; pedido: Pedido; limpar: () => void; pequeno?: boolean }) {
+  const itens = d.produtos.filter((p) => (pedido[p.id] ?? 0) > 0); if (!itens.length) return null;
+  const n = itens.reduce((a, p) => a + pedido[p.id], 0), total = itens.reduce((a, p) => a + (p.preco ?? 0) * pedido[p.id], 0), consulta = itens.some((p) => p.preco == null);
+  const texto = textoPedido(d, pedido);
+  const enviar = () => avisarClique(d.numero, "produto", "pedido"); // conta como pedido e faz sair o motoboy
+  const cls = `${pequeno ? "px-2 py-1.5 text-[11px]" : "px-4 py-2.5 text-sm"} rounded-xl font-bold text-white`;
+  return (
+    <div className={`${pequeno ? "mt-2 rounded-xl p-2" : "sticky bottom-3 z-10 mt-4 rounded-2xl p-3 shadow-xl"} flex flex-wrap items-center justify-between gap-2 bg-[#1D2128] text-white`}>
+      <span className={pequeno ? "text-[11px]" : "text-sm"}>🧺 <b>{n} {n === 1 ? "item" : "itens"}</b> · {total ? precoBR(total) : "a combinar"}{consulta && total ? " + sob consulta" : ""}</span>
+      <span className="flex items-center gap-1.5">
+        <button type="button" onClick={limpar} className={`${pequeno ? "text-[11px]" : "text-sm"} rounded-lg px-2 py-1 text-white/70 hover:text-white`}>Limpar</button>
+        {d.whatsapp
+          ? <a href={`https://wa.me/${numeroZap(d.whatsapp)}?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer nofollow" onClick={enviar} className={`${cls} bg-[#16A34A] hover:bg-[#15803d]`}>Enviar pedido no WhatsApp</a>
+          : d.atendente ? <button type="button" onClick={() => { enviar(); perguntarAtendente(texto.replace(/\n/g, " ")); }} className={`${cls} bg-[#1D4ED8] hover:bg-[#1a44c2]`}>Mandar à atendente</button> : null}
+      </span>
+    </div>
+  );
+}
+
 export function VitrineVisual({ d, compacto, previa }: { d: DadosVitrine; compacto?: boolean; previa?: boolean }) {
+  const [pedido, setPedido] = useState<Pedido>({});
   if (!d.produtos.length) return null;
+  const mudar = (id: string) => (n: number) => setPedido((p) => ({ ...p, [id]: Math.max(0, n) }));
+  const podePedir = !previa && (!!d.whatsapp || !!d.atendente);
   if (compacto) return (
     <div className="rounded-2xl border border-black/5 bg-[#F6F8FB] p-2">
       <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
@@ -76,13 +117,15 @@ export function VitrineVisual({ d, compacto, previa }: { d: DadosVitrine; compac
             <Foto p={p} cor={d.cor} classe="aspect-[4/3] w-full rounded-lg" />
             <div className="mt-1 line-clamp-2 min-h-[2.1rem] text-[12px] font-bold leading-tight text-[#1D2128]">{p.nome}</div>
             <div className={`text-[12px] font-semibold ${p.preco == null ? "text-[#5B6472]" : "text-[#15803d]"}`}>{precoBR(p.preco)}</div>
-            <BotaoPedido d={d} p={p} previa={previa} pequeno />
+            {podePedir ? <Contador q={pedido[p.id] ?? 0} mudar={mudar(p.id)} pequeno /> : <BotaoPedido d={d} p={p} previa={previa} pequeno />}
           </li>
         ))}
       </ul>
+      {podePedir && <BarraPedido d={d} pedido={pedido} limpar={() => setPedido({})} pequeno />}
     </div>
   );
   return (
+    <>
     <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
       {d.produtos.map((p) => (
         <li key={p.id} className="flex flex-col overflow-hidden rounded-2xl border border-[var(--linha,#E3E6EB)] bg-white">
@@ -91,11 +134,13 @@ export function VitrineVisual({ d, compacto, previa }: { d: DadosVitrine; compac
             <b className="line-clamp-2 text-[15px] leading-snug text-[#1D2128]">{p.nome}</b>
             <span className={`mt-0.5 text-[15px] font-semibold ${p.preco == null ? "text-[var(--tinta-2,#5B6472)]" : "text-[#15803d]"}`}>{precoBR(p.preco)}</span>
             {p.descricao && <p className="mt-1 line-clamp-3 whitespace-pre-line text-[13px] text-[var(--tinta-2,#5B6472)]">{p.descricao}</p>}
-            <div className="mt-auto"><BotaoPedido d={d} p={p} previa={previa} /></div>
+            <div className="mt-auto">{podePedir ? <Contador q={pedido[p.id] ?? 0} mudar={mudar(p.id)} /> : <BotaoPedido d={d} p={p} previa={previa} />}</div>
           </div>
         </li>
       ))}
     </ul>
+    {podePedir && <BarraPedido d={d} pedido={pedido} limpar={() => setPedido({})} />}
+    </>
   );
 }
 

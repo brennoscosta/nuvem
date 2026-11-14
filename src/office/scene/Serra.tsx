@@ -5,8 +5,10 @@
 // dela) e, ao sul, morros que descem até o mar. Norte: chão da cidade que continua (os prédios ficam em Horizonte.tsx).
 // Perto da cidade a malha é fina (3 m); longe, os espaços crescem (a névoa do CicloDia apaga a distância).
 // Mata: copas instanciadas pelos morros perto da cidade. Tudo criado uma vez (sem "new" no JSX, sem recompilar).
+import { contar } from "./medirGeracao";
+import { lerGuardado, guardar, fatia } from "./guardaNoAparelho";
 import * as THREE from "three";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BORDAS, MUNDO, NORTE, costaLeste, costaSul, rioNoVale } from "../data/mundo";
 import { MAT_AGUA, MAT_BRILHO } from "./Rio";
 import { registrarMolhavel } from "./Clima";
@@ -53,12 +55,14 @@ function morro(x: number, z: number) {
   if (z < -380) h = Math.max(h, suave(-380, -660, z) * (18 + 55 * fbm(x / 210, z / 210)) - 0.03);
   return h;
 }
+// o morro do último ponto calculado (a cor do terreno reaproveita: era o mesmo cálculo duas vezes por ponto)
+let ULTIMO_MORRO = -10;
 export function alturaTerreno(x: number, z: number) {
   let h = -0.03;
   const xi = XI(z), leste = x > xi, sul = z > ZI;
   if (leste) h = praia(x - xi, costaLeste(z) - xi, z < NORTE.calcadao.z0 ? 0 : BORDAS.orla, x, z);
   if (sul) { const hs = praia(z - ZI, costaSul(x) - ZI, x < -MUNDO.x || x > costaLeste(z) ? 0 : BORDAS.orla, x, z); h = leste ? Math.min(h, hs) : hs; }
-  const m = morro(x, z); if (m > h) h = m;
+  const m = morro(x, z); ULTIMO_MORRO = m; if (m > h) h = m;
   // canal do rio: a oeste (vale da serra) e a leste (da ponta do calçadão até o mar)
   if (x < -97 || x > 85) {
     const dz = Math.abs(z - (x < -97 ? rioNoVale(x) : BORDAS.rioZ)), meia = BORDAS.rioMeia;
@@ -74,8 +78,8 @@ const C = {
   mata: new THREE.Color("#3E8746"), mataEsc: new THREE.Color("#2B6636"), mataClara: new THREE.Color("#5FA052"), pedra: new THREE.Color("#8F8C7A"), barro: new THREE.Color("#7A6F55"),
 };
 const tc = new THREE.Color();
-function corTerreno(x: number, z: number, h: number, inclin: number, alvo: THREE.Color) {
-  const xi = XI(z), praiaL = x > xi, praiaS = z > ZI && (x > -MUNDO.x || morro(x, z) < 0.4);
+function corTerreno(x: number, z: number, h: number, inclin: number, alvo: THREE.Color, morroJa?: number) {
+  const xi = XI(z), praiaL = x > xi, praiaS = z > ZI && (x > -MUNDO.x || (morroJa ?? morro(x, z)) < 0.4);
   const n = ruido(x * 0.07, z * 0.07), n2 = ruido(x * 0.31 + 5, z * 0.31);
   if ((praiaL || praiaS) && h < 0.6) {
     // areia: clara e seca perto da orla, molhada perto da água, mais escura embaixo d'água
@@ -122,36 +126,48 @@ function texturaDetalhe() {
   TEX_DETALHE = new THREE.CanvasTexture(c); TEX_DETALHE.wrapS = TEX_DETALHE.wrapT = THREE.RepeatWrapping; TEX_DETALHE.anisotropy = 4; // linear de propósito: só multiplica a cor de 0,82 a 1
   return TEX_DETALHE;
 }
-function malhaTerreno(poucos: boolean) {
+interface DadosTerreno { pos: Float32Array; cor: Float32Array; uv: Float32Array; normal: Float32Array; idx: Uint16Array | Uint32Array }
+// v67: o mesmo cálculo de antes, mas em fatias de ~6 ms (a cidade continua desenhando) e devolvendo os números prontos
+// (posição, cor, uv, normal, índices) para guardar no aparelho
+async function terrenoAosPoucos(poucos: boolean): Promise<DadosTerreno> {
   const E = BORDAS.extensao;
   const xs = eixo(-E, 175, -135, 140, poucos ? 5 : 3, poucos ? 1.22 : 1.12, [-98, -MUNDO.x, 86, MUNDO.x, MUNDO.x + BORDAS.orla]);
   const zs = eixo(-E, 175, -215, 140, poucos ? 5 : 3, poucos ? 1.22 : 1.12, [NORTE.fim, NORTE.calcadao.z0, NORTE.rio.z0, NORTE.rio.z1, MUNDO.z, MUNDO.z + BORDAS.orla]);
   const nx = xs.length, nz = zs.length, n = nx * nz;
-  const pos = new Float32Array(n * 3), cor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
-  const alt = new Float32Array(n);
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) alt[j * nx + i] = alturaTerreno(xs[i], zs[j]);
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-    const k = j * nx + i, x = xs[i], z = zs[j], h = alt[k];
-    // inclinação pela diferença com os vizinhos (0 = plano, 1 = barranco)
-    const i0 = Math.max(0, i - 1), i1 = Math.min(nx - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(nz - 1, j + 1);
-    const gx = (alt[j * nx + i1] - alt[j * nx + i0]) / Math.max(0.5, xs[i1] - xs[i0]), gz = (alt[j1 * nx + i] - alt[j0 * nx + i]) / Math.max(0.5, zs[j1] - zs[j0]);
-    const inclin = Math.min(1, Math.hypot(gx, gz) / 1.4);
-    pos[k * 3] = x; pos[k * 3 + 1] = h; pos[k * 3 + 2] = z;
-    corTerreno(x, z, h, inclin, tc); cor[k * 3] = tc.r; cor[k * 3 + 1] = tc.g; cor[k * 3 + 2] = tc.b;
-    uv[k * 2] = x / 9; uv[k * 2 + 1] = z / 9;
+  const pos = new Float32Array(n * 3), cor = new Float32Array(n * 3), uv = new Float32Array(n * 2), alt = new Float32Array(n), mor = new Float32Array(n);
+  let t = performance.now();
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) { const k = j * nx + i; alt[k] = alturaTerreno(xs[i], zs[j]); mor[k] = ULTIMO_MORRO; }
+    if (performance.now() - t > 6) { await fatia(); t = performance.now(); }
   }
-  const idx: number[] = [];
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      const k = j * nx + i, x = xs[i], z = zs[j], h = alt[k];
+      const i0 = Math.max(0, i - 1), i1 = Math.min(nx - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(nz - 1, j + 1);
+      const gx = (alt[j * nx + i1] - alt[j * nx + i0]) / Math.max(0.5, xs[i1] - xs[i0]), gz = (alt[j1 * nx + i] - alt[j0 * nx + i]) / Math.max(0.5, zs[j1] - zs[j0]);
+      const inclin = Math.min(1, Math.hypot(gx, gz) / 1.4);
+      pos[k * 3] = x; pos[k * 3 + 1] = h; pos[k * 3 + 2] = z;
+      corTerreno(x, z, h, inclin, tc, mor[k]); cor[k * 3] = tc.r; cor[k * 3 + 1] = tc.g; cor[k * 3 + 2] = tc.b;
+      uv[k * 2] = x / 9; uv[k * 2 + 1] = z / 9;
+    }
+    if (performance.now() - t > 6) { await fatia(); t = performance.now(); }
+  }
+  const lista: number[] = [];
   for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
     if (dentro((xs[i] + xs[i + 1]) / 2, (zs[j] + zs[j + 1]) / 2)) continue;
     const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
-    idx.push(a, c, b, b, c, d);
+    lista.push(a, c, b, b, c, d);
   }
+  const idx = n > 65535 ? new Uint32Array(lista) : new Uint16Array(lista);
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeVertexNormals();
+  const normal = (g.getAttribute("normal") as THREE.BufferAttribute).array as Float32Array; g.dispose();
+  return { pos, cor, uv, normal, idx };
+}
+function geometriaDoTerreno(d: DadosTerreno) {
   const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  g.setAttribute("color", new THREE.BufferAttribute(cor, 3));
-  g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
-  g.setIndex(n > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
-  g.computeVertexNormals(); g.computeBoundingSphere();
+  g.setAttribute("position", new THREE.BufferAttribute(d.pos, 3)); g.setAttribute("normal", new THREE.BufferAttribute(d.normal, 3));
+  g.setAttribute("color", new THREE.BufferAttribute(d.cor, 3)); g.setAttribute("uv", new THREE.BufferAttribute(d.uv, 2));
+  g.setIndex(new THREE.BufferAttribute(d.idx, 1)); g.computeBoundingSphere();
   return g;
 }
 let MAT_TERRENO: THREE.MeshStandardMaterial | null = null;
@@ -196,36 +212,64 @@ export function criarArvoretas(lista: Arvoreta[]) {
   return [copa, tronco];
 }
 export const VERDES_MATA = ["#2E6E3A", "#3B7F3F", "#4E9A4A", "#2A5E33", "#5C9E4E", "#3F8A46", "#6AA858"].map((h) => new THREE.Color(h));
-function criarMata(poucos: boolean) {
+async function mataAosPoucos(poucos: boolean): Promise<Float32Array> {
   const total = poucos ? 650 : 2400;
-  const lista: Arvoreta[] = [];
+  const saida: number[] = []; let n = 0;
   let s = 4242; const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  for (let tent = 0; tent < total * 6 && lista.length < total; tent++) {
+  let t = performance.now();
+  for (let tent = 0; tent < total * 6 && n < total; tent++) {
+    if (performance.now() - t > 6) { await fatia(); t = performance.now(); }
     const x = -MUNDO.x - 4 - Math.pow(r(), 1.4) * 320, z = -420 + r() * 560;
     const h = alturaTerreno(x, z);
     if (h < 0.4 || h > 95) continue;
     if (Math.abs(z - rioNoVale(x)) < BORDAS.rioMeia + 4) continue;
-    // plano logo depois da cidade: árvores soltas (com tronco); nos morros, mata fechada
     if (h < 2 && r() < 0.45) continue;
     const perto = -MUNDO.x - x < 70;
     const raio = 1.5 + r() * 1.7 + Math.min(1.6, h / 45);
-    lista.push({ x, z, y: h, raio, cor: VERDES_MATA[Math.floor(r() * VERDES_MATA.length)].clone().multiplyScalar(0.88 + r() * 0.22), tronco: perto });
+    const c = VERDES_MATA[Math.floor(r() * VERDES_MATA.length)].clone().multiplyScalar(0.88 + r() * 0.22);
+    saida.push(x, z, h, raio, c.r, c.g, c.b, perto ? 1 : 0); n++;
   }
-  return criarArvoretas(lista);
+  return new Float32Array(saida);
 }
-
+function arvoretasDosNumeros(f: Float32Array): Arvoreta[] {
+  const l: Arvoreta[] = [];
+  for (let i = 0; i + 7 < f.length; i += 8) l.push({ x: f[i], z: f[i + 1], y: f[i + 2], raio: f[i + 3], cor: new THREE.Color(f[i + 4], f[i + 5], f[i + 6]), tronco: f[i + 7] > 0.5 });
+  return l;
+}
+// a serra pronta para desenhar: do aparelho (2ª visita em diante) ou calculada em fatias (1ª visita) e guardada
+const VERSAO_SERRA = "v67-1";
+const PROMESSAS = new Map<string, Promise<{ terreno: DadosTerreno; mata: Float32Array }>>();
+function dadosDaSerra(poucos: boolean) {
+  const chave = `serra-${poucos ? "leve" : "alta"}@${VERSAO_SERRA}`;
+  let p = PROMESSAS.get(chave);
+  if (!p) {
+    p = (async () => {
+      const guardado = await lerGuardado<{ terreno: DadosTerreno; mata: Float32Array }>(chave);
+      if (guardado?.terreno?.pos && guardado.mata) { contar("serra: do aparelho"); return guardado; }
+      const t0 = performance.now();
+      const terreno = await terrenoAosPoucos(poucos), mata = await mataAosPoucos(poucos);
+      contar("serra: calculada (ms, com as pausas)", performance.now() - t0);
+      guardar(chave, { terreno, mata });
+      return { terreno, mata };
+    })();
+    PROMESSAS.set(chave, p);
+  }
+  return p;
+}
 export function Serra() {
   const poucos = leve();
-  const geo = useMemo(() => malhaTerreno(poucos), [poucos]);
+  const [dados, setDados] = useState<{ terreno: DadosTerreno; mata: Float32Array } | null>(null);
+  useEffect(() => { let vivo = true; void dadosDaSerra(poucos).then((d) => { if (vivo) setDados(d); }); return () => { vivo = false; }; }, [poucos]);
   const material = useMemo(() => materialTerreno(), []);
   const rio = useMemo(() => ({ agua: faixaRio(-98, -BORDAS.extensao, BORDAS.rioMeia * 2 + 0.6, 1e9), brilho: faixaRio(-98, -BORDAS.extensao, BORDAS.rioMeia * 2 + 0.6, 14) }), []);
-  const mata = useMemo(() => criarMata(poucos), [poucos]);
+  const geo = useMemo(() => (dados ? geometriaDoTerreno(dados.terreno) : null), [dados]);
+  const mata = useMemo(() => (dados ? criarArvoretas(arvoretasDosNumeros(dados.mata)) : null), [dados]);
   return (
     <group>
-      <mesh geometry={geo} material={material} receiveShadow />
+      {geo && <mesh geometry={geo} material={material} receiveShadow />}
       <mesh geometry={rio.agua} material={MAT_AGUA} position={[0, NIVEL_RIO, 0]} />
       <mesh geometry={rio.brilho} material={MAT_BRILHO} position={[0, NIVEL_RIO + 0.02, 0]} renderOrder={2} />
-      {mata.map((im, i) => <primitive key={i} object={im} />)}
+      {mata && mata.map((im, i) => <primitive key={i} object={im} />)}
     </group>
   );
 }

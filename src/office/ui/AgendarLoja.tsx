@@ -7,7 +7,8 @@ import { useEffect, useState } from "react";
 type Servico = { id: string; nome: string; duracao: number; duracaoTexto: string; preco: string };
 type Meu = { id: string; servico: string; quando: string; status: string };
 type Dia = { dia: string; rotulo: string; horarios: string[] };
-type Info = { ligada: false } | { ligada: true; numero: number; empresa: string; servicos: Servico[]; antecedenciaMin: number; eu: { nome: string; ehDono: boolean } | null; meus: Meu[]; servico: string | null; dias?: Dia[] };
+type ParaAvaliar = { id: string; servico: string; quando: string };
+type Info = { ligada: false; paraAvaliar?: ParaAvaliar[] } | { ligada: true; paraAvaliar?: ParaAvaliar[]; numero: number; empresa: string; servicos: Servico[]; antecedenciaMin: number; eu: { nome: string; ehDono: boolean } | null; meus: Meu[]; servico: string | null; dias?: Dia[] };
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { ...init, headers: { "content-type": "application/json", ...(init?.headers ?? {}) }, cache: "no-store" });
@@ -20,6 +21,37 @@ function textoSobre(cor: string) {
   const m = /^#?([0-9a-f]{6})$/i.exec(cor); if (!m) return "#fff";
   const n = parseInt(m[1], 16), l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
   return l > 0.62 ? "#1D2128" : "#fff";
+}
+
+// Avaliação do atendimento (13/11/2026): depois que a loja marca "concluído", o cliente dá de 1 a 5 estrelas e um comentário
+function AvaliarAtendimento({ itens, compacto, aoAvaliar }: { itens: ParaAvaliar[]; compacto?: boolean; aoAvaliar: () => void }) {
+  const [nota, setNota] = useState<Record<string, number>>({});
+  const [texto, setTexto] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState<{ id: string; ok: boolean; t: string } | null>(null);
+  const [enviando, setEnviando] = useState<string | null>(null);
+  const enviar = async (id: string) => {
+    setEnviando(id); setMsg(null);
+    try { await api(`/api/workend/agenda/${encodeURIComponent(id)}/avaliar`, { method: "POST", body: JSON.stringify({ nota: nota[id], texto: texto[id] ?? "" }) }); setMsg({ id, ok: true, t: "Obrigado! A sua avaliação já conta na nota da loja." }); setTimeout(aoAvaliar, 1600); }
+    catch (e) { setMsg({ id, ok: false, t: (e as Error).message }); }
+    finally { setEnviando(null); }
+  };
+  const tam = compacto ? "text-xs" : "text-sm";
+  return (
+    <div className={`rounded-2xl border border-[#F59E0B]/40 bg-[#FFF8E6] ${compacto ? "p-3" : "p-4"} text-[#1D2128]`}>
+      <div className={`${compacto ? "text-[13px]" : "text-[15px]"} font-bold`}>⭐ Como foi o seu atendimento?</div>
+      {itens.map((a) => (
+        <div key={a.id} className="mt-2">
+          <div className={`${tam} text-[#5B6472]`}>{a.servico} · {a.quando}</div>
+          <div className="mt-1 flex gap-1" role="radiogroup" aria-label="Nota de 1 a 5">
+            {[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" role="radio" aria-checked={nota[a.id] === n} aria-label={`${n} estrela${n > 1 ? "s" : ""}`} onClick={() => setNota((x) => ({ ...x, [a.id]: n }))} className={`${compacto ? "text-xl" : "text-2xl"} leading-none ${(nota[a.id] ?? 0) >= n ? "text-[#F59E0B]" : "text-[#D9DDE3]"}`}>★</button>)}
+          </div>
+          {!!nota[a.id] && <textarea value={texto[a.id] ?? ""} onChange={(e) => setTexto((x) => ({ ...x, [a.id]: e.target.value.slice(0, 300) }))} rows={2} placeholder="Conte em poucas palavras (opcional)" className="mt-1.5 w-full rounded-lg border border-black/10 bg-white px-2 py-1.5 text-base sm:text-sm" />}
+          {!!nota[a.id] && <button type="button" onClick={() => enviar(a.id)} disabled={enviando === a.id} className={`mt-1.5 rounded-lg bg-[#1D2128] px-3 py-1.5 ${tam} font-bold text-white disabled:opacity-50`}>{enviando === a.id ? "Enviando…" : "Enviar avaliação"}</button>}
+          {msg?.id === a.id && <div className={`mt-1 ${tam} font-semibold ${msg.ok ? "text-[#166534]" : "text-[#B42318]"}`}>{msg.t}</div>}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: string; compacto?: boolean }) {
@@ -56,7 +88,9 @@ export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: st
   }, [numero, servico, versao]);
 
   const dados = info?.k === kInfo ? info.v : info?.v ?? null; // enquanto recarrega, mostra o que já tinha
-  if (!dados || !dados.ligada) return null;
+  if (!dados) return null;
+  const cartaoAvaliar = dados.paraAvaliar?.length ? <AvaliarAtendimento itens={dados.paraAvaliar} compacto={compacto} aoAvaliar={() => setVersao((v) => v + 1)} /> : null;
+  if (!dados.ligada) return cartaoAvaliar ? <div id={compacto ? undefined : "agenda"} className="scroll-mt-6">{cartaoAvaliar}</div> : null;
   const sl = slots && slots.k === kSlots ? slots : null;
   const dias = sl?.dias ?? null;
   const dia = dias?.find((d) => d.dia === diaSel) ?? dias?.[0] ?? null;
@@ -85,14 +119,17 @@ export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: st
 
   if (compacto && !aberto) {
     return (
+      <>{cartaoAvaliar && <div className="mb-2">{cartaoAvaliar}</div>}
       <button onClick={() => setAberto(true)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-bold hover:opacity-90" style={{ background: corOk, color: tinta }}>
         <span>📅 Agendar horário</span>
         <span className="text-[11px] font-semibold opacity-85">{dados.meus.length ? `${dados.meus.length} marcado${dados.meus.length > 1 ? "s" : ""}` : `${dados.servicos.length} ${dados.servicos.length === 1 ? "serviço" : "serviços"}`}</span>
       </button>
+      </>
     );
   }
 
   return (
+    <>{cartaoAvaliar && <div className="mb-3">{cartaoAvaliar}</div>}
     <div id={compacto ? undefined : "agenda"} className={`scroll-mt-6 rounded-2xl border border-black/10 bg-white ${compacto ? "p-3" : "p-5"} text-[#1D2128]`}>
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -180,5 +217,6 @@ export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: st
         </>
       )}
     </div>
+    </>
   );
 }

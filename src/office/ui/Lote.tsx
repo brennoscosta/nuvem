@@ -11,6 +11,8 @@ import { BotoesPersonagem } from "./BotoesPersonagem";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 import { ChatLoja, Contatos, Estrelas, useLoja } from "./ChatLoja";
 import { AgendarLoja } from "./AgendarLoja";
+import { BotaoSeguir } from "./BotaoSeguir";
+import { PegarCupom } from "./PegarCupom";
 import { VitrineLoja } from "./VitrineLoja";
 import { PRACA_CHAVE } from "../data/praca";
 
@@ -350,11 +352,12 @@ function LojaNoMapa({ numero, ativo, chave }: { numero: number; ativo: boolean; 
   return (
     <div className="mt-3 space-y-2">
       {promo && <div className="flex items-center justify-between gap-2 rounded-xl bg-[#E11D48] px-3 py-2 text-xs font-bold text-white"><span>🏷️ {promo.texto}</span><span className="font-semibold text-white/80">{horaPromo(promo.ate, agora)}</span></div>}
-      <div className="flex items-center justify-between gap-2"><span className="rounded-full bg-[#EEF3FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">{loja.nicho}</span><Estrelas media={loja.avaliacao.media} n={loja.avaliacao.n} /></div>
+      <div className="flex items-center justify-between gap-2"><span className="rounded-full bg-[#EEF3FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">{loja.nicho}</span><span className="flex items-center gap-2"><BotaoSeguir numero={numero} /><Estrelas media={loja.avaliacao.media} n={loja.avaliacao.n} /></span></div>
       {loja.sobre ? <p className="line-clamp-4 whitespace-pre-line text-xs text-[#1D2128]">{loja.sobre}</p> : <p className="text-xs text-[#5B6472]">A empresa ainda não contou o que faz. Pergunte à atendente.</p>}
       <Contatos c={loja.contatos} numero={numero} />
       {vagas > 0 && <a href={`/loja/${numero}#vagas`} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-[#FFF8D6] px-3 py-2 text-xs font-bold text-[#7A5A00] hover:bg-[#fff0b3]"><span>📋 Estamos contratando · {vagas} {vagas === 1 ? "vaga" : "vagas"}</span><span>Ver e me candidatar ↗</span></a>}
       <VitrineLoja numero={numero} compacto />
+      <PegarCupom numero={numero} compacto />
       <AgendarLoja numero={numero} cor={loja.cor} compacto />
       {conversa
         ? <ChatLoja loja={loja} logado={!!usuario} linkEntrar={`/entrar?destino=${encodeURIComponent(`/loja/${numero}`)}`} alto={240} />

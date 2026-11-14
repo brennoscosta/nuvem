@@ -6,6 +6,8 @@
 // Tudo o que o prédio tem é juntado por material numa malha só (poucas chamadas de desenho por prédio). As texturas são
 // pintadas em canvas uma vez e projetadas em metros (o tijolo não estica e casa entre as peças).
 // Coordenadas locais do lote: frente para -z, x positivo = esquerda de quem olha a fachada (ver data/predios.ts).
+import { lerVarios, guardar } from "./guardaNoAparelho";
+import { contar } from "./medirGeracao";
 import * as THREE from "three";
 import { useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -225,6 +227,7 @@ const M4 = new THREE.Matrix4(), RM = new THREE.Matrix4(), EU = new THREE.Euler()
 // u corre ao longo da face (na frente, da esquerda para a direita de quem olha), v é a altura, n aponta para fora.
 interface Face { cx: number; cz: number; th: number }
 interface Parte { geo: THREE.BufferGeometry; mat: MatKit; sombra: boolean; papel: Papel }
+const fazSombra = (p: Papel) => p !== "vidro" && p !== "luz" && !p.startsWith("int:");
 class Montador {
   lotes = new Map<Papel, THREE.BufferGeometry[]>();
   detalhe = !leve();
@@ -301,7 +304,7 @@ class Montador {
     for (const [p, geos] of this.lotes) {
       const geo = mergeGeometries(geos, false); geos.forEach((g) => g.dispose()); if (!geo) continue;
       geo.computeBoundingSphere(); geo.computeBoundingBox();
-      out.push({ geo, mat: material(p), sombra: p !== "vidro" && p !== "luz" && !p.startsWith("int:"), papel: p });
+      out.push({ geo, mat: material(p), sombra: fazSombra(p), papel: p });
     }
     return out;
   }
@@ -895,12 +898,34 @@ if (MEDIR) (window as unknown as { __kit?: typeof MEDIDA }).__kit = MEDIDA;
 
 // Monta uma vez por combinação e guarda: o mesmo prédio (mesma empresa, mesmos ajustes) reaproveita as malhas
 const CACHE = new Map<string, { partes: Parte[]; plantas: Plantas }>();
+// ---------- guardado no aparelho (v67) ----------
+// cada prédio montado vira números (posição, normal, uv, cor, índices por material) no IndexedDB; na próxima visita, o
+// mesmo prédio (mesmas opções) é só remontado com esses números, sem refazer paredes, janelas e telhados
+const VERSAO_KIT = "v67-1", MAX_GUARDADOS = 60;
+interface ParteCrua { papel: Papel; attrs: { nome: string; a: ArrayLike<number>; n: number; norm: boolean }[]; idx: ArrayLike<number> | null }
+interface PredioCru { partes: ParteCrua[]; plantas: Plantas }
+const GUARDADOS = new Map<string, PredioCru>();
+if (typeof window !== "undefined") void lerVarios<PredioCru>("kit|").then((m) => { for (const [k, v] of m) if (k.endsWith("@" + VERSAO_KIT)) GUARDADOS.set(k, v); });
+function paraCru(p: Parte): ParteCrua {
+  const attrs = Object.entries(p.geo.attributes).map(([nome, at]) => { const b = at as THREE.BufferAttribute; return { nome, a: b.array, n: b.itemSize, norm: b.normalized }; });
+  return { papel: p.papel, attrs, idx: p.geo.index ? p.geo.index.array : null };
+}
+function deCru(c: ParteCrua): Parte {
+  const geo = new THREE.BufferGeometry();
+  for (const at of c.attrs) geo.setAttribute(at.nome, new THREE.BufferAttribute(at.a as THREE.TypedArray, at.n, at.norm));
+  if (c.idx) geo.setIndex(new THREE.BufferAttribute(c.idx as THREE.TypedArray, 1));
+  geo.computeBoundingSphere(); geo.computeBoundingBox();
+  return { geo, mat: material(c.papel), sombra: fazSombra(c.papel), papel: c.papel };
+}
 function predio(o: Opcoes) {
   const k = `${o.id}|${o.n}|${o.duplo}|${o.material}|${o.corMarca}|${o.seed}|${o.plana}|${leve()}`;
   let c = CACHE.get(k); if (c) return c;
   const t0 = MEDIR ? performance.now() : 0;
+  const chaveGuardada = `kit|${k}@${VERSAO_KIT}`, cru = GUARDADOS.get(chaveGuardada);
+  if (cru) { c = { partes: cru.partes.map(deCru), plantas: cru.plantas }; contar("prédio do kit: do aparelho"); CACHE.set(k, c); return c; }
   const f = CONSTRUTORES[o.id](o, medidasKit(o.id, o.n, o.duplo, o.plana));
   c = { partes: f.M.montar(), plantas: f.plantas };
+  if (GUARDADOS.size < MAX_GUARDADOS) { const novo = { partes: c.partes.map(paraCru), plantas: c.plantas }; GUARDADOS.set(chaveGuardada, novo); guardar(chaveGuardada, novo); }
   if (MEDIR) { const ms = performance.now() - t0; MEDIDA.montados++; MEDIDA.ms += ms; MEDIDA.maiorMs = Math.max(MEDIDA.maiorMs, ms); }
   // guarda no máximo 40 combinações; a mais antiga libera a memória de vídeo (se ainda estiver na tela, o three.js
   // simplesmente envia de novo no próximo quadro)

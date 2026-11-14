@@ -2,6 +2,7 @@
 // Praça de eventos (12/11/2026, ideia do dono): o lote 0,1,1, em frente à Nuvem, virou praça. Palco no fundo com um telão
 // que mostra o evento do momento (ou o próximo), plateia no meio e postes de luz. Aos sábados, das 8h às 18h (Brasília),
 // as 6 barracas da feira aparecem nas laterais com o nome de quem alugou; ?feira=1 liga a feira fora do sábado (prévias).
+import { useDestaque, type DestaqueSemana } from "../destaque";
 import * as THREE from "three";
 import { useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -36,10 +37,20 @@ function caber(g: CanvasRenderingContext2D, texto: string, max: number, tam: num
   g.font = `900 ${tam}px Inter, Arial, sans-serif`;
   while (g.measureText(texto).width > max && tam > min) { tam -= 4; g.font = `900 ${tam}px Inter, Arial, sans-serif`; }
 }
-function desenharTelao(dados: DadosPraca | null) {
+// logo da loja destaque: carrega uma vez e redesenha o telão quando chega
+const LOGOS = new Map<string, HTMLImageElement>();
+function logoPronto(url: string | null, aoCarregar: () => void) {
+  if (!url || typeof Image === "undefined") return null;
+  let im = LOGOS.get(url);
+  if (!im) { im = new Image(); im.onload = aoCarregar; im.src = url; LOGOS.set(url, im); }
+  return im.complete && im.naturalWidth ? im : null;
+}
+function desenharTelao(dados: DadosPraca | null, dq: DestaqueSemana | null = null, aoCarregarLogo: () => void = () => {}) {
   const tex = texturaTelao(); if (!tex) return;
   const c = tex.image as HTMLCanvasElement, g = c.getContext("2d")!; const W = c.width, H = c.height;
   const { vivo, proximo } = eventosDoMomento(dados?.agenda ?? []);
+  // sem evento ao vivo, o telão mostra a loja destaque da semana (13/11/2026); o próximo evento vira uma linha embaixo
+  if (!vivo && dq) { desenharDestaque(g, W, H, dq, proximo ?? null, logoPronto(dq.logo, aoCarregarLogo)); rodapeFeira(g, W, H, dados); tex.needsUpdate = true; return; }
   const ev = vivo ?? proximo;
   const cor = ev?.empresa.cor ?? "#1D4ED8";
   const fundo = g.createLinearGradient(0, 0, W, H); fundo.addColorStop(0, "#0B1220"); fundo.addColorStop(1, cor); g.fillStyle = fundo; g.fillRect(0, 0, W, H);
@@ -62,12 +73,29 @@ function desenharTelao(dados: DadosPraca | null) {
     g.fillText("Lives e lançamentos das empresas da cidade", 60, 290, W - 120);
     g.font = "500 32px Inter, Arial, sans-serif"; g.fillStyle = "rgba(255,255,255,.7)"; g.fillText("Tem lote? Marque o seu evento de graça: clique na praça.", 60, 360, W - 120);
   }
+  rodapeFeira(g, W, H, dados);
+  tex.needsUpdate = true;
+}
+function desenharDestaque(g: CanvasRenderingContext2D, W: number, H: number, dq: DestaqueSemana, proximo: EventoPraca | null, logo: HTMLImageElement | null) {
+  const fundo = g.createLinearGradient(0, 0, W, H); fundo.addColorStop(0, "#0B1220"); fundo.addColorStop(1, dq.cor); g.fillStyle = fundo; g.fillRect(0, 0, W, H);
+  const luz = g.createRadialGradient(W * 0.85, -60, 10, W * 0.85, -60, 560); luz.addColorStop(0, "rgba(255,214,90,.35)"); luz.addColorStop(1, "rgba(255,214,90,0)"); g.fillStyle = luz; g.fillRect(0, 0, W, H);
+  g.textBaseline = "middle"; g.textAlign = "left";
+  const tag = "★ DESTAQUE DA SEMANA"; g.font = "900 34px Inter, Arial, sans-serif"; const lt = g.measureText(tag).width + 48;
+  const ouro = g.createLinearGradient(60, 0, 60 + lt, 0); ouro.addColorStop(0, "#F59E0B"); ouro.addColorStop(1, "#FACC15");
+  g.fillStyle = ouro; g.beginPath(); g.roundRect(60, 56, lt, 62, 31); g.fill(); g.fillStyle = "#3B2A00"; g.fillText(tag, 84, 88);
+  let x = 60;
+  if (logo) { g.fillStyle = "#FFFFFF"; g.beginPath(); g.roundRect(60, 150, 170, 170, 26); g.fill(); const k = Math.min(146 / logo.naturalWidth, 146 / logo.naturalHeight); g.drawImage(logo, 145 - (logo.naturalWidth * k) / 2, 235 - (logo.naturalHeight * k) / 2, logo.naturalWidth * k, logo.naturalHeight * k); x = 262; }
+  g.fillStyle = "#FFFFFF"; caber(g, dq.empresa, W - x - 60, 88, 40); g.fillText(dq.empresa, x, 210, W - x - 60);
+  g.font = "600 38px Inter, Arial, sans-serif"; g.fillStyle = "rgba(255,255,255,.88)"; g.fillText(`${dq.nicho} · ${dq.visitas} visitante${dq.visitas === 1 ? "" : "s"} na semana`, x, 286, W - x - 60);
+  g.font = "500 31px Inter, Arial, sans-serif"; g.fillStyle = "rgba(255,255,255,.72)"; g.fillText(`Lote ${dq.numero} · toque no balão dourado para visitar`, 60, 384, W - 120);
+  if (proximo) { g.font = "600 30px Inter, Arial, sans-serif"; g.fillStyle = "#FFD24A"; g.fillText(`Próximo evento: ${proximo.titulo} · ${diaSemana(new Date(proximo.inicio))} ${hhmm(new Date(proximo.inicio))}`, 60, 436, W - 120); }
+}
+function rodapeFeira(g: CanvasRenderingContext2D, W: number, H: number, dados: DadosPraca | null) {
   // rodapé: feira de sábado
   g.fillStyle = "rgba(0,0,0,.35)"; g.fillRect(0, H - 92, W, 92);
   g.fillStyle = "#FFD24A"; g.font = "800 34px Inter, Arial, sans-serif";
   const pagas = dados?.feira.barracas.filter((b) => b.status === "paga").length ?? 0;
   g.fillText(feiraAberta() ? `FEIRA DE SÁBADO ABERTA · ${pagas} barraca${pagas === 1 ? "" : "s"} · até as 18h` : `Feira de sábado ${dados ? dataCurta(dados.feira.dia) : ""} · 8h às 18h · barraca R$ 9,90`, 60, H - 46, W - 120);
-  tex.needsUpdate = true;
 }
 
 // ---------- placa de cada barraca ----------
@@ -147,10 +175,15 @@ function Barraca({ b, position, rot }: { b: BarracaFeira; position: [number, num
 export function Praca() {
   const l = LOTE_POR_CHAVE[PRACA_CHAVE];
   const dados = useMundo((s) => s.praca);
+  const destaqueSemana = useDestaque();
   const carregar = useMundo((s) => s.carregarPraca);
   // a agenda chega pela API e é conferida a cada minuto (o telão e o aviso de "vai começar" usam a mesma)
   useEffect(() => { void carregar(); const t = setInterval(() => void carregar(), 60_000); return () => clearInterval(t); }, [carregar]);
-  useEffect(() => { desenharTelao(dados); estado.vivo = !!eventosDoMomento(dados?.agenda ?? []).vivo; const t = setInterval(() => desenharTelao(dados), 30_000); return () => clearInterval(t); }, [dados]);
+  useEffect(() => {
+    const redesenhar = () => desenharTelao(dados, destaqueSemana, redesenhar);
+    redesenhar(); estado.vivo = !!eventosDoMomento(dados?.agenda ?? []).vivo;
+    const t = setInterval(redesenhar, 30_000); return () => clearInterval(t);
+  }, [dados, destaqueSemana]);
   useEffect(() => { const t = texturaTelao(); if (t) { MAT_TELA.map = t; MAT_TELA.needsUpdate = true; } }, []);
   useFrame(acender);
   const piso = useMemo(() => texturaPiso(), []);

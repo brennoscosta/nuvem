@@ -126,10 +126,12 @@ export async function salvarAgenda(u: Usuario, dados: unknown) {
 export async function agendaPublica(numero: number, u: Usuario | null, servicoId?: string | null) {
   await migrar();
   const loja = await lojaAberta(numero);
-  if (!loja) return { ligada: false as const };
-  const c = await configDe(loja.donoId);
-  if (!agendaUsavel(c)) return { ligada: false as const };
+  if (!loja) return { ligada: false as const, paraAvaliar: [] };
   const ehDono = !!u && u.id === loja.donoId;
+  // atendimentos concluídos que o cliente ainda não avaliou (aparecem mesmo se a loja desligar a agenda depois)
+  const paraAvaliar = u && !ehDono ? await pendentesDeAvaliacao(loja.donoId, u.id) : [];
+  const c = await configDe(loja.donoId);
+  if (!agendaUsavel(c)) return { ligada: false as const, paraAvaliar };
   const meus = u && !ehDono ? (await sql<LinhaAg[]>`SELECT * FROM agendamento WHERE dono_id = ${loja.donoId} AND cliente_id = ${u.id} AND status = 'marcado' AND fim > now() ORDER BY inicio`).map(paraTela) : [];
   const s = servicoId ? c.servicos.find((x) => x.id === servicoId) ?? null : null;
   let dias: { dia: string; rotulo: string; horarios: string[] }[] | undefined;
@@ -139,7 +141,7 @@ export async function agendaPublica(numero: number, u: Usuario | null, servicoId
   }
   return {
     ligada: true as const, numero: loja.numero, empresa: loja.empresa, servicos: c.servicos.map(servicoPublico), antecedenciaMin: c.antecedenciaMin,
-    eu: u ? { nome: u.nome, ehDono } : null, meus, servico: s?.id ?? null, dias,
+    eu: u ? { nome: u.nome, ehDono } : null, meus, servico: s?.id ?? null, dias, paraAvaliar,
   };
 }
 
@@ -215,9 +217,36 @@ export async function mudarStatus(u: Usuario, agId: string, acao: unknown) {
     if (a.status === "cancelado") throw new ErroAgenda("Esse horário foi cancelado.");
     if (new Date(a.inicio).getTime() > Date.now()) throw new ErroAgenda("Esse horário ainda não chegou.");
     await sql`UPDATE agendamento SET status = ${acao}, atualizado_em = now() WHERE id = ${agId}`;
+    // atendimento concluído (13/11/2026): o cliente recebe o pedido de avaliação no sino
+    if (acao === "concluido" && a.clienteId) void avisar(a.clienteId, { tipo: "agendamento", ref: `agenda:avaliar:${agId}`, titulo: `Como foi o seu atendimento na ${a.empresa}?`, texto: `${a.servico} · ${q}. Toque para dar uma nota de 1 a 5.`, link: numero ? `/loja/${numero}?avaliar=${agId}#agenda` : "/mundo" });
     return { ok: true, status: acao };
   }
   throw new ErroAgenda("Ação inválida.");
+}
+
+// ---------- avaliação do atendimento (13/11/2026) ----------
+// Uma por agendamento concluído, só do próprio cliente, até 45 dias depois. Vai para a tabela avaliacao (a mesma das
+// negociações), então já entra na nota da loja (média em lojaPublica e na busca).
+async function pendentesDeAvaliacao(donoId: string, clienteId: string) {
+  const rows = await sql<{ id: string; servico: string; inicio: Date; fim: Date }[]>`SELECT a.id, a.servico, a.inicio, a.fim FROM agendamento a
+    WHERE a.dono_id = ${donoId} AND a.cliente_id = ${clienteId} AND a.status = 'concluido' AND a.fim > now() - interval '45 days'
+      AND NOT EXISTS (SELECT 1 FROM avaliacao v WHERE v.agendamento_id = a.id) ORDER BY a.inicio DESC LIMIT 3`;
+  return rows.map((r) => ({ id: r.id, servico: r.servico, quando: quando(new Date(r.inicio), new Date(r.fim)) }));
+}
+export async function avaliarAtendimento(u: Usuario, agId: string, d: { nota?: unknown; texto?: unknown }) {
+  await migrar();
+  const nota = Math.trunc(Number(d.nota));
+  if (!(nota >= 1 && nota <= 5)) throw new ErroAgenda("Escolha uma nota de 1 a 5.");
+  const texto = limpa(d.texto, 300);
+  const [a] = await sql<LinhaAg[]>`SELECT * FROM agendamento WHERE id = ${agId}`;
+  if (!a || a.clienteId !== u.id) throw new ErroAgenda("Esse atendimento não é seu.", 404);
+  if (a.status !== "concluido") throw new ErroAgenda("Só dá para avaliar depois que a loja marca o atendimento como concluído.");
+  if (new Date(a.fim).getTime() < Date.now() - 45 * 86400_000) throw new ErroAgenda("O prazo para avaliar este atendimento já passou.");
+  const r = await sql`INSERT INTO avaliacao (id, negociacao_id, agendamento_id, de_id, para_id, nota, texto, servico)
+    VALUES (${id("av")}, NULL, ${agId}, ${u.id}, ${a.donoId}, ${nota}, ${texto}, ${a.servico}) ON CONFLICT (agendamento_id) WHERE agendamento_id IS NOT NULL DO NOTHING`;
+  if (!r.count) throw new ErroAgenda("Você já avaliou este atendimento. Obrigado!", 409);
+  void avisar(a.donoId, { tipo: "agendamento", ref: `agenda:avaliado:${agId}`, titulo: `Nova avaliação: ${"★".repeat(nota)}${"☆".repeat(5 - nota)}`, texto: `${a.nome} · ${a.servico}${texto ? ` · “${texto.slice(0, 90)}”` : ""}`, link: "/app/agenda" });
+  return { ok: true };
 }
 
 // ---------- lembretes no sino (chamado por src/server/avisos.ts ao abrir o sino) ----------

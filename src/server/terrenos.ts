@@ -2,6 +2,7 @@
 // os chãos pagos e as ações do admin. Regras: a reserva vale 1 hora sem pagamento; pagar (R$ 99 por lote
 // por mês) deixa o chão ativo por 30 dias, com 5 dias de tolerância depois do vencimento; um chão por conta
 // (o admin não tem essa trava); usuário banido não reserva.
+import { avisarSeguidores } from "./seguir";
 import { sql, migrar } from "./db";
 import { QUARTEIROES, nichoValido } from "@/office/data/mundo";
 import type { Usuario } from "./usuarios";
@@ -302,6 +303,7 @@ export async function salvarPromocao(u: Usuario, chave: string, d: { texto?: unk
   const ate = dur.horas ? new Date(Date.now() + dur.horas * 3600_000) : new Date(`${diaBR}T23:59:00-03:00`);
   const p: Promocao = { texto, ate: ate.toISOString(), desde: new Date().toISOString() };
   await sql`UPDATE terreno SET promocao = ${sql.json(p as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${alvo.chave}`;
+  void avisarSeguidores(alvo.usuarioId, "promocao", { texto }); // quem segue a loja (no máximo 1 aviso a cada 6 h)
   void registrar("escritorio", `Promoção na fachada: ${texto}`, { usuarioId: u.id, terrenoChave: alvo.chave, dados: { detalhes: `Até ${ate.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.` } });
   return p;
 }

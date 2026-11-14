@@ -42,6 +42,18 @@ export const MODELO = {
 export type NomeModelo = keyof typeof MODELO;
 
 export function precarregarModelos() { for (const u of Object.values(MODELO)) useGLTF.preload(u); }
+// v67: a cidade pede todos os modelos dela de uma vez, logo que o 3D carrega (antes cada parte só pedia o seu depois de
+// a anterior chegar, em fila). Os prédios dos clientes (escritorio-*) só baixam se algum lote usa: precarregarModelo.
+let cidadePedida = false;
+export function precarregarCidade() {
+  if (cidadePedida) return; cidadePedida = true;
+  for (const [nome, u] of Object.entries(MODELO)) if (!nome.startsWith("escritorio")) useGLTF.preload(u);
+}
+const pedidos = new Set<string>();
+export function precarregarModelo(nome: string) {
+  const u = (MODELO as Record<string, string>)[nome]; if (!u || pedidos.has(u)) return;
+  pedidos.add(u); useGLTF.preload(u);
+}
 
 // Uma instância de um modelo. altura = altura real em metros. cor = tinge o material (ex.: carro de outra cor).
 export function Modelo({ nome, position, rotation = 0, altura = 1, cor, escalaXZ = 1, sombra = true }: { nome: NomeModelo; position: [number, number, number]; rotation?: number; altura?: number; cor?: string; escalaXZ?: number; sombra?: boolean }) {

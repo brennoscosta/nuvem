@@ -147,8 +147,9 @@ export async function avaliarNegociacao(u: Usuario, negId: string, d: { nota?: u
 export async function avaliacoesRecebidas(usuarioId: string, limite = 20) {
   await migrar();
   return sql<{ id: string; nota: number; texto: string; criadoEm: Date; deNome: string; titulo: string }[]>`
-    SELECT a.id, a.nota, a.texto, a.criado_em, COALESCE(p.nome, us.nome) AS de_nome, n.titulo
-    FROM avaliacao a JOIN negociacao n ON n.id = a.negociacao_id LEFT JOIN personagem p ON p.usuario_id = a.de_id LEFT JOIN usuario us ON us.id = a.de_id
+    -- avaliações de negociação e, desde 13/11/2026, de horário da agenda (sem negociação: o título é o serviço)
+    SELECT a.id, a.nota, a.texto, a.criado_em, COALESCE(p.nome, us.nome) AS de_nome, COALESCE(n.titulo, a.servico, 'Atendimento') AS titulo
+    FROM avaliacao a LEFT JOIN negociacao n ON n.id = a.negociacao_id LEFT JOIN personagem p ON p.usuario_id = a.de_id LEFT JOIN usuario us ON us.id = a.de_id
     WHERE a.para_id = ${usuarioId} ORDER BY a.criado_em DESC LIMIT ${limite}`;
 }
 // média e quantidade de avaliações de vários usuários de uma vez (busca, fichas)

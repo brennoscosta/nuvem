@@ -17,6 +17,7 @@ import { VideoExplica } from "./_inicio/VideoExplica";
 import { CenaLote, CenaFachada, CenaEquipe } from "./_inicio/CenasPassos";
 import { Revelar, Contador, Rolagem } from "./_inicio/efeitos";
 import { vagasFundador, FUNDADOR } from "@/server/ofertas";
+import { lojaDestaque } from "@/server/destaque";
 import "./inicio.css";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +94,8 @@ export default async function Inicio() {
   const livres = await lotesLivres();
   // oferta de entrada (12/11/2026): as 10 primeiras empresas pagam R$ 49,90 no 1º mês
   const restamFundador = temBanco() ? await vagasFundador().catch(() => 0) : 0;
+  // loja destaque da semana (13/11/2026): a mais visitada na semana passada
+  const destaque = temBanco() ? await lojaDestaque().catch(() => null) : null;
   const lote = livres.length ? LOTES.find((l) => l.chave === livres[0]) ?? null : null;
   const crachas = ESPECIALISTAS_IA.map((e) => ({ id: e.id, nome: e.nome, cargo: e.cargo, cor: AREAS[e.area].cor, skill: e.skills[0]?.nome ?? "" }));
   const filas = [crachas.filter((_, i) => i % 2 === 0), crachas.filter((_, i) => i % 2 === 1)];
@@ -187,6 +190,19 @@ export default async function Inicio() {
         </section>
 
         {/* 5 ---------- preço, perguntas e o convite final ---------- */}
+        {destaque && (
+          <section className="faixa mt-2 mb-10" aria-label="Loja destaque da semana">
+            <a href={`/loja/${destaque.numero}`} className="group flex flex-wrap items-center gap-5 overflow-hidden rounded-[22px] p-6 text-white shadow-xl sm:flex-nowrap sm:p-7" style={{ background: `linear-gradient(120deg, #111827, ${destaque.cor})` }}>
+              <span className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white p-1.5 shadow-lg">{destaque.logo ? <img src={destaque.logo} alt={`Logo da ${destaque.empresa}`} className="h-full w-full object-contain" /> : <span className="text-2xl font-black" style={{ color: destaque.cor }}>{destaque.empresa.slice(0, 2).toUpperCase()}</span>}</span>
+              <span className="min-w-0 flex-1">
+                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#FACC15] px-3 py-1 text-[12px] font-black uppercase tracking-wide text-[#3B2A00]">⭐ Loja destaque da semana</span>
+                <span className="mt-2 block truncate text-[1.7rem] font-black leading-tight sm:text-[2rem]" style={{ color: "#FFFFFF" }}>{destaque.empresa}</span>
+                <span className="block text-[15px]" style={{ color: "rgba(255,255,255,.82)" }}>{destaque.nicho} · {destaque.visitas} visitante{destaque.visitas === 1 ? "" : "s"} na semana passada</span>
+              </span>
+              <span className="shrink-0 rounded-full bg-white px-5 py-2.5 text-[15px] font-bold text-[#111827] transition-transform group-hover:translate-x-1">Visitar a loja →</span>
+            </a>
+          </section>
+        )}
         <section id="preco" className="ws">
           <Revelar className="faixa ws-cab"><h2>Preço simples, <em>sem letra miúda.</em></h2><p>Criar a conta é grátis. Você só paga pelo que usar.</p></Revelar>
           <div className="faixa">

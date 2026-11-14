@@ -16,6 +16,7 @@ import { CameraMundo } from "./CameraMundo";
 import { CicloDia } from "./CicloDia";
 import { Acabamento } from "./Acabamento";
 import { MiniMapaRender } from "./MiniMapaRender";
+import { precarregarCidade } from "./Modelos";
 import { Agente, handlers } from "./Agente";
 import { qualidade, qualidadeManual, lembrarLeveAuto, escolherQualidade, escolherMapa } from "./qualidade";
 import { useEscritorio } from "../store";
@@ -57,6 +58,9 @@ const CAM_INICIAL = CAM ? { pos: [CAM[0], CAM[1], CAM[2]] as [number, number, nu
 // até onde o centro da tela pode ir ao arrastar (não deixa a câmera escapar do mundo e ver a borda dos painéis)
 // 12/11/2026: ao norte vai até o Parque da Cidade (LIMITE_CAMERA em data/mundo.ts); no escritório da Nuvem, o de sempre
 const LIMITE = typeof window !== "undefined" && modoMundo() ? LIMITE_CAMERA : { xMin: -(MUNDO.x - 22), xMax: MUNDO.x - 22, zMin: -(MUNDO.z - 22), zMax: MUNDO.z - 22 };
+
+// v67: assim que o 3D carrega, a cidade pede todos os modelos dela juntos (antes saíam em fila, um após o outro)
+if (typeof window !== "undefined" && modoMundo()) precarregarCidade();
 
 const DESLOCA = new THREE.Vector3();
 // Quando o usuário seleciona um agente, a câmera desliza até a mesa dele; trocar de vista reenquadra
@@ -286,12 +290,12 @@ export function Cena3D() {
       <Luzes sombras={!leveInicial} luz={luz} hemi={hemi} preench={preench} />
       {modoMundo() && <CicloDia luzes={{ hemi, sol: luz, preench }} />}
       {modoMundo() && !leveInicial && <Acabamento hemi={hemi} preench={preench} />}
-      <Suspense fallback={null}>
-        <Mundo />
-        <Predio />
-        <Fachada />
-        {ordem.map((id) => agentes[id] && <Agente key={id} def={agentes[id]} />)}
-      </Suspense>
+      {/* v67: cada parte com o próprio limite de carregamento. O letreiro em texto 3D da Nuvem (<Text> do drei) suspende até
+          gerar as letras; no mesmo limite, ele segurava a cidade inteira (o mundo só aparecia ~30 s depois num celular) */}
+      <Suspense fallback={null}><Mundo /></Suspense>
+      <Suspense fallback={null}><Predio /></Suspense>
+      <Suspense fallback={null}><Fachada /></Suspense>
+      <Suspense fallback={null}>{ordem.map((id) => agentes[id] && <Agente key={id} def={agentes[id]} />)}</Suspense>
       <Despachante />
       {MEDIR && <Medidor />}
       <MapControls ref={controles} target={cam.alvo} minDistance={4} maxDistance={RETRATO ? 138 : 119} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />

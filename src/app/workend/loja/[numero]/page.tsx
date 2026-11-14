@@ -17,6 +17,8 @@ import { registrarVisitaDia } from "@/server/resultados";
 import { obterTerreno } from "@/server/terrenos";
 import { LinkRastreado, type TipoClique } from "@/office/ui/LinkRastreado";
 import { AgendarLoja } from "@/office/ui/AgendarLoja";
+import { BotaoSeguir } from "@/office/ui/BotaoSeguir";
+import { PegarCupom } from "@/office/ui/PegarCupom";
 import { VitrineLoja } from "@/office/ui/VitrineLoja";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +61,7 @@ export default async function Loja({ params }: Props) {
           </div>
           {promo && <p className="relative mt-5 inline-flex flex-wrap items-center gap-2 rounded-full bg-[#E11D48] px-4 py-1.5 text-[15px] font-bold shadow-lg">🏷️ {promo.texto}<span className="font-semibold text-white/80">· até {new Date(promo.ate).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></p>}
           <div className="relative mt-6 flex flex-wrap gap-2">
+            <BotaoSeguir numero={l.numero} claro />
             <Link href={`/mundo?lote=${encodeURIComponent(l.chave)}`} className="btn" style={{ background: "#fff", color: "var(--ink)" }}>Ver no mapa 3D</Link>
             {vagas.length > 0 && <a href="#vagas" className="btn border-white/40 bg-white/10" style={{ color: "#fff" }}><span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-[#FFD24A]" aria-hidden="true" />Estamos contratando · {vagas.length} {vagas.length === 1 ? "vaga" : "vagas"}</a>}
             {ehDono && <Link href="/app/equipe" className="btn border-white/40 bg-white/10" style={{ color: "#fff" }}>Esta é a sua loja · Minha equipe</Link>}
@@ -110,6 +113,7 @@ export default async function Loja({ params }: Props) {
             </section>
           </div>
           <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+            <PegarCupom numero={l.numero} />
             <AgendarLoja numero={l.numero} cor={l.cor} />
             <ConversaDaLoja loja={l} logado={!!u} />
             <ContatosBloco c={l.contatos} numero={l.numero} />

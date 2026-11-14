@@ -6,6 +6,7 @@
 //  - norte, depois do parque: a cidade continua em várias fileiras de prédios que somem na névoa (aqui);
 //  - céu: nuvens em duas camadas que acompanham dia, noite, chuva e neblina (Nuvens.tsx).
 // A névoa do CicloDia apaga a distância, então não existe "parede" nem borda à vista.
+import { cronometrar } from "./medirGeracao";
 import * as THREE from "three";
 import { useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -100,7 +101,7 @@ function faixaNorte(poucos: boolean): Arvoreta[] {
 }
 function CidadeNorte() {
   const poucos = leve();
-  const malhas = useMemo(() => [...criarCidade(poucos), ...criarArvoretas(faixaNorte(poucos))], [poucos]);
+  const malhas = useMemo(() => cronometrar("horizonte", () => [...criarCidade(poucos), ...criarArvoretas(faixaNorte(poucos))]), [poucos]);
   // janelas acendem à noite
   useFrame(() => { if (MAT_PREDIO) MAT_PREDIO.emissiveIntensity = (Math.max(0, ceu.noite - 0.2) / 0.8) * 0.95; });
   return <group>{malhas.map((im, k) => <primitive key={k} object={im} />)}</group>;

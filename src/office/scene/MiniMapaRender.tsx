@@ -7,6 +7,7 @@
 // Por que no próprio canvas e não num "render target": desenhar num render target muda a saída de cor (sem tom e linear)
 // e o three.js compilaria uma segunda versão de cada material. Aqui os materiais são os mesmos do quadro normal.
 // Nada fica mexido: viewport, recorte, fundo, neblina e o que foi escondido voltam ao que eram.
+import { etapaAtual } from "./etapas";
 import * as THREE from "three";
 import { useEffect, useMemo, useRef } from "react";
 import { useProgress } from "@react-three/drei";
@@ -70,6 +71,9 @@ export function MiniMapaRender() {
     if (t - x.inicio < 3) return; // nos primeiros segundos ainda não tem cidade para desenhar
     // o 1º desenho espera os modelos chegarem (desenhar no meio do carregamento só atrasa a cidade), no máximo 20 s
     if (!x.desenhou && x.carregando && t - x.inicio < 20) return;
+    // v67: nada antes da cidade inteira chegar (etapa 2) nem com o painel fechado (no celular ele começa fechado):
+    // o preparo compila os materiais da cena toda e, sem placa de vídeo boa, atrasava o 1º quadro da cidade
+    if (etapaAtual() < 2 || !miniMapa.visivel()) { x.prox = Math.max(x.prox, t + 1); return; }
     // antes do 1º desenho, prepara (em paralelo, sem travar a tela) os materiais das partes que a câmera ainda não viu
     if (x.preparo === 0) { x.preparo = 1; gl.compileAsync(scene, cam).catch(() => {}).finally(() => { x.preparo = 2; }); return; }
     if (x.preparo === 1) return;

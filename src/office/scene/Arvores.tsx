@@ -11,6 +11,7 @@
 // Uma malha instanciada por espécie e parte (madeira, folhas, flores no chão): poucos draw calls para a cidade toda.
 // Regras da integração de 12/11: geometria e material FIXOS (cache do módulo); as matrizes são preenchidas por ref de
 // callback (sobrevive a uma recriação da malha) e o boundingSphere é recalculado; nada de recompilar material depois.
+import { cronometrar } from "./medirGeracao";
 import * as THREE from "three";
 import { useCallback, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -375,6 +376,9 @@ function moverUV(g: THREE.BufferGeometry, v0: number, v1: number) {
 }
 export function kitDaEspecie(esp: Especie): Kit {
   const ja = KITS.get(esp); if (ja) return ja;
+  return cronometrar("árvore " + esp, () => gerarKit(esp));
+}
+function gerarKit(esp: Especie): Kit {
   const simples = leve(), semente = ESPECIES.indexOf(esp) * 1013 + 7;
   const palm = esp === "palmeiraImperial" || esp === "coqueiro";
   const forma = palm ? palmeira(esp === "coqueiro", semente, simples) : esp === "arbusto" || esp === "topiaria" || esp === "azaleia" ? moita(esp, semente, simples) : folhosa(esp, semente, simples);
