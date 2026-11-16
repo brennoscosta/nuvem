@@ -31,6 +31,25 @@ const LUGARES: { nome: string; x: number; y: number; z: number; estilo: "marco" 
   { nome: "Rio", x: -74, y: 0, z: -96, estilo: "agua" },
   { nome: "Praia", x: -30, y: 0, z: 95, estilo: "areia" },
 ];
+// Mover e ampliar (16/11/2026, pedido do dono: "expandir o mapa, movimentar o minimapa para qualquer lugar da tela"):
+// no computador o painel é arrastado pelo cabeçalho, muda de tamanho pela alça do canto e tem o botão Expandir.
+// Posição e largura ficam neste navegador; duplo clique no cabeçalho volta ao canto de sempre.
+const CHAVE_LUGAR = "workend-minimapa";
+const LARG_PADRAO = 288, LARG_MIN = 240, TOPO = 72; // TOPO: abaixo da barra de cima (o cabeçalho do mapa nunca fica escondido)
+type LugarPainel = { x: number | null; y: number | null; w: number };
+const PADRAO: LugarPainel = { x: null, y: null, w: LARG_PADRAO };
+function lerLugar(): LugarPainel {
+  try { const j = JSON.parse(window.localStorage.getItem(CHAVE_LUGAR) ?? "null"); if (j && typeof j.w === "number") return { x: typeof j.x === "number" ? j.x : null, y: typeof j.y === "number" ? j.y : null, w: j.w }; } catch { /* nada guardado */ }
+  return PADRAO;
+}
+const guardarLugar = (l: LugarPainel) => { try { window.localStorage.setItem(CHAVE_LUGAR, JSON.stringify(l)); } catch { /* sem armazenamento */ } };
+// cabe na área do mapa: largura entre o mínimo e o que cabe (a altura acompanha a largura), sem sair da tela e sem
+// passar por baixo da barra de cima
+function limitar(l: LugarPainel, W: number, H: number, alt: number): LugarPainel {
+  const w = Math.round(Math.max(LARG_MIN, Math.min(l.w, W - 24, 1100, (H - TOPO - 8 - 175) * PROPORCAO)));
+  if (l.x == null || l.y == null) return { x: null, y: null, w };
+  return { w, x: Math.round(Math.max(8, Math.min(l.x, W - w - 8))), y: Math.round(Math.max(TOPO, Math.min(l.y, H - Math.min(alt, H - TOPO - 8) - 8))) };
+}
 const ESTILO_LUGAR = { marco: "bg-[#1D4ED8] text-white", agua: "bg-transparent text-[#BFE3FF] italic", verde: "bg-[#14532D]/85 text-[#D9F99D]", areia: "bg-transparent text-[#FDE7B0] italic" } as const;
 
 // polígono (na caixa do desenho) de um retângulo do chão: os quatro cantos projetados
@@ -79,6 +98,10 @@ export function MiniMapa() {
   const [abertoCel, setAbertoCel] = useState(false);
   const [minimizado, setMin] = useState(false);
   const [dica, setDica] = useState<{ u: number; v: number; texto: string } | null>(null);
+  const [lugar, setLugar] = useState<LugarPainel>(() => (typeof window === "undefined" ? PADRAO : lerLugar()));
+  const painel = useRef<HTMLDivElement>(null);
+  const ultimoToque = useRef(0); // duplo clique no cabeçalho (o arrastar segura o clique; contamos à mão)
+  const arrasto = useRef<null | { tipo: "mover" | "tamanho"; id: number; x0: number; y0: number; l0: LugarPainel }>(null);
   const cam = useRef<SVGGElement>(null), eu = useRef<SVGCircleElement>(null);
   const visivel = mundo && (largo ? !minimizado : abertoCel);
   // a cena só desenha a imagem com o painel à vista; abrir o painel ou a cidade mudar pede um desenho novo
@@ -101,11 +124,56 @@ export function MiniMapa() {
   }, []);
   const nichosPresentes = useMemo(() => { const s = new Set(Object.values(terrenos).filter((t) => t.status === "ativo" && !t.anexoDe).map((t) => t.nicho ?? "negocios")); return NICHOS.filter((n) => s.has(n.id)); }, [terrenos]);
   // resolução da imagem: o mapa desenha em 2× o tamanho do painel (nítido em tela retina); no modo leve, menor
-  const largura = useMemo(() => (mundo && leve() ? 384 : 544), [mundo]);
+  // ampliado, a imagem é desenhada maior para continuar nítida (no modo leve, menos)
+  const largura = useMemo(() => {
+    const fraco = mundo && leve(), base = fraco ? 384 : 544;
+    if (!largo) return base;
+    return Math.min(fraco ? 640 : 1152, Math.max(base, Math.round((lugar.w * (fraco ? 1.2 : 1.8)) / 32) * 32));
+  }, [mundo, largo, lugar.w]);
+  useEffect(() => { miniMapa.pedir(); }, [largura]);
+  // a janela mudou de tamanho: o painel volta para dentro da tela
+  useEffect(() => {
+    const ajustar = () => { const p = painel.current, b = p?.offsetParent as HTMLElement | null; if (!p || !b) return; setLugar((l) => limitar(l, b.clientWidth, b.clientHeight, p.offsetHeight)); };
+    window.addEventListener("resize", ajustar); return () => window.removeEventListener("resize", ajustar);
+  }, []);
   if (!mundo) return null;
   const altura = Math.round(largura / PROPORCAO);
   const vivo = !!eventosDoMomento(praca?.agenda ?? []).vivo;
   const fechar = () => { if (largo) setMin(true); else setAbertoCel(false); };
+  // arrastar pelo cabeçalho (mover) ou pela alça do canto (tamanho): mexe direto no painel e guarda ao soltar
+  const comecar = (tipo: "mover" | "tamanho", e: React.PointerEvent<HTMLElement>) => {
+    if (!largo || e.button !== 0) return;
+    if (tipo === "mover" && (e.target as HTMLElement).closest("button")) return;
+    if (tipo === "mover") { if (e.timeStamp - ultimoToque.current < 330) { ultimoToque.current = 0; voltarAoCanto(); return; } ultimoToque.current = e.timeStamp; }
+    const p = painel.current, b = p?.offsetParent as HTMLElement | null; if (!p || !b) return;
+    const r = p.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    arrasto.current = { tipo, id: e.pointerId, x0: e.clientX, y0: e.clientY, l0: { x: r.left - rb.left, y: r.top - rb.top, w: r.width } };
+    e.currentTarget.setPointerCapture(e.pointerId); p.dataset.arrastando = ""; e.preventDefault();
+  };
+  const comecarMover = (e: React.PointerEvent<HTMLElement>) => comecar("mover", e);
+  const comecarTamanho = (e: React.PointerEvent<HTMLElement>) => comecar("tamanho", e);
+  const arrastar = (e: React.PointerEvent<HTMLElement>) => {
+    const a = arrasto.current, p = painel.current, b = p?.offsetParent as HTMLElement | null; if (!a || !p || !b || a.id !== e.pointerId) return;
+    const dx = e.clientX - a.x0, dy = e.clientY - a.y0;
+    const c = limitar(a.tipo === "mover" ? { ...a.l0, x: (a.l0.x ?? 0) + dx, y: (a.l0.y ?? 0) + dy } : { ...a.l0, w: a.l0.w + dx }, b.clientWidth, b.clientHeight, p.offsetHeight);
+    p.style.left = `${c.x}px`; p.style.top = `${c.y}px`; p.style.width = `${c.w}px`;
+  };
+  const soltar = (e: React.PointerEvent<HTMLElement>) => {
+    const a = arrasto.current, p = painel.current, b = p?.offsetParent as HTMLElement | null; if (!a || !p || !b || a.id !== e.pointerId) return;
+    arrasto.current = null; delete p.dataset.arrastando;
+    const r = p.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    const novo = limitar({ x: r.left - rb.left, y: r.top - rb.top, w: r.width }, b.clientWidth, b.clientHeight, p.offsetHeight);
+    setLugar(novo); guardarLugar(novo);
+  };
+  const grande = lugar.w >= 480;
+  const alternarTamanho = () => {
+    const p = painel.current, b = p?.offsetParent as HTMLElement | null; if (!p || !b) return;
+    const w = grande ? LARG_PADRAO : Math.min(680, b.clientWidth * 0.6);
+    const novo = limitar({ ...lugar, w }, b.clientWidth, b.clientHeight, w / PROPORCAO + 170);
+    setLugar(novo); guardarLugar(novo);
+  };
+  const voltarAoCanto = () => { setLugar(PADRAO); guardarLugar(PADRAO); };
+  const escala = Math.min(1.7, Math.max(1, (lugar.w / LARG_PADRAO) * 0.85));
   const ir = (chave: string) => { useMundo.getState().selecionarLote(chave); if (!largo) setAbertoCel(false); };
   const voar = (x: number, z: number) => {
     const cx = Math.max(LIMITE_CAMERA.xMin, Math.min(LIMITE_CAMERA.xMax, x)), cz = Math.max(LIMITE_CAMERA.zMin, Math.min(LIMITE_CAMERA.zMax, z));
@@ -138,10 +206,13 @@ export function MiniMapa() {
   return (
     <>
       <button data-tour="mapa" onClick={() => { setAbertoCel(true); setMin(false); }} className={`hud-ilha hud-btn pointer-events-auto absolute right-2 top-[4.4rem] z-10 !h-11 !rounded-2xl !px-3.5 sm:left-3 sm:right-auto sm:top-[5.2rem] ${abertoCel ? "hidden" : "flex"} ${minimizado ? "sm:flex" : "sm:hidden"}`}><Icone nome="mapa" tamanho={18} />Mapa da cidade</button>
-      <div data-tour="mapa" className={`pointer-events-auto fixed inset-x-2 top-[4.2rem] z-20 max-h-[calc(100dvh-5rem)] overflow-y-auto hud-ilha p-2.5 sm:absolute sm:inset-x-auto sm:left-3 sm:top-[5.2rem] sm:z-10 sm:w-[18rem] sm:max-h-none sm:overflow-visible ${abertoCel ? "block" : "hidden"} ${minimizado ? "sm:hidden" : "sm:block"}`}>
-        <div className="mb-2 flex items-center justify-between gap-1 pl-1">
-          <span className="flex items-center gap-2 text-[13px] font-semibold text-white/90"><Icone nome="mapa" tamanho={17} className="text-[#93C5FD]" />Mapa da cidade</span>
+      <div ref={painel} data-tour="mapa" style={largo ? { left: lugar.x ?? undefined, top: lugar.y ?? undefined, width: lugar.w, ["--mm-escala" as string]: escala } : undefined} className={`mm-painel pointer-events-auto fixed inset-x-2 top-[4.2rem] z-20 max-h-[calc(100dvh-5rem)] overflow-y-auto hud-ilha p-2.5 sm:absolute sm:inset-x-auto sm:left-3 sm:top-[5.2rem] sm:z-10 sm:w-[18rem] sm:max-h-none sm:overflow-visible ${abertoCel ? "block" : "hidden"} ${minimizado ? "sm:hidden" : "sm:block"}`}>
+        <div className={`mb-2 flex items-center justify-between gap-1 pl-1 ${largo ? "mm-cabeca" : ""}`} onPointerDown={comecarMover} onPointerMove={arrastar} onPointerUp={soltar} onPointerCancel={soltar} onDoubleClick={() => largo && voltarAoCanto()} title={largo ? "Arraste para levar o mapa a qualquer lugar. Duplo clique volta ao canto." : undefined}>
+          <span className="flex items-center gap-2 text-[13px] font-semibold text-white/90">{largo && <Icone nome="arrastar" tamanho={15} className="-mr-1 text-white/40" />}<Icone nome="mapa" tamanho={17} className="text-[#93C5FD]" />Mapa da cidade</span>
+          <span className="flex items-center gap-0.5">
+          {largo && <button onClick={alternarTamanho} aria-label={grande ? "Diminuir o mapa" : "Expandir o mapa"} title={grande ? "Diminuir" : "Expandir"} className="hud-btn hud-btn-icone !h-8 !w-8"><Icone nome={grande ? "recolher" : "expandir"} tamanho={16} /></button>}
           <button onClick={fechar} aria-label={largo ? "Recolher o mapa" : "Fechar o mapa"} title={largo ? "Recolher" : "Fechar"} className="hud-btn hud-btn-icone !h-8 !w-8"><Icone nome={largo ? "menos" : "fechar"} tamanho={16} /></button>
+          </span>
         </div>
         <div className="relative w-full cursor-pointer select-none overflow-hidden rounded-xl bg-[#1B222B] ring-1 ring-white/10" style={{ aspectRatio: String(PROPORCAO) }}
           role="img" aria-label="Mapa da cidade em 3D visto de cima, com o norte para cima" onClick={aoClicar} onMouseMove={aoMover} onMouseLeave={() => setDica(null)}>
@@ -161,26 +232,26 @@ export function MiniMapa() {
           </svg>
           {/* nomes dos bairros e dos lugares */}
           {BAIRROS.map((b) => { const [cx, cz] = centroQuarteirao(b.i, b.j); const p = projetar(cx, 1, cz); const fraco = !!nicho && nicho !== `bairro:${b.id}`; return (
-            <span key={b.id} className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-[#111418]/72 px-1.5 py-px text-[8.5px] font-bold leading-tight text-white shadow transition-opacity sm:text-[8px] ${fraco ? "opacity-30" : "opacity-95"}`} style={{ left: pct(p.u), top: pct(p.v) }}>
+            <span key={b.id} className={`mm-e pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-[#111418]/72 px-1.5 py-px text-[8.5px] font-bold leading-tight text-white shadow transition-opacity sm:text-[8px] ${fraco ? "opacity-30" : "opacity-95"}`} style={{ left: pct(p.u), top: pct(p.v) }}>
               <i className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ background: b.cor }} />{b.curto}
             </span>
           ); })}
           {LUGARES.map((l) => { const p = projetar(l.x, l.y, l.z); return (
-            <button key={l.nome} onClick={(e) => { e.stopPropagation(); if (l.alvo) voar(l.alvo[0], l.alvo[2]); }} className={`absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full px-1.5 py-px text-[9px] font-extrabold leading-tight shadow-sm ${ESTILO_LUGAR[l.estilo]} ${l.alvo ? "" : "pointer-events-none"}`} style={{ left: pct(p.u), top: pct(p.v) }}>{l.nome}</button>
+            <button key={l.nome} onClick={(e) => { e.stopPropagation(); if (l.alvo) voar(l.alvo[0], l.alvo[2]); }} className={`mm-e absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full px-1.5 py-px text-[9px] font-extrabold leading-tight shadow-sm ${ESTILO_LUGAR[l.estilo]} ${l.alvo ? "" : "pointer-events-none"}`} style={{ left: pct(p.u), top: pct(p.v) }}>{l.nome}</button>
           ); })}
           {/* praça de eventos */}
           {praca2 && (() => { const p = projetar(praca2.centro[0], 3, praca2.centro[1]); return (
-            <button onClick={(e) => { e.stopPropagation(); ir(PRACA_CHAVE); }} title={`Praça de Eventos${vivo ? " · ao vivo agora" : ""}`} className={`absolute grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[10px] shadow ring-2 ring-white ${vivo ? "animate-pulse bg-[#E11D48]" : "bg-[#0F766E]"} ${nicho && nicho !== "bairro:praca" ? "opacity-40" : ""} text-white`} style={{ left: pct(p.u), top: pct(p.v) }}><Icone nome="microfone" tamanho={11} traco={2.2} /></button>
+            <button onClick={(e) => { e.stopPropagation(); ir(PRACA_CHAVE); }} title={`Praça de Eventos${vivo ? " · ao vivo agora" : ""}`} className={`mm-e absolute grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[10px] shadow ring-2 ring-white ${vivo ? "animate-pulse bg-[#E11D48]" : "bg-[#0F766E]"} ${nicho && nicho !== "bairro:praca" ? "opacity-40" : ""} text-white`} style={{ left: pct(p.u), top: pct(p.v) }}><Icone nome="microfone" tamanho={11} traco={2.2} /></button>
           ); })()}
           {/* lojas abertas (alfinete com a logo) e obras */}
           {/* o alfinete fica perto do chão: com a inclinação, o alto do prédio já cai no quarteirão vizinho */}
           {lojas.map((x) => { const p = projetar(x.x, Math.min(x.h, 4), x.z); const eMeu = meu === x.t.chave; const selecionada = sel === x.t.chave; const cor = x.t.cor;
             if (!x.ativo) return (
-              <button key={x.t.chave} onClick={(e) => { e.stopPropagation(); ir(x.t.chave); }} title={`${x.t.empresaNome} · em obras`} className={`absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-sm bg-[#E0A91B] ring-2 ring-[#111418] ${x.apagado ? "opacity-25" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }} />
+              <button key={x.t.chave} onClick={(e) => { e.stopPropagation(); ir(x.t.chave); }} title={`${x.t.empresaNome} · em obras`} className={`mm-e absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-sm bg-[#E0A91B] ring-2 ring-[#111418] ${x.apagado ? "opacity-25" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }} />
             );
             return (
               <button key={x.t.chave} onClick={(e) => { e.stopPropagation(); ir(x.t.chave); }} title={`${x.t.empresaNome} · Lote ${x.numero} · ${nomeNicho(x.t.nicho ?? "negocios")}${x.promo ? ` · promoção: ${x.promo.texto}` : ""}${x.contratando ? " · contratando" : ""}`}
-                className={`absolute flex -translate-x-1/2 -translate-y-full flex-col items-center transition-opacity ${x.apagado ? "opacity-25" : ""} ${x.destaque ? "z-[2] scale-110" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }}>
+                className={`mm-e mm-pino absolute flex -translate-x-1/2 -translate-y-full flex-col items-center transition-opacity ${x.apagado ? "opacity-25" : ""} ${x.destaque ? "z-[2] scale-110" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }}>
                 <span className={`relative block rounded-full p-[2px] shadow-md ${selecionada ? "ring-2 ring-white" : eMeu ? "ring-2 ring-[#93C5FD]" : ""}`} style={{ background: cor }}>
                   <span className="grid h-[18px] w-[18px] place-items-center overflow-hidden rounded-full bg-white text-[7px] font-black" style={{ color: cor }}>
                     {x.t.temLogo ? <img src={`/api/terrenos/${encodeURIComponent(x.t.chave)}/logo`} alt="" className="h-full w-full object-contain" /> : x.t.empresaNome.trim().slice(0, 2).toUpperCase()}
@@ -211,6 +282,7 @@ export function MiniMapa() {
           {algumaPromo && <span><i className="bg-[#E11D48]" />promoção</span>}
         </div>
         <p className="mt-2 px-1 text-[11px] leading-snug text-white/45">Toque numa loja para abrir ou em qualquer ponto para ir até lá.</p>
+        {largo && <span className="mm-alca" role="separator" aria-label="Arraste para mudar o tamanho do mapa" title="Arraste para mudar o tamanho" onPointerDown={comecarTamanho} onPointerMove={arrastar} onPointerUp={soltar} onPointerCancel={soltar} />}
       </div>
     </>
   );
