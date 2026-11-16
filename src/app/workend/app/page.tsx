@@ -1,132 +1,440 @@
-// Painel do dono: o lote, a equipe de IA (Minha equipe, desde 11/11/2026), a rede e o catálogo de especialistas para contratar.
+// Painel do dono, "Meu escritório" (refeito em 16/11/2026: "melhore totalmente essa página"). Três situações:
+//  - loja aberta: o prédio da empresa, a semana em números, hoje na loja, o que falta para a loja ficar completa,
+//    as ferramentas com prévia de verdade, a equipe de IA, a indicação e o catálogo de especialistas por setor;
+//  - lote reservado: contagem da reserva e o preço do 1º mês já com a oferta;
+//  - sem lote: o convite com o preço de entrada, os 3 passos e o catálogo.
+// Os dados vêm de src/server/painel.ts; o movimento fica em ./_painel.tsx e ./painel.css.
 import Link from "next/link";
-import Image from "next/image";
 import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
-import { terrenoDoUsuario, ehAdmin } from "@/server/terrenos";
+import { terrenoDoUsuario, ehAdmin, PRECO_LOTE, type Terreno } from "@/server/terrenos";
+import { painelDoDono, painelReserva, ofertaDeEntrada, saudacaoBR, type Painel, type Numero } from "@/server/painel";
 import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
 import { CabecalhoApp } from "../_cabecalho";
-
+import { Contador, ContagemReserva, CopiarLink, Catalogo } from "./_painel";
 import { meta } from "../seo";
+import "./painel.css";
 
 export const metadata = meta({ titulo: "Meu escritório — WorkEnd", caminho: "/app", indexar: false });
 export const dynamic = "force-dynamic";
 
-const faltaMs = (d: Date | string) => new Date(d).getTime() - Date.now();
+const reais = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const plural = (n: number, um: string, varios: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? um : varios}`;
 
 export default async function App() {
   const u = await usuarioAtual().catch(() => null);
   if (!u) redirect("/entrar");
   const chao = await terrenoDoUsuario(u.id).catch(() => null);
-  const empresa = chao?.empresaNome || u.empresaNome || `Empresa de ${u.nome.split(" ")[0]}`;
+  const nome = u.nome.split(" ")[0];
+  const empresa = chao?.empresaNome || u.empresaNome || `Empresa de ${nome}`;
+  const { oi, data } = saudacaoBR();
+  const ativo = chao?.status === "ativo";
+  const [p, reserva, entrada] = await Promise.all([
+    ativo && chao ? painelDoDono(u, chao).catch((e) => { console.error("[painel]", (e as Error).message); return null; }) : null,
+    chao && !ativo ? painelReserva(u, chao) : null,
+    !chao ? ofertaDeEntrada(u) : null,
+  ]);
+  const linkLote = chao ? `/mundo?lote=${encodeURIComponent(chao.chave)}` : "/mundo";
+
   return (
-    <>
+    <div className="pn">
       <CabecalhoApp atual="app" email={u.email} admin={ehAdmin(u)} />
 
-      <section className="faixa pt-4">
-        <h1 className="text-[2rem] lg:text-[2.6rem]">Olá, {u.nome.split(" ")[0]}. Este é o painel da {empresa}.</h1>
-        <p className="mt-3 max-w-[60ch] text-[var(--tinta-2)]">Daqui você acompanha seu lote, sua equipe de IA e sua rede.</p>
+      <section className="faixa pn-oi">
+        <p className="pn-data">{data}</p>
+        <h1>{oi}, {nome}.</h1>
+        <p className="pn-sub">
+          {ativo ? <>A <b>{empresa}</b> está aberta no mapa. Veja como foi a semana e o que dá para fazer hoje.</>
+            : chao ? <>Falta pagar o 1º mês para a <b>{empresa}</b> abrir as portas no mapa.</>
+            : <>Falta só o endereço da sua empresa na cidade.</>}
+        </p>
       </section>
 
-      {/* seu escritório: estado vazio com direção */}
-      <section className="faixa mt-10 grid gap-8 lg:grid-cols-[1.1fr_1fr]">
-        <div className="rounded-2xl bg-[var(--cinza)] p-7">
-          <h2 className="text-[1.5rem]">Seu chão no mundo</h2>
-          {chao?.status === "ativo" && chao.pagoAte && faltaMs(chao.pagoAte) < 5 * 86400_000 && <p className="mt-2 rounded-xl bg-[#FFF4DB] px-3 py-2 text-sm text-[#7A5200]">{faltaMs(chao.pagoAte) > 0 ? "Seu lote vence em breve." : "Seu lote venceu e está na tolerância de 5 dias."} Renove pelo mapa para manter o endereço. Se ele sair do mapa, sua marca e sua equipe ficam guardadas na conta.</p>}
-          {chao ? (
-            <>
-              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">{chao.status === "ativo" ? <>Seu lote de 20 × 20 m está <b>ativo até {chao.pagoAte ? new Date(chao.pagoAte).toLocaleDateString("pt-BR") : "—"}</b>, com a placa <b>{chao.empresaNome}</b> no mapa. Renove pelo mapa quando quiser.</> : <>Você reservou um lote de 20 × 20 m com a placa <b>{chao.empresaNome}</b>. A reserva vale 1 hora: pague o 1º mês (R$ 99) no mapa pra garantir.</>}</p>
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <Link href={`/mundo?lote=${encodeURIComponent(chao.chave)}`} className="btn btn-azul">Ver meu chão no mapa</Link>
-                {chao.status === "ativo" && <Link href="/app/equipe" className="btn btn-tinta">Falar com a minha equipe</Link>}
-              </div>
-              {/* a loja no dia a dia (12/11/2026): resultados, agenda, vitrine */}
-              {chao.status === "ativo" && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href="/app/resultados" className="btn btn-claro !py-2 text-sm">📈 Resultados da loja</Link>
-                  <Link href="/app/agenda" className="btn btn-claro !py-2 text-sm">📅 Agenda</Link>
-                  <Link href="/app/vitrine" className="btn btn-claro !py-2 text-sm">🛍️ Vitrine</Link>
-                  <Link href="/app/equipe?aba=vagas" className="btn btn-claro !py-2 text-sm">📋 Vagas</Link>
-                  <Link href="/app/cupons" className="btn btn-claro !py-2 text-sm">🎟️ Cupons</Link>
-                  <Link href="/app/divulgar" className="btn btn-claro !py-2 text-sm">📣 Divulgar</Link>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <p className="mt-2 max-w-[50ch] text-[var(--tinta-2)]">O WorkEnd é um mundo com lotes à venda: R$ 99 por lote, por mês. Escolha o seu no mapa, coloque o nome e a logomarca na placa, reserve por 1 hora e pague pelo Mercado Pago (Pix, direto no mapa).</p>
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <Link href="/mundo" className="btn btn-azul">Escolher meu chão no mapa</Link>
-                <Link href="/encontrar" className="btn btn-linha">Encontrar profissionais</Link>
-              </div>
-            </>
-          )}
-        </div>
-        {chao?.status === "ativo" ? <CartaoEquipe equipe={chao.escritorio?.equipe ?? []} /> : <div className="vitrine">
-          <div className="janela">
-            <div className="barra" aria-hidden="true"><i /><i /><i /></div>
-            <a href={DEMO} target="_blank" rel="noreferrer" aria-label="Abrir um escritório de demonstração funcionando ao vivo"><Image src="/workend/poster.jpg" alt="" width={1280} height={720} /></a>
+      {ativo && chao && p ? <LojaAberta chao={chao} p={p} empresa={empresa} linkLote={linkLote} />
+        : chao && reserva ? <Reservado chao={chao} r={reserva} linkLote={linkLote} />
+        : <SemLote fundador={entrada?.fundador ?? null} />}
+
+      {/* catálogo: um setor por vez, com quem já está na equipe marcado */}
+      <section className="faixa pn-bloco">
+        <div className="pn-titulo">
+          <div>
+            <h2>Especialistas de IA para a sua equipe</h2>
+            <p>Cada setor tem um gerente, que recebe suas ordens e aprova o que sai, e quem executa. Você contrata no mapa, em Contratar agentes, e conversa com eles em Minha equipe.</p>
           </div>
-          <a href={DEMO} target="_blank" rel="noreferrer" className="btn btn-tinta absolute bottom-5 left-5 z-10">Ver um escritório funcionando ao vivo</a>
-        </div>}
-      </section>
-
-      {/* rede */}
-      <section className="faixa mt-10 rounded-2xl border border-[var(--linha)] p-7">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div><h2 className="text-[1.5rem]">Minha rede</h2><p className="mt-1 max-w-[60ch] text-[var(--tinta-2)]">O WorkEnd também é uma rede de network: com um personagem você anda pelo mundo, fala com a equipe das lojas, faz amigos, negocia e faz calls com quem está online.</p></div>
-          <Link href="/app/rede" className="btn btn-azul">Abrir minha rede</Link>
+          <span className="pn-nota">{ESPECIALISTAS.length} prontos · incluídos no lote</span>
         </div>
-      </section>
-
-      {/* catálogo */}
-      <section className="faixa mt-14">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-[1.6rem]">Especialistas para contratar</h2>
-          <span className="text-sm text-[var(--tinta-2)]">{ESPECIALISTAS.length} prontos · incluídos no lote</span>
-        </div>
-        <p className="mt-2 max-w-[60ch] text-[var(--tinta-2)]">Cada setor tem um gerente de IA, que recebe suas ordens e aprova o que sai, e uma equipe que executa. Contrate no mapa, em Contratar agentes: eles chegam com as habilidades prontas e você conversa com eles em Minha equipe.</p>
-        {SETORES.map((s) => (
-          <div key={s.id} className="mt-8">
-            <div className="mb-4 flex items-center gap-3">
-              <span className="placa" style={{ ["--cor" as string]: s.cor }}><b />{s.nome}</span>
-              <span className="text-[15px] text-[var(--tinta-2)]">{s.entrega}</span>
-            </div>
-            <ul className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3">
-              {ESPECIALISTAS.filter((e) => e.setor === s.id).map((e) => (
-                <li key={e.cargo} className="cracha" style={{ ["--cor" as string]: e.cor }}>
-                  <div className="foto"><img src={e.foto} alt={`Foto de ${e.nome}`} width={100} height={100} loading="lazy" decoding="async" /></div>
-                  <div>
-                    <div className="font-semibold">{e.nome} <span className="font-normal text-[var(--tinta-2)]">· {e.cargo}</span></div>
-                    <small>{e.faz}</small>
-                    <small className="mt-1 block opacity-80">{e.skills.join(" · ")}</small>
-                    <div className="mt-2"><Link href={chao?.status === "ativo" ? `/mundo?lote=${encodeURIComponent(chao.chave)}` : "/mundo"} className="inline-block rounded-full bg-[var(--azul)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--azul-escuro)]">{chao?.status === "ativo" ? "Contratar no mapa" : "Escolher lote para contratar"}</Link></div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        <Catalogo setores={SETORES.map(({ id, nome, cor, entrega }) => ({ id, nome, cor, entrega }))} especialistas={ESPECIALISTAS} contratados={p?.contratados ?? []}
+          link={linkLote} rotulo={ativo ? "Contratar no mapa" : chao ? "Pagar o lote para contratar" : "Escolher lote para contratar"} />
       </section>
 
       <div className="h-16" />
       <Rodape />
+    </div>
+  );
+}
+
+// ======================= loja aberta =======================
+function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; empresa: string; linkLote: string }) {
+  const dias = p.diasRestam ?? 0;
+  const vencendo = p.diasRestam !== null && dias <= 5;
+  const feitos = p.passos.filter((x) => x.feito).length;
+  return (
+    <>
+      {/* a loja: o prédio da empresa, endereço, prazo e atalhos */}
+      <section className="faixa">
+        <div className="pn-loja" style={{ ["--marca" as string]: chao.cor || "#0A6CFF" }}>
+          <div className="pn-loja-texto">
+            <div className="flex items-center gap-3">
+              {p.logo ? <img src={p.logo} alt="" className="pn-logo" /> : <span className="pn-logo pn-logo-letra" aria-hidden="true">{empresa.slice(0, 1)}</span>}
+              <span className="pn-aberta"><i aria-hidden="true" />{p.inaugurouHoje ? "Inauguração hoje" : "Aberta no mapa"}</span>
+            </div>
+            <h2>{empresa}</h2>
+            <p className="pn-endereco">{[p.numero ? `Loja nº ${p.numero}` : null, p.bairro?.nome, p.nicho].filter(Boolean).join(" · ")}</p>
+            {p.promo && <p className="pn-promo-linha"><b>Promoção na fachada:</b> {p.promo.texto} <span>({p.promo.quando})</span></p>}
+            <div className={`pn-prazo ${vencendo ? "pn-prazo-alerta" : ""}`}>
+              <div className="pn-prazo-txt">
+                <span>{p.diasRestam === null ? "Lote ativo" : dias > 0 ? `Pago até ${p.pagoAte}` : "Venceu: você está na tolerância de 5 dias"}</span>
+                {p.diasRestam !== null && dias > 0 && <b>{plural(dias, "dia", "dias")}</b>}
+              </div>
+              <div className="pn-prazo-trilho"><i style={{ width: `${Math.max(3, Math.min(100, (dias / 30) * 100))}%` }} /></div>
+              {vencendo && <p className="pn-prazo-aviso">Renove pelo mapa para manter o endereço. Se o lote sair do mapa, a marca e a equipe ficam guardadas na conta.</p>}
+            </div>
+            <div className="mt-6 flex flex-wrap gap-2.5">
+              <Link href={linkLote} className="btn btn-azul">{vencendo ? "Renovar no mapa" : "Ver minha loja no mapa"}</Link>
+              {p.numero && <Link href={`/loja/${p.numero}`} className="btn pn-btn-vidro">Página da loja</Link>}
+            </div>
+          </div>
+          <div className="pn-predio" aria-hidden="true">
+            <span className="pn-balao">{p.logo ? <img src={p.logo} alt="" /> : <i>{empresa.slice(0, 1)}</i>}<b>{empresa}</b></span>
+            <img src={`/workend/predios/${p.layout}.webp`} alt="" width={420} height={400} />
+          </div>
+        </div>
+      </section>
+
+      {/* a semana em números */}
+      {p.semana && (
+        <section className="faixa pn-bloco">
+          <div className="pn-titulo">
+            <div><h2>Sua loja nos últimos 7 dias</h2><p>Comparado com os 7 dias anteriores.{p.semana.topDia ? ` O dia mais movimentado foi ${p.semana.topDia}.` : ""}</p></div>
+            <Link href="/app/resultados" className="pn-link">Ver resultados completos</Link>
+          </div>
+          <div className="pn-numeros">
+            <CartaoNumero rotulo="Visitas na loja" n={p.semana.visitas} grande unidade={["visita", "visitas"]} />
+            <CartaoNumero rotulo="Conversas com a equipe" n={p.semana.conversas} unidade={["conversa", "conversas"]} />
+            <CartaoNumero rotulo="Cliques nos contatos" n={p.semana.cliques} unidade={["clique", "cliques"]} />
+            {p.semana.horarios ? <CartaoNumero rotulo="Horários marcados" n={p.semana.horarios} unidade={["horário", "horários"]} />
+              : <div className="pn-num pn-num-seg"><span className="pn-num-rot">Seguidores da loja</span><span className="pn-num-val"><Contador valor={p.seguidores.total} /></span><span className="pn-delta">{p.seguidores.novos ? `+${p.seguidores.novos} nos últimos 30 dias` : "Quem segue recebe suas promoções"}</span></div>}
+          </div>
+          {p.semana.horarios && <p className="pn-rodape-num">{p.seguidores.total ? <><b>{plural(p.seguidores.total, "pessoa segue", "pessoas seguem")}</b> a loja{p.seguidores.novos ? ` (+${p.seguidores.novos} nos últimos 30 dias)` : ""} e recebe as suas promoções.</> : <>Ninguém segue a loja ainda. Quem segue recebe as suas promoções e eventos no celular.</>}</p>}
+        </section>
+      )}
+
+      {/* hoje + o que falta */}
+      <section className="faixa pn-bloco pn-duas">
+        <div className="pn-cartao">
+          <h3>Hoje na loja</h3>
+          <ul className="pn-hoje">
+            {p.proximos.map((a) => (
+              <li key={a.id}>
+                <span className={`pn-hora ${a.hoje ? "pn-hora-hoje" : ""}`}><b>{a.hora}</b><small>{a.hoje ? "hoje" : a.dia}</small></span>
+                <span className="min-w-0"><b className="block truncate">{a.servico}</b><small>com {a.nome}</small></span>
+              </li>
+            ))}
+            {!p.proximos.length && (
+              <li className="pn-hoje-vazio"><span className="pn-hora"><b>—</b></span><span><b className="block">{p.semana?.agendaLigada ? "Nenhum horário marcado" : "Agenda desligada"}</b><small>{p.semana?.agendaLigada ? "Quando alguém marcar, aparece aqui." : "Se você atende com hora marcada, ligue em Agenda."}</small></span></li>
+            )}
+            <li>
+              <span className="pn-hoje-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" /></svg></span>
+              <span className="min-w-0"><b className="block">{p.visitantes24h ? plural(p.visitantes24h, "visitante falou", "visitantes falaram") + " com a atendente" : "Ninguém falou com a atendente hoje"}</b><small>{p.visitantes24h ? "Nas últimas 24 horas." : "Quem entra na loja pelo mapa é atendido por ela."}</small></span>
+              {p.visitantes24h > 0 && <Link href="/app/equipe?aba=visitantes" className="pn-link">Ler</Link>}
+            </li>
+            {(p.semana?.candidaturas ?? 0) > 0 && (
+              <li>
+                <span className="pn-hoje-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z M14 3v4h4" /></svg></span>
+                <span className="min-w-0"><b className="block">{plural(p.semana!.candidaturas, "candidatura nova", "candidaturas novas")}</b><small>Nas suas vagas, nesta semana.</small></span>
+                <Link href="/app/equipe?aba=vagas" className="pn-link">Ver</Link>
+              </li>
+            )}
+            {p.avisosNaoLidos > 0 && (
+              <li>
+                <span className="pn-hoje-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z M10 20h4" /></svg></span>
+                <span className="min-w-0"><b className="block">{plural(p.avisosNaoLidos, "aviso não lido", "avisos não lidos")}</b><small>Toque no sino, no alto da página.</small></span>
+              </li>
+            )}
+          </ul>
+          <Link href="/app/agenda" className="pn-link mt-4 inline-block">Abrir a agenda</Link>
+        </div>
+
+        <div className="pn-cartao">
+          <div className="flex items-center gap-4">
+            <Anel feitos={feitos} total={p.passos.length} />
+            <div>
+              <h3>{feitos === p.passos.length ? "Sua loja está completa" : "Deixe a loja completa"}</h3>
+              <p className="pn-mudo">{feitos === p.passos.length ? "Tudo montado. Agora é divulgar." : `${feitos} de ${p.passos.length} prontos. Lojas completas recebem mais conversas.`}</p>
+            </div>
+          </div>
+          <ul className="pn-passos">
+            {p.passos.map((x, i) => (
+              <li key={x.id} className={x.feito ? "pn-feito" : ""} style={{ ["--i" as string]: i }}>
+                <span className="pn-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3 8.5l3.2 3L13 4.5" /></svg></span>
+                <span className="min-w-0"><b className="block">{x.titulo}</b>{!x.feito && <small>{x.texto}</small>}</span>
+                {!x.feito && <Link href={x.link} className="pn-passo-btn">{x.acao}</Link>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* ferramentas da loja: cada uma mostra o que já tem */}
+      <section className="faixa pn-bloco">
+        <div className="pn-titulo"><div><h2>Ferramentas da loja</h2><p>Tudo o que aparece para o cliente no mapa e na página da loja.</p></div></div>
+        <div className="pn-ferr">
+          <Link href="/app/vitrine" className="pn-f pn-f-largo">
+            <div className="pn-f-topo"><b>Vitrine</b><span>{p.vitrine.ativos} de {p.vitrine.max} produtos</span></div>
+            <div className="pn-vitrine">
+              {p.vitrine.primeiros.map((x) => (
+                <figure key={x.id}>
+                  {x.foto ? <img src={x.foto} alt="" loading="lazy" decoding="async" /> : <span className="pn-vitrine-letra" style={{ background: chao.cor }}>{x.nome.slice(0, 1)}</span>}
+                  <figcaption><span className="truncate">{x.nome}</span>{x.preco !== null && <b>{reais(x.preco / 100)}</b>}</figcaption>
+                </figure>
+              ))}
+              {Array.from({ length: Math.max(0, (p.vitrine.primeiros.length ? 4 : 3) - p.vitrine.primeiros.length) }).map((_, i) => <figure key={`v${i}`} className="pn-vitrine-vazio"><span>+</span></figure>)}
+            </div>
+            <p className="pn-f-rodape">{p.vitrine.ativos ? "Pedido pelo WhatsApp com vários produtos de uma vez." : "Mostre até 12 produtos com foto e preço."}</p>
+          </Link>
+
+          <Link href="/app/agenda" className="pn-f">
+            <div className="pn-f-topo"><b>Agenda</b><span>{p.semana?.agendaLigada ? "ligada" : "desligada"}</span></div>
+            <div className={`pn-cal ${p.semana?.agendaLigada ? "" : "pn-cal-off"}`}>
+              <div className="pn-cal-folha"><small>{p.proximos[0] ? (p.proximos[0].hoje ? "hoje" : p.proximos[0].dia.split(" ")[0]) : p.hoje.semana}</small><b>{p.proximos[0]?.diaNum ?? p.hoje.num}</b></div>
+              <div className="min-w-0">{p.proximos[0] ? <><b className="block">{p.proximos[0].hora}</b><small className="block truncate">{p.proximos[0].servico}</small></> : <small>{p.semana?.agendaLigada ? "Sem horários marcados" : "Ligue para receber horários"}</small>}</div>
+            </div>
+            <p className="pn-f-rodape">O cliente marca pelo mapa ou pedindo à atendente.</p>
+          </Link>
+
+          <Link href="/app/cupons" className="pn-f">
+            <div className="pn-f-topo"><b>Cupons</b><span>{plural(p.cupons.ativos, "ativo", "ativos")}</span></div>
+            <div className={`pn-ticket ${p.cupons.primeiro ? "" : "pn-ticket-vazio"}`} style={{ ["--marca" as string]: chao.cor || "#0A6CFF" }}>
+              <b className="truncate">{p.cupons.primeiro ?? "Crie o primeiro cupom"}</b>
+              <small className="truncate">{p.cupons.primeiro ? `${plural(p.cupons.pegos, "pego", "pegos")} · ${plural(p.cupons.usados, "usado", "usados")}` : "ex.: 10% na primeira compra"}</small>
+            </div>
+            <p className="pn-f-rodape">Cada cliente pega um código só dele, e você confere no balcão.</p>
+          </Link>
+
+          <Link href={linkLote} className="pn-f pn-f-largo">
+            <div className="pn-f-topo"><b>Promoção na fachada</b><span>{p.promo ? p.promo.quando : "nenhuma agora"}</span></div>
+            <div className={`pn-faixa ${p.promo ? "" : "pn-faixa-vazia"}`} style={{ ["--marca" as string]: chao.cor || "#0A6CFF" }}>
+              {p.promo ? <div className="pn-faixa-rolo" aria-hidden="true">{Array.from({ length: 6 }).map((_, i) => <span key={i}>{p.promo!.texto}</span>)}</div> : <span>Ligue uma faixa de promoção na frente do prédio</span>}
+              {p.promo && <span className="sr-only">{p.promo.texto}</span>}
+            </div>
+            <p className="pn-f-rodape">{p.promo ? "Quem segue a loja recebe o aviso no celular." : "Liga no cartão do lote, no mapa. Quem segue a loja é avisado."}</p>
+          </Link>
+
+          <Link href="/app/divulgar" className="pn-f">
+            <div className="pn-f-topo"><b>Divulgar</b><span>Stories e adesivo</span></div>
+            <div className="pn-story" style={{ ["--marca" as string]: chao.cor || "#0A6CFF" }}>
+              <span className="pn-story-tela"><span className="pn-qr" /><i className="pn-scan" /></span>
+              <small>Imagem com QR Code e o seu link de indicação.</small>
+            </div>
+          </Link>
+
+          <Link href="/app/equipe?aba=vagas" className="pn-f">
+            <div className="pn-f-topo"><b>Vagas</b><span>{plural(p.semana?.vagasAbertas ?? 0, "aberta", "abertas")}</span></div>
+            <div className="pn-vagas">
+              <span className="pn-folhas" aria-hidden="true"><i /><i /><i /></span>
+              <small>{(p.semana?.candidaturas ?? 0) > 0 ? `${plural(p.semana!.candidaturas, "candidatura", "candidaturas")} nesta semana` : "Contrate gente de verdade pela cidade."}</small>
+            </div>
+          </Link>
+        </div>
+      </section>
+
+      {/* equipe de IA + indicação */}
+      <section className="faixa pn-bloco pn-duas pn-duas-larga">
+        <div className="pn-equipe">
+          <h3>Sua equipe está no escritório</h3>
+          <p>{plural(p.equipe.length, "pessoa", "pessoas")} trabalhando: CEO, atendente{p.especialistas ? ` e ${plural(p.especialistas, "especialista", "especialistas")}` : ""}. Peça tarefas, aprove o que entregam e leia o que os visitantes perguntaram.</p>
+          <ul className="pn-rostos">
+            {p.equipe.slice(0, 9).map((m, i) => (
+              <li key={m.id} style={{ ["--i" as string]: i }} title={`${m.nome} · ${m.cargo}`}>
+                {m.foto ? <img src={m.foto} alt={`${m.nome}, ${m.cargo}`} width={56} height={56} /> : <span style={{ background: m.camisa }}>{m.nome.slice(0, 1)}</span>}
+              </li>
+            ))}
+            {p.equipe.length > 9 && <li className="pn-rostos-mais"><span>+{p.equipe.length - 9}</span></li>}
+          </ul>
+          <div className="pn-ia">
+            <div className="flex justify-between text-sm"><span>IA usada neste mês</span><b>{reais(p.ia.gasto)} de {reais(p.ia.teto)}</b></div>
+            <div className="pn-ia-trilho"><i style={{ width: `${Math.max(2, Math.min(100, (p.ia.gasto / p.ia.teto) * 100))}%` }} /></div>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-2.5">
+            <Link href="/app/equipe" className="btn btn-azul">Falar com a equipe</Link>
+            <Link href={linkLote} className="btn pn-btn-vidro">Contratar no mapa</Link>
+          </div>
+        </div>
+
+        <div className="pn-cartao pn-indica">
+          <h3>Indique um vizinho</h3>
+          <p className="pn-mudo">Cada empresa que entrar pelo seu link e pagar o lote vale {reais(p.indicacao.porEmpresa)} de crédito nas suas mensalidades (até metade de cada uma). Ela ganha {p.indicacao.descontoIndicado}% no 1º mês.</p>
+          {p.indicacao.codigo && p.indicacao.link ? (
+            <>
+              <div className="pn-codigo"><span>Seu código</span><b>{p.indicacao.codigo}</b></div>
+              <p className="pn-link-ind">{p.indicacao.link}</p>
+              <CopiarLink texto={p.indicacao.link} />
+            </>
+          ) : <p className="pn-mudo">O seu código aparece aqui em instantes. Recarregue a página.</p>}
+          <dl className="pn-indica-num">
+            <div><dt>Crédito para usar</dt><dd><Contador valor={p.indicacao.credito} prefixo="R$ " casas={2} /></dd></div>
+            <div><dt>Indicações pagas</dt><dd>{p.indicacao.pagas}</dd></div>
+            <div><dt>Esperando pagar</dt><dd>{p.indicacao.esperando}</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <Rede />
     </>
   );
 }
 
-// a equipe do lote no painel: quem já está lá e o atalho para conversar
-function CartaoEquipe({ equipe }: { equipe: { id: string; nome: string; cargo: string; papel: string; camisa: string }[] }) {
-  const especialistas = equipe.filter((m) => m.papel === "profissional").length;
+function CartaoNumero({ rotulo, n, unidade, grande }: { rotulo: string; n: Numero; unidade: [string, string]; grande?: boolean }) {
+  const max = Math.max(1, ...n.serie.map((s) => s.n));
+  const dif = n.total - n.anterior;
+  const pct = n.anterior > 0 ? Math.round((dif / n.anterior) * 100) : null;
   return (
-    <div className="rounded-2xl bg-[var(--night)] p-7 text-white">
-      <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--blue-lit)]">Equipe de IA · trabalhando</span>
-      <h2 className="mt-1 text-[1.5rem]" style={{ color: "#fff" }}>Sua equipe está no escritório</h2>
-      <p className="mt-2 text-white/75">CEO, atendente{especialistas ? ` e ${especialistas} ${especialistas === 1 ? "especialista" : "especialistas"}` : ""}. Peça tarefas, aprove o que entregam e leia o que os visitantes perguntaram na loja.</p>
-      <ul className="mt-4 flex flex-wrap gap-2">
-        {equipe.slice(0, 8).map((m) => <li key={m.id} className="flex items-center gap-2 rounded-full bg-white/10 py-1 pl-1 pr-3 text-sm"><span className="grid h-7 w-7 place-items-center rounded-full text-xs font-bold" style={{ background: m.camisa }}>{m.nome.slice(0, 1)}</span>{m.nome}<span className="text-white/60">· {m.cargo.slice(0, 18)}</span></li>)}
-      </ul>
-      <Link href="/app/equipe" className="btn btn-azul mt-5">Abrir Minha equipe</Link>
+    <div className={`pn-num ${grande ? "pn-num-grande" : ""}`}>
+      <span className="pn-num-rot">{rotulo}</span>
+      <span className="pn-num-val"><Contador valor={n.total} /></span>
+      <span className={`pn-delta ${dif > 0 ? "pn-sobe" : dif < 0 ? "pn-desce" : ""}`}>
+        {dif === 0 ? (n.total ? "igual à semana anterior" : "nenhuma ainda") : <><svg viewBox="0 0 10 10" aria-hidden="true"><path d={dif > 0 ? "M5 2l4 5H1z" : "M5 8L1 3h8z"} /></svg>{dif > 0 ? "+" : "−"}{plural(Math.abs(dif), unidade[0], unidade[1])}{pct !== null ? ` (${pct > 0 ? "+" : ""}${pct}%)` : ""}</>}
+      </span>
+      <div className="pn-barras" role="img" aria-label={`${rotulo} por dia: ${n.serie.map((s) => `${s.rotulo}, ${s.n}`).join("; ")}`}>
+        {n.serie.map((s, i) => (
+          <i key={s.rotulo} title={`${s.rotulo}: ${plural(s.n, unidade[0], unidade[1])}`} className={i === n.serie.length - 1 ? "pn-barra-hoje" : s.n === 0 ? "pn-barra-zero" : ""}
+            style={{ height: `${s.n ? Math.max(10, (s.n / max) * 100) : 6}%`, ["--i" as string]: i }} />
+        ))}
+      </div>
+      <div className="pn-barras-dias" aria-hidden="true">{n.serie.map((s, i) => <span key={s.rotulo}>{i === n.serie.length - 1 ? "hoje" : s.rotulo.split(" ")[0]}</span>)}</div>
     </div>
+  );
+}
+
+function Anel({ feitos, total }: { feitos: number; total: number }) {
+  const r = 24, c = 2 * Math.PI * r, f = total ? feitos / total : 0;
+  return (
+    <span className="pn-anel" role="img" aria-label={`${feitos} de ${total} prontos`}>
+      <svg viewBox="0 0 60 60"><circle cx="30" cy="30" r={r} className="pn-anel-fundo" /><circle cx="30" cy="30" r={r} className="pn-anel-cheio" style={{ strokeDasharray: c, ["--fim" as string]: c * (1 - f), ["--c" as string]: c }} /></svg>
+      <b>{feitos}/{total}</b>
+    </span>
+  );
+}
+
+// ======================= lote reservado =======================
+function Reservado({ chao, r, linkLote }: { chao: Terreno; r: { valor: number | null; base: number; oferta: { nome: string; detalhe: string } | null; creditoUsado: number; restaMs: number | null }; linkLote: string }) {
+  return (
+    <>
+      <section className="faixa">
+        <div className="pn-loja pn-loja-reserva" style={{ ["--marca" as string]: chao.cor || "#0A6CFF" }}>
+          <div className="pn-loja-texto">
+            <span className="pn-aberta pn-aberta-espera"><i aria-hidden="true" />Lote reservado</span>
+            <h2>{chao.empresaNome}</h2>
+            {r.restaMs !== null && <p className="mt-3"><ContagemReserva restaMs={r.restaMs} /></p>}
+            <div className="pn-preco">
+              <span>1º mês</span>
+              {r.valor !== null && r.valor < r.base && <s>{reais(r.base)}</s>}
+              <b>{reais(r.valor ?? r.base)}</b>
+            </div>
+            {r.oferta && <p className="pn-oferta"><b>{r.oferta.nome}.</b> {r.oferta.detalhe}</p>}
+            {r.creditoUsado > 0 && <p className="pn-oferta">Inclui {reais(r.creditoUsado)} do seu crédito de indicação.</p>}
+            <div className="mt-6 flex flex-wrap gap-2.5">
+              <Link href={linkLote} className="btn btn-azul btn-grande">Pagar com Pix no mapa</Link>
+            </div>
+          </div>
+          <div className="pn-predio pn-predio-passo" aria-hidden="true"><img src="/workend/passos/fachada.webp" alt="" width={480} height={360} /></div>
+        </div>
+      </section>
+      <Passos atual={2} />
+      <Rede />
+    </>
+  );
+}
+
+// ======================= sem lote =======================
+function SemLote({ fundador }: { fundador: { valor: number; vagas: number; restam: number } | null }) {
+  return (
+    <>
+      <section className="faixa">
+        <div className="pn-chegar">
+          <div className="pn-chegar-texto">
+            <h2>Escolha o endereço da sua empresa</h2>
+            <p>Um lote de 20 × 20 m numa cidade 3D aberta 24 horas, com o seu prédio, a sua placa e uma equipe de IA atendendo quem passa.</p>
+            {fundador ? (
+              <div className="pn-preco pn-preco-claro">
+                <span>1º mês</span><s>{reais(PRECO_LOTE)}</s><b>{reais(fundador.valor)}</b>
+                <small>Preço de fundador para as {fundador.vagas} primeiras empresas: {fundador.restam === 1 ? "resta 1 vaga" : `restam ${fundador.restam} vagas`}. Depois, {reais(PRECO_LOTE)} por mês.</small>
+              </div>
+            ) : (
+              <div className="pn-preco pn-preco-claro"><span>Por mês</span><b>{reais(PRECO_LOTE)}</b><small>Pix direto no mapa. Sem fidelidade.</small></div>
+            )}
+            <div className="mt-6 flex flex-wrap gap-2.5">
+              <Link href="/mundo" className="btn btn-azul btn-grande">Escolher meu lote no mapa</Link>
+              <a href={DEMO} target="_blank" rel="noreferrer" className="btn btn-linha btn-grande">Ver um escritório ao vivo</a>
+            </div>
+          </div>
+          <div className="pn-chegar-img pn-rua" aria-hidden="true">
+            <span className="pn-nuvem" /><span className="pn-nuvem pn-nuvem-2" />
+            <span className="pn-chao" />
+            <img className="pn-r1" src="/workend/predios/torre.webp" alt="" />
+            <img className="pn-r2" src="/workend/predios/moderno.webp" alt="" />
+            <span className="pn-vazio"><b>Seu lote</b></span>
+            <img className="pn-r3" src="/workend/predios/loja.webp" alt="" />
+          </div>
+        </div>
+      </section>
+      <Passos atual={1} />
+      <Rede encontrar />
+    </>
+  );
+}
+
+const PASSOS = [
+  { img: "/workend/passos/lote.webp", titulo: "Escolha o lote", texto: "Ande pelo mapa, veja os bairros e reserve o lote por 1 hora." },
+  { img: "/workend/passos/fachada.webp", titulo: "Ponha a sua marca", texto: "Nome e logomarca na placa, tipo de prédio e cores. Pague com Pix." },
+  { img: "/workend/passos/equipe.webp", titulo: "A equipe começa a trabalhar", texto: "CEO e atendente de IA atendem quem entra. Contrate mais especialistas quando quiser." },
+];
+function Passos({ atual }: { atual: number }) {
+  return (
+    <section className="faixa pn-bloco">
+      <div className="pn-titulo"><div><h2>Como a sua loja abre</h2></div></div>
+      <ol className="pn-passos3">
+        {PASSOS.map((x, i) => (
+          <li key={x.titulo} className={i + 1 < atual ? "pn-p-feito" : i + 1 === atual ? "pn-p-agora" : ""} style={{ ["--i" as string]: i }}>
+            <div className="pn-p-img"><img src={x.img} alt="" loading="lazy" decoding="async" width={480} height={360} /></div>
+            <div className="pn-p-txt">
+              <span className="pn-p-n">{i + 1 < atual ? <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" /></svg> : i + 1}</span>
+              <div><b>{x.titulo}</b><p>{x.texto}</p></div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function Rede({ encontrar }: { encontrar?: boolean }) {
+  return (
+    <section className="faixa pn-bloco">
+      <div className="pn-rede">
+        <svg className="pn-rede-svg" viewBox="0 0 160 90" aria-hidden="true">
+          <path d="M22 60L62 24L104 46L140 18M62 24L78 74L104 46M22 60L78 74" />
+          {[[22, 60], [62, 24], [104, 46], [140, 18], [78, 74]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r={i === 2 ? 9 : 6} style={{ ["--i" as string]: i }} />)}
+        </svg>
+        <div className="pn-rede-txt">
+          <h3>Minha rede</h3>
+          <p>Com um personagem você anda pelo mundo, fala com a equipe das lojas, faz amigos, negocia e faz chamadas com quem está online.</p>
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          <Link href="/app/rede" className="btn btn-tinta">Abrir minha rede</Link>
+          {encontrar && <Link href="/encontrar" className="btn btn-linha">Encontrar profissionais</Link>}
+        </div>
+      </div>
+    </section>
   );
 }

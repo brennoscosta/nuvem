@@ -30,7 +30,7 @@ export async function vagasFundador(excetoUsuario: string | null = null) {
   return Math.max(0, FUNDADOR.vagas - n);
 }
 // nunca teve lote: sem pagamento de lote aprovado, sem lote ativo e sem lote guardado no arquivo
-async function primeiraVez(uid: string) {
+export async function primeiraVez(uid: string) {
   const [r] = await sql<{ ja: boolean }[]>`SELECT (EXISTS (SELECT 1 FROM pagamento WHERE usuario_id = ${uid} AND tipo = 'lote' AND status = 'aprovado')
     OR EXISTS (SELECT 1 FROM terreno WHERE usuario_id = ${uid} AND status = 'ativo') OR EXISTS (SELECT 1 FROM terreno_arquivo WHERE usuario_id = ${uid})) AS ja`;
   return !r?.ja;

@@ -72,6 +72,13 @@ async function whatsappDe(donoId: string, chave: string) {
 }
 
 // ---------- dono ----------
+// resumo para o painel Meu escritório (16/11/2026): quantos produtos estão à mostra e os primeiros, com foto
+export async function vitrineResumo(usuarioId: string, n = 4) {
+  await migrar();
+  const [c] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM produto WHERE usuario_id = ${usuarioId} AND ativo`;
+  const rows = await sql<Linha[]>`SELECT ${CAMPOS()} FROM produto WHERE usuario_id = ${usuarioId} AND ativo ORDER BY ordem, criado_em LIMIT ${n}`;
+  return { ativos: c?.n ?? 0, max: MAX_PRODUTOS, primeiros: rows.map(paraPublico) };
+}
 export async function vitrineDoDono(u: Usuario) {
   await migrar();
   const t = await terrenoDoUsuario(u.id);
