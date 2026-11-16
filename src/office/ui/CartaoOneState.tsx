@@ -6,6 +6,7 @@ import { FLUTUANTE, LARGO } from "./estilo";
 import { Icone, type NomeIcone } from "./Icone";
 import { AREAS_ONESTATE, SITE_ONESTATE, ANDARES_COM_AREAS, andarDaArea, SEDE, CHAVE_SEDE } from "../data/onestate";
 import { useSede } from "../sedeStore";
+import { useEscritorio } from "../store";
 
 export const useCartaoOneState = useSede;
 export function abrirOneState() {
@@ -28,6 +29,8 @@ export function CartaoOneState() {
   const loteAberto = useMundo((s) => !!s.loteSelecionado);
   const sede = useMundo((s) => s.terrenos[CHAVE_SEDE]);
   const souDono = useMundo((s) => s.meu === CHAVE_SEDE);
+  const dentro = useEscritorio((s) => s.vista === "dentro");
+  const alternarVista = () => { useEscritorio.getState().setVista(dentro ? "fora" : "dentro"); useMundo.setState({ alvoCamera: [SEDE.x, 0.5, SEDE.z + 3] }); };
   if (!aberto || loteAberto) return null;
   const andares = Array.from({ length: ANDARES_COM_AREAS }, (_, i) => i + 1);
   return (
@@ -36,6 +39,7 @@ export function CartaoOneState() {
         <button onClick={fechar} aria-label="Fechar" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full text-white/70 hover:bg-white/10"><Icone nome="fechar" tamanho={17} /></button>
         <img src="/onestate/logo.png" alt="OneState" className="h-11 w-auto" />
         <p className="mt-2 text-[13px] leading-snug text-white/75">A sede do OneState RP na cidade. Cada andar reúne áreas do site: toque para abrir.</p>
+        <button type="button" onClick={alternarVista} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold ring-1 ring-[#D4A63A]/50 hover:bg-white/15"><Icone nome={dentro ? "predios" : "escritorio"} tamanho={15} className="text-[#E9C46A]" />{dentro ? "Ver a sede por fora" : "Ver a sede por dentro"}</button>
         {sede?.escritorio && <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11.5px] font-semibold"><span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5"><Icone nome="equipe" tamanho={13} className="text-[#E9C46A]" />{sede.escritorio.equipe.length} agentes de IA</span><span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5"><Icone nome="camadas" tamanho={13} className="text-[#E9C46A]" />{sede.escritorio.setores.length} setores</span></div>}
         {souDono && <div className="mt-3 flex gap-2"><a href="/app/equipe" className="inline-flex items-center gap-1.5 rounded-lg bg-[#E9C46A] px-3 py-1.5 text-[12.5px] font-bold text-[#1A1306]"><Icone nome="conversar" tamanho={15} />Falar com a equipe</a><a href="/app" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold"><Icone nome="escritorio" tamanho={15} />Meu escritório</a></div>}
       </div>

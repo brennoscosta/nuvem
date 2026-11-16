@@ -14,6 +14,8 @@ import { ceu } from "./CicloDia";
 import { leve } from "./qualidade";
 import { SEDE, ALTURA_SEDE, OS_X, OS_Z, areasDoAndar, ANDARES_COM_AREAS, AREAS_ONESTATE, type AreaOneState } from "../data/onestate";
 import { abrirOneState } from "../ui/CartaoOneState";
+import { InteriorSede } from "./OneStateInterior";
+import { useEscritorio } from "../store";
 
 const OURO = "#D4A63A", GRAFITE = "#1E2228", PISO = "#4A4F57";
 const PROP_LOGO = 240 / 809; // altura / largura da logo do OneState (public/onestate/logo.png)
@@ -116,14 +118,22 @@ function Fachadas() {
 }
 
 // ---------- estrutura (juntada num objeto só pelo Estatico) ----------
-function Estrutura() {
+// parte "sempre": piso da praça e totem; parte "fora": a torre e a decoração (somem na vista por dentro)
+function Estrutura({ parte }: { parte: "sempre" | "fora" }) {
   const H = ALTURA_SEDE, mG = mat(GRAFITE, { rough: 0.55, metal: 0.4 }), mOuro = mat(OURO, { rough: 0.3, metal: 0.85, emissive: OURO, ei: 0.25 });
   const mPiso = mat(PISO, { rough: 0.92 }), mCaminho = mat("#6B7079", { rough: 0.8 }), mVerde = mat("#3E7D4A"), mTerra = mat("#5A4632");
   const lajes = Array.from({ length: SEDE.andares + 1 }, (_, f) => f * SEDE.andar).filter((y) => y > 0);
+  if (parte === "sempre") return (
+    <group>
+      <mesh geometry={caixa(40, 0.08, 40)} material={mPiso} position={[OS_X, 0.04, OS_Z]} receiveShadow />
+      {/* totem da praça (canto sudoeste) */}
+      <mesh geometry={caixa(2.2, 7.4, 0.6)} material={mG} position={[OS_X - 15.5, 3.7, OS_Z + 16.5]} castShadow />
+      {[-1.12, 1.12].map((dx) => <mesh key={dx} geometry={caixa(0.08, 7.4, 0.64)} material={mOuro} position={[OS_X - 15.5 + dx, 3.7, OS_Z + 16.5]} />)}
+    </group>
+  );
   return (
     <group>
-      {/* praça: piso escuro, caminho de entrada com frisos dourados, canteiros e bancos */}
-      <mesh geometry={caixa(40, 0.08, 40)} material={mPiso} position={[OS_X, 0.04, OS_Z]} receiveShadow />
+      {/* praça: caminho de entrada com frisos dourados, canteiros e bancos */}
       <mesh geometry={caixa(7, 0.09, 20 - (S - OS_Z) + 0.5)} material={mCaminho} position={[SEDE.x, 0.05, (S + OS_Z + 20) / 2]} receiveShadow />
       {[-3.6, 3.6].map((dx) => <mesh key={dx} geometry={caixa(0.22, 0.1, 20 - (S - OS_Z) + 0.5)} material={mOuro} position={[SEDE.x + dx, 0.06, (S + OS_Z + 20) / 2]} />)}
       {[[-12, 13], [12, 13], [-15.5, -2], [15.5, -2]].map(([dx, dz], i) => (
@@ -161,9 +171,6 @@ function Estrutura() {
       {[-3.5, 3.5].map((dx) => <mesh key={dx} geometry={caixa(0.6, 4.8, 0.6)} material={mOuro} position={[SEDE.x + dx, 2.4, S + 2.1]} castShadow />)}
       <mesh geometry={caixa(7.8, 0.6, 2.6)} material={mOuro} position={[SEDE.x, 4.8, S + 1.25]} castShadow />
       <mesh geometry={caixa(7.4, 2.5, 0.2)} material={mat("#07090C", { rough: 0.5 })} position={[SEDE.x, 6.35, S + 2.45]} castShadow />
-      {/* totem da praça (canto sudoeste) */}
-      <mesh geometry={caixa(2.2, 7.4, 0.6)} material={mG} position={[OS_X - 15.5, 3.7, OS_Z + 16.5]} castShadow />
-      {[-1.12, 1.12].map((dx) => <mesh key={dx} geometry={caixa(0.08, 7.4, 0.64)} material={mOuro} position={[OS_X - 15.5 + dx, 3.7, OS_Z + 16.5]} />)}
     </group>
   );
 }
@@ -177,12 +184,13 @@ function useLogos() {
   ];
   return { logo, icone, placa };
 }
-function Logos() {
+function Logos({ fora }: { fora: boolean }) {
   const { logo, icone, placa } = useLogos();
   const H = ALTURA_SEDE, wS = 15, hS = wS * PROP_LOGO, yS = H + 1.4 + hS / 2, wO = 11, hO = wO * PROP_LOGO;
   const mPoste = mat(GRAFITE, { rough: 0.5, metal: 0.4 });
   return (
     <group>
+      <group visible={fora}>
       {/* no alto: frente (sul) com verso para o norte, e o lado oeste */}
       <group position={[SEDE.x, 0, S - 0.9]}>
         <mesh position={[0, yS, 0]}>{placa(logo, wS, hS)}</mesh>
@@ -195,6 +203,7 @@ function Logos() {
       </group>
       {/* no pórtico da entrada */}
       <mesh position={[SEDE.x, 6.35, S + 2.56]}>{placa(logo, 7, 7 * PROP_LOGO)}</mesh>
+      </group>
       {/* no totem, dos dois lados */}
       <mesh position={[OS_X - 15.5, 5.6, OS_Z + 16.81]}>{placa(icone, 1.9, 1.9)}</mesh>
       <mesh position={[OS_X - 15.5, 5.6, OS_Z + 16.19]} rotation={[0, Math.PI, 0]}>{placa(icone, 1.9, 1.9)}</mesh>
@@ -207,11 +216,15 @@ function Logos() {
 const cursor = (v: string) => () => { document.body.style.cursor = v; };
 export function OneStateHQ() {
   useFrame(() => brilhoSede(ceu.noite));
+  // vista por dentro (o mesmo botão que abre as lojas): a torre some e aparece a planta com a equipe (OneStateInterior)
+  const fora = useEscritorio((s) => s.vista === "fora");
   return (
     <group onClick={(e) => { e.stopPropagation(); abrirOneState(); }} onPointerOver={cursor("pointer")} onPointerOut={cursor("")}>
-      <Estatico><Estrutura /></Estatico>
-      <Fachadas />
-      <ComFallback fallback={null}><Logos /></ComFallback>
+      <Estatico><Estrutura parte="sempre" /></Estatico>
+      <Estatico visivel={fora}><Estrutura parte="fora" /></Estatico>
+      <group visible={fora}><Fachadas /></group>
+      <ComFallback fallback={null}><Logos fora={fora} /></ComFallback>
+      {!fora && <InteriorSede />}
       <Balao position={[SEDE.x, ALTURA_SEDE + 10.5, SEDE.z]} nome="OneState" cor="#14110A" logo="/onestate/icone.png" subtitulo={`Roleplay · ${AREAS_ONESTATE.length} áreas`} onClick={abrirOneState} />
     </group>
   );
