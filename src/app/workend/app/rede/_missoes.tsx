@@ -3,6 +3,7 @@
 // selos conquistados, que aparecem no perfil do personagem para quem clicar nele no mapa.
 import { useEffect, useState } from "react";
 import { PRACA_CHAVE } from "@/office/data/praca";
+import { Icone, ICONE_MISSAO } from "@/office/ui/Icone";
 
 type Missao = { id: string; nome: string; desc: string; meta: number; selo: string; cor: string; feito: number; completa: boolean };
 // onde cumprir cada missão (negócio e avaliação acontecem nesta própria tela)
@@ -21,16 +22,15 @@ export function PainelMissoes() {
   if (!lista || !lista.length) return null;
   const ganhos = lista.filter((m) => m.completa);
   return (
-    <section className="mt-6 rounded-2xl border border-[var(--linha)] bg-[var(--surface)] p-5 sm:p-6">
+    <section className="rd-missoes">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--azul)]">Missões de visitante</div>
-          <h2 className="mt-1 text-[1.4rem] leading-tight">{ganhos.length ? `${ganhos.length} de ${lista.length} selos conquistados` : "Ganhe selos andando pela cidade"}</h2>
-          <p className="mt-1 max-w-[60ch] text-sm text-[var(--tinta-2)]">Visite lojas, converse, faça amigos e feche negócios. Cada missão cumprida vira um selo no perfil do seu personagem: quem clicar em você no mapa vê.</p>
+          <h2>{ganhos.length ? `${ganhos.length} de ${lista.length} selos conquistados` : "Ganhe selos andando pela cidade"}</h2>
+          <p>Missões de visitante: visite lojas, converse, faça amigos e feche negócios. Cada missão cumprida vira um selo no perfil do seu personagem: quem clicar em você no mapa vê.</p>
         </div>
         {ganhos.length > 0 && (
           <div className="flex -space-x-2" aria-label="Selos conquistados">
-            {ganhos.map((m) => <span key={m.id} title={m.nome} className="selo-ganho grid h-11 w-11 place-items-center rounded-full border-2 border-white text-xl shadow-md" style={{ background: m.cor }}>{m.selo}</span>)}
+            {ganhos.map((m) => <span key={m.id} title={m.nome} className="selo-ganho grid h-11 w-11 place-items-center rounded-full border-2 border-white text-white shadow-md" style={{ background: m.cor }}><Icone nome={ICONE_MISSAO[m.id] ?? "selo"} tamanho={20} /></span>)}
           </div>
         )}
       </div>
@@ -39,7 +39,7 @@ export function PainelMissoes() {
           const pct = Math.min(100, (m.feito / m.meta) * 100), onde = ONDE[m.id];
           return (
             <li key={m.id} className="flex items-center gap-3">
-              <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl transition ${m.completa ? "selo-ganho text-white shadow-lg" : "bg-[var(--cinza)] grayscale"}`} style={m.completa ? { background: m.cor } : { opacity: 0.55 + pct / 250 }}>{m.selo}</span>
+              <span className={`rd-selo ${m.completa ? "selo-ganho rd-selo-ganho" : ""}`} style={{ ["--cor" as string]: m.cor, ["--i" as string]: i }}><Icone nome={ICONE_MISSAO[m.id] ?? "selo"} tamanho={24} /></span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <b className="truncate">{m.nome}</b>
@@ -50,7 +50,7 @@ export function PainelMissoes() {
                 </div>
                 <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-2 text-[13px] text-[var(--tinta-2)]">
                   <span>{m.desc}</span>
-                  {!m.completa && onde && <a href={onde[0]} className="font-semibold text-[var(--azul)] hover:underline">{onde[1]} →</a>}
+                  {!m.completa && onde && <a href={onde[0]} className="rd-missao-link">{onde[1]}<Icone nome="seta" tamanho={14} /></a>}
                 </div>
               </div>
             </li>

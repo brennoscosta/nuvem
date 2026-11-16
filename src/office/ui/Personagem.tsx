@@ -11,6 +11,7 @@ import { PixAberto } from "./Lote";
 import { ACESSORIOS, ACESSORIO_POR_ID, type LugarAcessorio } from "../data/acessorios";
 import { MISSAO_POR_ID, type Missao } from "../data/missoes";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
+import { Icone } from "./Icone";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR");
@@ -195,10 +196,10 @@ export function FichaPersonagem() {
       {p.bio && <p className="mt-2 text-sm text-[#1D2128]">{p.bio}</p>}
       {!souEu && !negociando && (
         <div className="mt-3 grid grid-cols-2 gap-1.5 text-center text-[12px] font-semibold">
-          <button onClick={() => guardar(() => abrirChat(o))} className="rounded-xl bg-[#EEF3FF] px-2 py-2.5 text-[#1D4ED8]"><div className="text-base">💬</div>Conversar</button>
-          <button onClick={() => guardar(() => setNegociando(true))} className="rounded-xl bg-[#FFF4D6] px-2 py-2.5 text-[#7A5A00]"><div className="text-base">🤝</div>Negociar</button>
-          <button onClick={call} className={`rounded-xl px-2 py-2.5 ${p.online ? "bg-[#E3F6EA] text-[#166534]" : "bg-[#F1F3F6] text-[#9AA3AD]"}`}><div className="text-base">📹</div>Fazer uma call</button>
-          <button onClick={amizade} className={`rounded-xl px-2 py-2.5 ${rel === "amigos" ? "bg-[#F1F3F6] text-[#5B6472]" : "bg-[#FDE8F3] text-[#9D174D]"}`}><div className="text-base">{rel === "amigos" ? "✓" : rel === "pediram" ? "✋" : "➕"}</div>{rel === "amigos" ? "Amigos" : rel === "pedi" ? "Pedido enviado" : rel === "pediram" ? "Aceitar amizade" : "Amizade"}</button>
+          <button onClick={() => guardar(() => abrirChat(o))} className="rounded-xl bg-[#EEF3FF] px-2 py-2.5 text-[#1D4ED8]"><div className="grid place-items-center"><Icone nome="conversar" tamanho={20} /></div>Conversar</button>
+          <button onClick={() => guardar(() => setNegociando(true))} className="rounded-xl bg-[#FFF4D6] px-2 py-2.5 text-[#7A5A00]"><div className="grid place-items-center"><Icone nome="negociar" tamanho={20} /></div>Negociar</button>
+          <button onClick={call} className={`rounded-xl px-2 py-2.5 ${p.online ? "bg-[#E3F6EA] text-[#166534]" : "bg-[#F1F3F6] text-[#9AA3AD]"}`}><div className="grid place-items-center"><Icone nome="chamada" tamanho={20} /></div>Fazer uma chamada</button>
+          <button onClick={amizade} className={`rounded-xl px-2 py-2.5 ${rel === "amigos" ? "bg-[#F1F3F6] text-[#5B6472]" : "bg-[#FDE8F3] text-[#9D174D]"}`}><div className="grid place-items-center"><Icone nome={rel === "amigos" ? "check" : "amizade"} tamanho={20} /></div>{rel === "amigos" ? "Amigos" : rel === "pedi" ? "Pedido enviado" : rel === "pediram" ? "Aceitar amizade" : "Amizade"}</button>
         </div>
       )}
       {negociando && <FormNegociar para={p} aoFechar={() => setNegociando(false)} aoEnviar={(msg) => { setNegociando(false); setAviso(msg); }} />}
@@ -380,7 +381,7 @@ export function FormNegociar({ para, aoFechar, aoEnviar }: { para: { usuarioId: 
   const enviar = async () => { setEnviando(true); const e = await negociar(para.usuarioId, f); setEnviando(false); if (e) setErro(e); else aoEnviar(`Proposta enviada pra ${para.nome}. Acompanhe em Minha rede › Negociações.`); };
   return (
     <div className="mt-3 rounded-2xl border border-[#D97706]/30 bg-[#FFFBEB] p-3">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-[#7A5A00]">🤝 Proposta pra {para.nome}</div>
+      <div className="text-[10px] font-bold uppercase tracking-wide text-[#7A5A00]"><Icone nome="negociar" tamanho={13} className="mr-1 inline align-[-2px]" />Proposta pra {para.nome}</div>
       <input value={f.titulo} onChange={(e) => setF({ ...f, titulo: e.target.value.slice(0, 80) })} placeholder="O que você propõe? Ex.: Parceria de fornecimento" className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#D97706]" />
       <textarea value={f.texto} onChange={(e) => setF({ ...f, texto: e.target.value.slice(0, 1000) })} rows={3} placeholder="Detalhes: prazos, o que cada um faz, condições…" className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#D97706]" />
       <input value={f.valor} onChange={(e) => setF({ ...f, valor: e.target.value.replace(/[^\d.,]/g, "").slice(0, 12) })} placeholder="Valor em R$ (opcional)" inputMode="decimal" className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#D97706]" />
@@ -402,7 +403,7 @@ function Bolha({ m, minha, outroNome, status }: { m: Mensagem; minha: boolean; o
     return (
       <div className={`flex ${minha ? "justify-end" : "justify-start"}`}>
         <div className="max-w-[88%] rounded-2xl border-2 bg-white px-3 py-2 text-sm text-[#1D2128]" style={{ borderColor: cor }}>
-          <div className="text-[9px] font-black uppercase" style={{ color: cor }}>🤝 {rotulo}</div>
+          <div className="text-[9px] font-black uppercase" style={{ color: cor }}><Icone nome="negociar" tamanho={12} className="mr-1 inline align-[-2px]" />{rotulo}</div>
           <div className="font-bold">{d.titulo}</div>
           {d.texto && <div className="text-xs text-[#5B6472]">{d.texto}</div>}
           {d.valor != null && <div className="mt-0.5 text-xs font-bold">{brl(Number(d.valor))}</div>}
@@ -420,9 +421,9 @@ function Bolha({ m, minha, outroNome, status }: { m: Mensagem; minha: boolean; o
     let d: { titulo?: string; status?: string } = {}; try { d = JSON.parse(m.texto); } catch { d = {}; }
     const quem = minha ? "Você" : outroNome;
     const verbo = d.status === "aceita" ? "aceitou a proposta" : d.status === "recusada" ? "recusou a proposta" : d.status === "cancelada" ? "cancelou a proposta" : d.status === "entregue" ? "marcou como concluído o negócio" : d.status === "avaliada" ? "avaliou o negócio" : "confirmou a conclusão do negócio";
-    return <div className="py-0.5 text-center text-[11px] text-[#5B6472]">🤝 {quem} {verbo} “{d.titulo}”</div>;
+    return <div className="py-0.5 text-center text-[11px] text-[#5B6472]"><Icone nome="negociar" tamanho={13} className="mr-1 inline align-[-2px]" />{quem} {verbo} “{d.titulo}”</div>;
   }
-  if (m.tipo === "amizade_pedido" || m.tipo === "amizade_aceite" || m.tipo === "chamada") return <div className="py-0.5 text-center text-[11px] text-[#5B6472]">{m.tipo === "chamada" ? "📹" : "➕"} {minha ? "Você" : outroNome}: {m.texto}</div>;
+  if (m.tipo === "amizade_pedido" || m.tipo === "amizade_aceite" || m.tipo === "chamada") return <div className="py-0.5 text-center text-[11px] text-[#5B6472]"><Icone nome={m.tipo === "chamada" ? "chamada" : "amizade"} tamanho={13} className="mr-1 inline align-[-2px]" />{minha ? "Você" : outroNome}: {m.texto}</div>;
   return (
     <div className={`flex ${minha ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[80%] rounded-2xl px-3 py-1.5 text-sm ${minha ? "bg-[#1D4ED8] text-white" : "bg-[#F1F3F6] text-[#1D2128]"}`}>{m.texto}</div>
@@ -449,7 +450,7 @@ export function CorpoChat({ o, altura = "h-full" }: { o: Outro; altura?: string 
   return (
     <div className={`flex ${altura} min-h-0 flex-col`}>
       <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-3">
-        {mensagens.length === 0 && <div className="py-6 text-center text-xs text-[#5B6472]">Diga oi 👋</div>}
+        {mensagens.length === 0 && <div className="py-6 text-center text-xs text-[#5B6472]">Diga oi para começar a conversa</div>}
         {mensagens.map((m) => { let nid: string | undefined; if (m.tipo === "negocio") { try { nid = JSON.parse(m.texto).negociacaoId; } catch { /* ignora */ } } return <Bolha key={m.id} m={m} minha={m.deId === meu?.usuarioId} outroNome={o.nome} status={nid ? statusDe[nid] : undefined} />; })}
         {pediuAmizade && o.relacao?.status === "pediram" && o.relacao.id && <AceitarAmizadeInline pedidoId={o.relacao.id} nome={o.nome} />}
         <div ref={fim} />
@@ -457,7 +458,7 @@ export function CorpoChat({ o, altura = "h-full" }: { o: Outro; altura?: string 
       <div className="border-t border-black/5 p-2">
         {negociando ? <FormNegociar para={o} aoFechar={() => setNegociando(false)} aoEnviar={() => setNegociando(false)} /> : (
           <>
-            <div className="mb-1 flex gap-1 text-[11px]"><button onClick={() => setNegociando(true)} className="rounded-full bg-[#FFF4D6] px-2 py-0.5 font-semibold text-[#7A5A00]">🤝 Negociar</button><button onClick={async () => { const e = await ligar(o, true); if (e) setErro(e); }} className="rounded-full bg-[#E3F6EA] px-2 py-0.5 font-semibold text-[#166534]">📹 Call</button></div>
+            <div className="mb-1 flex gap-1 text-[11px]"><button onClick={() => setNegociando(true)} className="rounded-full bg-[#FFF4D6] px-2 py-0.5 font-semibold text-[#7A5A00] inline-flex items-center gap-1"><Icone nome="negociar" tamanho={13} />Negociar</button><button onClick={async () => { const e = await ligar(o, true); if (e) setErro(e); }} className="rounded-full bg-[#E3F6EA] px-2 py-0.5 font-semibold text-[#166534] inline-flex items-center gap-1"><Icone nome="chamada" tamanho={13} />Chamada</button></div>
             <div className="flex gap-1.5"><input value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void mandar(); }} placeholder="Escreva…" className="min-w-0 flex-1 rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-[#1D4ED8]" /><button onClick={mandar} className="rounded-xl bg-[#1D4ED8] px-3 py-2 text-sm font-bold text-white">Enviar</button></div>
           </>
         )}
@@ -506,7 +507,7 @@ export function CaixaPersonagem() {
         {conversas.map((c) => (
           <button key={c.outroId} onClick={() => abrirChat({ usuarioId: c.outroId, nome: c.nome, boneco: c.boneco, roupa: c.roupa, bio: "", x: 0, z: 0, rot: 0, online: c.online })} className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-[#F1F3F6]">
             <MiniAvatar boneco={c.boneco} roupa={c.roupa} tamanho={36} />
-            <div className="min-w-0 flex-1"><div className="flex items-center gap-1 text-sm font-bold">{c.nome}{c.online && <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" />}</div><div className="truncate text-xs text-[#5B6472]">{c.tipo === "negocio" ? "🤝 " : ""}{c.ultimo}</div></div>
+            <div className="min-w-0 flex-1"><div className="flex items-center gap-1 text-sm font-bold">{c.nome}{c.online && <span className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" />}</div><div className="truncate text-xs text-[#5B6472]">{c.tipo === "negocio" ? <Icone nome="negociar" tamanho={12} className="mr-1 inline align-[-1px]" /> : null}{c.ultimo}</div></div>
             {c.naoLidas > 0 && <span className="rounded-full bg-[#1D4ED8] px-1.5 py-0.5 text-[10px] font-bold text-white">{c.naoLidas}</span>}
           </button>
         ))}

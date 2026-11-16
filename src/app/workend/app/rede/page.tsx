@@ -6,6 +6,7 @@ import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { RedeDashboard } from "./_rede";
 import { meta } from "../../seo";
+import "./rede.css";
 
 export const metadata = meta({ titulo: "Minha rede — WorkEnd", caminho: "/app/rede", indexar: false });
 export const dynamic = "force-dynamic";

@@ -6,9 +6,11 @@ import { useEffect, useRef, useState } from "react";
 import { useMundo, modoMundo } from "../mundoStore";
 import { usePersonagem } from "../personagemStore";
 import { PRACA_CHAVE } from "../data/praca";
+import { Icone, type NomeIcone } from "./Icone";
 
 interface Aviso { id: string; tipo: string; titulo: string; texto: string; link: string; lidoEm: string | null; criadoEm: string }
-const ICONE: Record<string, string> = { candidatura: "📋", evento: "🎤", mensagem: "💬", loja: "🛎️", pagamento: "✅", indicacao: "🤝", agendamento: "📅", amizade: "👋", negociacao: "🤝", seguindo: "⭐", resumo: "📈", sistema: "ℹ️" };
+// ícones próprios por tipo (16/11/2026: nada de emoji), cada um com a sua cor
+const ICONE: Record<string, [NomeIcone, string]> = { candidatura: ["candidato", "#7C3AED"], evento: ["microfone", "#D9661F"], mensagem: ["conversar", "#0A6CFF"], loja: ["escritorio", "#0E8F7E"], pagamento: ["check", "#16A34A"], indicacao: ["amizade", "#DB2777"], agendamento: ["agenda", "#0A6CFF"], amizade: ["amizade", "#DB2777"], negociacao: ["negociar", "#B7791F"], seguindo: ["estrela", "#E8A317"], resumo: ["resultados", "#0A6CFF"], sistema: ["ajuda", "#5B6472"] };
 
 // ---------- avisos no celular (web push, 13/11/2026) ----------
 // O push chega sem conteúdo e o service worker (public/sw.js) busca o aviso mais recente. A permissão só é pedida no toque.
@@ -127,8 +129,8 @@ export function Sino({ tema = "escuro" }: { tema?: "escuro" | "claro" }) {
   return (
     <div ref={caixa} className="relative shrink-0" data-tour="avisos">
       <button onClick={() => { setAberto((a) => !a); if (!aberto) buscar.current(); }} aria-label={n ? `Avisos: ${n} não lidos` : "Avisos"} aria-expanded={aberto}
-        className={`relative grid h-8 w-8 place-items-center rounded-full text-[15px] ${escuro ? "bg-white/10 text-white hover:bg-white/20" : "bg-[var(--cinza)] hover:bg-[var(--linha)]"}`}>
-        <span aria-hidden className={n ? "sino-balanca" : ""}>🔔</span>
+        className={`relative grid place-items-center rounded-full transition-colors ${escuro ? "h-8 w-8 bg-white/10 text-white hover:bg-white/20" : "h-[38px] w-[38px] bg-white/70 text-[var(--tinta)] ring-1 ring-[var(--linha)] hover:bg-white"}`}>
+        <span aria-hidden className={`grid place-items-center ${n ? "sino-balanca" : ""}`}><Icone nome="sino" tamanho={escuro ? 17 : 19} /></span>
         {n > 0 && <span className={`absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[#E2575B] px-1 text-center text-[10px] font-bold leading-[18px] text-white ring-2 ${escuro ? "ring-[#111418]" : "ring-white"}`}>{n > 9 ? "9+" : n}</span>}
       </button>
       {aberto && (
@@ -142,7 +144,7 @@ export function Sino({ tema = "escuro" }: { tema?: "escuro" | "claro" }) {
             {dados.avisos.map((a) => (
               <li key={a.id}>
                 <button onClick={() => { if (!a.lidoEm) marcar([a.id]); setAberto(false); abrirLink(a.link); }} className={`flex w-full gap-3 px-4 py-2.5 text-left hover:bg-[#F1F3F6] ${a.lidoEm ? "" : "bg-[#EEF3FF]/60"}`}>
-                  <span className="mt-0.5 text-[18px] leading-none" aria-hidden>{ICONE[a.tipo] ?? "🔔"}</span>
+                  {(() => { const [ic, cor] = ICONE[a.tipo] ?? ["sino", "#5B6472"]; return <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ background: `${cor}1A`, color: cor }} aria-hidden><Icone nome={ic} tamanho={17} /></span>; })()}
                   <span className="min-w-0 flex-1">
                     <span className="flex items-start justify-between gap-2"><span className={`text-[13px] leading-snug ${a.lidoEm ? "font-semibold" : "font-bold"}`}>{a.titulo}</span>{!a.lidoEm && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#1D4ED8]" aria-label="não lido" />}</span>
                     {a.texto && <span className="mt-0.5 line-clamp-2 block text-[12px] text-[#5B6472]">{a.texto}</span>}

@@ -210,7 +210,7 @@ export function VitrinePainel() {
           </ul>
         </div>
 
-        <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start">
+        <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-[1.2rem]">Prévia</h2>
             <div className="flex rounded-full bg-[var(--cinza)] p-1 text-sm font-semibold" role="tablist" aria-label="Onde ver a prévia">

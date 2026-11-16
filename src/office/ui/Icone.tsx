@@ -1,0 +1,77 @@
+// Ícones próprios do WorkEnd (16/11/2026, pedido do dono: "não quero esses ícones de WhatsApp, quero ícones próprios").
+// Todos no mesmo desenho: grade de 24, traço de 1,8 com pontas redondas e um preenchimento leve na mesma cor (duotom).
+// Funcionam sem CSS (tudo em atributo), então servem no site, no mapa e nos avisos. A classe "ic" permite animar o traço.
+import type { ReactNode } from "react";
+
+const T = { fill: "currentColor", fillOpacity: 0.16 } as const; // o tom: preenchimento leve
+
+const ICONES = {
+  mapa: <><path {...T} d="M8.5 4.2l7 2.5V20l-7-2.5z" /><path d="M3 6.6l5.5-2.4 7 2.5L21 4.3v13.2l-5.5 2.5-7-2.5L3 19.9z" /><path d="M8.5 4.2v13.3M15.5 6.7V20" /></>,
+  escritorio: <><path {...T} d="M4.5 9L12 4.5 19.5 9z" /><path d="M4.5 21V9L12 4.5 19.5 9v12M2.5 21h19" /><path d="M10 21v-4.2h4V21M8.2 11.8h1.6M14.2 11.8h1.6M8.2 14.6h1.6M14.2 14.6h1.6" /></>,
+  resultados: <><rect {...T} x="15" y="5.5" width="4" height="14.5" rx="1.2" /><path d="M3.5 20.5h17" /><rect x="5" y="13" width="4" height="7" rx="1.2" /><rect x="10" y="9" width="4" height="11" rx="1.2" /><rect x="15" y="5.5" width="4" height="14.5" rx="1.2" /></>,
+  equipe: <><circle {...T} cx="9" cy="8.2" r="3.2" /><circle cx="9" cy="8.2" r="3.2" /><path d="M3.2 20c0-3.4 2.6-6 5.8-6s5.8 2.6 5.8 6" /><circle cx="17" cy="9" r="2.5" /><path d="M16 14.1c2.9.2 4.8 2.6 4.8 5.6" /></>,
+  encontrar: <><circle {...T} cx="10.8" cy="10.8" r="6.3" /><circle cx="10.8" cy="10.8" r="6.3" /><path d="M15.6 15.6l4.9 4.9" /><path d="M8 9.2a3.2 3.2 0 0 1 2.6-1.7" /></>,
+  rede: <><circle {...T} cx="12" cy="16.8" r="2.6" /><path d="M7.8 8.6l2.9 5.9M16.3 8.1l-2.9 6.3M8.6 6.6h6.7" /><circle cx="6.4" cy="6.8" r="2.4" /><circle cx="17.6" cy="6.3" r="2.4" /><circle cx="12" cy="16.8" r="2.6" /></>,
+  admin: <><path {...T} d="M12 3l7 3v5.4c0 4.4-3 8-7 9.6-4-1.6-7-5.2-7-9.6V6z" /><path d="M12 3l7 3v5.4c0 4.4-3 8-7 9.6-4-1.6-7-5.2-7-9.6V6z" /><path d="M9 12l2.1 2.1L15.2 10" /></>,
+  sair: <><path d="M13.5 4H6.6A1.6 1.6 0 0 0 5 5.6v12.8A1.6 1.6 0 0 0 6.6 20h6.9" /><path d="M10.5 12H21M17.4 8.4L21 12l-3.6 3.6" /></>,
+  menu: <><path d="M4 7h16M4 12h16M4 17h10" /></>,
+  fechar: <><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" /></>,
+  baixo: <><path d="M6.5 9.5L12 15l5.5-5.5" /></>,
+  seta: <><path d="M5 12h14M13.5 6.5L19 12l-5.5 5.5" /></>,
+  mais: <><path d="M12 5v14M5 12h14" /></>,
+  check: <><path d="M5 12.5l4.4 4.4L19 7.4" /></>,
+  conversar: <><path {...T} d="M4 5.6A1.6 1.6 0 0 1 5.6 4h8.8A1.6 1.6 0 0 1 16 5.6v5.8a1.6 1.6 0 0 1-1.6 1.6H9.2L5.6 16v-3H5.6A1.6 1.6 0 0 1 4 11.4z" /><path d="M4 5.6A1.6 1.6 0 0 1 5.6 4h8.8A1.6 1.6 0 0 1 16 5.6v5.8a1.6 1.6 0 0 1-1.6 1.6H9.2L5.6 16v-3H5.6A1.6 1.6 0 0 1 4 11.4z" /><path d="M19 9h.4A1.6 1.6 0 0 1 21 10.6v5.6a1.6 1.6 0 0 1-1.6 1.6H19V20l-3.2-2.2h-4.2a1.6 1.6 0 0 1-1.6-1.6v-.8" /><path d="M7.6 8.6h.01M10 8.6h.01M12.4 8.6h.01" strokeWidth="2.4" /></>,
+  negociar: <><path {...T} d="M6.2 3h7.6L18 7.2v12.6a1.2 1.2 0 0 1-1.2 1.2H6.2A1.2 1.2 0 0 1 5 19.8V4.2A1.2 1.2 0 0 1 6.2 3z" /><path d="M6.2 3h7.6L18 7.2v12.6a1.2 1.2 0 0 1-1.2 1.2H6.2A1.2 1.2 0 0 1 5 19.8V4.2A1.2 1.2 0 0 1 6.2 3z" /><path d="M13.6 3v4.4H18M8.4 14l2.2 2.2 4.2-4.4" /></>,
+  chamada: <><rect {...T} x="3" y="6.5" width="12.5" height="11" rx="2.6" /><rect x="3" y="6.5" width="12.5" height="11" rx="2.6" /><path d="M15.5 10.4l5.5-3.1v9.4l-5.5-3.1" /></>,
+  amizade: <><circle {...T} cx="9" cy="8" r="3.3" /><circle cx="9" cy="8" r="3.3" /><path d="M3 20c0-3.6 2.7-6.2 6-6.2s6 2.6 6 6.2M18.5 8v6M15.5 11h6" /></>,
+  explorador: <><circle cx="12" cy="12" r="8.6" /><path {...T} d="M15.2 8.8l-2 4.4-4.4 2 2-4.4z" /><path d="M15.2 8.8l-2 4.4-4.4 2 2-4.4z" /><path d="M12 3.4v1.8M12 18.8v1.8M3.4 12h1.8M18.8 12h1.8" /></>,
+  maleta: <><rect {...T} x="3" y="7.5" width="18" height="12.5" rx="2.2" /><rect x="3" y="7.5" width="18" height="12.5" rx="2.2" /><path d="M9 7.5V6a1.6 1.6 0 0 1 1.6-1.6h2.8A1.6 1.6 0 0 1 15 6v1.5M3 12.6h18M11 12.6v1.6h2v-1.6" /></>,
+  estrela: <><path {...T} d="M12 3.6l2.6 5.2 5.7.8-4.1 4 1 5.7L12 16.6l-5.2 2.7 1-5.7-4.1-4 5.7-.8z" /><path d="M12 3.6l2.6 5.2 5.7.8-4.1 4 1 5.7L12 16.6l-5.2 2.7 1-5.7-4.1-4 5.7-.8z" /></>,
+  candidato: <><rect {...T} x="5" y="3" width="14" height="18" rx="2" /><rect x="5" y="3" width="14" height="18" rx="2" /><circle cx="12" cy="9" r="2.3" /><path d="M8.4 15.4c.6-1.7 2-2.6 3.6-2.6s3 .9 3.6 2.6M9.2 18h5.6" /></>,
+  feirante: <><path {...T} d="M3 9l2-5h14l2 5z" /><path d="M3 9l2-5h14l2 5M3 9a2.25 2.25 0 0 0 4.5 0 2.25 2.25 0 0 0 4.5 0 2.25 2.25 0 0 0 4.5 0 2.25 2.25 0 0 0 4.5 0M4.5 11.2V20M19.5 11.2V20M2.5 20h19M7.5 15.2h9" /></>,
+  editar: <><path {...T} d="M4 20l1-4.6L15.4 5a2.1 2.1 0 0 1 3 3L8 18.4z" /><path d="M4 20l1-4.6L15.4 5a2.1 2.1 0 0 1 3 3L8 18.4zM13.4 7l3 3" /></>,
+  pino: <><path {...T} d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.3" /></>,
+  ajuda: <><circle {...T} cx="12" cy="12" r="8.8" /><circle cx="12" cy="12" r="8.8" /><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 16.9h.01" /></>,
+  cabide: <><path d="M10 5.6a2 2 0 1 1 2.7 1.9c-.4.2-.7.5-.7 1V9.4l8.3 5.4c.9.6.5 2-.6 2H4.3c-1.1 0-1.5-1.4-.6-2L12 9.4" /><path {...T} d="M12 9.4l8.3 5.4c.9.6.5 2-.6 2H4.3c-1.1 0-1.5-1.4-.6-2z" /></>,
+  etiqueta: <><path {...T} d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-6l-2 3-2-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" /><path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-6l-2 3-2-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM7 9.4h10M7 12.2h6" /></>,
+  link: <><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></>,
+  selo: <><circle {...T} cx="12" cy="9.2" r="5.6" /><circle cx="12" cy="9.2" r="5.6" /><path d="M8.6 13.6L7.2 21l4.8-2.4 4.8 2.4-1.4-7.4M10 9.2l1.4 1.4L14.2 8" /></>,
+  raio: <><path {...T} d="M13 2.5L5 13.5h6l-1 8 8-11h-6z" /><path d="M13 2.5L5 13.5h6l-1 8 8-11h-6z" /></>,
+  instagram: <><rect {...T} x="4" y="4" width="16" height="16" rx="4.6" /><rect x="4" y="4" width="16" height="16" rx="4.6" /><circle cx="12" cy="12" r="3.7" /><path d="M16.7 7.3h.01" strokeWidth="2.4" /></>,
+  telefone: <><path {...T} d="M6.4 4.5h3l1.5 4-2 1.3a10 10 0 0 0 5.3 5.3l1.3-2 4 1.5v3a2 2 0 0 1-2 2A15.5 15.5 0 0 1 4.4 6.5a2 2 0 0 1 2-2z" /><path d="M6.4 4.5h3l1.5 4-2 1.3a10 10 0 0 0 5.3 5.3l1.3-2 4 1.5v3a2 2 0 0 1-2 2A15.5 15.5 0 0 1 4.4 6.5a2 2 0 0 1 2-2z" /></>,
+  perfil: <><rect {...T} x="3" y="5" width="18" height="14" rx="2.2" /><rect x="3" y="5" width="18" height="14" rx="2.2" /><circle cx="8.6" cy="10.6" r="2" /><path d="M5.9 15.8c.5-1.3 1.5-2 2.7-2s2.2.7 2.7 2M14 10h4M14 13.2h3" /></>,
+  globo: <><circle {...T} cx="12" cy="12" r="8.8" /><circle cx="12" cy="12" r="8.8" /><path d="M3.2 12h17.6M12 3.2c2.4 2.5 3.7 5.5 3.7 8.8s-1.3 6.3-3.7 8.8c-2.4-2.5-3.7-5.5-3.7-8.8S9.6 5.7 12 3.2z" /></>,
+  agenda: <><rect {...T} x="3.5" y="5" width="17" height="15.5" rx="2.2" /><rect x="3.5" y="5" width="17" height="15.5" rx="2.2" /><path d="M3.5 9.6h17M8 3.2v3.4M16 3.2v3.4M8 13.4h2.4M13.6 13.4H16M8 16.6h2.4" /></>,
+  microfone: <><rect {...T} x="9" y="3" width="6" height="11" rx="3" /><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.6 11a6.4 6.4 0 0 0 12.8 0M12 17.4V21M9 21h6" /></>,
+  sino: <><path {...T} d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z" /><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 20.5h4" /></>,
+  // roupas e acessórios do personagem (src/office/data/acessorios.ts)
+  bone: <><path {...T} d="M4.6 15a7.4 7.4 0 0 1 14.8 0z" /><path d="M4.6 15a7.4 7.4 0 0 1 14.8 0M3 15h18.4c.5 0 .7.6.3.9-1.7 1.2-3.9 1.6-6 1.6H4a1 1 0 0 1-1-1zM12 7.6V6.6" /></>,
+  chapeu: <><path {...T} d="M8 13.4V10a4 4 0 0 1 8 0v3.4z" /><path d="M8 13.4V10a4 4 0 0 1 8 0v3.4M2.5 14.6c0 1.7 4.3 3 9.5 3s9.5-1.3 9.5-3-4.3-3-9.5-3-9.5 1.3-9.5 3zM8 11.8h8" /></>,
+  cartola: <><rect {...T} x="7.5" y="4.5" width="9" height="10.5" rx=".8" /><path d="M7.5 15V5.3c0-.4.4-.8.8-.8h7.4c.4 0 .8.4.8.8V15M3.5 15.4c2.6 1.6 14.4 1.6 17 0M7.5 11.6h9" /></>,
+  coroa: <><path {...T} d="M4.2 17.5L3 7.6l5 4 4-6.1 4 6.1 5-4-1.2 9.9z" /><path d="M4.2 17.5L3 7.6l5 4 4-6.1 4 6.1 5-4-1.2 9.9zM4.2 20.5h15.6" /></>,
+  fone: <><path d="M4.5 15v-3a7.5 7.5 0 0 1 15 0v3" /><rect {...T} x="3" y="13.5" width="4.2" height="7" rx="1.6" /><rect x="3" y="13.5" width="4.2" height="7" rx="1.6" /><rect {...T} x="16.8" y="13.5" width="4.2" height="7" rx="1.6" /><rect x="16.8" y="13.5" width="4.2" height="7" rx="1.6" /></>,
+  oculosSol: <><path fill="currentColor" fillOpacity={0.55} d="M4 10h6.5v2.6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3zM13.5 10H20v2.6a3 3 0 0 1-3 3h-.5a3 3 0 0 1-3-3z" /><path d="M2.5 10h19M4 10h6.5v2.6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3zM13.5 10H20v2.6a3 3 0 0 1-3 3h-.5a3 3 0 0 1-3-3z" /></>,
+  oculosRedondo: <><circle {...T} cx="7" cy="13" r="3.6" /><circle {...T} cx="17" cy="13" r="3.6" /><circle cx="7" cy="13" r="3.6" /><circle cx="17" cy="13" r="3.6" /><path d="M10.6 12.6c.9-.9 1.9-.9 2.8 0M3.4 12.3L2 10.3M20.6 12.3l1.4-2" /></>,
+  mochila: <><rect {...T} x="5" y="7" width="14" height="14" rx="4" /><rect x="5" y="7" width="14" height="14" rx="4" /><path d="M9 7V5.6a3 3 0 0 1 6 0V7M8.6 13.8h6.8v4H8.6z" /></>,
+  asas: <><path {...T} d="M11 13c-2-5-6-7-9-6 1 3 2 5 4 6-1 1-2 2-2 3 3 1 5 0 7-3zM13 13c2-5 6-7 9-6-1 3-2 5-4 6 1 1 2 2 2 3-3 1-5 0-7-3z" /><path d="M11 13c-2-5-6-7-9-6 1 3 2 5 4 6-1 1-2 2-2 3 3 1 5 0 7-3zM13 13c2-5 6-7 9-6-1 3-2 5-4 6 1 1 2 2 2 3-3 1-5 0-7-3z" /></>,
+  cachecol: <><path {...T} d="M5 7c4 2 10 2 14 0v3c-4 2-10 2-14 0z" /><path d="M5 7c4 2 10 2 14 0v3c-4 2-10 2-14 0zM14 10.6V20l2.4-1 2.2 1V9.4" /></>,
+  colar: <><path d="M5 4.5c0 5 3.1 8.6 7 8.6s7-3.6 7-8.6" /><circle {...T} cx="12" cy="16.6" r="2.4" /><circle cx="12" cy="16.6" r="2.4" /><path d="M12 13.1v1.1" /></>,
+} satisfies Record<string, ReactNode>;
+
+export type NomeIcone = keyof typeof ICONES;
+export const ICONE_ACESSORIO: Record<string, NomeIcone> = {
+  "bone-workend": "bone", "chapeu-palha": "chapeu", cartola: "cartola", coroa: "coroa", fone: "fone",
+  "oculos-sol": "oculosSol", "oculos-redondo": "oculosRedondo", mochila: "mochila", asas: "asas", cachecol: "cachecol", colar: "colar",
+};
+// selo de cada missão de visitante (src/office/data/missoes.ts)
+export const ICONE_MISSAO: Record<string, NomeIcone> = { explorador: "explorador", papo: "conversar", amigos: "equipe", negociante: "maleta", avaliador: "estrela", candidato: "candidato", feirante: "feirante" };
+
+export function Icone({ nome, tamanho = 20, className, titulo, traco = 1.8 }: { nome: NomeIcone; tamanho?: number; className?: string; titulo?: string; traco?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={tamanho} height={tamanho} className={`ic ${className ?? ""}`} fill="none" stroke="currentColor" strokeWidth={traco} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden={titulo ? undefined : true} role={titulo ? "img" : undefined} focusable="false">
+      {titulo && <title>{titulo}</title>}
+      {ICONES[nome]}
+    </svg>
+  );
+}
