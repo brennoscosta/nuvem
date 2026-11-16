@@ -1,6 +1,7 @@
 "use client";
 // Ruas com nome (12/11/2026): no cartão do dono, a empresa fundadora (1º mês pago com o preço de fundador) escolhe UMA
 // rua livre e dá o nome. Só aparece para fundador que ainda não deu nome; depois de dar, mostra a confirmação uma vez.
+import { Icone } from "./Icone";
 import { useState } from "react";
 import { RUAS } from "../data/mundo";
 import { useRuas, recarregarRuas } from "../scene/RuasPlacas";
@@ -14,7 +15,7 @@ export function NomearRua() {
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [feito, setFeito] = useState<string | null>(null);
-  if (feito) return <div className="mt-2 rounded-2xl bg-[#E8F1FF] px-3 py-2 text-xs text-[#1B4E9B]">🪧 Pronto: a <b>{feito}</b> já tem placa nas esquinas da cidade.</div>;
+  if (feito) return <div className="mt-2 rounded-2xl bg-[#E8F1FF] px-3 py-2 text-xs text-[#1B4E9B]"><Icone nome="placa" tamanho={14} className="mr-1 inline align-[-3px]" />Pronto: a <b>{feito}</b> já tem placa nas esquinas da cidade.</div>;
   if (!eu?.podeNomear) return null;
   const livres = RUAS.filter((r) => !dadas[r.id]);
   if (!livres.length) return null;
@@ -33,7 +34,7 @@ export function NomearRua() {
   const verNoMapa = (id: string) => { const r = RUAS.find((x) => x.id === id); if (!r) return; useMundo.setState({ alvoCamera: r.eixo === "z" ? [0, 0.5, r.valor] : [r.valor, 0.5, 0], loteSelecionado: null }); };
   if (!aberto) return (
     <button onClick={() => setAberto(true)} className="mt-2 w-full rounded-2xl border border-[#1B4E9B]/25 bg-[#E8F1FF] px-3 py-2.5 text-left text-xs text-[#1B4E9B] hover:bg-[#dce9ff]">
-      <b>🪧 Você é fundador: dê nome a uma rua da cidade</b>
+      <b><Icone nome="placa" tamanho={14} className="mr-1 inline align-[-3px]" />Você é fundador: dê nome a uma rua da cidade</b>
       <span className="mt-0.5 block text-[11px] text-[#3A5A8C]">A placa azul aparece nas esquinas. O primeiro que escolher fica com a rua.</span>
     </button>
   );

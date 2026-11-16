@@ -3,6 +3,7 @@
 // entre ela e o mapa simples em 2D (aparelho sem WebGL ou fraco demais).
 // 12/11/2026: a qualidade se ajusta durante o uso (mede os quadros por segundo; se travar, tira a resolução extra, depois
 // as sombras, depois limita a 30 quadros; nunca sobe sozinha) e um aviso mostra quanto da cidade já carregou.
+import { Icone } from "../ui/Icone";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRodaNoCanvas } from "./roda";
 import { Canvas, advance, useFrame, useThree } from "@react-three/fiber";
@@ -200,7 +201,7 @@ function Progresso() {
   useEffect(() => { if (active) { const t = setTimeout(() => setVisto(true), 600); return () => clearTimeout(t); } }, [active]);
   if (!active || !visto || total < 3) return null;
   return (
-    <div className="pointer-events-none absolute bottom-24 left-1/2 z-10 -translate-x-1/2 rounded-full bg-[#111418]/80 px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-lg backdrop-blur" role="status">
+    <div className="hud-ilha pointer-events-none absolute bottom-24 left-1/2 z-10 -translate-x-1/2 !rounded-2xl px-4 py-2 text-[12.5px] font-semibold" role="status">
       Montando a cidade… {Math.round(progress)}%
       <span className="mt-1 block h-1 w-36 overflow-hidden rounded-full bg-white/20"><span className="block h-1 rounded-full bg-[#5B9DFF] transition-[width] duration-300" style={{ width: `${Math.max(6, progress)}%` }} /></span>
     </div>
@@ -209,20 +210,20 @@ function Progresso() {
 function AvisoQualidade({ tipo, aoFechar }: { tipo: "baixou" | "travou"; aoFechar: () => void }) {
   useEffect(() => { if (tipo !== "baixou") return; const t = setTimeout(aoFechar, 9000); return () => clearTimeout(t); }, [tipo, aoFechar]);
   return (
-    <div className="pointer-events-auto absolute left-1/2 top-40 z-20 w-[min(24rem,calc(100%-1.5rem))] -translate-x-1/2 rounded-2xl sm:bottom-24 sm:top-auto bg-[#111418]/92 p-3 text-[12px] text-white shadow-2xl backdrop-blur" role="status">
+    <div className="hud-ilha pointer-events-auto absolute left-1/2 top-40 z-20 w-[min(24rem,calc(100%-1.5rem))] -translate-x-1/2 p-3.5 text-[12.5px] sm:bottom-24 sm:top-auto" role="status">
       {tipo === "baixou" ? (
         <div className="flex items-center gap-3">
           <span className="flex-1">Deixei os gráficos mais leves para o mapa andar liso neste aparelho.</span>
-          <button onClick={() => escolherQualidade("alta")} className="shrink-0 rounded-lg bg-white/15 px-2.5 py-1 font-bold">Voltar aos completos</button>
-          <button onClick={aoFechar} aria-label="Fechar" className="shrink-0 px-1 text-white/60">✕</button>
+          <button onClick={() => escolherQualidade("alta")} className="hud-btn !h-8 shrink-0 bg-white/15 !text-[12px]"><Icone nome="brilho" tamanho={15} />Voltar aos completos</button>
+          <button onClick={aoFechar} aria-label="Fechar" className="hud-btn hud-btn-icone !h-8 !w-8 shrink-0"><Icone nome="fechar" tamanho={15} /></button>
         </div>
       ) : (
         <>
-          <div className="font-bold">O mapa 3D está pesado neste aparelho</div>
+          <div className="flex items-center gap-2 font-bold"><Icone nome="raio" tamanho={16} className="text-[#FACC15]" />O mapa 3D está pesado neste aparelho</div>
           <div className="mt-0.5 text-white/75">O mapa simples mostra as mesmas lojas, em 2D, e abre na hora.</div>
           <div className="mt-2 flex gap-2">
-            <button onClick={() => escolherMapa("2d")} className="flex-1 rounded-lg bg-[#1D4ED8] px-3 py-1.5 font-bold">Usar o mapa simples</button>
-            <button onClick={aoFechar} className="rounded-lg bg-white/15 px-3 py-1.5 font-semibold">Continuar no 3D</button>
+            <button onClick={() => escolherMapa("2d")} className="hud-btn hud-azul !h-9 flex-1 justify-center"><Icone nome="camadas" tamanho={16} />Usar o mapa simples</button>
+            <button onClick={aoFechar} className="hud-btn !h-9 bg-white/10">Continuar no 3D</button>
           </div>
         </>
       )}

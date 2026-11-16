@@ -1,6 +1,7 @@
 "use client";
 // Seguir a loja (13/11/2026): quem segue recebe no sino (e no celular) a promoção, o evento na praça e o produto novo.
 // No cartão do mapa e na página /loja/N. Sem conta: leva para entrar. O dono vê só quantos seguidores tem.
+import { Icone } from "./Icone";
 import { useEffect, useState } from "react";
 
 interface Estado { seguindo: boolean; seguidores: number; meu: boolean; logado: boolean }
@@ -17,7 +18,7 @@ export function BotaoSeguir({ numero, claro = false }: { numero: number; claro?:
   }, [numero]);
   const est = e?.numero === numero ? e.estado : null;
   if (!est) return null;
-  if (est.meu) return <span className={`text-[12px] font-semibold ${claro ? "text-white/85" : "text-[#5B6472]"}`}>⭐ {n(est.seguidores)}</span>;
+  if (est.meu) return <span className={`text-[12px] font-semibold ${claro ? "text-white/85" : "text-[#5B6472]"}`}><Icone nome="estrela" tamanho={13} className="mr-1 inline align-[-3px]" />{n(est.seguidores)}</span>;
   const base = `inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold transition-colors ${claro ? "" : "ring-1"}`;
   const cor = est.seguindo
     ? (claro ? "bg-white/20 text-white" : "bg-[#FFF7DB] text-[#7A5A00] ring-[#F5C542]/60")

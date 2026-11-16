@@ -8,6 +8,7 @@ import { NomearRua } from "./NomearRua";
 import { FotoPredio } from "./FotoPredio";
 import { useEscritorio } from "../store";
 import { BotoesPersonagem } from "./BotoesPersonagem";
+import { Icone } from "./Icone";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 import { ChatLoja, Contatos, Estrelas, useLoja } from "./ChatLoja";
 import { AgendarLoja } from "./AgendarLoja";
@@ -56,7 +57,7 @@ function ResumoPreco({ cot, preco }: { cot: Cotacao | null; preco: number }) {
   const cheio = cot.admin ? preco : cot.base;
   return (
     <div className="mt-2 rounded-2xl bg-[#EAF7EE] px-3 py-2 text-xs text-[#166534]">
-      {cot.oferta && <div><b>🎉 {cot.oferta.nome}:</b> 1º mês de <s>{brl(cheio)}</s> por <b>{brl(cot.valor + (cot.admin ? 0 : cot.creditoUsado))}</b>. <span className="opacity-80">{cot.oferta.detalhe}</span></div>}
+      {cot.oferta && <div><b><Icone nome="brilho" tamanho={14} className="mr-1 inline align-[-3px]" />{cot.oferta.nome}:</b> 1º mês de <s>{brl(cheio)}</s> por <b>{brl(cot.valor + (cot.admin ? 0 : cot.creditoUsado))}</b>. <span className="opacity-80">{cot.oferta.detalhe}</span></div>}
       {cot.creditoUsado > 0 && <div className={cot.oferta ? "mt-1" : ""}><b>Desconto de indicação:</b> − {brl(cot.creditoUsado)}{cot.creditoDisponivel > cot.creditoUsado ? ` (sobram ${brl(cot.creditoDisponivel - cot.creditoUsado)} para as próximas)` : ""}.</div>}
     </div>
   );
@@ -106,7 +107,7 @@ export function PixAberto({ chave }: { chave: string }) {
   if (pix.tipo === "layout" && !painelEsc) return null; // o Pix da troca de prédio aparece dentro do painel do escritório
   const copiar = async () => { try { await navigator.clipboard.writeText(pix.codigo); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { window.prompt("Copie o código Pix:", pix.codigo); } };
   if (pix.status === "aprovado") return (
-    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]"><div className="font-bold">Pagamento confirmado! 🎉</div><div className="mt-1 text-xs">{pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : pix.tipo === "personagem" ? "Seu personagem está ativo por 30 dias. Clique no chão pra andar e nos outros pra conversar." : pix.tipo === "outdoor" ? "Seu anúncio já está no outdoor por 30 dias. Quem clicar nele vem até a sua loja." : pix.tipo === "barraca" ? "Sua barraca está garantida no sábado. Ela aparece na praça das 8h às 18h, com o seu nome na placa." : pix.tipo === "item" ? "Item liberado: o seu personagem já está usando." : "O chão é seu por 30 dias. Monte seu escritório pelos botões de edição."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white">Fechar</button></div>
+    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]"><div className="font-bold"><Icone nome="check" tamanho={16} className="mr-1 inline align-[-3px]" />Pagamento confirmado!</div><div className="mt-1 text-xs">{pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : pix.tipo === "personagem" ? "Seu personagem está ativo por 30 dias. Clique no chão pra andar e nos outros pra conversar." : pix.tipo === "outdoor" ? "Seu anúncio já está no outdoor por 30 dias. Quem clicar nele vem até a sua loja." : pix.tipo === "barraca" ? "Sua barraca está garantida no sábado. Ela aparece na praça das 8h às 18h, com o seu nome na placa." : pix.tipo === "item" ? "Item liberado: o seu personagem já está usando." : "O chão é seu por 30 dias. Monte seu escritório pelos botões de edição."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white">Fechar</button></div>
   );
   if (pix.status !== "pendente") return (
     <div className="mt-3 rounded-2xl bg-[#FDE8E8] px-3 py-3 text-sm text-[#8A2A2A]"><div className="font-bold">{pix.status === "expirado" ? "Este Pix expirou." : "Pagamento não aprovado."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-bold text-white">Gerar outro Pix</button></div>
@@ -189,7 +190,7 @@ export function CartaoLote() {
         <>
           <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm">
             <div className="flex items-center justify-between"><span className="text-[#5B6472]">Mensalidade</span><span className="font-semibold">{brl(preco)}/mês</span></div>
-            {!!fundador && fundador.restam > 0 && <div className="mt-1.5 rounded-xl bg-[#EAF7EE] px-2 py-1.5 text-xs font-semibold text-[#166534]">🎉 Preço de fundador: 1º mês por {brl(fundador.valor)} · restam {fundador.restam} de {fundador.vagas} vagas</div>}
+            {!!fundador && fundador.restam > 0 && <div className="mt-1.5 rounded-xl bg-[#EAF7EE] px-2 py-1.5 text-xs font-semibold text-[#166534]"><Icone nome="brilho" tamanho={14} className="mr-1 inline align-[-3px]" />Preço de fundador: 1º mês por {brl(fundador.valor)} · restam {fundador.restam} de {fundador.vagas} vagas</div>}
             <div className="mt-1 text-xs text-[#5B6472]">Você reserva por {minutos >= 60 ? `${Math.round(minutos / 60)} hora${minutos >= 120 ? "s" : ""}` : `${minutos} minutos`}, coloca o nome e a logo na placa e paga no Pix, direto aqui no mapa (QR Code, sem cadastro no Mercado Pago). Sem pagamento, o lote volta a ficar livre.</div>
           </div>
           {usuario?.banidoEm ? (
@@ -237,26 +238,26 @@ export function CartaoLote() {
           {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
           {ehMeu && ativo && !ehAnexo && (
             // a equipe de IA do lote trabalha de verdade desde 11/11/2026 (tela Minha equipe)
-            <a href="/app/equipe" className="mt-3 block w-full rounded-xl bg-[#1D2128] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-black">💬 Falar com a minha equipe de IA</a>
+            <a href="/app/equipe" className="mt-3 block w-full rounded-xl bg-[#1D2128] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-black"><Icone nome="conversar" tamanho={17} className="mr-1 inline align-[-3px]" />Falar com a minha equipe de IA</a>
           )}
           {ehMeu && ativo && terreno.escritorio && (
             // chão comprado: só opções de edição (prédio, setores, equipe, marca, treino, contratação)
             <div className="mt-3">
               <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">Editar minha empresa</div>
               <div className="grid grid-cols-3 gap-1.5 text-center text-[11px] font-semibold">
-                <button onClick={() => abrirEscritorio("predio")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="text-base">🏢</div>Prédio</button>
-                <button onClick={() => abrirEscritorio("setores")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="text-base">🗂️</div>Setores · {terreno.escritorio.setores.length}</button>
-                <button onClick={() => abrirEscritorio("equipe")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="text-base">👥</div>Equipe · {terreno.escritorio.equipe.length}</button>
-                <button onClick={() => abrirEscritorio("contratar")} className="rounded-xl bg-[#E3F6EA] px-2 py-2 text-[#166534] hover:bg-[#d2efdc]"><div className="text-base">🛒</div>Contratar agentes</button>
-                <button onClick={() => abrirEscritorio("treinar")} className="rounded-xl bg-[#FFF4D6] px-2 py-2 text-[#7A5A00] hover:bg-[#ffeab8]"><div className="text-base">🎓</div>Treinar</button>
-                <button onClick={abrirPainel} className="rounded-xl bg-[#F1F3F6] px-2 py-2 text-[#1D2128] hover:bg-[#e6e9ee]"><div className="text-base">🎨</div>Marca e logo</button>
+                <button onClick={() => abrirEscritorio("predio")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="grid place-items-center"><Icone nome="escritorio" tamanho={20} /></div>Prédio</button>
+                <button onClick={() => abrirEscritorio("setores")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="grid place-items-center"><Icone nome="camadas" tamanho={20} /></div>Setores · {terreno.escritorio.setores.length}</button>
+                <button onClick={() => abrirEscritorio("equipe")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="grid place-items-center"><Icone nome="equipe" tamanho={20} /></div>Equipe · {terreno.escritorio.equipe.length}</button>
+                <button onClick={() => abrirEscritorio("contratar")} className="rounded-xl bg-[#E3F6EA] px-2 py-2 text-[#166534] hover:bg-[#d2efdc]"><div className="grid place-items-center"><Icone nome="amizade" tamanho={20} /></div>Contratar agentes</button>
+                <button onClick={() => abrirEscritorio("treinar")} className="rounded-xl bg-[#FFF4D6] px-2 py-2 text-[#7A5A00] hover:bg-[#ffeab8]"><div className="grid place-items-center"><Icone nome="selo" tamanho={20} /></div>Treinar</button>
+                <button onClick={abrirPainel} className="rounded-xl bg-[#F1F3F6] px-2 py-2 text-[#1D2128] hover:bg-[#e6e9ee]"><div className="grid place-items-center"><Icone nome="brilho" tamanho={20} /></div>Marca e logo</button>
               </div>
               <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-center text-[11px] font-semibold">
-                <button onClick={() => abrirEscritorio("interior")} className="rounded-xl bg-[#F6EEDF] px-2 py-2 text-[#7A4E1F] hover:bg-[#efe3cc]">🛋️ Interior</button>
-                <a href="/app/equipe?aba=vagas" className="rounded-xl bg-[#FFF8D6] px-2 py-2 text-[#7A5A00] hover:bg-[#fff0b3]">📋 Vagas{vagasDoLote > 0 ? ` · ${vagasDoLote}` : ""}</a>
-                <a href="/app/agenda" className="rounded-xl bg-[#EAF7EE] px-2 py-2 text-[#166534] hover:bg-[#d8f0e0]">📅 Agenda</a>
-                <a href="/app/vitrine" className="rounded-xl bg-[#FCE7F3] px-2 py-2 text-[#9D174D] hover:bg-[#fbd5ea]">🛍️ Vitrine</a>
-                <a href="/app/resultados" className="col-span-2 rounded-xl bg-[#1D2128] px-2 py-2 text-white hover:bg-black">📈 Resultados da loja</a>
+                <button onClick={() => abrirEscritorio("interior")} className="rounded-xl bg-[#F6EEDF] px-2 py-2 text-[#7A4E1F] hover:bg-[#efe3cc]"><Icone nome="casa" tamanho={15} className="mr-1 inline align-[-3px]" />Interior</button>
+                <a href="/app/equipe?aba=vagas" className="rounded-xl bg-[#FFF8D6] px-2 py-2 text-[#7A5A00] hover:bg-[#fff0b3]"><Icone nome="candidato" tamanho={15} className="mr-1 inline align-[-3px]" />Vagas{vagasDoLote > 0 ? ` · ${vagasDoLote}` : ""}</a>
+                <a href="/app/agenda" className="rounded-xl bg-[#EAF7EE] px-2 py-2 text-[#166534] hover:bg-[#d8f0e0]"><Icone nome="agenda" tamanho={15} className="mr-1 inline align-[-3px]" />Agenda</a>
+                <a href="/app/vitrine" className="rounded-xl bg-[#FCE7F3] px-2 py-2 text-[#9D174D] hover:bg-[#fbd5ea]"><Icone nome="sacola" tamanho={15} className="mr-1 inline align-[-3px]" />Vitrine</a>
+                <a href="/app/resultados" className="col-span-2 rounded-xl bg-[#1D2128] px-2 py-2 text-white hover:bg-black"><Icone nome="resultados" tamanho={15} className="mr-1 inline align-[-3px]" />Resultados da loja</a>
               </div>
               <PromocaoDono chave={chave} />
               <div className="mt-1.5"><FotoPredio chave={chave} /></div>
@@ -317,11 +318,11 @@ function PromocaoDono({ chave }: { chave: string }) {
   };
   if (promo && !aberto) return (
     <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl bg-[#FFE4E9] px-3 py-2 text-xs text-[#9F1239]">
-      <span><b>🏷️ {promo.texto}</b> · na fachada {horaPromo(promo.ate, agora)}</span>
+      <span><b><Icone nome="etiqueta" tamanho={14} className="mr-1 inline align-[-3px]" />{promo.texto}</b> · na fachada {horaPromo(promo.ate, agora)}</span>
       <span className="flex shrink-0 gap-1"><button onClick={() => { setTexto(promo.texto); setAberto(true); }} className="rounded-lg bg-white/70 px-2 py-1 font-semibold">Trocar</button><button onClick={() => chamar("DELETE")} disabled={enviando} className="rounded-lg bg-[#E11D48] px-2 py-1 font-bold text-white disabled:opacity-50">Encerrar</button></span>
     </div>
   );
-  if (!aberto) return <button onClick={() => setAberto(true)} className="mt-1.5 w-full rounded-xl bg-[#FFE4E9] px-3 py-2 text-[11px] font-bold text-[#9F1239] hover:bg-[#ffd3dc]">🏷️ Ligar uma promoção na fachada</button>;
+  if (!aberto) return <button onClick={() => setAberto(true)} className="mt-1.5 w-full rounded-xl bg-[#FFE4E9] px-3 py-2 text-[11px] font-bold text-[#9F1239] hover:bg-[#ffd3dc]"><Icone nome="etiqueta" tamanho={14} className="mr-1 inline align-[-3px]" />Ligar uma promoção na fachada</button>;
   return (
     <div className="mt-2 rounded-2xl border border-[#E11D48]/30 bg-[#FFF5F7] p-2.5">
       <div className="text-xs font-bold text-[#9F1239]">Promoção na fachada</div>
@@ -351,17 +352,17 @@ function LojaNoMapa({ numero, ativo, chave }: { numero: number; ativo: boolean; 
   if (!loja) return <div className="mt-3 text-xs text-[#5B6472]">Abrindo a loja…</div>;
   return (
     <div className="mt-3 space-y-2">
-      {promo && <div className="flex items-center justify-between gap-2 rounded-xl bg-[#E11D48] px-3 py-2 text-xs font-bold text-white"><span>🏷️ {promo.texto}</span><span className="font-semibold text-white/80">{horaPromo(promo.ate, agora)}</span></div>}
+      {promo && <div className="flex items-center justify-between gap-2 rounded-xl bg-[#E11D48] px-3 py-2 text-xs font-bold text-white"><span><Icone nome="etiqueta" tamanho={14} className="mr-1 inline align-[-3px]" />{promo.texto}</span><span className="font-semibold text-white/80">{horaPromo(promo.ate, agora)}</span></div>}
       <div className="flex items-center justify-between gap-2"><span className="rounded-full bg-[#EEF3FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">{loja.nicho}</span><span className="flex items-center gap-2"><BotaoSeguir numero={numero} /><Estrelas media={loja.avaliacao.media} n={loja.avaliacao.n} /></span></div>
       {loja.sobre ? <p className="line-clamp-4 whitespace-pre-line text-xs text-[#1D2128]">{loja.sobre}</p> : <p className="text-xs text-[#5B6472]">A empresa ainda não contou o que faz. Pergunte à atendente.</p>}
       <Contatos c={loja.contatos} numero={numero} />
-      {vagas > 0 && <a href={`/loja/${numero}#vagas`} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-[#FFF8D6] px-3 py-2 text-xs font-bold text-[#7A5A00] hover:bg-[#fff0b3]"><span>📋 Estamos contratando · {vagas} {vagas === 1 ? "vaga" : "vagas"}</span><span>Ver e me candidatar ↗</span></a>}
+      {vagas > 0 && <a href={`/loja/${numero}#vagas`} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-[#FFF8D6] px-3 py-2 text-xs font-bold text-[#7A5A00] hover:bg-[#fff0b3]"><span><Icone nome="candidato" tamanho={14} className="mr-1 inline align-[-3px]" />Estamos contratando · {vagas} {vagas === 1 ? "vaga" : "vagas"}</span><span>Ver e me candidatar ↗</span></a>}
       <VitrineLoja numero={numero} compacto />
       <PegarCupom numero={numero} compacto />
       <AgendarLoja numero={numero} cor={loja.cor} compacto />
       {conversa
         ? <ChatLoja loja={loja} logado={!!usuario} linkEntrar={`/entrar?destino=${encodeURIComponent(`/loja/${numero}`)}`} alto={240} />
-        : loja.atendente && <button onClick={() => setConversa(true)} className="w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d]">💬 Conversar com {loja.atendente.nome}</button>}
+        : loja.atendente && <button onClick={() => setConversa(true)} className="w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d]"><Icone nome="conversar" tamanho={17} className="mr-1 inline align-[-3px]" />Conversar com {loja.atendente.nome}</button>}
       <a href={`/loja/${numero}`} target="_blank" rel="noreferrer" className="block text-center text-[11px] font-semibold text-[#1D4ED8]">Abrir a página da loja ↗</a>
     </div>
   );
@@ -510,16 +511,47 @@ export function PainelEmpresa() {
 export function ContaWorkend() {
   const usuario = useMundo((s) => s.usuario);
   const meu = useMundo((s) => s.meu);
-  const sair = useMundo((s) => s.sairWorkend);
   const selecionarLote = useMundo((s) => s.selecionarLote);
   if (!modoMundo()) return null;
-  if (!usuario) return <div className="flex items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0"><BotoesPersonagem /><a href="/entrar" className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">Entrar</a></div>;
   return (
-    <div className="flex items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0">
+    <div className="flex items-center gap-1 whitespace-nowrap [&>*]:shrink-0">
       <BotoesPersonagem />
-      {meu && <button onClick={() => selecionarLote(meu)} className="rounded-full bg-[#1D4ED8] px-3 py-1.5 text-xs font-bold text-white">Meu chão · {LOTE_POR_CHAVE[meu]?.numero}</button>}
-      <a href="/app" className="hidden rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80 sm:inline-block" title={usuario.email}>{usuario.nome.split(" ")[0]}</a>
-      <button onClick={sair} className="hidden rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/60 sm:inline-block">Sair</button>
+      {usuario && meu && <button onClick={() => selecionarLote(meu)} title="Ir até o meu lote" className="hud-btn hud-azul"><Icone nome="pino" tamanho={17} /><span className="hud-rotulo">Meu chão</span><span className="opacity-80">· {LOTE_POR_CHAVE[meu]?.numero}</span></button>}
+    </div>
+  );
+}
+
+// Menu da conta no mapa (16/11/2026): a inicial abre o nome, o e-mail, os atalhos do painel e o sair
+export function MenuConta() {
+  const usuario = useMundo((s) => s.usuario);
+  const meu = useMundo((s) => s.meu);
+  const sair = useMundo((s) => s.sairWorkend);
+  const selecionarLote = useMundo((s) => s.selecionarLote);
+  const [aberto, setAberto] = useState(false);
+  const caixa = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!aberto) return;
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") setAberto(false); };
+    const fora = (e: PointerEvent) => { if (!caixa.current?.contains(e.target as Node)) setAberto(false); };
+    window.addEventListener("keydown", tecla); document.addEventListener("pointerdown", fora);
+    return () => { window.removeEventListener("keydown", tecla); document.removeEventListener("pointerdown", fora); };
+  }, [aberto]);
+  if (!modoMundo()) return null;
+  if (!usuario) return <a href="/entrar" className="hud-btn hud-azul">Entrar</a>;
+  const inicial = usuario.nome.trim().slice(0, 1).toUpperCase() || "?";
+  return (
+    <div ref={caixa} className="relative">
+      <button type="button" onClick={() => setAberto(!aberto)} aria-expanded={aberto} aria-haspopup="menu" aria-label="Minha conta" className="hud-btn hud-btn-icone"><span className="hud-avatar">{inicial}</span></button>
+      {aberto && (
+        <div className="hud-menu" role="menu">
+          <div className="hud-menu-topo"><span className="hud-avatar hud-avatar-g" aria-hidden="true">{inicial}</span><div className="min-w-0"><b>{usuario.nome.split(" ")[0]}</b><span>{usuario.email}</span></div></div>
+          <a role="menuitem" href="/app" className="hud-menu-item"><Icone nome="escritorio" tamanho={18} />Meu escritório</a>
+          {meu && <button role="menuitem" type="button" onClick={() => { selecionarLote(meu); setAberto(false); }} className="hud-menu-item"><Icone nome="pino" tamanho={18} />Meu chão · Lote {LOTE_POR_CHAVE[meu]?.numero}</button>}
+          <a role="menuitem" href="/app/resultados" className="hud-menu-item"><Icone nome="resultados" tamanho={18} />Resultados da loja</a>
+          <a role="menuitem" href="/app/rede" className="hud-menu-item"><Icone nome="rede" tamanho={18} />Minha rede e personagem</a>
+          <button role="menuitem" type="button" onClick={sair} className="hud-menu-item hud-menu-sair"><Icone nome="sair" tamanho={18} />Sair da conta</button>
+        </div>
+      )}
     </div>
   );
 }

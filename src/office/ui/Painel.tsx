@@ -7,7 +7,7 @@ import { PainelPersonagem, FichaPersonagem, ChatPersonagem, CaixaPersonagem } fr
 import { JanelaChamada } from "./Chamada";
 import { AREAS, AREAS_APOIO, FUNCOES, NIVEIS, NIVEL, PERSONALIDADES, type AreaId, type Nivel } from "../data/org";
 import { SETORES_ESCRITORIO } from "../data/layout";
-import { qualidade, escolherQualidade, usarMapa2D, escolherMapa } from "../scene/qualidade";
+import { usarMapa2D } from "../scene/qualidade";
 import { BONECOS } from "../data/bonecos";
 import { useEscritorio } from "../store";
 import { useSimulador } from "../sim/simulador";
@@ -15,7 +15,8 @@ import { PainelAgente, STATUS } from "./PainelAgente";
 import { MenuAgente } from "./MenuAgente";
 import { Mural } from "./Mural";
 import { ModalLogin, CartaoPublico } from "./Login";
-import { CartaoLote, PainelEmpresa, ContaWorkend, AvisoPagamento } from "./Lote";
+import { CartaoLote, PainelEmpresa, ContaWorkend, MenuConta, AvisoPagamento } from "./Lote";
+import { Icone } from "./Icone";
 import { CartaoPraca, AvisoEventos } from "./Praca";
 import { MiniMapa } from "./MiniMapa";
 import { Sino } from "./Sino";
@@ -52,21 +53,26 @@ export function BarraTopo() {
   const trabalhando = ordem.filter((id) => agentes[id]?.status === "trabalhando").length;
   const gasto = ordem.reduce((a, id) => a + (agentes[id]?.gastoHoje ?? 0), 0);
   // No mundo do WorkEnd a barra é enxuta (sem os agentes nem o estado do servidor da Nuvem) e rola de lado no celular
+  // No mundo do WorkEnd (16/11/2026): duas ilhas de vidro, a marca à esquerda e as ações à direita, com ícones próprios.
+  // No celular as ações que não cabem rolam de lado; o som e os ajustes ficam na barra de baixo.
   if (mundo) return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-2 sm:p-3">
-      <div className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-[#111418]/85 px-3 py-2 text-white shadow-xl backdrop-blur sm:gap-3 sm:px-4">
-        <div className="flex shrink-0 items-center gap-2 border-r border-white/10 pr-2 sm:pr-3">
-          <Link href="/" aria-label="WorkEnd, início" className="py-1.5"><Logotipo altura={18} claro /></Link>
-          <div className="hidden whitespace-nowrap text-[10px] leading-tight text-white/50 md:block">Clique num lote à venda<br />pra reservar o seu</div>
-        </div>
-        <div className="sem-barra min-w-0 flex-1 overflow-x-auto">
-          <div className="ml-auto flex w-max items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0">
-            <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório" : "Ver o prédio por fora"} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">{vista === "fora" ? "🏢 Ver por dentro" : "🌆 Ver por fora"}</button>
-            <BotaoSom />
-            <ContaWorkend />
-          </div>
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-2 sm:p-3">
+      <div className="hud-ilha pointer-events-auto flex shrink-0 items-center gap-3 px-3.5 py-2.5">
+        <Link href="/" aria-label="WorkEnd, início" className="py-0.5"><Logotipo altura={18} claro /></Link>
+        <span className="hud-sep hidden lg:block" aria-hidden="true" />
+        <span className="hidden text-[11.5px] leading-tight text-white/55 lg:block">Toque num lote à venda<br />para reservar o seu</span>
+      </div>
+      <div className="hud-ilha pointer-events-auto flex min-w-0 items-center gap-1 p-1.5">
+        <div className="sem-barra flex min-w-0 items-center gap-1 overflow-x-auto">
+          <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório da Nuvem" : "Ver o prédio por fora"} className="hud-btn hud-so-pc">
+            <Icone nome={vista === "fora" ? "escritorio" : "predios"} tamanho={18} /><span className="hud-rotulo">{vista === "fora" ? "Ver por dentro" : "Ver por fora"}</span>
+          </button>
+          <BotaoSom />
+          <span className="hud-sep hud-so-pc" aria-hidden="true" />
+          <ContaWorkend />
         </div>
         <Sino tema="escuro" />
+        <MenuConta />
       </div>
     </div>
   );
@@ -89,7 +95,7 @@ export function BarraTopo() {
         </div>
         {sirene && <span className="animate-pulse rounded-full bg-[#E53935] px-2 py-1 text-[10px] font-bold">APROVAÇÃO PENDENTE</span>}
         <span title={statusServidor ? `banco: ${statusServidor.banco} · IA: ${statusServidor.ia}${statusServidor.detalhe ? " · " + statusServidor.detalhe : ""}` : "conectando"} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${online && statusServidor?.ia === "ok" ? "bg-[#22A86B]/20 text-[#7EE2B0]" : online ? "bg-[#F2913D]/20 text-[#FFC48A]" : "bg-white/5 text-white/50"}`}><span className={`h-1.5 w-1.5 rounded-full ${online ? (statusServidor?.ia === "ok" ? "bg-[#22A86B]" : "bg-[#F2913D]") : "bg-white/30"}`} />{!checado ? "Conectando…" : online ? (statusServidor?.ia === "ok" ? "Agentes reais" : "Banco ok · sem IA") : "Offline"}</span>
-        <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório" : "Ver o prédio por fora"} className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">{vista === "fora" ? "🏢 Ver por dentro" : "🌆 Ver por fora"}</button>
+        <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório" : "Ver o prédio por fora"} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"><Icone nome={vista === "fora" ? "escritorio" : "predios"} tamanho={15} />{vista === "fora" ? "Ver por dentro" : "Ver por fora"}</button>
         {temSimulados && <button onClick={() => setSimulando(!simulando)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${simulando ? "bg-white/10 text-white" : "bg-white/5 text-white/50"}`}>{simulando ? "Simulação: ligada" : "Simulação: pausada"}</button>}
         {!mundo && (admin || !online) && <button onClick={() => setModal(true)} className="rounded-full bg-[#4F7DF3] px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-[#3f6ae0]">+ Contratar agente</button>}
         {mundo ? <ContaWorkend /> : online && (admin
@@ -240,26 +246,6 @@ function PainelOuCartao() {
   return admin || !online ? <PainelAgente /> : <CartaoPublico />;
 }
 
-// Gráficos leves (celular/máquina fraca) ou completos. A escolha fica salva no aparelho.
-function BotaoGraficos() {
-  // no servidor não existe aparelho pra detectar: o botão só aparece no navegador (sem erro de hidratação)
-  const q = useSyncExternalStore(semAssinatura, qualidade, () => null);
-  // mapa simples em 2D (12/11/2026): ele tem os próprios botões, inclusive o "Ver em 3D"
-  const dois = useSyncExternalStore(semAssinatura, () => modoMundo() && usarMapa2D(), () => false);
-  const mundo = useSyncExternalStore(semAssinatura, modoMundo, () => false);
-  if (!q || dois) return null;
-  const leve = q === "leve";
-  return (
-    <>
-    <button onClick={() => escolherQualidade(leve ? "alta" : "leve")} title={leve ? "Gráficos leves: sem sombras, resolução menor e 30 quadros/s. Clique pra usar os completos." : "Gráficos completos. Clique pra usar os leves (melhor em celular e computador fraco)."}
-      className="pointer-events-auto shrink-0 rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur hover:bg-[#111418]/85">
-      {leve ? "⚡ Gráficos leves" : "✨ Gráficos completos"}
-    </button>
-    {mundo && <button onClick={() => escolherMapa("2d")} title="Mapa simples em 2D: as mesmas lojas, mais leve para aparelhos fracos" className="pointer-events-auto shrink-0 rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur hover:bg-[#111418]/85">🗺️ <span className="hidden sm:inline">Mapa simples</span><span className="sm:hidden">2D</span></button>}
-    </>
-  );
-}
-
 export function Painel() {
   useSimulador();
   // ?vista=fora abre já na vista externa (prévias e links). No mundo do WorkEnd a entrada é sempre por fora (o mapa),
@@ -300,10 +286,9 @@ export function Painel() {
       <VisitaGuiada />
       <ModalLogin />
       <ModalContratar />
+      {/* celular: girar, início, drone, andar e ajustes; no computador a barra da câmera tem tudo (ControlesCamera) */}
       <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2">
-        {!mapa2d && <div className="hidden rounded-xl bg-[#111418]/70 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur sm:block">Arraste pra mover · roda pra zoom · botão direito pra girar · duplo clique vai até o ponto · teclado: WASD e Q/E</div>}
         <ControlesCameraCelular />
-        <BotaoGraficos />
       </div>
       <ControlesCamera />
     </>

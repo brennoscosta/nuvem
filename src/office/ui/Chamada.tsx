@@ -1,5 +1,6 @@
 "use client";
 // Janela da chamada (áudio/vídeo): toca → atender/recusar; ativa → vídeo do outro grande, o meu pequeno, mudo/câmera/desligar.
+import { Icone } from "./Icone";
 import { useEffect, useRef, useState } from "react";
 import { useChamada } from "../chamadaStore";
 import { MiniAvatar } from "./Personagem";
@@ -32,7 +33,7 @@ export function JanelaChamada() {
   const temVideoRemoto = !!remoto && remoto.getVideoTracks().some((t) => t.enabled);
   if (fase === "tocando") return (
     <div className="fixed inset-x-0 top-20 z-40 mx-auto w-[22rem] rounded-2xl bg-[#111418] p-4 text-white shadow-2xl ring-1 ring-white/10">
-      <div className="flex items-center gap-3"><MiniAvatar boneco={c.outroBoneco ?? "classico"} roupa={c.outroRoupa ?? "#1D4ED8"} tamanho={48} /><div><div className="text-[10px] font-bold uppercase tracking-wide text-[#16A34A]">📹 Chamada chegando</div><div className="text-lg font-bold leading-tight">{nome}</div><div className="text-xs text-white/60">{c.video ? "vídeo e áudio" : "só áudio"}</div></div></div>
+      <div className="flex items-center gap-3"><MiniAvatar boneco={c.outroBoneco ?? "classico"} roupa={c.outroRoupa ?? "#1D4ED8"} tamanho={48} /><div><div className="text-[10px] font-bold uppercase tracking-wide text-[#16A34A]"><Icone nome="chamada" tamanho={13} className="mr-1 inline align-[-3px]" />Chamada chegando</div><div className="text-lg font-bold leading-tight">{nome}</div><div className="text-xs text-white/60">{c.video ? "vídeo e áudio" : "só áudio"}</div></div></div>
       {erro && <div className="mt-2 text-xs font-semibold text-[#FCA5A5]">{erro}</div>}
       <div className="mt-3 flex gap-2"><button onClick={() => void desligar("Chamada recusada.")} className="flex-1 rounded-xl bg-white/10 px-3 py-2.5 text-sm font-bold">Recusar</button><button onClick={() => void atender()} className="flex-1 rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold">Atender</button></div>
     </div>
@@ -48,8 +49,8 @@ export function JanelaChamada() {
         {erro && fase !== "encerrada" && <div className="absolute inset-x-2 bottom-28 rounded-lg bg-[#E2575B]/90 px-2 py-1 text-center text-[11px] font-semibold">{erro}</div>}
       </div>
       <div className="flex items-center justify-center gap-2 p-3">
-        <button onClick={alternarMudo} title={mudo ? "Ativar microfone" : "Silenciar"} className={`rounded-full px-4 py-2 text-sm font-bold ${mudo ? "bg-[#E2575B]" : "bg-white/10"}`}>{mudo ? "🔇" : "🎙️"}</button>
-        {c.video && <button onClick={alternarCamera} title={semCamera ? "Ligar câmera" : "Desligar câmera"} className={`rounded-full px-4 py-2 text-sm font-bold ${semCamera ? "bg-[#E2575B]" : "bg-white/10"}`}>{semCamera ? "🚫" : "📷"}</button>}
+        <button onClick={alternarMudo} title={mudo ? "Ativar microfone" : "Silenciar"} className={`rounded-full px-4 py-2 text-sm font-bold ${mudo ? "bg-[#E2575B]" : "bg-white/10"}`}><Icone nome={mudo ? "mudo" : "microfone"} tamanho={18} /></button>
+        {c.video && <button onClick={alternarCamera} title={semCamera ? "Ligar câmera" : "Desligar câmera"} className={`rounded-full px-4 py-2 text-sm font-bold ${semCamera ? "bg-[#E2575B]" : "bg-white/10"}`}><Icone nome={semCamera ? "cameraOff" : "chamada"} tamanho={18} /></button>}
         <button onClick={() => void desligar()} className="rounded-full bg-[#E2575B] px-5 py-2 text-sm font-bold">Desligar</button>
       </div>
     </div>

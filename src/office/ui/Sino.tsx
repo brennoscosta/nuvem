@@ -54,17 +54,17 @@ function AvisosNoCelular() {
   const agir = (f: () => Promise<EstadoPush>) => { setErro(null); setEstado("ligando"); f().then(setEstado).catch((e: Error) => { setErro(e.message || "Não deu para ligar agora."); setEstado("desligado"); }); };
   return (
     <div className="border-t border-black/5 bg-[#F7F9FC] px-4 py-3 text-[12px] text-[#3D4552]" data-push={estado}>
-      {estado === "iphone-tela" && <p><b>📲 Avisos no iPhone:</b> toque em Compartilhar <span aria-hidden>⎋</span> › <b>Adicionar à Tela de Início</b> e abra o WorkEnd por lá. Aí este sino passa a avisar no celular.</p>}
-      {estado === "negado" && <p><b>📲 Avisos no celular bloqueados</b> neste navegador. Para liberar, toque no cadeado ao lado do endereço › Notificações › Permitir.</p>}
+      {estado === "iphone-tela" && <p><b><Icone nome="telefone" tamanho={14} className="mr-1 inline align-[-3px]" />Avisos no iPhone:</b> toque em Compartilhar <span aria-hidden>⎋</span> › <b>Adicionar à Tela de Início</b> e abra o WorkEnd por lá. Aí este sino passa a avisar no celular.</p>}
+      {estado === "negado" && <p><b><Icone nome="telefone" tamanho={14} className="mr-1 inline align-[-3px]" />Avisos no celular bloqueados</b> neste navegador. Para liberar, toque no cadeado ao lado do endereço › Notificações › Permitir.</p>}
       {(estado === "desligado" || estado === "ligando") && (
         <div className="flex items-center justify-between gap-3">
-          <p><b>📲 Receber os avisos no celular,</b> mesmo com o site fechado.</p>
+          <p><b><Icone nome="telefone" tamanho={14} className="mr-1 inline align-[-3px]" />Receber os avisos no celular,</b> mesmo com o site fechado.</p>
           <button onClick={() => agir(ligarPush)} disabled={estado === "ligando"} className="shrink-0 rounded-full bg-[#1D4ED8] px-3 py-1.5 text-[12px] font-bold text-white disabled:opacity-60">{estado === "ligando" ? "Ligando…" : "Ligar"}</button>
         </div>
       )}
       {estado === "ligado" && (
         <div className="flex items-center justify-between gap-3">
-          <p><b>📲 Avisos no celular ligados</b> neste aparelho.</p>
+          <p><b><Icone nome="telefone" tamanho={14} className="mr-1 inline align-[-3px]" />Avisos no celular ligados</b> neste aparelho.</p>
           <button onClick={() => agir(desligarPush)} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-[#5B6472] ring-1 ring-black/10">Desligar</button>
         </div>
       )}
@@ -129,9 +129,9 @@ export function Sino({ tema = "escuro" }: { tema?: "escuro" | "claro" }) {
   return (
     <div ref={caixa} className="relative shrink-0" data-tour="avisos">
       <button onClick={() => { setAberto((a) => !a); if (!aberto) buscar.current(); }} aria-label={n ? `Avisos: ${n} não lidos` : "Avisos"} aria-expanded={aberto}
-        className={`relative grid place-items-center rounded-full transition-colors ${escuro ? "h-8 w-8 bg-white/10 text-white hover:bg-white/20" : "h-[38px] w-[38px] bg-white/70 text-[var(--tinta)] ring-1 ring-[var(--linha)] hover:bg-white"}`}>
+        className={`relative grid place-items-center rounded-full transition-colors ${escuro ? "h-[38px] w-[38px] !rounded-xl text-white/85 hover:bg-white/10 hover:text-white" : "h-[38px] w-[38px] bg-white/70 text-[var(--tinta)] ring-1 ring-[var(--linha)] hover:bg-white"}`}>
         <span aria-hidden className={`grid place-items-center ${n ? "sino-balanca" : ""}`}><Icone nome="sino" tamanho={escuro ? 17 : 19} /></span>
-        {n > 0 && <span className={`absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[#E2575B] px-1 text-center text-[10px] font-bold leading-[18px] text-white ring-2 ${escuro ? "ring-[#111418]" : "ring-white"}`}>{n > 9 ? "9+" : n}</span>}
+        {n > 0 && <span className={`absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[#E2575B] px-1 text-center text-[10px] font-bold leading-[18px] text-white ring-2 ${escuro ? "ring-[#0E1219]" : "ring-white"}`}>{n > 9 ? "9+" : n}</span>}
       </button>
       {aberto && (
         <div className="absolute right-0 top-full z-30 mt-2 w-[min(22rem,calc(100vw-1rem))] overflow-hidden rounded-2xl bg-white text-[#1D2128] shadow-2xl ring-1 ring-black/10" role="dialog" aria-label="Avisos">

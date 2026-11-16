@@ -1,6 +1,7 @@
 "use client";
 // Painel "Montar escritório": o dono do lote escolhe o layout do prédio, os setores (nome, cor, mesas) e a equipe
 // (atendente e CEO obrigatórios; profissionais por setor). A cena desenha o rascunho ao vivo; Salvar grava no servidor.
+import { Icone } from "./Icone";
 import { FLUTUANTE, LARGO } from "./estilo";
 import { useEffect, useState } from "react";
 import { PixAberto } from "./Lote";
@@ -268,8 +269,8 @@ function AbaInterior({ e, set, temLogo }: { e: Escritorio; set: (e: Escritorio) 
       </div>
       {titulo("Nas paredes")}
       <div className="grid grid-cols-2 gap-1.5">
-        <Opcao ativo={i.quadros} onClick={() => muda({ quadros: !i.quadros })} titulo={temLogo ? "Quadros com a sua logo na recepção, no hall e na sala do CEO" : "Envie a logo em Marca e logo para aparecer nos quadros"}><span className="mr-1">🖼️</span>Quadros com a logo</Opcao>
-        <Opcao ativo={i.plantas} onClick={() => muda({ plantas: !i.plantas })}><span className="mr-1">🪴</span>Plantas nas salas</Opcao>
+        <Opcao ativo={i.quadros} onClick={() => muda({ quadros: !i.quadros })} titulo={temLogo ? "Quadros com a sua logo na recepção, no hall e na sala do CEO" : "Envie a logo em Marca e logo para aparecer nos quadros"}><Icone nome="quadro" tamanho={15} className="mr-1 inline align-[-3px]" />Quadros com a logo</Opcao>
+        <Opcao ativo={i.plantas} onClick={() => muda({ plantas: !i.plantas })}><Icone nome="planta" tamanho={15} className="mr-1 inline align-[-3px]" />Plantas nas salas</Opcao>
       </div>
       {i.quadros && !temLogo && <div className="mt-2 rounded-xl bg-[#FFF4D6] px-3 py-2 text-[11px] text-[#7A5A00]">Sua empresa ainda não tem logo: os quadros saem com a cor da marca. Envie a logo em “Marca e logo” no cartão do lote.</div>}
       <div className="mt-3 rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">O mapa entra no prédio para você ver cada mudança. Mudar o interior é grátis.</div>
@@ -333,7 +334,7 @@ function AbaVisual({ e, set, corMarca, nicho }: { e: Escritorio; set: (e: Escrit
     <div>
       {titulo("Letreiro de LED")}
       <div className="rounded-xl border border-black/10 p-2.5">
-        <label className="flex items-center justify-between gap-2 text-[12px] font-semibold"><span>💡 Painel de LED com texto correndo, em cima do letreiro</span><input type="checkbox" checked={led.ligado} onChange={(ev) => mudaLed({ ligado: ev.target.checked })} className="h-4 w-4" /></label>
+        <label className="flex items-center justify-between gap-2 text-[12px] font-semibold"><span><Icone nome="brilho" tamanho={15} className="mr-1 inline align-[-3px]" />Painel de LED com texto correndo, em cima do letreiro</span><input type="checkbox" checked={led.ligado} onChange={(ev) => mudaLed({ ligado: ev.target.checked })} className="h-4 w-4" /></label>
         {led.ligado && (
           <div className="mt-2 space-y-2">
             <div className="grid grid-cols-3 gap-1.5">{MODOS_LED.map(([m, n]) => <Opcao key={m} ativo={led.modo === m} onClick={() => mudaLed({ modo: m })}>{n}</Opcao>)}</div>
@@ -358,7 +359,7 @@ function AbaVisual({ e, set, corMarca, nicho }: { e: Escritorio; set: (e: Escrit
         <option value="nenhuma">Nenhuma</option>
       </select>
       {titulo("Vitrine na janela")}
-      <label className="flex items-center justify-between gap-2 rounded-xl border border-black/10 p-2.5 text-[12px] font-semibold"><span>🛍️ Mostrar os produtos da vitrine colados no vidro da frente</span><input type="checkbox" checked={d.vitrineJanela ?? true} onChange={(ev) => muda({ vitrineJanela: ev.target.checked })} className="h-4 w-4" /></label>
+      <label className="flex items-center justify-between gap-2 rounded-xl border border-black/10 p-2.5 text-[12px] font-semibold"><span><Icone nome="sacola" tamanho={15} className="mr-1 inline align-[-3px]" />Mostrar os produtos da vitrine colados no vidro da frente</span><input type="checkbox" checked={d.vitrineJanela ?? true} onChange={(ev) => muda({ vitrineJanela: ev.target.checked })} className="h-4 w-4" /></label>
       <div className="mt-1 text-[11px] text-[#5B6472]">Os cartazes usam as fotos e os preços de <a href="/app/vitrine" target="_blank" className="font-semibold text-[#1D4ED8]">Minha vitrine</a>.</div>
       {titulo("Letreiro")}
       <div className="grid grid-cols-2 gap-1.5">

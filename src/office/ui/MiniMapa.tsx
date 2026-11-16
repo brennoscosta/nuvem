@@ -16,6 +16,7 @@ import { eventosDoMomento } from "../scene/Praca";
 import { minhaPos, usePersonagem } from "../personagemStore";
 import { leve } from "../scene/qualidade";
 import { projetar, noChao, PROPORCAO, miniMapa, useVersaoMiniMapa } from "../miniMapa";
+import { Icone } from "./Icone";
 
 const semAssinatura = () => () => {};
 const assinarLargura = (f: () => void) => { const m = window.matchMedia("(min-width: 640px)"); m.addEventListener("change", f); return () => m.removeEventListener("change", f); };
@@ -136,13 +137,13 @@ export function MiniMapa() {
   };
   return (
     <>
-      <button data-tour="mapa" onClick={() => { setAbertoCel(true); setMin(false); }} className={`pointer-events-auto absolute right-2 top-[4.4rem] z-10 items-center gap-1.5 rounded-full bg-[#111418]/85 px-3 py-1.5 text-xs font-semibold text-white shadow-xl backdrop-blur sm:left-3 sm:right-auto sm:top-20 ${abertoCel ? "hidden" : "flex"} ${minimizado ? "sm:flex" : "sm:hidden"}`}>🗺️ Mapa da cidade</button>
-      <div data-tour="mapa" className={`pointer-events-auto fixed inset-x-2 top-[4.2rem] z-20 max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl bg-[#111418]/92 p-2 text-white shadow-2xl backdrop-blur sm:absolute sm:inset-x-auto sm:left-3 sm:top-20 sm:z-10 sm:w-[17rem] sm:max-h-none sm:overflow-visible ${abertoCel ? "block" : "hidden"} ${minimizado ? "sm:hidden" : "sm:block"}`}>
-        <div className="mb-1.5 flex items-center justify-between gap-1 px-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-white/60">Mapa da cidade</span>
-          <button onClick={fechar} aria-label="Fechar o mapa" className="rounded-full px-1.5 text-white/60 hover:bg-white/10">✕</button>
+      <button data-tour="mapa" onClick={() => { setAbertoCel(true); setMin(false); }} className={`hud-ilha hud-btn pointer-events-auto absolute right-2 top-[4.4rem] z-10 !h-11 !rounded-2xl !px-3.5 sm:left-3 sm:right-auto sm:top-[5.2rem] ${abertoCel ? "hidden" : "flex"} ${minimizado ? "sm:flex" : "sm:hidden"}`}><Icone nome="mapa" tamanho={18} />Mapa da cidade</button>
+      <div data-tour="mapa" className={`pointer-events-auto fixed inset-x-2 top-[4.2rem] z-20 max-h-[calc(100dvh-5rem)] overflow-y-auto hud-ilha p-2.5 sm:absolute sm:inset-x-auto sm:left-3 sm:top-[5.2rem] sm:z-10 sm:w-[18rem] sm:max-h-none sm:overflow-visible ${abertoCel ? "block" : "hidden"} ${minimizado ? "sm:hidden" : "sm:block"}`}>
+        <div className="mb-2 flex items-center justify-between gap-1 pl-1">
+          <span className="flex items-center gap-2 text-[13px] font-semibold text-white/90"><Icone nome="mapa" tamanho={17} className="text-[#93C5FD]" />Mapa da cidade</span>
+          <button onClick={fechar} aria-label={largo ? "Recolher o mapa" : "Fechar o mapa"} title={largo ? "Recolher" : "Fechar"} className="hud-btn hud-btn-icone !h-8 !w-8"><Icone nome={largo ? "menos" : "fechar"} tamanho={16} /></button>
         </div>
-        <div className="relative w-full cursor-pointer select-none overflow-hidden rounded-xl bg-[#1B222B]" style={{ aspectRatio: String(PROPORCAO) }}
+        <div className="relative w-full cursor-pointer select-none overflow-hidden rounded-xl bg-[#1B222B] ring-1 ring-white/10" style={{ aspectRatio: String(PROPORCAO) }}
           role="img" aria-label="Mapa da cidade em 3D visto de cima, com o norte para cima" onClick={aoClicar} onMouseMove={aoMover} onMouseLeave={() => setDica(null)}>
           {/* base desenhada enquanto a imagem da cidade não chega (e por baixo dela) */}
           <svg viewBox={`0 0 ${VB} ${VBA}`} className="absolute inset-0 h-full w-full" aria-hidden>
@@ -169,7 +170,7 @@ export function MiniMapa() {
           ); })}
           {/* praça de eventos */}
           {praca2 && (() => { const p = projetar(praca2.centro[0], 3, praca2.centro[1]); return (
-            <button onClick={(e) => { e.stopPropagation(); ir(PRACA_CHAVE); }} title={`Praça de Eventos${vivo ? " · ao vivo agora" : ""}`} className={`absolute grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[10px] shadow ring-2 ring-white ${vivo ? "animate-pulse bg-[#E11D48]" : "bg-[#0F766E]"} ${nicho && nicho !== "bairro:praca" ? "opacity-40" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }}>🎤</button>
+            <button onClick={(e) => { e.stopPropagation(); ir(PRACA_CHAVE); }} title={`Praça de Eventos${vivo ? " · ao vivo agora" : ""}`} className={`absolute grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[10px] shadow ring-2 ring-white ${vivo ? "animate-pulse bg-[#E11D48]" : "bg-[#0F766E]"} ${nicho && nicho !== "bairro:praca" ? "opacity-40" : ""} text-white`} style={{ left: pct(p.u), top: pct(p.v) }}><Icone nome="microfone" tamanho={11} traco={2.2} /></button>
           ); })()}
           {/* lojas abertas (alfinete com a logo) e obras */}
           {/* o alfinete fica perto do chão: com a inclinação, o alto do prédio já cai no quarteirão vizinho */}
@@ -178,7 +179,7 @@ export function MiniMapa() {
               <button key={x.t.chave} onClick={(e) => { e.stopPropagation(); ir(x.t.chave); }} title={`${x.t.empresaNome} · em obras`} className={`absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-sm bg-[#E0A91B] ring-2 ring-[#111418] ${x.apagado ? "opacity-25" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }} />
             );
             return (
-              <button key={x.t.chave} onClick={(e) => { e.stopPropagation(); ir(x.t.chave); }} title={`${x.t.empresaNome} · Lote ${x.numero} · ${nomeNicho(x.t.nicho ?? "negocios")}${x.promo ? ` · 🏷️ ${x.promo.texto}` : ""}${x.contratando ? " · contratando" : ""}`}
+              <button key={x.t.chave} onClick={(e) => { e.stopPropagation(); ir(x.t.chave); }} title={`${x.t.empresaNome} · Lote ${x.numero} · ${nomeNicho(x.t.nicho ?? "negocios")}${x.promo ? ` · promoção: ${x.promo.texto}` : ""}${x.contratando ? " · contratando" : ""}`}
                 className={`absolute flex -translate-x-1/2 -translate-y-full flex-col items-center transition-opacity ${x.apagado ? "opacity-25" : ""} ${x.destaque ? "z-[2] scale-110" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }}>
                 <span className={`relative block rounded-full p-[2px] shadow-md ${selecionada ? "ring-2 ring-white" : eMeu ? "ring-2 ring-[#93C5FD]" : ""}`} style={{ background: cor }}>
                   <span className="grid h-[18px] w-[18px] place-items-center overflow-hidden rounded-full bg-white text-[7px] font-black" style={{ color: cor }}>
@@ -193,19 +194,23 @@ export function MiniMapa() {
           })}
           {dica && largo && <span className="pointer-events-none absolute z-[3] -translate-x-1/2 -translate-y-[130%] whitespace-nowrap rounded-md bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#1D2128] shadow" style={{ left: pct(dica.u), top: pct(dica.v) }}>{dica.texto}</span>}
         </div>
-        <select value={nicho} onChange={(e) => setNicho(e.target.value)} aria-label="Filtrar por área" className="mt-1.5 w-full rounded-lg bg-white/10 px-2 py-1 text-base font-semibold text-white outline-none sm:text-[11px] [&>option]:text-[#1D2128]">
-          <option value="">Todas as áreas</option>
-          {algumaPromo && <option value="__promo">🏷️ Com promoção agora</option>}
-          {nichosPresentes.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}
-          <optgroup label="Bairros">{BAIRROS.map((b) => <option key={b.id} value={`bairro:${b.id}`}>{b.nome}</option>)}</optgroup>
-        </select>
-        <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 px-0.5 text-[9.5px] text-white/60">
-          <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-white align-middle ring-2 ring-[#5B9DFF]" />loja aberta</span>
-          <span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-[#E0A91B] align-middle" />em obras</span>
-          <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#FACC15] align-middle" />contratando</span>
-          {algumaPromo && <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-[#E11D48] align-middle" />promoção</span>}
-          <span className="w-full text-white/45">Toque numa loja para abrir ou em qualquer ponto para ir até lá.</span>
+        <label className="hud-filtro">
+          <Icone nome="filtro" tamanho={15} />
+          <select value={nicho} onChange={(e) => setNicho(e.target.value)} aria-label="Filtrar por área">
+            <option value="">Todas as áreas</option>
+            {algumaPromo && <option value="__promo">Com promoção agora</option>}
+            {nichosPresentes.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}
+            <optgroup label="Bairros">{BAIRROS.map((b) => <option key={b.id} value={`bairro:${b.id}`}>{b.nome}</option>)}</optgroup>
+          </select>
+          <Icone nome="baixo" tamanho={14} />
+        </label>
+        <div className="hud-legenda">
+          <span><i className="bg-white ring-2 ring-[#5B9DFF]" />loja aberta</span>
+          <span><i className="!rounded-sm bg-[#E0A91B]" />em obras</span>
+          <span><i className="bg-[#FACC15]" />contratando</span>
+          {algumaPromo && <span><i className="bg-[#E11D48]" />promoção</span>}
         </div>
+        <p className="mt-2 px-1 text-[11px] leading-snug text-white/45">Toque numa loja para abrir ou em qualquer ponto para ir até lá.</p>
       </div>
     </>
   );

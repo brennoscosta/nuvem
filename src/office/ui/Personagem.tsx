@@ -247,7 +247,7 @@ function MeusSelos() {
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {lista.map((m) => <span key={m.id} title={`${m.nome}: ${m.desc} (${m.feito}/${m.meta})`} className={`flex h-9 w-9 items-center justify-center rounded-full text-base ${m.completa ? "shadow-sm" : "opacity-40 grayscale"}`} style={{ background: m.completa ? m.cor : "#E3E6EA" }}>{m.selo}</span>)}
       </div>
-      <div className="mt-1.5 text-[11px] text-[#5B6472]">{proxima ? <>Próximo: <b className="text-[#1D2128]">{proxima.nome}</b> · {proxima.desc} ({proxima.feito}/{proxima.meta})</> : "Você conquistou todos os selos! 🎉"} Os selos aparecem na sua ficha para todo mundo.</div>
+      <div className="mt-1.5 text-[11px] text-[#5B6472]">{proxima ? <>Próximo: <b className="text-[#1D2128]">{proxima.nome}</b> · {proxima.desc} ({proxima.feito}/{proxima.meta})</> : "Você conquistou todos os selos!"} Os selos aparecem na sua ficha para todo mundo.</div>
     </div>
   );
 }

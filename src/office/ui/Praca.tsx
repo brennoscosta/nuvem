@@ -2,6 +2,7 @@
 // Cartão da praça de eventos (12/11/2026): agenda do palco (lives e lançamentos das empresas, com o link de cada uma),
 // marcar um evento (empresas com lote ativo, de graça, até 2 por vez) e a feira de sábado (barraca a R$ 9,90 para quem
 // ainda não tem lote, paga no Pix aqui mesmo). Também o aviso que aparece no mapa quando um evento vai começar.
+import { Icone } from "./Icone";
 import { useEffect, useState } from "react";
 import { useMundo, LOTE_POR_CHAVE, type EventoPraca, type BarracaFeira } from "../mundoStore";
 import { PRACA_CHAVE, TIPOS_BARRACA, CORES_BARRACA, DURACOES_EVENTO, PRECO_BARRACA, FEIRA_ABRE, FEIRA_FECHA, dataCurta } from "../data/praca";
@@ -47,7 +48,7 @@ export function CartaoPraca() {
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
       </div>
       <div className="mt-3 flex gap-1 rounded-xl bg-[#F1F3F6] p-1 text-xs font-semibold">
-        {([["agenda", vivo ? "🔴 Palco ao vivo" : "Agenda do palco"], ["feira", `Feira de sábado${praca ? ` · ${dataCurta(praca.feira.dia)}` : ""}`]] as const).map(([k, t]) => <button key={k} onClick={() => setAba(k)} className={`flex-1 rounded-lg px-2 py-1.5 ${aba === k ? "bg-white shadow" : "text-[#5B6472]"}`}>{t}</button>)}
+        {([["agenda", vivo ? "Palco ao vivo" : "Agenda do palco"], ["feira", `Feira de sábado${praca ? ` · ${dataCurta(praca.feira.dia)}` : ""}`]] as const).map(([k, t]) => <button key={k} onClick={() => setAba(k)} className={`flex-1 rounded-lg px-2 py-1.5 ${aba === k ? "bg-white shadow" : "text-[#5B6472]"}`}>{t}</button>)}
       </div>
       {!praca ? <div className="mt-3 text-xs text-[#5B6472]">Abrindo a agenda…</div> : aba === "agenda" ? (
         <Agenda agenda={praca.agenda} agora={agora} podeMarcar={loteAtivo || admin} logado={!!usuario} temLote={!!meu} aoMudar={carregar} />
@@ -89,7 +90,7 @@ function Agenda({ agenda, agora, podeMarcar, logado, temLote, aoMudar }: { agend
               <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#5B6472]">
                 <span>{aoVivo ? <span className="mr-1 rounded-full bg-[#E11D48] px-1.5 py-0.5 text-[9px] font-black uppercase text-white">ao vivo</span> : null}{quando(e)}</span>
                 {e.meu ? <button onClick={() => cancelar(e.id)} className="text-[11px] font-semibold text-[#E2575B]">Cancelar</button>
-                  : !aoVivo && logado && <button onClick={() => lembrar(e.id)} aria-pressed={lembretes.includes(e.id)} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${lembretes.includes(e.id) ? "bg-[#0F766E] text-white" : "bg-[#E6F4F1] text-[#0F766E]"}`}>{lembretes.includes(e.id) ? "🔔 Vou ser avisado" : "🔔 Me avise"}</button>}
+                  : !aoVivo && logado && <button onClick={() => lembrar(e.id)} aria-pressed={lembretes.includes(e.id)} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${lembretes.includes(e.id) ? "bg-[#0F766E] text-white" : "bg-[#E6F4F1] text-[#0F766E]"}`}><Icone nome="sino" tamanho={13} className="mr-1 inline align-[-3px]" />{lembretes.includes(e.id) ? "Vou ser avisado" : "Me avise"}</button>}
               </div>
               <div className="mt-0.5 font-bold leading-snug">{e.titulo}</div>
               {e.descricao && <div className="mt-0.5 text-xs text-[#5B6472]">{e.descricao}</div>}
@@ -103,11 +104,11 @@ function Agenda({ agenda, agora, podeMarcar, logado, temLote, aoMudar }: { agend
       </ol>
       {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
       {podeMarcar ? (form ? <FormEvento aoFechar={() => setForm(false)} aoMudar={aoMudar} /> : (
-        <button onClick={() => setForm(true)} className="mt-3 w-full rounded-xl bg-[#0F766E] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#0d6b63]">🎤 Marcar um evento no palco</button>
+        <button onClick={() => setForm(true)} className="mt-3 w-full rounded-xl bg-[#0F766E] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#0d6b63]"><Icone nome="microfone" tamanho={17} className="mr-1 inline align-[-3px]" />Marcar um evento no palco</button>
       )) : (
         <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">{!logado ? <>Empresas com lote no mapa marcam lives e lançamentos aqui de graça. <a href="/entrar?destino=/mundo?lote=0,1,1" className="font-semibold text-[#1D4ED8]">Entrar</a></> : temLote ? "Assim que o 1º mês do seu lote for pago, você marca eventos aqui de graça (até 2 por vez)." : "Marcar eventos é para empresas com lote no mapa. Sem lote? A feira de sábado é para você."}</div>
       )}
-      <div className="mt-2 text-center text-[10px] text-[#5B6472]">Quem está no mapa vê um aviso 10 minutos antes de cada evento. Com “Me avise”, ele chega também no sino 🔔.</div>
+      <div className="mt-2 text-center text-[10px] text-[#5B6472]">Quem está no mapa vê um aviso 10 minutos antes de cada evento. Com “Me avise”, ele chega também no sino de avisos.</div>
     </div>
   );
 }
@@ -168,7 +169,7 @@ function Feira({ barracas, dia, preco, logado, podeAlugar, pixAberto, aoMudar }:
       <button type="button" onClick={() => setEscolhida(x.vaga)} disabled={!paga && !pode} title={paga ? x.nome : livre ? "Barraca livre" : "Reservada"}
         className={`relative h-14 w-full overflow-hidden rounded-lg text-left text-[10px] font-bold transition ${escolhida === x.vaga ? "ring-2 ring-[#1D2128]" : ""} ${livre ? "border-2 border-dashed border-[#B9B2A4] bg-[#F7F4EE] text-[#7A7366] hover:bg-[#EFEBE2]" : ""} ${!paga && !livre ? "bg-[#E6E2DA] text-[#7A7366]" : ""}`}
         style={paga ? { background: `repeating-linear-gradient(90deg, ${x.cor} 0 9px, #fff 9px 18px)` } : undefined}>
-        <span className={`absolute inset-x-1 bottom-1 truncate rounded px-1 py-0.5 ${paga ? "bg-white/95 text-[#1D2128]" : ""}`}>{paga ? `${TIPOS_BARRACA.find((t) => t.id === x.tipo)?.icone ?? "🛍️"} ${x.nome}` : livre ? `Vaga ${x.vaga} · livre` : x.meu ? "Sua (falta o Pix)" : "Reservada"}</span>
+        <span className={`absolute inset-x-1 bottom-1 truncate rounded px-1 py-0.5 ${paga ? "bg-white/95 text-[#1D2128]" : ""}`}>{paga ? `${x.nome}` : livre ? `Vaga ${x.vaga} · livre` : x.meu ? "Sua (falta o Pix)" : "Reservada"}</span>
       </button>
     );
   };
@@ -186,7 +187,7 @@ function Feira({ barracas, dia, preco, logado, podeAlugar, pixAberto, aoMudar }:
       </div>
       {b && b.status === "paga" && !b.meu && (
         <div className="mt-3 rounded-2xl border border-black/5 bg-white px-3 py-2.5 text-sm">
-          <div className="font-bold">{TIPOS_BARRACA.find((t) => t.id === b.tipo)?.icone} {b.nome}</div>
+          <div className="font-bold">{b.nome}</div>
           {b.descricao && <div className="mt-0.5 text-xs text-[#5B6472]">{b.descricao}</div>}
           <div className="mt-1.5 flex gap-3 text-xs font-semibold">
             {b.contato.whatsapp && <a href={`https://wa.me/${b.contato.whatsapp.length <= 11 ? `55${b.contato.whatsapp}` : b.contato.whatsapp}`} target="_blank" rel="noreferrer" className="text-[#16A34A]">WhatsApp ↗</a>}
@@ -197,7 +198,7 @@ function Feira({ barracas, dia, preco, logado, podeAlugar, pixAberto, aoMudar }:
       )}
       {pixAberto && <PixAberto chave={PRACA_CHAVE} />}
       {!pixAberto && b && (b.status === "livre" || b.meu) && podeAlugar && b.status !== "paga" && <FormBarraca key={b.vaga} vaga={b.vaga} nomeInicial={b.meu ? b.nome : ""} aoMudar={aoMudar} />}
-      {!pixAberto && minha?.status === "paga" && <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-2 text-xs text-[#166534]">Sua barraca <b>{minha.nome}</b> está garantida neste sábado. 🎪</div>}
+      {!pixAberto && minha?.status === "paga" && <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-2 text-xs text-[#166534]">Sua barraca <b>{minha.nome}</b> está garantida neste sábado.</div>}
       {!logado && <div className="mt-3 text-center text-[11px] text-[#5B6472]"><a href="/cadastro?lote=0,1,1" className="font-semibold text-[#1D4ED8]">Crie sua conta</a> para alugar uma barraca.</div>}
       {logado && !podeAlugar && <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">A feira é para quem ainda não tem lote: a sua empresa já tem endereço no mapa. Que tal marcar um evento no palco?</div>}
       {podeAlugar && !b && !minha && <div className="mt-2 text-center text-[11px] text-[#5B6472]">Toque numa vaga livre para alugar.</div>}
@@ -226,7 +227,7 @@ function FormBarraca({ vaga, nomeInicial, aoMudar }: { vaga: number; nomeInicial
       <div className="text-sm font-bold text-[#7A5A00]">Barraca {vaga} · sua placa</div>
       <label className="mt-2 block text-xs font-semibold text-[#5B6472]">Nome na placa<input autoFocus value={f.nome} onChange={(e) => muda({ nome: e.target.value.slice(0, 28) })} placeholder="Ex.: Doces da Lu" className={campo} /></label>
       <div className="mt-2 text-xs font-semibold text-[#5B6472]">O que você vende</div>
-      <div className="mt-1 flex flex-wrap gap-1.5">{TIPOS_BARRACA.map((t) => <button key={t.id} type="button" onClick={() => muda({ tipo: t.id })} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${f.tipo === t.id ? "border-[#D97706] bg-[#FFF1D6] text-[#7A5A00]" : "border-black/10 bg-white text-[#5B6472]"}`}>{t.icone} {t.nome}</button>)}</div>
+      <div className="mt-1 flex flex-wrap gap-1.5">{TIPOS_BARRACA.map((t) => <button key={t.id} type="button" onClick={() => muda({ tipo: t.id })} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${f.tipo === t.id ? "border-[#D97706] bg-[#FFF1D6] text-[#7A5A00]" : "border-black/10 bg-white text-[#5B6472]"}`}>{t.nome}</button>)}</div>
       <div className="mt-2 text-xs font-semibold text-[#5B6472]">Cor do toldo</div>
       <div className="mt-1 flex gap-1.5">{CORES_BARRACA.map((c) => <button key={c} type="button" onClick={() => muda({ cor: c })} aria-label={`Toldo ${c}`} className={`h-7 w-7 rounded-full border-2 ${f.cor === c ? "border-[#1D2128]" : "border-transparent"}`} style={{ background: `repeating-linear-gradient(90deg, ${c} 0 5px, #fff 5px 10px)` }} />)}</div>
       <label className="mt-2 block text-xs font-semibold text-[#5B6472]">Uma frase (opcional)<input value={f.descricao} onChange={(e) => muda({ descricao: e.target.value.slice(0, 120) })} placeholder="Ex.: bolos caseiros e brigadeiros gourmet" className={campo} /></label>

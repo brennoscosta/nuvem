@@ -34,8 +34,10 @@ const CHAVE_HORA = "workend-hora";
 function lerModoHora(): ModoHora {
   try { const v = typeof window !== "undefined" ? window.localStorage.getItem(CHAVE_HORA) : null; return v === "dia" || v === "noite" ? v : "auto"; } catch { return "auto"; }
 }
-export const useHora = create<{ modo: ModoHora; proximo: () => void }>((set, get) => ({
+export const useHora = create<{ modo: ModoHora; proximo: () => void; definir: (m: ModoHora) => void }>((set, get) => ({
   modo: lerModoHora(),
+  // escolha direta (painel de ajustes do mapa, 16/11/2026)
+  definir: (modo) => { try { window.localStorage.setItem(CHAVE_HORA, modo); } catch { /* sem armazenamento */ } set({ modo }); },
   proximo: () => {
     const modo: ModoHora = get().modo === "auto" ? "dia" : get().modo === "dia" ? "noite" : "auto";
     try { window.localStorage.setItem(CHAVE_HORA, modo); } catch { /* sem armazenamento: vale só nesta visita */ }

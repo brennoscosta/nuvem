@@ -1,8 +1,9 @@
 "use client";
-// Botões da barra de cima: meu personagem (ou criar) e conversas com contador
+// Botões da barra de cima: meu personagem (ou criar) e conversas com contador. 16/11/2026: ícones próprios, sem emoji.
 import { usePersonagem } from "../personagemStore";
 import { useMundo } from "../mundoStore";
 import { MiniAvatar } from "./Personagem";
+import { Icone } from "./Icone";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -16,16 +17,16 @@ export function BotoesPersonagem() {
   const posicao = usePersonagem((s) => s.posicao);
   const irCamera = () => useMundo.setState({ alvoCamera: [posicao[0], 0.5, posicao[1]] });
   return (
-    <div data-tour="personagem" className="flex items-center gap-1.5 whitespace-nowrap [&>*]:shrink-0">
+    <div data-tour="personagem" className="flex items-center gap-1 whitespace-nowrap [&>*]:shrink-0">
       {ativo && meu ? (
         <>
-          <button onClick={irCamera} title="Centralizar em mim" className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white"><MiniAvatar boneco={meu.boneco} roupa={meu.roupa} tamanho={18} acessorios={meu.acessorios} />{meu.nome}</button>
-          <button onClick={() => abrir("caixa")} className="relative rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">Conversas{naoLidas > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-[#E2575B] px-1.5 text-[10px] font-bold text-white">{naoLidas}</span>}</button>
-          <a href="/app/rede" className="relative rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">Minha rede{pedidos > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-[#DB2777] px-1.5 text-[10px] font-bold text-white">{pedidos}</span>}</a>
-          <button onClick={() => abrir("montar")} className="rounded-full bg-white/10 px-2.5 py-1.5 text-xs text-white/60" title="Editar personagem">✎</button>
+          <button onClick={irCamera} title="Ir até o meu personagem" className="hud-btn !pl-1.5"><MiniAvatar boneco={meu.boneco} roupa={meu.roupa} tamanho={26} acessorios={meu.acessorios} /><span className="hud-rotulo">{meu.nome}</span></button>
+          <button onClick={() => abrir("caixa")} aria-label={naoLidas ? `Conversas: ${naoLidas} não lidas` : "Conversas"} title="Conversas" className="hud-btn"><Icone nome="conversar" tamanho={18} /><span className="hud-rotulo">Conversas</span>{naoLidas > 0 && <span className="hud-selo">{naoLidas}</span>}</button>
+          <a href="/app/rede" aria-label={pedidos ? `Minha rede: ${pedidos} pedidos de amizade` : "Minha rede"} title="Minha rede" className="hud-btn"><Icone nome="rede" tamanho={18} /><span className="hud-rotulo">Minha rede</span>{pedidos > 0 && <span className="hud-selo hud-selo-rosa">{pedidos}</span>}</a>
+          <button onClick={() => abrir("montar")} className="hud-btn hud-btn-icone" title="Editar personagem" aria-label="Editar personagem"><Icone nome="editar" tamanho={18} /></button>
         </>
       ) : (
-        <button onClick={() => abrir("montar")} className="rounded-full bg-[#16A34A] px-3 py-1.5 text-xs font-bold text-white">{meu ? "Ativar meu personagem" : "Criar personagem"} · {brl(preco)}</button>
+        <button onClick={() => abrir("montar")} className="hud-cta"><Icone nome="pessoa" tamanho={18} /><span>{meu ? "Ativar personagem" : "Criar personagem"}</span><span className="hud-preco">{brl(preco)}</span></button>
       )}
     </div>
   );

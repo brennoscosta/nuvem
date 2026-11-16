@@ -2,6 +2,7 @@
 // Botão "Foto do meu prédio" (12/11/2026), para o cartão do dono no mapa: escolhe a hora (agora, de dia ou de noite) e
 // baixa um PNG de 1920 × 1080 com o prédio enquadrado de frente, um pouco de lado, sem a interface do mapa.
 // Durante a foto o cartão some por um instante (a moldura do lote selecionado não pode aparecer na foto) e volta sozinho.
+import { Icone } from "./Icone";
 import { useState } from "react";
 import { tirarFotoPredio, type HoraFoto, LARGURA_FOTO, ALTURA_FOTO } from "../scene/fotoPredio";
 
@@ -22,7 +23,7 @@ export function FotoPredio({ chave }: { chave: string }) {
   };
   if (!aberto) return (
     <div>
-      <button onClick={() => { setAberto(true); setMsg(null); ultimo = null; }} className="w-full rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] font-bold text-[#1D2128] hover:bg-[#e6e9ee]">📸 Foto do meu prédio para postar</button>
+      <button onClick={() => { setAberto(true); setMsg(null); ultimo = null; }} className="w-full rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] font-bold text-[#1D2128] hover:bg-[#e6e9ee]"><Icone nome="foto" tamanho={14} className="mr-1 inline align-[-3px]" />Foto do meu prédio para postar</button>
       {msg && <div className={`mt-1 text-center text-[11px] font-semibold ${msg.ok ? "text-[#166534]" : "text-[#B42318]"}`}>{msg.texto}</div>}
     </div>
   );

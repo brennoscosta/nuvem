@@ -2,6 +2,7 @@
 // Agendar horário na loja (12/11/2026): serviço → dia → horário livre → nome e contato → confirmar. Usado no cartão da
 // loja no mapa (compacto, começa fechado num botão) e na página /loja/N (aberto). Some quando a loja não usa agenda.
 // Quem já marcou vê "Seus horários nesta loja" e pode cancelar. A atendente de IA também marca pela conversa.
+import { Icone } from "./Icone";
 import { useEffect, useState } from "react";
 
 type Servico = { id: string; nome: string; duracao: number; duracaoTexto: string; preco: string };
@@ -38,7 +39,7 @@ function AvaliarAtendimento({ itens, compacto, aoAvaliar }: { itens: ParaAvaliar
   const tam = compacto ? "text-xs" : "text-sm";
   return (
     <div className={`rounded-2xl border border-[#F59E0B]/40 bg-[#FFF8E6] ${compacto ? "p-3" : "p-4"} text-[#1D2128]`}>
-      <div className={`${compacto ? "text-[13px]" : "text-[15px]"} font-bold`}>⭐ Como foi o seu atendimento?</div>
+      <div className={`${compacto ? "text-[13px]" : "text-[15px]"} font-bold`}><Icone nome="estrela" tamanho={15} className="mr-1 inline align-[-3px]" />Como foi o seu atendimento?</div>
       {itens.map((a) => (
         <div key={a.id} className="mt-2">
           <div className={`${tam} text-[#5B6472]`}>{a.servico} · {a.quando}</div>
@@ -121,7 +122,7 @@ export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: st
     return (
       <>{cartaoAvaliar && <div className="mb-2">{cartaoAvaliar}</div>}
       <button onClick={() => setAberto(true)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-bold hover:opacity-90" style={{ background: corOk, color: tinta }}>
-        <span>📅 Agendar horário</span>
+        <span><Icone nome="agenda" tamanho={15} className="mr-1 inline align-[-3px]" />Agendar horário</span>
         <span className="text-[11px] font-semibold opacity-85">{dados.meus.length ? `${dados.meus.length} marcado${dados.meus.length > 1 ? "s" : ""}` : `${dados.servicos.length} ${dados.servicos.length === 1 ? "serviço" : "serviços"}`}</span>
       </button>
       </>
@@ -133,13 +134,13 @@ export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: st
     <div id={compacto ? undefined : "agenda"} className={`scroll-mt-6 rounded-2xl border border-black/10 bg-white ${compacto ? "p-3" : "p-5"} text-[#1D2128]`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className={`${compacto ? "text-sm" : "text-[1.15rem]"} font-bold`}>📅 Agendar horário</div>
+          <div className={`${compacto ? "text-sm" : "text-[1.15rem]"} font-bold`}><Icone nome="agenda" tamanho={17} className="mr-1 inline align-[-3px]" />Agendar horário</div>
           <div className={`${compacto ? "text-[11px]" : "text-[13px]"} text-[#5B6472]`}>Escolha o serviço, o dia e o horário. A {dados.empresa} recebe na hora.</div>
         </div>
         {compacto && <button onClick={() => setAberto(false)} aria-label="Fechar a agenda" className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>}
       </div>
 
-      {feito && <div className={`mt-2 rounded-xl bg-[#E8F7EE] px-3 py-2 ${tam} font-semibold text-[#14532D]`}>✅ {feito}{feito.startsWith("Horário marcado") && <span className="block font-normal">Você recebe um lembrete no sino 1 hora antes.</span>}</div>}
+      {feito && <div className={`mt-2 rounded-xl bg-[#E8F7EE] px-3 py-2 ${tam} font-semibold text-[#14532D]`}><Icone nome="check" tamanho={15} className="mr-1 inline align-[-3px]" />{feito}{feito.startsWith("Horário marcado") && <span className="block font-normal">Você recebe um lembrete no sino 1 hora antes.</span>}</div>}
       {erro && <div className={`mt-2 rounded-xl bg-[#FDECEC] px-3 py-2 ${tam} text-[#8A1C1C]`}>{erro}</div>}
 
       {dados.meus.length > 0 && (

@@ -3,6 +3,7 @@
 // o dono já com a mensagem do produto. O WorkEnd não passa dinheiro adiante. Sem WhatsApp, o botão leva à atendente de
 // IA da loja. No cartão do mapa (compacto) é uma faixa que rola de lado; na página /loja/N, uma grade.
 // Cada pedido no WhatsApp conta um clique no painel de resultados do dono (/api/workend/clique).
+import { Icone } from "./Icone";
 import { avisarClique } from "./LinkRastreado";
 import { useEffect, useState } from "react";
 
@@ -45,7 +46,7 @@ function irParaEntrar() {
 export function perguntarAtendente(texto: string) {
   const campo = campoDoChat(); if (campo) { preencher(campo, texto); return; }
   if (irParaEntrar()) return;
-  const botao = Array.from(document.querySelectorAll("button")).find((b) => /^💬 Conversar com/.test((b.textContent ?? "").trim()) && visivel(b));
+  const botao = Array.from(document.querySelectorAll("button")).find((b) => /^Conversar com/.test((b.textContent ?? "").trim()) && visivel(b));
   if (!botao) return;
   botao.click();
   let tentativas = 0;
@@ -89,7 +90,7 @@ function BarraPedido({ d, pedido, limpar, pequeno }: { d: DadosVitrine; pedido: 
   const cls = `${pequeno ? "px-2 py-1.5 text-[11px]" : "px-4 py-2.5 text-sm"} rounded-xl font-bold text-white`;
   return (
     <div className={`${pequeno ? "mt-2 rounded-xl p-2" : "sticky bottom-3 z-10 mt-4 rounded-2xl p-3 shadow-xl"} flex flex-wrap items-center justify-between gap-2 bg-[#1D2128] text-white`}>
-      <span className={pequeno ? "text-[11px]" : "text-sm"}>🧺 <b>{n} {n === 1 ? "item" : "itens"}</b> · {total ? precoBR(total) : "a combinar"}{consulta && total ? " + sob consulta" : ""}</span>
+      <span className={pequeno ? "text-[11px]" : "text-sm"}><Icone nome="sacola" tamanho={14} className="mr-1 inline align-[-3px]" /><b>{n} {n === 1 ? "item" : "itens"}</b> · {total ? precoBR(total) : "a combinar"}{consulta && total ? " + sob consulta" : ""}</span>
       <span className="flex items-center gap-1.5">
         <button type="button" onClick={limpar} className={`${pequeno ? "text-[11px]" : "text-sm"} rounded-lg px-2 py-1 text-white/70 hover:text-white`}>Limpar</button>
         {d.whatsapp
@@ -108,7 +109,7 @@ export function VitrineVisual({ d, compacto, previa }: { d: DadosVitrine; compac
   if (compacto) return (
     <div className="rounded-2xl border border-black/5 bg-[#F6F8FB] p-2">
       <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-[#5B6472]">🛍️ Vitrine · {d.produtos.length} {d.produtos.length === 1 ? "produto" : "produtos"}</span>
+        <span className="text-[11px] font-bold uppercase tracking-wide text-[#5B6472]"><Icone nome="sacola" tamanho={13} className="mr-1 inline align-[-3px]" />Vitrine · {d.produtos.length} {d.produtos.length === 1 ? "produto" : "produtos"}</span>
         {!previa && <a href={`/loja/${d.numero}#vitrine`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#1D4ED8] hover:underline">Ver tudo ↗</a>}
       </div>
       <ul className="sem-barra flex snap-x snap-mandatory gap-2 overflow-x-auto pb-0.5" aria-label={`Produtos da ${d.empresa}`}>

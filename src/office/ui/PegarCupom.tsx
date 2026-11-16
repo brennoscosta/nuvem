@@ -1,6 +1,7 @@
 "use client";
 // Cupons da loja para o visitante (13/11/2026): no cartão do mapa (compacto) e na página /loja/N. Com conta, "Pegar cupom"
 // gera um código só dele para mostrar na hora da compra. O dono vê um atalho para validar. Sem cupom ativo, não aparece.
+import { Icone } from "./Icone";
 import { useEffect, useState } from "react";
 
 type Cupom = { id: string; titulo: string; regra: string; validade: string; restam: number | null; meu: string | null; usado: boolean };
@@ -34,8 +35,8 @@ export function PegarCupom({ numero, compacto }: { numero: number; compacto?: bo
   const t = compacto ? "text-[11px]" : "text-[13px]";
   return (
     <div id={compacto ? undefined : "cupons"} className={`scroll-mt-6 ${compacto ? "" : "rounded-2xl border border-[var(--linha,#E3E6EB)] bg-white p-5"}`}>
-      {!compacto && <b className="text-[17px] text-[#1D2128]">🎟️ Cupons da loja</b>}
-      {d.ehDono && <a href="/app/cupons" className={`mt-1 block rounded-xl bg-[#FFF8E6] px-3 py-2 ${t} font-semibold text-[#7A5200]`}>🎟️ Sua loja tem {d.cupons.length} cupom{d.cupons.length > 1 ? "s" : ""} ativo{d.cupons.length > 1 ? "s" : ""} · Validar um código ↗</a>}
+      {!compacto && <b className="text-[17px] text-[#1D2128]"><Icone nome="cupom" tamanho={18} className="mr-1 inline align-[-3px]" />Cupons da loja</b>}
+      {d.ehDono && <a href="/app/cupons" className={`mt-1 block rounded-xl bg-[#FFF8E6] px-3 py-2 ${t} font-semibold text-[#7A5200]`}><Icone nome="cupom" tamanho={15} className="mr-1 inline align-[-3px]" />Sua loja tem {d.cupons.length} cupom{d.cupons.length > 1 ? "s" : ""} ativo{d.cupons.length > 1 ? "s" : ""} · Validar um código ↗</a>}
       {!d.ehDono && (
         <ul className={`${compacto ? "space-y-1.5" : "mt-3 space-y-2"}`}>
           {d.cupons.map((c) => (

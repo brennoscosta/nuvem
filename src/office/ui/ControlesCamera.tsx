@@ -1,102 +1,176 @@
 "use client";
-// Barra da câmera no mapa (11/11/2026): girar, aproximar/afastar, ver de cima, ver da rua, seguir meu personagem,
-// passeio automático e voltar ao início, com a ajuda dos atalhos de teclado. Fica no canto de baixo à esquerda,
-// acima da dica de navegação (os cartões ficam à direita).
-// 12/11/2026: voo de drone (O) e andar pela rua (C), com joystick na tela do celular e as dicas de cada modo.
-import { useRef, useState, useSyncExternalStore } from "react";
-import { useCamera, useHora, ATALHOS, joystick, type ComandoCamera } from "../cameraStore";
+// Barra da câmera no mapa (11/11/2026; refeita em 16/11/2026: "deixe tudo mais moderno e atual"). Ilha de vidro escuro no
+// canto de baixo à esquerda com ícones próprios (src/office/ui/Icone.tsx) e uma dica com a tecla de atalho em cada botão:
+// girar, aproximar/afastar, ver de cima, ver da rua, seguir meu personagem, girar devagar, drone, andar e voltar ao início.
+// "Ajustes" junta o que antes ficava espalhado: gráficos leves/completos, mapa 3D ou simples, hora do dia e som.
+// "Como mexer" mostra o mouse e os atalhos (a frase fixa embaixo virou um aviso que some sozinho).
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCamera, useHora, ATALHOS, joystick, type ComandoCamera, type ModoHora } from "../cameraStore";
 import { usePersonagem } from "../personagemStore";
 import { modoMundo } from "../mundoStore";
-import { usarMapa2D } from "../scene/qualidade";
+import { usarMapa2D, qualidade, escolherQualidade, escolherMapa } from "../scene/qualidade";
+import { alternarSom, assinarSom, somLigado } from "../som";
+import { Icone, type NomeIcone } from "./Icone";
 
 // modoMundo() lê o endereço do navegador: no servidor é sempre falso. Para não dar erro de hidratação, a barra só aparece
-// depois de montar no navegador (o mesmo jeito do botão de gráficos).
+// depois de montar no navegador.
 const semAssinatura = () => () => {};
 // no mapa simples (2D) não tem câmera: a barra some
 const useNoMundo = () => useSyncExternalStore(semAssinatura, () => modoMundo() && !usarMapa2D(), () => false);
 
-const ICONE: Record<string, string> = {
-  girarEsq: "M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4", girarDir: "M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4",
-  aproximar: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM11 8v6M8 11h6M20 20l-4-4", afastar: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM8 11h6M20 20l-4-4",
-  cima: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 3v18M4 7.5l8 4.5 8-4.5", rua: "M3 20h18M6 20l3-14h6l3 14M12 8v2M12 13v2M12 18v1",
-  seguir: "M12 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 20c0-3.3 2.7-6 6-6s6 2.7 6 6M3 12h2M19 12h2", passeio: "M12 3a9 9 0 1 0 9 9M21 3v6h-6M12 8v4l3 2",
-  inicio: "M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10",
-  drone: "M12 10h0M9 10h6v4H9zM5 6a2 2 0 1 0 0 .1M19 6a2 2 0 1 0 0 .1M5 18a2 2 0 1 0 0 .1M19 18a2 2 0 1 0 0 .1M7 7.5l2 2.5M17 7.5l-2 2.5M7 16.5l2-2.5M17 16.5l-2-2.5",
-  andar: "M13 4a1.6 1.6 0 1 0 0 .1M10 21l2-6 2 2v4M9 11l2-3 3 2 2 3M11 8l-2 5",
-  sol: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
-  lua: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z", auto: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2",
-};
-// dia e noite: automático (Brasília) → sempre dia → sempre noite
-function BotaoHora() {
-  const modo = useHora((s) => s.modo); const proximo = useHora((s) => s.proximo);
-  const rotulo = modo === "auto" ? "Hora automática (Brasília). Clique para sempre dia" : modo === "dia" ? "Sempre dia. Clique para sempre noite" : "Sempre noite. Clique para a hora automática";
-  const icone = modo === "auto" ? ICONE.auto : modo === "dia" ? ICONE.sol : ICONE.lua;
-  return <button type="button" onClick={proximo} title={rotulo} aria-label={rotulo} className={`grid h-9 w-9 place-items-center rounded-xl transition active:scale-95 ${modo === "noite" ? "bg-[#1E2A4A] text-[#C9D6FF]" : modo === "dia" ? "bg-[#FFF4D6] text-[#7A5A00]" : "text-white/85 hover:bg-white/15"}`}><svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={icone} /></svg></button>;
-}
-function Botao({ tipo, rotulo, ativo = false }: { tipo: ComandoCamera; rotulo: string; ativo?: boolean }) {
+const ICONE: Record<ComandoCamera, NomeIcone> = {
+  girarEsq: "girarEsq", girarDir: "girarDir", aproximar: "zoomMais", afastar: "zoomMenos", cima: "cubo", rua: "rua",
+  seguir: "seguir", passeio: "orbita", inicio: "casa", drone: "drone", andar: "andar",
+} as Record<ComandoCamera, NomeIcone>;
+
+function Botao({ tipo, rotulo, tecla, ativo }: { tipo: ComandoCamera; rotulo: string; tecla?: string; ativo?: boolean }) {
   const pedir = useCamera((s) => s.pedir);
   return (
-    <button type="button" onClick={() => pedir(tipo)} title={rotulo} aria-label={rotulo} aria-pressed={ativo}
-      className={`grid h-9 w-9 place-items-center rounded-xl transition active:scale-95 ${ativo ? "bg-[#1D4ED8] text-white shadow-[0_0_0_2px_rgba(91,157,255,.5)]" : "text-white/85 hover:bg-white/15"}`}>
-      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICONE[tipo]} /></svg>
+    <button type="button" onClick={() => pedir(tipo)} aria-label={tecla ? `${rotulo} (${tecla})` : rotulo} aria-pressed={ativo ?? undefined} className="hud-btn hud-btn-icone">
+      <Icone nome={ICONE[tipo]} tamanho={19} />
+      <span className="hud-dica" aria-hidden="true">{rotulo}{tecla && <kbd>{tecla}</kbd>}</span>
     </button>
   );
+}
+
+// fecha um cartão aberto com Esc ou clicando fora da caixa
+function useFecharFora(aberto: boolean, caixa: React.RefObject<HTMLElement | null>, fechar: () => void) {
+  useEffect(() => {
+    if (!aberto) return;
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") fechar(); };
+    const fora = (e: PointerEvent) => { if (!caixa.current?.contains(e.target as Node)) fechar(); };
+    window.addEventListener("keydown", tecla); document.addEventListener("pointerdown", fora);
+    return () => { window.removeEventListener("keydown", tecla); document.removeEventListener("pointerdown", fora); };
+  }, [aberto, caixa, fechar]);
 }
 
 export function ControlesCamera() {
   const { seguir, passeio, cima, rua, drone, andar } = useCamera();
   const personagem = usePersonagem((s) => s.ativo);
-  const [ajuda, setAjuda] = useState(false);
+  const [aberto, setAberto] = useState<null | "ajustes" | "ajuda">(null);
+  const caixa = useRef<HTMLDivElement>(null);
+  const fechar = useCallback(() => setAberto(null), []);
+  useFecharFora(!!aberto, caixa, fechar);
   const noMundo = useNoMundo();
   if (!noMundo) return null;
-  const sep = <span className="mx-0.5 h-5 w-px bg-white/15" aria-hidden="true" />;
   return (
     <>
-    <ModoCamera />
-    <div data-tour="camera" className="pointer-events-auto absolute bottom-14 left-3 z-10 hidden items-center gap-0.5 rounded-2xl bg-[#111418]/75 p-1 shadow-xl backdrop-blur sm:flex" role="toolbar" aria-label="Câmera">
-      <Botao tipo="girarEsq" rotulo="Girar para a esquerda (Q)" />
-      <Botao tipo="girarDir" rotulo="Girar para a direita (E)" />
-      {sep}
-      <Botao tipo="aproximar" rotulo="Aproximar (+)" />
-      <Botao tipo="afastar" rotulo="Afastar (−)" />
-      {sep}
-      <Botao tipo="cima" rotulo="Ver de cima (T)" ativo={cima} />
-      <Botao tipo="rua" rotulo="Ver da altura da rua (V)" ativo={rua} />
-      {personagem && <Botao tipo="seguir" rotulo="Seguir meu personagem (F)" ativo={seguir} />}
-      <Botao tipo="passeio" rotulo="Girar devagar (P)" ativo={passeio} />
-      <Botao tipo="drone" rotulo="Voo de drone pela cidade (O)" ativo={drone} />
-      <Botao tipo="andar" rotulo={personagem ? "Andar pela rua com o meu personagem (C)" : "Andar pela rua: crie o seu personagem"} ativo={andar} />
-      {sep}
-      <Botao tipo="inicio" rotulo="Voltar ao início (H)" />
-      <BotaoHora />
-      <span className="relative">
-        <button type="button" onClick={() => setAjuda((v) => !v)} aria-expanded={ajuda} title="Atalhos do teclado" className="grid h-9 w-9 place-items-center rounded-xl text-[13px] font-black text-white/70 hover:bg-white/15">?</button>
-        {ajuda && (
-          <span className="absolute bottom-11 left-0 block w-64 rounded-xl bg-[#111418]/95 p-3 text-[11px] text-white/85 shadow-2xl">
-            <b className="mb-1 block text-white">Atalhos do teclado</b>
-            {ATALHOS.map(([k, o]) => <span key={k} className="flex justify-between gap-3 py-0.5"><kbd className="rounded bg-white/10 px-1.5 font-semibold text-white">{k}</kbd><span className="text-right">{o}</span></span>)}
-          </span>
-        )}
-      </span>
-    </div>
+      <ModoCamera />
+      <AvisoMover />
+      <div ref={caixa} data-tour="camera" className="hud-ilha hud-dock pointer-events-auto absolute bottom-4 left-3 z-10 hidden sm:flex" role="toolbar" aria-label="Câmera">
+        <Botao tipo="girarEsq" rotulo="Girar para a esquerda" tecla="Q" />
+        <Botao tipo="girarDir" rotulo="Girar para a direita" tecla="E" />
+        <span className="hud-sep" aria-hidden="true" />
+        <Botao tipo="aproximar" rotulo="Aproximar" tecla="+" />
+        <Botao tipo="afastar" rotulo="Afastar" tecla="−" />
+        <span className="hud-sep" aria-hidden="true" />
+        <Botao tipo="cima" rotulo="Ver de cima" tecla="T" ativo={cima} />
+        <Botao tipo="rua" rotulo="Ver da altura da rua" tecla="V" ativo={rua} />
+        {personagem && <Botao tipo="seguir" rotulo="Seguir meu personagem" tecla="F" ativo={seguir} />}
+        <Botao tipo="passeio" rotulo="Girar devagar" tecla="P" ativo={passeio} />
+        <Botao tipo="drone" rotulo="Voo de drone pela cidade" tecla="O" ativo={drone} />
+        <Botao tipo="andar" rotulo={personagem ? "Andar pela rua" : "Andar pela rua (crie o seu personagem)"} tecla="C" ativo={andar} />
+        <span className="hud-sep" aria-hidden="true" />
+        <Botao tipo="inicio" rotulo="Voltar ao início" tecla="H" />
+        <button type="button" onClick={() => setAberto(aberto === "ajustes" ? null : "ajustes")} aria-expanded={aberto === "ajustes"} aria-label="Ajustes do mapa" className="hud-btn hud-btn-icone">
+          <Icone nome="ajustes" tamanho={19} /><span className="hud-dica" aria-hidden="true">Ajustes</span>
+        </button>
+        <button type="button" onClick={() => setAberto(aberto === "ajuda" ? null : "ajuda")} aria-expanded={aberto === "ajuda"} aria-label="Como mexer no mapa" className="hud-btn hud-btn-icone">
+          <Icone nome="ajuda" tamanho={19} /><span className="hud-dica" aria-hidden="true">Como mexer</span>
+        </button>
+        {aberto === "ajustes" && <PainelAjustes />}
+        {aberto === "ajuda" && <PainelAjuda />}
+      </div>
     </>
   );
 }
 
-// No celular: só girar e voltar ao início, ao lado do botão de gráficos
+// ---------- ajustes: gráficos, mapa, hora do dia e som ----------
+function Segmentos<T extends string>({ itens, atual, escolher, rotulo }: { itens: [T, NomeIcone, string][]; atual: T | null; escolher: (v: T) => void; rotulo: string }) {
+  return (
+    <div className="hud-seg" role="group" aria-label={rotulo}>
+      {itens.map(([v, ic, nome]) => <button key={v} type="button" aria-pressed={atual === v} onClick={() => { if (atual !== v) escolher(v); }}><Icone nome={ic} tamanho={15} />{nome}</button>)}
+    </div>
+  );
+}
+export function PainelAjustes() {
+  const q = useSyncExternalStore(semAssinatura, qualidade, () => null);
+  const hora = useHora((s) => s.modo), definirHora = useHora((s) => s.definir);
+  const som = useSyncExternalStore(assinarSom, somLigado, () => false);
+  return (
+    <div className="hud-pop" role="dialog" aria-label="Ajustes do mapa">
+      <b className="hud-pop-titulo"><Icone nome="ajustes" tamanho={18} />Ajustes do mapa</b>
+      <div className="hud-secao">
+        <span>Gráficos</span>
+        <Segmentos rotulo="Gráficos" atual={q} escolher={(v) => escolherQualidade(v)} itens={[["leve", "raio", "Leves"], ["alta", "brilho", "Completos"]]} />
+        <p className="hud-nota">{q === "leve" ? "Sem sombras e a 30 quadros por segundo: melhor em celular e computador fraco." : "Sombras, reflexos e mais detalhes."} Trocar recarrega a página.</p>
+      </div>
+      <div className="hud-secao">
+        <span>Mapa</span>
+        <Segmentos rotulo="Mapa" atual={"3d" as "3d" | "2d"} escolher={(v) => escolherMapa(v)} itens={[["3d", "cubo", "Cidade 3D"], ["2d", "camadas", "Simples (2D)"]]} />
+      </div>
+      <div className="hud-secao">
+        <span>Hora do dia</span>
+        <Segmentos<ModoHora> rotulo="Hora do dia" atual={hora} escolher={definirHora} itens={[["auto", "relogio", "Automática"], ["dia", "sol", "Dia"], ["noite", "lua", "Noite"]]} />
+        <p className="hud-nota">Automática segue o horário de Brasília.</p>
+      </div>
+      <div className="hud-linha">
+        <span><Icone nome={som ? "som" : "mudo"} tamanho={18} />Som da cidade</span>
+        <button type="button" role="switch" aria-checked={som} aria-label="Som da cidade" onClick={alternarSom} className="hud-chave" />
+      </div>
+    </div>
+  );
+}
+
+// ---------- como mexer: mouse e teclado ----------
+const MOUSE: [NomeIcone, string][] = [["mouse", "Arraste para mover"], ["zoomMais", "Roda do mouse para aproximar e afastar"], ["girarDir", "Botão direito para girar"], ["pino", "Duplo clique vai até o ponto"]];
+function PainelAjuda() {
+  return (
+    <div className="hud-pop hud-ajuda" role="dialog" aria-label="Como mexer no mapa">
+      <b className="hud-pop-titulo"><Icone nome="mouse" tamanho={18} />Como mexer no mapa</b>
+      <ul className="mt-2">{MOUSE.map(([ic, t]) => <li key={t}><Icone nome={ic} tamanho={16} />{t}</li>)}</ul>
+      <b className="hud-pop-titulo mt-3"><Icone nome="teclado" tamanho={18} />Atalhos do teclado</b>
+      <ul className="mt-1">{ATALHOS.map(([k, o]) => <li key={k}><kbd>{k}</kbd><span>{o}</span></li>)}</ul>
+    </div>
+  );
+}
+
+// aviso de como mexer na primeira visita: some sozinho em 10 s ou ao fechar (lembrado neste navegador)
+const CHAVE_AVISO = "workend-aviso-mover";
+function AvisoMover() {
+  const [ver, setVer] = useState(() => { try { return window.localStorage.getItem(CHAVE_AVISO) !== "1"; } catch { return true; } });
+  const fechar = useCallback(() => { setVer(false); try { window.localStorage.setItem(CHAVE_AVISO, "1"); } catch { /* sem armazenamento */ } }, []);
+  useEffect(() => { if (!ver) return; const t = setTimeout(fechar, 10000); return () => clearTimeout(t); }, [ver, fechar]);
+  if (!ver) return null;
+  return (
+    <div className="hud-ilha hud-aviso-mover pointer-events-auto absolute bottom-[4.6rem] left-3 z-10 hidden items-center gap-2.5 py-2 pl-3 pr-1.5 text-[12.5px] text-white/85 sm:flex" role="status">
+      <Icone nome="mouse" tamanho={18} className="text-[#93C5FD]" />
+      <span>Arraste para mover, use a roda para aproximar e o botão direito para girar.</span>
+      <button type="button" onClick={fechar} aria-label="Fechar o aviso" className="hud-btn hud-btn-icone !h-8 !w-8"><Icone nome="fechar" tamanho={15} /></button>
+    </div>
+  );
+}
+
+// No celular: girar, voltar ao início, drone, andar e os ajustes, no canto de baixo
 const ROTULO_CEL: Partial<Record<ComandoCamera, string>> = { inicio: "Voltar ao início", girarEsq: "Girar para a esquerda", girarDir: "Girar para a direita", drone: "Voo de drone pela cidade", andar: "Andar pela rua com o meu personagem" };
 export function ControlesCameraCelular() {
   const pedir = useCamera((s) => s.pedir);
   const drone = useCamera((s) => s.drone), andar = useCamera((s) => s.andar);
+  const [ajustes, setAjustes] = useState(false);
+  const caixa = useRef<HTMLSpanElement>(null);
+  const fechar = useCallback(() => setAjustes(false), []);
+  useFecharFora(ajustes, caixa, fechar);
   const noMundo = useNoMundo();
   if (!noMundo) return null;
   return (
-    <span className="pointer-events-auto flex gap-1 rounded-xl bg-[#111418]/70 p-0.5 backdrop-blur sm:hidden">
+    <span ref={caixa} className="hud-ilha pointer-events-auto relative flex gap-0.5 p-1 sm:hidden">
       {(["girarEsq", "girarDir", "inicio", "drone", "andar"] as ComandoCamera[]).map((t) => (
-        <button key={t} type="button" onClick={() => pedir(t)} aria-label={ROTULO_CEL[t]} aria-pressed={t === "drone" ? drone : t === "andar" ? andar : undefined} className={`grid h-8 w-8 place-items-center rounded-lg ${(t === "drone" && drone) || (t === "andar" && andar) ? "bg-[#1D4ED8] text-white" : "text-white/85"}`}>
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICONE[t]} /></svg>
+        <button key={t} type="button" onClick={() => pedir(t)} aria-label={ROTULO_CEL[t]} aria-pressed={t === "drone" ? drone : t === "andar" ? andar : undefined} className="hud-btn hud-btn-icone !h-9 !w-9">
+          <Icone nome={ICONE[t]} tamanho={18} />
         </button>
       ))}
+      <button type="button" onClick={() => setAjustes(!ajustes)} aria-expanded={ajustes} aria-label="Ajustes do mapa" className="hud-btn hud-btn-icone !h-9 !w-9"><Icone nome="ajustes" tamanho={18} /></button>
+      {ajustes && <PainelAjustes />}
     </span>
   );
 }
@@ -108,11 +182,11 @@ export function ModoCamera() {
   if (!noMundo || (!drone && !andar)) return null;
   return (
     <>
-      <div className="pointer-events-auto absolute left-1/2 top-[7.2rem] z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-[#111418]/85 py-1.5 pl-3 pr-1.5 text-[12px] font-semibold text-white shadow-xl backdrop-blur sm:top-20">
-        <span className={`h-2 w-2 rounded-full ${drone ? "animate-pulse bg-[#38BDF8]" : "bg-[#22C55E]"}`} aria-hidden="true" />
+      <div className="hud-ilha pointer-events-auto absolute left-1/2 top-[7.2rem] z-10 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap !rounded-full py-1.5 pl-3 pr-1.5 text-[12.5px] font-semibold sm:top-20">
+        <Icone nome={drone ? "drone" : "andar"} tamanho={17} className={drone ? "text-[#38BDF8]" : "text-[#4ADE80]"} />
         {drone ? <span>Voo de drone<span className="hidden text-white/60 sm:inline"> · toque ou aperte uma tecla para assumir</span></span>
           : <span>Andando pela rua<span className="hidden text-white/60 sm:inline"> · W A S D andam · arraste para olhar em volta · Esc sai</span></span>}
-        <button type="button" onClick={() => pedir(drone ? "drone" : "andar")} className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold hover:bg-white/25">Sair</button>
+        <button type="button" onClick={() => pedir(drone ? "drone" : "andar")} className="hud-btn !h-7 !rounded-full !px-3 !text-[12px] bg-white/15">Sair</button>
       </div>
       {andar && <Joystick />}
     </>
@@ -136,8 +210,8 @@ function Joystick() {
     <div ref={base} role="application" aria-label="Joystick: arraste para andar"
       onPointerDown={(e) => { id.current = e.pointerId; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); mover(e); }}
       onPointerMove={mover} onPointerUp={soltar} onPointerCancel={soltar}
-      className="pointer-events-auto absolute bottom-24 left-6 z-20 grid h-32 w-32 touch-none select-none place-items-center rounded-full bg-[#111418]/45 ring-2 ring-white/25 backdrop-blur [@media(pointer:fine)]:hidden">
-      <span className="h-14 w-14 rounded-full bg-white/85 shadow-lg" style={{ transform: `translate(${bola[0]}px, ${bola[1]}px)` }} />
+      className="pointer-events-auto absolute bottom-24 left-6 z-20 grid h-32 w-32 touch-none select-none place-items-center rounded-full bg-[#0E1219]/50 ring-2 ring-white/25 backdrop-blur [@media(pointer:fine)]:hidden">
+      <span className="h-14 w-14 rounded-full bg-white/90 shadow-lg" style={{ transform: `translate(${bola[0]}px, ${bola[1]}px)` }} />
     </div>
   );
 }
