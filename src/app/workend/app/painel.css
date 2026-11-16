@@ -349,3 +349,8 @@
 }
 .we .pn-predio.pn-predio-passo { padding-top: 0; height: auto; }
 .we .pn-ticket-vazio .truncate { white-space: normal; overflow: visible; }
+
+/* a sede do OneState no painel do dono: a logo no lugar da foto do prédio */
+.we .pn-predio.pn-predio-sede { align-items: center; padding-top: 0; }
+.we .pn-predio-sede img { width: min(100%, 440px); max-height: none; filter: drop-shadow(0 18px 30px rgba(0,0,0,.6)); }
+.we .pn-predio-sede::before { display: none; }

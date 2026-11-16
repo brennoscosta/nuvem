@@ -8,6 +8,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
 import { terrenoDoUsuario, ehAdmin, PRECO_LOTE, type Terreno } from "@/server/terrenos";
+import { CHAVE_SEDE } from "@/office/data/onestate";
 import { painelDoDono, painelReserva, ofertaDeEntrada, saudacaoBR, type Painel, type Numero } from "@/server/painel";
 import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
 import { CabecalhoApp } from "../_cabecalho";
@@ -34,7 +35,7 @@ export default async function App() {
     chao && !ativo ? painelReserva(u, chao) : null,
     !chao ? ofertaDeEntrada(u) : null,
   ]);
-  const linkLote = chao ? `/mundo?lote=${encodeURIComponent(chao.chave)}` : "/mundo";
+  const linkLote = chao ? (chao.chave === CHAVE_SEDE ? "/mundo?sede=1" : `/mundo?lote=${encodeURIComponent(chao.chave)}`) : "/mundo";
 
   return (
     <div className="pn">
@@ -89,14 +90,14 @@ function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; 
               <span className="pn-aberta"><i aria-hidden="true" />{p.inaugurouHoje ? "Inauguração hoje" : "Aberta no mapa"}</span>
             </div>
             <h2>{empresa}</h2>
-            <p className="pn-endereco">{[p.numero ? `Loja nº ${p.numero}` : null, p.bairro?.nome, p.nicho].filter(Boolean).join(" · ")}</p>
+            <p className="pn-endereco">{[p.sede ? "Sede no quarteirão sudeste" : null, p.numero ? `Loja nº ${p.numero}` : null, p.bairro?.nome, p.nicho].filter(Boolean).join(" · ")}</p>
             {p.promo && <p className="pn-promo-linha"><b>Promoção na fachada:</b> {p.promo.texto} <span>({p.promo.quando})</span></p>}
             <div className={`pn-prazo ${vencendo ? "pn-prazo-alerta" : ""}`}>
               <div className="pn-prazo-txt">
-                <span>{p.diasRestam === null ? "Lote ativo" : dias > 0 ? `Pago até ${p.pagoAte}` : "Venceu: você está na tolerância de 5 dias"}</span>
+                <span>{p.diasRestam === null ? (p.sede ? `Sede ativa até ${p.pagoAte}` : "Lote ativo") : dias > 0 ? `Pago até ${p.pagoAte}` : "Venceu: você está na tolerância de 5 dias"}</span>
                 {p.diasRestam !== null && dias > 0 && <b>{plural(dias, "dia", "dias")}</b>}
               </div>
-              <div className="pn-prazo-trilho"><i style={{ width: `${Math.max(3, Math.min(100, (dias / 30) * 100))}%` }} /></div>
+              <div className="pn-prazo-trilho"><i style={{ width: `${p.sede ? 100 : Math.max(3, Math.min(100, (dias / 30) * 100))}%` }} /></div>
               {vencendo && <p className="pn-prazo-aviso">Renove pelo mapa para manter o endereço. Se o lote sair do mapa, a marca e a equipe ficam guardadas na conta.</p>}
             </div>
             <div className="mt-6 flex flex-wrap gap-2.5">
@@ -104,10 +105,10 @@ function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; 
               {p.numero && <Link href={`/loja/${p.numero}`} className="btn pn-btn-vidro">Página da loja</Link>}
             </div>
           </div>
-          <div className="pn-predio" aria-hidden="true">
+          {p.sede ? <div className="pn-predio pn-predio-sede" aria-hidden="true"><img src="/onestate/logo.png" alt="" width={809} height={240} /></div> : <div className="pn-predio" aria-hidden="true">
             <span className="pn-balao">{p.logo ? <img src={p.logo} alt="" /> : <i>{empresa.slice(0, 1)}</i>}<b>{empresa}</b></span>
             <img src={`/workend/predios/${p.layout}.webp`} alt="" width={420} height={400} />
-          </div>
+          </div>}
         </div>
       </section>
 

@@ -3,6 +3,7 @@
 // (a correção vira regra), pede o relatório da semana ao CEO, lê as conversas dos visitantes da loja e escreve o
 // "Sobre a empresa" que a equipe e a página pública usam. Dados: /api/workend/equipe* (src/server/equipeCliente.ts).
 // Aba Vagas (12/11/2026): o dono abre vagas e lê as candidaturas (src/server/cidade.ts).
+import { CHAVE_SEDE } from "@/office/data/onestate";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { VagasDono } from "./_vagas-dono";
@@ -106,7 +107,8 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
         </div>
         <div className="flex flex-wrap gap-2">
           {p.lote.numero && <Link href={`/loja/${p.lote.numero}`} className="btn btn-linha">Ver minha loja</Link>}
-          <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="btn btn-claro">Montar escritório</Link>
+          {/* a sede do OneState tem um setor por área do site e não passa pelo editor */}
+          {p.lote.chave !== CHAVE_SEDE && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="btn btn-claro">Montar escritório</Link>}
         </div>
       </section>
 

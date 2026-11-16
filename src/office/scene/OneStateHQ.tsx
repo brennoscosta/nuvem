@@ -20,6 +20,7 @@ const PROP_LOGO = 240 / 809; // altura / largura da logo do OneState (public/one
 const S = SEDE.z + SEDE.d / 2, N = SEDE.z - SEDE.d / 2, O = SEDE.x - SEDE.w / 2, L = SEDE.x + SEDE.w / 2; // faces
 
 // ---------- fachadas desenhadas em canvas ----------
+const PELES = ["#F1C9A5", "#C98E68", "#8D5A3B", "#F3D2B3", "#6B4029"];
 const comAlfa = (hex: string, a: number) => { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
 type Tipo = "areas" | "comum" | "saguao";
 function pintar(W: number, H: number, salas: (AreaOneState | null)[], tipo: Tipo) {
@@ -46,6 +47,10 @@ function pintar(W: number, H: number, salas: (AreaOneState | null)[], tipo: Tipo
         const dx = x0 + sw * (0.16 + d * 0.25);
         g.fillStyle = "rgba(6,8,12,.78)"; g.fillRect(dx, H * 0.74, sw * 0.17, H * 0.05); g.fillRect(dx + sw * 0.06, H * 0.62, sw * 0.05, H * 0.11);
         g.fillStyle = comAlfa(cor, 0.85); g.fillRect(dx + sw * 0.065, H * 0.635, sw * 0.04, H * 0.06);
+        // o agente na mesa: tronco com a camisa na cor da área e a cabeça
+        const px = dx + sw * 0.135, pele = PELES[(k * 3 + d) % PELES.length];
+        g.fillStyle = comAlfa(cor, 0.95); g.beginPath(); g.roundRect?.(px - sw * 0.025, H * 0.655, sw * 0.05, H * 0.09, 4); g.fill();
+        g.fillStyle = pele; g.beginPath(); g.arc(px, H * 0.62, H * 0.032, 0, Math.PI * 2); g.fill();
       }
     }
     // montantes do caixilho

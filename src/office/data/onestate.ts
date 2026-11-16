@@ -6,6 +6,8 @@
 import { centroQuarteirao } from "./mundo";
 
 export const SITE_ONESTATE = "https://onestatebr.com.br";
+// a sede é o "lote" de uma conta (o dono): chave fora da lista de lotes à venda, sem número de loja (scripts/sede-onestate.mjs)
+export const CHAVE_SEDE = "1,1,0";
 export const [OS_X, OS_Z] = centroQuarteirao(1, 1);
 // torre: 22 m de frente (x) por 16 m de fundo (z), recuada para o norte (a praça de entrada fica na frente, ao sul)
 export const SEDE = { x: OS_X, z: OS_Z - 3, w: 22, d: 16, andar: 4, andares: 6 };

@@ -2,6 +2,7 @@
 // os chãos pagos e as ações do admin. Regras: a reserva vale 1 hora sem pagamento; pagar (R$ 99 por lote
 // por mês) deixa o chão ativo por 30 dias, com 5 dias de tolerância depois do vencimento; um chão por conta
 // (o admin não tem essa trava); usuário banido não reserva.
+import { CHAVE_SEDE } from "@/office/data/onestate";
 import { avisarSeguidores } from "./seguir";
 import { sql, migrar } from "./db";
 import { QUARTEIROES, nichoValido } from "@/office/data/mundo";
@@ -195,6 +196,7 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
   if (!t) throw new Error("Lote sem dono.");
   if (t.usuarioId !== u.id && !ehAdmin(u)) throw new Error("Esse chão não é seu.");
   if (t.status !== "ativo") throw new Error("Pague o 1º mês pra montar o escritório.");
+  if (chave === CHAVE_SEDE) throw new Error("A sede do OneState tem um setor para cada área do site e não é montada pelo editor.");
   const base = t.escritorio ?? (await garantirEscritorio(chave)) ?? escritorioPadrao(t.empresaNome, t.cor);
   const e = normalizarEscritorio(dados, base);
   const detalhes: string[] = [];
