@@ -19,6 +19,7 @@ import { CartaoLote, PainelEmpresa, ContaWorkend, MenuConta, AvisoPagamento } fr
 import { Icone } from "./Icone";
 import { CartaoPraca, AvisoEventos } from "./Praca";
 import { MiniMapa } from "./MiniMapa";
+import { CartaoOneState } from "./CartaoOneState";
 import { Sino } from "./Sino";
 import { VisitaGuiada } from "./VisitaGuiada";
 import { BotaoSom } from "./Som";
@@ -273,6 +274,7 @@ export function Painel() {
       <CartaoLote />
       <CartaoPraca />
       <CartaoOutdoor />
+      <CartaoOneState />
       <PainelEmpresa />
       <PainelEscritorio />
       <PainelPersonagem />

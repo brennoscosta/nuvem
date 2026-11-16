@@ -17,6 +17,8 @@ import { minhaPos, usePersonagem } from "../personagemStore";
 import { leve } from "../scene/qualidade";
 import { projetar, noChao, PROPORCAO, miniMapa, useVersaoMiniMapa } from "../miniMapa";
 import { Icone } from "./Icone";
+import { abrirOneState } from "./CartaoOneState";
+import { SEDE, ALTURA_SEDE } from "../data/onestate";
 
 const semAssinatura = () => () => {};
 const assinarLargura = (f: () => void) => { const m = window.matchMedia("(min-width: 640px)"); m.addEventListener("change", f); return () => m.removeEventListener("change", f); };
@@ -24,7 +26,8 @@ const largoAgora = () => window.matchMedia("(min-width: 640px)").matches;
 const VB = 1000, VBA = Math.round(VB / PROPORCAO); // caixa do desenho por cima da imagem
 const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
 const Q = QUARTEIRAO + 2 * CALCADA;
-const LUGARES: { nome: string; x: number; y: number; z: number; estilo: "marco" | "agua" | "verde" | "areia"; alvo?: [number, number, number] }[] = [
+const LUGARES: { nome: string; x: number; y: number; z: number; estilo: "marco" | "agua" | "verde" | "areia" | "ouro"; alvo?: [number, number, number]; abrir?: () => void }[] = [
+  { nome: "OneState", x: SEDE.x, y: ALTURA_SEDE, z: SEDE.z, estilo: "ouro", alvo: [SEDE.x, 0.5, SEDE.z + 6], abrir: () => abrirOneState() },
   { nome: "Nuvem", x: 0, y: 22, z: 0, estilo: "marco", alvo: [0, 0.5, 0] },
   { nome: "Lanchonete", x: 52, y: 12, z: 0, estilo: "marco", alvo: [52, 0.5, 0] },
   { nome: "Parque da Cidade", x: 0, y: 2, z: -128, estilo: "verde", alvo: [0, 0.5, -122] },
@@ -50,7 +53,7 @@ function limitar(l: LugarPainel, W: number, H: number, alt: number): LugarPainel
   if (l.x == null || l.y == null) return { x: null, y: null, w };
   return { w, x: Math.round(Math.max(8, Math.min(l.x, W - w - 8))), y: Math.round(Math.max(TOPO, Math.min(l.y, H - Math.min(alt, H - TOPO - 8) - 8))) };
 }
-const ESTILO_LUGAR = { marco: "bg-[#1D4ED8] text-white", agua: "bg-transparent text-[#BFE3FF] italic", verde: "bg-[#14532D]/85 text-[#D9F99D]", areia: "bg-transparent text-[#FDE7B0] italic" } as const;
+const ESTILO_LUGAR = { ouro: "bg-[#14110A] text-[#F2C14E] ring-1 ring-[#D4A63A]", marco: "bg-[#1D4ED8] text-white", agua: "bg-transparent text-[#BFE3FF] italic", verde: "bg-[#14532D]/85 text-[#D9F99D]", areia: "bg-transparent text-[#FDE7B0] italic" } as const;
 
 // polígono (na caixa do desenho) de um retângulo do chão: os quatro cantos projetados
 function poligono(x0: number, z0: number, x1: number, z1: number) {
@@ -75,6 +78,7 @@ function descrever(x: number, z: number, terrenos: Record<string, Terreno>, nome
   }
   const r = RUAS.find((q) => Math.abs((q.eixo === "z" ? z : x) - q.valor) < 4 && Math.abs(q.eixo === "z" ? x : z) < MUNDO.x - 8);
   if (r) return nomesRuas[r.id] ?? r.padrao;
+  if (Math.abs(x - SEDE.x) < Q / 2 && Math.abs(z - (SEDE.z + 3)) < Q / 2) return "Sede do OneState RP";
   if (z < NORTE.rio.z1) return "Parque da Cidade";
   if (z < NORTE.rio.z0) return "Rio";
   if (z < NORTE.calcadao.z0 + 0.5) return "Calçadão do rio";
@@ -237,7 +241,7 @@ export function MiniMapa() {
             </span>
           ); })}
           {LUGARES.map((l) => { const p = projetar(l.x, l.y, l.z); return (
-            <button key={l.nome} onClick={(e) => { e.stopPropagation(); if (l.alvo) voar(l.alvo[0], l.alvo[2]); }} className={`mm-e absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full px-1.5 py-px text-[9px] font-extrabold leading-tight shadow-sm ${ESTILO_LUGAR[l.estilo]} ${l.alvo ? "" : "pointer-events-none"}`} style={{ left: pct(p.u), top: pct(p.v) }}>{l.nome}</button>
+            <button key={l.nome} onClick={(e) => { e.stopPropagation(); if (l.abrir) { l.abrir(); if (!largo) setAbertoCel(false); } else if (l.alvo) voar(l.alvo[0], l.alvo[2]); }} className={`mm-e absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full px-1.5 py-px text-[9px] font-extrabold leading-tight shadow-sm ${ESTILO_LUGAR[l.estilo]} ${l.alvo ? "" : "pointer-events-none"}`} style={{ left: pct(p.u), top: pct(p.v) }}>{l.nome}</button>
           ); })}
           {/* praça de eventos */}
           {praca2 && (() => { const p = projetar(praca2.centro[0], 3, praca2.centro[1]); return (

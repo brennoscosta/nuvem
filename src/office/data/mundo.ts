@@ -25,7 +25,7 @@ export type Lote =
 export interface Quarteirao {
   i: number; // coluna (x)
   j: number; // linha (z)
-  ocupante?: "nuvem" | "restaurante"; // quarteirão inteiro
+  ocupante?: "nuvem" | "restaurante" | "onestate"; // quarteirão inteiro
   lotes?: [Lote, Lote, Lote, Lote]; // ordem: noroeste, nordeste, sudoeste, sudeste
 }
 
@@ -53,7 +53,9 @@ export const QUARTEIROES: Quarteirao[] = [
   { i: -1, j: 1, lotes: [V(), C("casaModerna"), C("casaVelha", 0.95), V(true)] },
   // o lote 0,1,1 (ao sul da Nuvem) virou a praça de eventos e da feira de sábado em 12/11/2026
   { i: 0, j: 1, lotes: [C("casaColonial", 0.95), { tipo: "praca" }, V(), C("casaTerrea", 1.05)] },
-  { i: 1, j: 1, lotes: [C("casaVelha"), C("casaSobrado", 1.05), C("casaModerna", 0.95), V()] },
+  // 16/11/2026: o quarteirão 1,1 (último na ordem, então nenhum lote mudou de número) virou a sede do OneState RP
+  // (src/office/data/onestate.ts); antes tinha 4 lotes à venda, nenhum vendido
+  { i: 1, j: 1, ocupante: "onestate" },
 ];
 
 // Ruas: linhas (z fixo) e colunas (x fixo) nos eixos entre os quarteirões, cobrindo o mundo inteiro
@@ -124,7 +126,6 @@ export type PisoBairro = "terracota" | "xadrezRosa" | "graficoNeon" | "folhas" |
 export type ArvoreBairro = "ipeAmarelo" | "ipeRosa" | "topiaria" | "copaVerde" | "jacaranda" | "palmeiraImperial" | "oiti";
 export interface Bairro { id: string; nome: string; curto: string; lema: string; cor: string; corLuz: string; i: number; j: number; piso: PisoBairro; arvore: ArvoreBairro; sugestao: string[] }
 export const BAIRROS: Bairro[] = [
-  { id: "gastronomico", nome: "Polo Gastronômico", curto: "Gastronomia", lema: "comida, café e bar", cor: "#D9661F", corLuz: "#FFB060", i: 1, j: 1, piso: "terracota", arvore: "ipeAmarelo", sugestao: ["alimentacao", "eventos", "turismo"] },
   { id: "moda", nome: "Rua da Moda", curto: "Moda", lema: "moda, beleza e varejo", cor: "#D6337A", corLuz: "#FF8CC6", i: -1, j: 1, piso: "xadrezRosa", arvore: "ipeRosa", sugestao: ["varejo", "beleza"] },
   { id: "tech", nome: "Distrito Tech", curto: "Tech", lema: "tecnologia e inovação", cor: "#0E8FD6", corLuz: "#5FE3FF", i: -1, j: -1, piso: "graficoNeon", arvore: "topiaria", sugestao: ["tecnologia", "marketing", "conteudo"] },
   { id: "saude", nome: "Saúde & Bem-estar", curto: "Saúde", lema: "clínicas, academias e terapias", cor: "#18A058", corLuz: "#B8FFD2", i: -1, j: 0, piso: "folhas", arvore: "copaVerde", sugestao: ["saude", "beleza"] },
