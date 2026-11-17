@@ -148,6 +148,9 @@ const GEOS = new Map<string, THREE.BufferGeometry>();
 function geo<T extends THREE.BufferGeometry>(k: string, criar: () => T): T { let g = GEOS.get(k) as T | undefined; if (!g) { g = criar(); GEOS.set(k, g); } return g; }
 // quarto de cilindro aberto (guarda-corpo nas quinas arredondadas): q = 0 sudeste, 1 nordeste, 2 noroeste, 3 sudoeste
 const arco = (r: number, h: number, q: number) => geo(`arco${r},${h},${q}`, () => new THREE.CylinderGeometry(r, r, h, 10, 1, true, (q * PI) / 2, PI / 2));
+// quarto de cilindro fechado (quinas do Arredondado): só a parte que aparece; os outros 3/4 ficavam escondidos dentro das
+// caixas (17/11/2026: a bday.fm passava de 22 mil triângulos). Mesmas quinas do arco: 0 sudeste, 1 nordeste, 2 noroeste, 3 sudoeste.
+const quarto = (r: number, h: number, q: number, seg: number) => geo(`quarto${r},${h},${q},${seg}`, () => new THREE.CylinderGeometry(r, r, h, seg, 1, false, (q * PI) / 2, PI / 2));
 // bolinha de poucas faces (lâmpadas: 20 triângulos; plantas: 80) no lugar da esfera de 128
 const bola = (r: number, detalhe: 0 | 1) => geo(`bola${r},${detalhe}`, () => new THREE.IcosahedronGeometry(r, detalhe));
 // prato da parabólica: calota de esfera
@@ -166,7 +169,7 @@ function Arredondado({ x0, x1, z0, z1, r, y, h, m, sombra = false, seg = 20 }: {
     <group>
       <mesh geometry={caixa(w - 2 * r, h, d)} material={m} position={[cx, y, cz]} castShadow={sombra} />
       <mesh geometry={caixa(w, h, d - 2 * r)} material={m} position={[cx, y, cz]} castShadow={sombra} />
-      {[[x0 + r, z0 + r], [x1 - r, z0 + r], [x0 + r, z1 - r], [x1 - r, z1 - r]].map(([x, z], i) => <mesh key={i} geometry={cilindro(r, r, h, seg)} material={m} position={[x, y, z]} castShadow={sombra} />)}
+      {[[x0 + r, z0 + r, 2], [x1 - r, z0 + r, 1], [x0 + r, z1 - r, 3], [x1 - r, z1 - r, 0]].map(([x, z, q]) => <mesh key={q} geometry={quarto(r, h, q, Math.max(3, Math.round(seg / 4)))} material={m} position={[x, y, z]} castShadow={sombra} />)}
     </group>
   );
 }
@@ -312,7 +315,7 @@ function Festa({ sede }: { sede: Sede }) {
   const plantas = (x0: number, x1: number, z0: number, z1: number, y: number, qtd: number) => Array.from({ length: Math.ceil(qtd / passo) }, (_, j) => {
     const k = j * passo, t = qtd > 1 ? k / (qtd - 1) : 0.5, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
     const m = k % 3 === 1 ? (k % 2 ? mFlor : mFlor2) : k % 2 ? mFolha2 : mFolha;
-    return <mesh key={`${x0}:${z0}:${k}`} geometry={bola(0.36, 1)} material={m} position={[x, y, z]} />;
+    return <mesh key={`${x0}:${z0}:${k}`} geometry={bola(0.36, 0)} material={m} position={[x, y, z]} />;
   });
   // varal de lâmpadas do terraço: do mastro do meio até postes na beirada (só para trás e para os lados: a frente é da logo)
   const topoMastro: V3 = [SEDE.x, H + 7, SEDE.z - 2];
