@@ -31,7 +31,7 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
           </div>
         </section>
       ) : (
-        <EquipePainel chaveInicial={sp.lote ?? chao?.chave ?? null} membroInicial={sp.membro ?? null} abaInicial={sp.aba === "vagas" || sp.aba === "visitantes" || sp.aba === "sobre" ? sp.aba : undefined} />
+        <EquipePainel chaveInicial={sp.lote ?? chao?.chave ?? null} membroInicial={sp.membro ?? null} abaInicial={sp.aba === "vagas" || sp.aba === "visitantes" || sp.aba === "sobre" || sp.aba === "internas" ? sp.aba : undefined} />
       )}
       <div className="h-16" />
       <Rodape />

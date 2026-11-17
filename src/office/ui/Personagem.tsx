@@ -6,17 +6,21 @@ import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react
 import { usePersonagem, type Redes, type Outro, type Mensagem, type Perfil } from "../personagemStore";
 import { NICHOS } from "../data/mundo";
 import { useMundo } from "../mundoStore";
-import { TIPOS_AVATAR, TODOS_BONECOS, type Genero } from "../data/bonecos";
+import { TIPOS_AVATAR, TODOS_BONECOS, bonecoDe, codificarVisual, visualCompleto, ESTILOS_CABELO, BARBAS, TRAJES_ESCOLHA, PELES, CORES_CABELO, CORES_ROUPA, CORES_CALCA, CORES_CALCADO, type Genero, type Visual, type Traje, type Boneco as BonecoDef } from "../data/bonecos";
 import { PixAberto } from "./Lote";
 import { ACESSORIOS, ACESSORIO_POR_ID, type LugarAcessorio } from "../data/acessorios";
 import { MISSAO_POR_ID, type Missao } from "../data/missoes";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
-import { Icone, ICONE_ACESSORIO } from "./Icone";
+import { Icone, ICONE_ACESSORIO, ICONE_MISSAO, type NomeIcone } from "./Icone";
+import { RetratoBoneco } from "./RetratoBoneco";
+import { PreviaBoneco } from "./PreviaBoneco";
+import { Cores, Opcoes, Interruptor } from "./EditorVisual";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR");
 
-// Mini avatar em CSS (pele, cabelo, roupa); com acessórios, o ícone de cada um aparece no lugar dele
+// Mini avatar: retrato em SVG do visual do personagem (ui/RetratoBoneco.tsx); com acessórios, o ícone de cada um
+// aparece no lugar dele
 const POS_ICONE: Record<LugarAcessorio, (t: number) => CSSProperties> = {
   cabeca: (t) => ({ left: "50%", top: -t * 0.2, transform: "translateX(-50%)", fontSize: t * 0.42 }),
   rosto: (t) => ({ left: "50%", top: t * 0.2, transform: "translateX(-50%)", fontSize: t * 0.3 }),
@@ -25,7 +29,7 @@ const POS_ICONE: Record<LugarAcessorio, (t: number) => CSSProperties> = {
 };
 export function MiniAvatar({ boneco, roupa, tamanho = 40, acessorios }: { boneco: string; roupa: string; tamanho?: number; acessorios?: string[] }) {
   const usados = (acessorios ?? []).map((i) => ACESSORIO_POR_ID[i]).filter(Boolean);
-  const avatar = <AvatarCss boneco={boneco} roupa={roupa} tamanho={tamanho} />;
+  const avatar = <AvatarRetrato boneco={boneco} roupa={roupa} tamanho={tamanho} />;
   if (!usados.length) return avatar;
   return (
     <span className="relative inline-block shrink-0" style={{ width: tamanho, height: tamanho }}>
@@ -34,21 +38,32 @@ export function MiniAvatar({ boneco, roupa, tamanho = 40, acessorios }: { boneco
     </span>
   );
 }
-function AvatarCss({ boneco, roupa, tamanho }: { boneco: string; roupa: string; tamanho: number }) {
-  const b = TODOS_BONECOS[boneco] ?? TODOS_BONECOS.classico;
-  const semCamisa = b.traje === "semCamisa" || b.traje === "biquini";
+function AvatarRetrato({ boneco, roupa, tamanho }: { boneco: string; roupa: string; tamanho: number }) {
   return (
-    <span className="relative inline-block shrink-0 overflow-hidden rounded-full" style={{ width: tamanho, height: tamanho, background: semCamisa ? b.pele : roupa }}>
-      <span className="absolute left-1/2 -translate-x-1/2 rounded-full" style={{ top: tamanho * 0.1, width: tamanho * 0.46, height: tamanho * 0.46, background: b.pele }} />
-      {b.estiloCabelo !== "careca" && <span className="absolute left-1/2 -translate-x-1/2 rounded-t-full" style={{ top: tamanho * 0.06, width: tamanho * 0.5, height: tamanho * 0.22, background: b.cabelo }} />}
-      {b.estiloCabelo === "longo" && <span className="absolute left-1/2 -translate-x-1/2 rounded-b-lg" style={{ top: tamanho * 0.22, width: tamanho * 0.58, height: tamanho * 0.3, background: b.cabelo, zIndex: 0 }} />}
-      {b.oculos && <span className="absolute left-1/2 -translate-x-1/2 rounded bg-black/70" style={{ top: tamanho * 0.3, width: tamanho * 0.42, height: tamanho * 0.1 }} />}
-      {b.chapeu && <span className="absolute left-1/2 -translate-x-1/2 rounded-full" style={{ top: tamanho * 0.02, width: tamanho * 0.7, height: tamanho * 0.12, background: b.chapeu }} />}
-      {b.traje === "blazer" && <span className="absolute left-1/2 -translate-x-1/2" style={{ top: tamanho * 0.6, width: tamanho * 0.2, height: tamanho * 0.4, background: "#F4F4F0", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />}
-      {b.traje === "biquini" && <span className="absolute left-1/2 -translate-x-1/2 rounded" style={{ top: tamanho * 0.64, width: tamanho * 0.5, height: tamanho * 0.12, background: roupa }} />}
+    <span className="relative inline-block shrink-0 overflow-hidden rounded-full" style={{ width: tamanho, height: tamanho }}>
+      <RetratoBoneco def={bonecoDe(boneco, TODOS_BONECOS.classico)} roupa={roupa} tamanho={tamanho} />
     </span>
   );
 }
+
+// ---------- painel "Meu personagem" (refeito em 16/11/2026) ----------
+// Prévia 3D girando em cima, nome, e abas: Visual pronto, Corpo, Cabelo, Roupa, Calça e tênis, Acessórios, Perfil e
+// redes. Cada ajuste (pele, penteado, cores, roupa, barba, óculos) vai no "visual" salvo com o personagem. No celular
+// é uma gaveta que sobe de baixo.
+type Aba = "pronto" | "corpo" | "cabelo" | "roupa" | "pes" | "acessorios" | "perfil";
+const ABAS: { id: Aba; nome: string; icone: NomeIcone }[] = [
+  { id: "pronto", nome: "Visual pronto", icone: "brilho" },
+  { id: "corpo", nome: "Corpo", icone: "pessoa" },
+  { id: "cabelo", nome: "Cabelo", icone: "cabelo" },
+  { id: "roupa", nome: "Roupa", icone: "camiseta" },
+  { id: "pes", nome: "Calça e tênis", icone: "tenis" },
+  { id: "acessorios", nome: "Acessórios", icone: "oculosSol" },
+  { id: "perfil", nome: "Perfil e redes", icone: "perfil" },
+];
+const NOME_PRAIA: Partial<Record<Traje, string>> = { semCamisa: "Sem camisa", biquini: "Biquíni", saida: "Saída de praia" };
+const sortear = <T,>(l: readonly T[]) => l[Math.floor(Math.random() * l.length)];
+const clarear = (hex: string, k: number) => { const n = parseInt(hex.slice(1), 16) || 0; const c = (s: number) => Math.round(((n >> s) & 255) * (1 - k) + 255 * k); return `rgb(${c(16)},${c(8)},${c(0)})`; };
+const BOTAO_PREVIA = "grid h-9 w-9 place-items-center rounded-full bg-white/85 text-[#3A414C] shadow-sm backdrop-blur transition-colors hover:bg-white";
 
 export function PainelPersonagem() {
   const painel = usePersonagem((s) => s.painel);
@@ -57,13 +72,16 @@ export function PainelPersonagem() {
   const preco = usePersonagem((s) => s.preco);
   const precoCheio = usePersonagem((s) => s.precoCheio);
   const pagamentoLigado = usePersonagem((s) => s.pagamentoLigado);
+  const itens = usePersonagem((s) => s.itens);
   const salvar = usePersonagem((s) => s.salvar);
   const pagar = usePersonagem((s) => s.pagar);
   const fechar = usePersonagem((s) => s.fechar);
   const pix = useMundo((s) => s.pix);
   const usuario = useMundo((s) => s.usuario);
   const [genero, setGenero] = useState<Genero | "todos">("todos");
-  const [f, setF] = useState({ nome: "", tipo: TIPOS_AVATAR[0].id, bio: "", redes: {} as Redes, mostrarRedes: false, perfil: PERFIL_VAZIO as Perfil });
+  const [f, setF] = useState({ nome: "", tipo: TIPOS_AVATAR[0].id, bio: "", redes: {} as Redes, mostrarRedes: false, perfil: PERFIL_VAZIO as Perfil, visual: {} as Visual });
+  const [aba, setAba] = useState<Aba>("pronto");
+  const [perto, setPerto] = useState<boolean | null>(null); // null = a câmera segue a aba (rosto em Corpo e Cabelo)
   const [abrirPerfil, setAbrirPerfil] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -72,7 +90,7 @@ export function PainelPersonagem() {
   const [pagando, setPagando] = useState(false);
   const carregadoDe = useRef<string | null>(null);
   // preenche o formulário com o que já existe (uma vez por personagem)
-  useEffect(() => { if (painel === "montar" && meu && carregadoDe.current !== meu.usuarioId) { carregadoDe.current = meu.usuarioId; setF({ nome: meu.nome, tipo: meu.tipo, bio: meu.bio, redes: meu.redes ?? {}, mostrarRedes: meu.mostrarRedes, perfil: { profissao: meu.profissao ?? "", nicho: meu.nicho ?? "", servicos: meu.servicos ?? "", preco: meu.preco ?? "", local: meu.local ?? "", portfolio: meu.portfolio ?? [], disponivel: meu.disponivel ?? true } }); setAbrirPerfil(!!meu.profissao); } }, [painel, meu]);
+  useEffect(() => { if (painel === "montar" && meu && carregadoDe.current !== meu.usuarioId) { carregadoDe.current = meu.usuarioId; setF({ nome: meu.nome, tipo: meu.tipo, bio: meu.bio, redes: meu.redes ?? {}, mostrarRedes: meu.mostrarRedes, perfil: { profissao: meu.profissao ?? "", nicho: meu.nicho ?? "", servicos: meu.servicos ?? "", preco: meu.preco ?? "", local: meu.local ?? "", portfolio: meu.portfolio ?? [], disponivel: meu.disponivel ?? true }, visual: meu.visual ?? {} }); setAbrirPerfil(!!meu.profissao); } }, [painel, meu]);
   if (painel !== "montar") return null;
   if (!usuario) return (
     <div className={`${FLUTUANTE} ${ESTREITO} painel-entra overflow-y-auto p-4`}>
@@ -86,6 +104,21 @@ export function PainelPersonagem() {
   );
   const tipos = TIPOS_AVATAR.filter((t) => genero === "todos" || t.genero === genero);
   const tipo = TIPOS_AVATAR.find((t) => t.id === f.tipo) ?? TIPOS_AVATAR[0];
+  // o visual que aparece: o boneco do tipo escolhido com os ajustes por cima
+  const base = bonecoDe(tipo.boneco);
+  const personalizado = Object.keys(f.visual).length > 0;
+  const vc = visualCompleto(base, tipo.roupa, f.visual);
+  const bonecoId = personalizado ? codificarVisual(vc, tipo.boneco) : tipo.boneco;
+  const def = bonecoDe(bonecoId, base);
+  const camisa = vc.roupa;
+  const usando = itens?.usando ?? meu?.acessorios ?? [];
+  const praia = vc.traje === "semCamisa" || vc.traje === "biquini" || vc.traje === "saida";
+  const trajes = TRAJES_ESCOLHA.some((t) => t.id === base.traje) || !base.traje ? TRAJES_ESCOLHA : [...TRAJES_ESCOLHA, { id: base.traje, nome: NOME_PRAIA[base.traje] ?? "Praia" }];
+  const pertoAgora = perto ?? (aba === "cabelo" || aba === "corpo");
+  const mudarVisual = (p: Partial<Visual>) => setF({ ...f, visual: { ...f.visual, ...p } });
+  const escolherAba = (a: Aba) => { setAba(a); setPerto(null); };
+  const surpresa = () => setF({ ...f, visual: { pele: sortear(PELES), cabelo: sortear(CORES_CABELO.slice(0, 9)), estiloCabelo: sortear(ESTILOS_CABELO).id, barba: Math.random() < 0.65 ? "nenhuma" : sortear(BARBAS).id, traje: sortear(TRAJES_ESCOLHA).id, roupa: sortear(CORES_ROUPA), calca: sortear(CORES_CALCA), calcado: sortear(CORES_CALCADO), tenis: Math.random() < 0.5 ? "" : sortear(CORES_CALCADO), oculos: Math.random() < 0.2 } });
+  const retrato = (d: Partial<BonecoDef>, t = 54) => <RetratoBoneco def={{ ...def, ...d }} roupa={camisa} tamanho={t} />;
   // salvar: mostra o "salvo com sucesso" e fecha sozinho (se ainda não pagou, fica aberto no Pix)
   const clicarSalvar = async () => {
     setErro(null); setSalvando(true); const e = await salvar(f); setSalvando(false);
@@ -95,54 +128,135 @@ export function PainelPersonagem() {
   };
   const clicarPagar = async () => { setErro(null); setPagando(true); const e1 = meu ? null : await salvar(f); if (e1) { setErro(e1); setPagando(false); return; } const e = await pagar(1); setPagando(false); if (e) setErro(e); };
   const setRede = (k: keyof Redes, v: string) => setF({ ...f, redes: { ...f.redes, [k]: v } });
+  const campoRede = (k: keyof Redes, icone: NomeIcone, dica: string) => (
+    <label className="flex items-center gap-2 rounded-xl border border-black/10 px-3 py-2 focus-within:border-[#1D4ED8]">
+      <Icone nome={icone} tamanho={16} className="shrink-0 text-[#8A93A3]" />
+      <input value={f.redes[k] ?? ""} onChange={(e) => setRede(k, e.target.value)} placeholder={dica} aria-label={dica} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+    </label>
+  );
+  const pixAberto = pix?.lote === "personagem";
   return (
-    <div className={`${FLUTUANTE} ${LARGO} painel-entra flex flex-col overflow-hidden`}>
+    <div className="painel-entra absolute inset-x-0 bottom-0 z-20 flex h-[86dvh] flex-col overflow-hidden rounded-t-3xl bg-white text-[#1D2128] shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-20 sm:h-[min(46rem,calc(100dvh-7rem))] sm:w-[26rem] sm:rounded-3xl">
       {salvo && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/95">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/95">
           <svg viewBox="0 0 64 64" className="salvo-pop h-20 w-20"><circle cx="32" cy="32" r="30" fill="#16A34A" /><path d="M18 33 L28 43 L46 23" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" className="salvo-risco" /></svg>
           <div className="text-lg font-bold text-[#166534]">Salvo com sucesso</div>
         </div>
       )}
-      <div className="flex items-start justify-between p-4 pb-2">
-        <div><div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">Meu personagem</div><div className="text-lg font-bold">{meu ? meu.nome : "Monte seu personagem"}</div>
-          <div className="text-xs text-[#5B6472]">{ativo ? `Ativo até ${meu?.pagoAte ? dataBR(meu.pagoAte) : "—"} · clique no chão pra andar` : "Ande pelo mapa, converse e faça negócios."}</div></div>
-        <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
+      {/* prévia 3D */}
+      <div className="relative h-[30dvh] max-h-[15.5rem] min-h-[10.5rem] shrink-0 sm:h-[15.5rem]" style={{ background: `radial-gradient(120% 95% at 50% 100%, ${clarear(camisa, 0.62)} 0%, #F6F8FB 64%)` }}>
+        <PreviaBoneco def={def} camisa={camisa} acessorios={usando} perto={pertoAgora} className="absolute inset-0" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start gap-3 p-4">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-lg font-bold leading-tight">{f.nome.trim() || (meu ? meu.nome : "Seu personagem")}</div>
+            <div className="mt-0.5 text-xs text-[#5B6472]">{ativo ? `Ativo até ${meu?.pagoAte ? dataBR(meu.pagoAte) : "—"}` : meu ? "Falta ativar para entrar no mapa" : "Monte o seu e entre no mapa"}</div>
+          </div>
+          <button onClick={fechar} aria-label="Fechar" className={`pointer-events-auto ${BOTAO_PREVIA}`}><Icone nome="fechar" tamanho={18} /></button>
+        </div>
+        <span className="pointer-events-none absolute left-1/2 top-1.5 h-1 w-10 -translate-x-1/2 rounded-full bg-black/15 sm:hidden" />
+        <div className="pointer-events-none absolute bottom-3 left-4 flex items-center gap-1 text-[11px] font-medium text-[#5B6472]"><Icone nome="girarDir" tamanho={13} />Arraste para girar</div>
+        <div className="absolute bottom-3 right-3 flex gap-1.5">
+          {personalizado && <button onClick={() => setF({ ...f, visual: {} })} aria-label="Voltar ao visual pronto" title="Voltar ao visual pronto" className={BOTAO_PREVIA}><Icone nome="girarEsq" tamanho={18} /></button>}
+          <button onClick={surpresa} aria-label="Visual surpresa" title="Visual surpresa" className={BOTAO_PREVIA}><Icone nome="dado" tamanho={18} /></button>
+          <button onClick={() => setPerto(!pertoAgora)} aria-label={pertoAgora ? "Ver o corpo inteiro" : "Ver o rosto de perto"} title={pertoAgora ? "Ver o corpo inteiro" : "Ver o rosto de perto"} className={BOTAO_PREVIA}><Icone nome={pertoAgora ? "zoomMenos" : "zoomMais"} tamanho={18} /></button>
+        </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
-        <div className="flex items-center gap-3 rounded-2xl bg-[#F1F3F6] p-3"><MiniAvatar boneco={tipo.boneco} roupa={tipo.roupa} tamanho={56} acessorios={meu?.acessorios} /><div><div className="font-bold">{tipo.nome}</div><div className="text-xs text-[#5B6472]">{tipo.genero} · {tipo.estilo}</div></div></div>
-        {meu && <MeusSelos />}
-        <label className="mt-3 block text-xs font-semibold text-[#5B6472]">Nome no balãozinho<input value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value.slice(0, 24) })} placeholder="Ex.: Bia" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal outline-none focus:border-[#1D4ED8]" /></label>
-        <div className="mt-3 text-xs font-semibold text-[#5B6472]">Gênero</div>
-        <div className="mt-1 flex gap-1.5">{(["todos", "feminino", "masculino", "neutro"] as const).map((g) => <button key={g} onClick={() => setGenero(g)} className={`rounded-full px-3 py-1 text-xs font-semibold ${genero === g ? "bg-[#1D4ED8] text-white" : "bg-[#F1F3F6] text-[#5B6472]"}`}>{g === "todos" ? "Todos" : g[0].toUpperCase() + g.slice(1)}</button>)}</div>
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
-          {tipos.map((t) => <button key={t.id} onClick={() => setF({ ...f, tipo: t.id })} title={t.nome} className={`flex flex-col items-center gap-1 rounded-xl border-2 p-1.5 ${f.tipo === t.id ? "border-[#1D4ED8] bg-[#EEF3FF]" : "border-transparent bg-[#F7F8FA]"}`}><MiniAvatar boneco={t.boneco} roupa={t.roupa} tamanho={36} /><span className="w-full truncate text-center text-[10px] font-semibold">{t.nome}</span></button>)}
+      {/* nome e abas */}
+      <div className="shrink-0 border-b border-black/5 px-4 pt-3">
+        <label className="flex items-center gap-2 rounded-2xl bg-[#F4F6F9] px-3 py-2 focus-within:ring-2 focus-within:ring-[#1D4ED8]/30">
+          <span className="shrink-0 text-xs font-semibold text-[#5B6472]">Nome no balãozinho</span>
+          <input value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value.slice(0, 24) })} placeholder="Ex.: Bia" className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:font-normal" />
+        </label>
+        <div role="tablist" aria-label="Partes do personagem" className="mt-2 flex flex-wrap gap-1 pb-2.5">
+          {ABAS.map((a) => (
+            <button key={a.id} role="tab" aria-selected={aba === a.id} onClick={() => escolherAba(a.id)} className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold ${aba === a.id ? "bg-[#1D2128] text-white" : "bg-[#F4F6F9] text-[#5B6472] hover:bg-[#E9ECF1]"}`}>
+              <Icone nome={a.icone} tamanho={16} />{a.nome}
+            </button>
+          ))}
         </div>
-        <label className="mt-3 block text-xs font-semibold text-[#5B6472]">Sobre você (aparece na ficha)<textarea value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value.slice(0, 200) })} rows={2} placeholder="Ex.: Dona de loja de roupas em Aracaju, procuro fornecedores." className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal outline-none focus:border-[#1D4ED8]" /></label>
-        <div className="mt-3 text-xs font-semibold text-[#5B6472]">Redes sociais (pra trocar com quem você quiser)</div>
-        <div className="mt-1 grid grid-cols-2 gap-1.5">
-          <input value={f.redes.instagram ?? ""} onChange={(e) => setRede("instagram", e.target.value)} placeholder="Instagram (@)" className="rounded-xl border border-black/10 px-3 py-1.5 text-sm" />
-          <input value={f.redes.whatsapp ?? ""} onChange={(e) => setRede("whatsapp", e.target.value)} placeholder="WhatsApp (DDD+nº)" className="rounded-xl border border-black/10 px-3 py-1.5 text-sm" />
-          <input value={f.redes.linkedin ?? ""} onChange={(e) => setRede("linkedin", e.target.value)} placeholder="LinkedIn" className="rounded-xl border border-black/10 px-3 py-1.5 text-sm" />
-          <input value={f.redes.site ?? ""} onChange={(e) => setRede("site", e.target.value)} placeholder="Site" className="rounded-xl border border-black/10 px-3 py-1.5 text-sm" />
-        </div>
-        <label className="mt-2 flex items-center gap-2 text-xs text-[#5B6472]"><input type="checkbox" checked={f.mostrarRedes} onChange={(e) => setF({ ...f, mostrarRedes: e.target.checked })} /> Mostrar minhas redes pra todo mundo (senão só pra quem eu aceitar)</label>
-        <CamposPerfil perfil={f.perfil} aberto={abrirPerfil} abrir={() => setAbrirPerfil(true)} mudar={(p) => setF({ ...f, perfil: { ...f.perfil, ...p } })} />
-        {meu && <LojaAcessorios boneco={tipo.boneco} roupa={tipo.roupa} />}
-        {!ativo && (
-          <div className="mt-3 rounded-2xl border border-[#16A34A]/30 bg-[#F3FBF5] p-3">
-            <div className="text-sm"><span className="text-[#5B6472] line-through">{brl(precoCheio)}</span> <b className="text-lg text-[#166534]">{brl(preco)}</b><span className="text-xs text-[#5B6472]">/mês · promoção de lançamento</span></div>
-            <div className="mt-1 text-[11px] text-[#5B6472]">Entre no mapa como personagem: fale com a equipe de qualquer loja, converse ao vivo, faça amigos, negocie e faça calls.</div>
-            {pix?.lote === "personagem" ? <PixAberto chave="personagem" /> : pagamentoLigado
-              ? <button onClick={clicarPagar} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Ativar por ${brl(preco)} no Pix`}</button>
-              : <div className="mt-2 rounded-xl bg-[#F1F3F6] px-3 py-2 text-center text-xs text-[#5B6472]">Pagamento em instantes.</div>}
+      </div>
+      {/* conteúdo da aba */}
+      <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
+        {pixAberto && <div className="mb-3"><PixAberto chave="personagem" /></div>}
+        {aba === "pronto" && (
+          <>
+            <p className="text-xs text-[#5B6472]">Comece por um visual pronto e ajuste os detalhes nas outras abas.</p>
+            <div className="mt-3 flex gap-1.5">{(["todos", "feminino", "masculino", "neutro"] as const).map((g) => <button key={g} onClick={() => setGenero(g)} className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${genero === g ? "bg-[#1D4ED8] text-white" : "bg-[#F1F3F6] text-[#5B6472] hover:bg-[#E6E9EE]"}`}>{g === "todos" ? "Todos" : g[0].toUpperCase() + g.slice(1)}</button>)}</div>
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {tipos.map((t) => { const sel = f.tipo === t.id; return (
+                <button key={t.id} onClick={() => setF({ ...f, tipo: t.id, visual: {} })} title={t.nome} aria-pressed={sel} className={`flex min-w-0 flex-col items-center gap-1 rounded-2xl border-2 p-1.5 pb-2 transition-colors ${sel ? "border-[#1D4ED8] bg-[#EEF3FF]" : "border-transparent bg-[#F4F6F9] hover:bg-[#EBEEF3]"}`}>
+                  <MiniAvatar boneco={t.boneco} roupa={t.roupa} tamanho={50} />
+                  <span className={`w-full truncate text-center text-[11px] font-semibold ${sel ? "text-[#1D4ED8]" : "text-[#3A414C]"}`}>{t.nome}</span>
+                </button>); })}
+            </div>
+            {personalizado && <div className="mt-3 flex items-start gap-2 rounded-2xl bg-[#EEF3FF] px-3 py-2 text-xs text-[#1D3A8A]"><Icone nome="editar" tamanho={16} className="mt-px shrink-0" /><span>Visual personalizado a partir de <b>{tipo.nome}</b>. Escolher outro visual pronto desfaz os ajustes.</span></div>}
+          </>
+        )}
+        {aba === "corpo" && (
+          <>
+            <Cores titulo="Tom de pele" cores={PELES} valor={vc.pele} mudar={(c) => mudarVisual({ pele: c })} />
+            <Opcoes titulo="Barba" opcoes={BARBAS.map((b) => ({ id: b.id, nome: b.nome, figura: retrato({ barba: b.id }) }))} valor={vc.barba} mudar={(b) => mudarVisual({ barba: b })} />
+            <Interruptor ligado={vc.oculos} mudar={(o) => mudarVisual({ oculos: o })}><b className="block font-semibold">Óculos de grau</b><span className="text-xs text-[#5B6472]">Grátis. Óculos escuros e outros modelos estão em Acessórios.</span></Interruptor>
+          </>
+        )}
+        {aba === "cabelo" && (
+          <>
+            <Opcoes titulo="Penteado" opcoes={ESTILOS_CABELO.map((e) => ({ id: e.id, nome: e.nome, figura: retrato({ estiloCabelo: e.id }) }))} valor={vc.estiloCabelo} mudar={(e) => mudarVisual({ estiloCabelo: e })} />
+            <Cores titulo="Cor do cabelo" cores={CORES_CABELO} valor={vc.cabelo} mudar={(c) => mudarVisual({ cabelo: c })} />
+          </>
+        )}
+        {aba === "roupa" && (
+          <>
+            <Opcoes titulo="Tipo de roupa" colunas={trajes.length > 6 ? 4 : 3} opcoes={trajes.map((t) => ({ id: t.id, nome: t.nome, figura: retrato({ traje: t.id }, trajes.length > 6 ? 54 : 64) }))} valor={vc.traje} mudar={(t) => mudarVisual({ traje: t })} />
+            <Cores titulo={vc.traje === "blazer" ? "Cor do blazer" : vc.traje === "vestido" ? "Cor do vestido" : "Cor da roupa"} cores={CORES_ROUPA} valor={vc.roupa} mudar={(c) => mudarVisual({ roupa: c })} />
+            {vc.traje === "camisa" && <p className="mt-3 text-[11px] text-[#5B6472]">A camiseta leva o logo da Nuvem no peito e o crachá.</p>}
+          </>
+        )}
+        {aba === "pes" && (
+          <>
+            {vc.traje === "vestido" ? <p className="text-xs text-[#5B6472]">Com vestido as pernas ficam de fora.</p>
+              : <Cores titulo={praia ? "Cor da bermuda ou do biquíni" : "Cor da calça"} cores={CORES_CALCA} valor={vc.calca} mudar={(c) => mudarVisual({ calca: c })} />}
+            {praia ? <p className="mt-4 rounded-2xl bg-[#F4F6F9] px-3 py-2 text-xs text-[#5B6472]">Na praia o personagem anda de chinelo. Escolha outra roupa para usar tênis.</p> : (
+              <>
+                <Cores titulo="Cor do tênis" cores={CORES_CALCADO} valor={vc.calcado} mudar={(c) => mudarVisual({ calcado: c })} />
+                <Cores titulo="Sola e listra" cores={CORES_CALCADO} valor={vc.tenis} nenhum="Liso" mudar={(c) => mudarVisual({ tenis: c })} />
+              </>
+            )}
+          </>
+        )}
+        {aba === "acessorios" && (meu ? <LojaAcessorios boneco={bonecoId} roupa={camisa} embutida /> : <p className="rounded-2xl bg-[#F4F6F9] px-3 py-3 text-xs text-[#5B6472]">Salve o personagem para abrir a loja de roupas e acessórios: boné, óculos, mochila, coroa e mais.</p>)}
+        {aba === "perfil" && (
+          <>
+            {meu && <MeusSelos />}
+            <label className="mt-1 block text-[13px] font-semibold">Sobre você<span className="ml-1 font-normal text-[#8A93A3]">aparece na ficha</span>
+              <textarea value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value.slice(0, 200) })} rows={2} placeholder="Ex.: Dona de loja de roupas em Aracaju, procuro fornecedores." className="mt-1.5 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal outline-none focus:border-[#1D4ED8]" />
+            </label>
+            <div className="mt-4 text-[13px] font-semibold">Redes sociais<span className="ml-1 font-normal text-[#8A93A3]">para trocar com quem você quiser</span></div>
+            <div className="mt-1.5 grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-2">
+              {campoRede("instagram", "instagram", "Instagram (@)")}
+              {campoRede("whatsapp", "telefone", "WhatsApp com DDD")}
+              {campoRede("linkedin", "maleta", "LinkedIn")}
+              {campoRede("site", "globo", "Site")}
+            </div>
+            <Interruptor ligado={f.mostrarRedes} mudar={(v) => setF({ ...f, mostrarRedes: v })}><b className="block font-semibold">Mostrar minhas redes para todo mundo</b><span className="text-xs text-[#5B6472]">Desligado, só quem você aceitar vê.</span></Interruptor>
+            <CamposPerfil perfil={f.perfil} aberto={abrirPerfil} abrir={() => setAbrirPerfil(true)} mudar={(p) => setF({ ...f, perfil: { ...f.perfil, ...p } })} />
+          </>
+        )}
+        {erro && <div className="mt-3 text-xs font-semibold text-[#E2575B]">{erro}</div>}
+        {aviso && <div className="mt-3 text-xs font-semibold text-[#166534]">{aviso}</div>}
+      </div>
+      {/* rodapé: ativar (se ainda não pagou) e salvar */}
+      <div className="shrink-0 border-t border-black/5 p-3 sm:px-4">
+        {!ativo && !pixAberto && (
+          <div className="mb-2 flex items-center gap-3 rounded-2xl bg-[#F3FBF5] px-3 py-2">
+            <div className="min-w-0 flex-1 text-xs"><span className="text-[#5B6472] line-through">{brl(precoCheio)}</span> <b className="text-sm text-[#166534]">{brl(preco)}</b><span className="text-[#5B6472]">/mês</span><div className="truncate text-[11px] text-[#5B6472]">Entre no mapa, converse, negocie e faça calls.</div></div>
+            {pagamentoLigado ? <button onClick={clicarPagar} disabled={pagando} className="shrink-0 rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{pagando ? "Gerando o Pix…" : "Ativar no Pix"}</button> : <span className="shrink-0 text-[11px] text-[#5B6472]">Pagamento em instantes</span>}
           </div>
         )}
-        {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
-        {aviso && <div className="mt-2 text-xs font-semibold text-[#166534]">{aviso}</div>}
-      </div>
-      <div className="flex gap-2 border-t border-black/5 p-4 pt-3">
-        <button onClick={fechar} className="rounded-xl bg-[#F1F3F6] px-3 py-2.5 text-sm font-semibold text-[#5B6472]">Fechar</button>
-        <button onClick={clicarSalvar} disabled={salvando || f.nome.trim().length < 2} className="flex-1 rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50">{salvando ? "Salvando…" : meu ? "Salvar personagem" : "Criar personagem"}</button>
+        <div className="flex gap-2">
+          <button onClick={fechar} className="rounded-xl bg-[#F1F3F6] px-4 py-2.5 text-sm font-semibold text-[#5B6472]">Fechar</button>
+          <button onClick={clicarSalvar} disabled={salvando || f.nome.trim().length < 2} title={f.nome.trim().length < 2 ? "Dê um nome ao seu personagem" : undefined} className="flex-1 rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50">{salvando ? "Salvando…" : meu ? "Salvar personagem" : "Criar personagem"}</button>
+        </div>
       </div>
     </div>
   );
@@ -225,7 +339,7 @@ export function Selos({ ids }: { ids: string[] }) {
   if (!lista.length) return null;
   return (
     <div className="mt-2 flex flex-wrap gap-1" aria-label="Selos conquistados">
-      {lista.map((m) => <span key={m.id} title={`${m.nome}: ${m.desc}`} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm" style={{ background: m.cor }}><span className="text-[11px]">{m.selo}</span>{m.nome}</span>)}
+      {lista.map((m) => <span key={m.id} title={`${m.nome}: ${m.desc}`} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm" style={{ background: m.cor }}><Icone nome={ICONE_MISSAO[m.id] ?? "selo"} tamanho={12} traco={2.2} />{m.nome}</span>)}
     </div>
   );
 }
@@ -243,10 +357,10 @@ function MeusSelos() {
   const feitas = lista.filter((m) => m.completa).length;
   const proxima = lista.find((m) => !m.completa);
   return (
-    <div className="mt-2 rounded-2xl bg-[#F7F8FA] p-3">
-      <div className="flex items-center justify-between"><div className="text-xs font-semibold text-[#5B6472]">Meus selos</div><div className="text-[11px] font-semibold text-[#5B6472]">{feitas} de {lista.length}</div></div>
+    <div className="mb-4 rounded-2xl bg-[#F7F8FA] p-3">
+      <div className="flex items-center justify-between"><div className="text-[13px] font-semibold">Meus selos</div><div className="text-[11px] font-semibold text-[#5B6472]">{feitas} de {lista.length}</div></div>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
-        {lista.map((m) => <span key={m.id} title={`${m.nome}: ${m.desc} (${m.feito}/${m.meta})`} className={`flex h-9 w-9 items-center justify-center rounded-full text-base ${m.completa ? "shadow-sm" : "opacity-40 grayscale"}`} style={{ background: m.completa ? m.cor : "#E3E6EA" }}>{m.selo}</span>)}
+        {lista.map((m) => <span key={m.id} title={`${m.nome}: ${m.desc} (${m.feito}/${m.meta})`} className={`flex h-9 w-9 items-center justify-center rounded-full ${m.completa ? "text-white shadow-sm" : "text-[#8A93A3]"}`} style={{ background: m.completa ? m.cor : "#E3E6EA" }}><Icone nome={ICONE_MISSAO[m.id] ?? "selo"} tamanho={18} /></span>)}
       </div>
       <div className="mt-1.5 text-[11px] text-[#5B6472]">{proxima ? <>Próximo: <b className="text-[#1D2128]">{proxima.nome}</b> · {proxima.desc} ({proxima.feito}/{proxima.meta})</> : "Você conquistou todos os selos!"} Os selos aparecem na sua ficha para todo mundo.</div>
     </div>
@@ -255,7 +369,7 @@ function MeusSelos() {
 
 // Loja de roupas e acessórios do personagem (12/11/2026): um item por lugar; comprado fica na conta para sempre
 const LUGARES: [LugarAcessorio, string][] = [["cabeca", "Cabeça"], ["rosto", "Rosto"], ["costas", "Costas"], ["pescoco", "Pescoço"]];
-function LojaAcessorios({ boneco, roupa }: { boneco: string; roupa: string }) {
+function LojaAcessorios({ boneco, roupa, embutida = false }: { boneco: string; roupa: string; embutida?: boolean }) {
   const itens = usePersonagem((s) => s.itens);
   const carregarItens = usePersonagem((s) => s.carregarItens);
   const vestir = usePersonagem((s) => s.vestir);
@@ -269,7 +383,7 @@ function LojaAcessorios({ boneco, roupa }: { boneco: string; roupa: string }) {
   useEffect(() => { void carregarItens(); }, [carregarItens]);
   const comprados = itens?.comprados ?? [], usando = itens?.usando ?? [];
   const pixItem = pix?.tipo === "item" ? pix.lote : null;
-  const mostrar = aberto || (!!pixItem && pix?.status === "pendente");
+  const mostrar = embutida || aberto || (!!pixItem && pix?.status === "pendente");
   const precoMin = Math.min(...ACESSORIOS.map((a) => a.preco));
   const agir = async (id: string) => {
     setErro(null); setOcupado(id);
@@ -281,20 +395,21 @@ function LojaAcessorios({ boneco, roupa }: { boneco: string; roupa: string }) {
     setOcupado(null); if (e) setErro(e);
   };
   return (
-    <div className="mt-3 rounded-2xl border border-[#7C3AED]/20 bg-[#FAF7FF] p-3">
+    <div className={embutida ? "" : "mt-3 rounded-2xl border border-[#7C3AED]/20 bg-[#FAF7FF] p-3"}>
+      {embutida ? <div className="flex items-center gap-3 rounded-2xl bg-[#FAF7FF] p-2.5"><MiniAvatar boneco={boneco} roupa={roupa} tamanho={44} acessorios={usando} /><div className="min-w-0 flex-1 text-xs text-[#5B6472]">{comprados.length ? `${comprados.length} na sua conta · ${usando.length} em uso` : `Boné, óculos, mochila, coroa… a partir de ${brl(precoMin)}, no Pix`}</div></div> : (
       <button type="button" onClick={() => setAberto(!mostrar)} className="flex w-full items-center gap-3 text-left">
         <MiniAvatar boneco={boneco} roupa={roupa} tamanho={44} acessorios={usando} />
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-[#7C3AED]">Roupas e acessórios</div>
+          <div className="text-[13px] font-semibold text-[#7C3AED]">Roupas e acessórios</div>
           <div className="text-xs text-[#5B6472]">{comprados.length ? `${comprados.length} na sua conta · ${usando.length} em uso` : `Boné, óculos, mochila, coroa… a partir de ${brl(precoMin)}, no Pix`}</div>
         </div>
-        <span className="text-sm text-[#7C3AED]">{mostrar ? "▴" : "▾"}</span>
-      </button>
+        <Icone nome="baixo" tamanho={18} className={`text-[#7C3AED] transition-transform ${mostrar ? "rotate-180" : ""}`} />
+      </button>)}
       {mostrar && (
-        <div className="mt-2 space-y-2">
+        <div className={embutida ? "mt-3 space-y-4" : "mt-2 space-y-2"}>
           {LUGARES.map(([lugar, nome]) => (
             <div key={lugar}>
-              <div className="text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">{nome} <span className="font-normal normal-case">· um por vez</span></div>
+              <div className="text-[13px] font-semibold">{nome} <span className="text-[11px] font-normal text-[#8A93A3]">· um por vez</span></div>
               <div className="mt-1 grid grid-flow-row-dense grid-cols-2 gap-1.5">
                 {ACESSORIOS.filter((a) => a.lugar === lugar).map((a) => {
                   const tem = comprados.includes(a.id), uso = usando.includes(a.id), chave = `item:${a.id}`;
@@ -302,7 +417,7 @@ function LojaAcessorios({ boneco, roupa }: { boneco: string; roupa: string }) {
                     <Fragment key={a.id}>
                     <div className={`flex items-center gap-2 rounded-xl border-2 p-1.5 ${uso ? "border-[#7C3AED] bg-white" : "border-transparent bg-white/70"}`}>
                       <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white" style={{ color: a.cor === "#FFFFFF" ? "#8C97A6" : a.cor }}><Icone nome={ICONE_ACESSORIO[a.id] ?? "mais"} tamanho={20} /></span>
-                      <div className="min-w-0 flex-1"><div className="truncate text-[11px] font-bold">{a.nome}</div><div className="text-[10px] text-[#5B6472]">{uso ? "usando ✓" : tem ? "na sua conta" : brl(a.preco)}</div></div>
+                      <div className="min-w-0 flex-1"><div className="truncate text-[11px] font-bold">{a.nome}</div><div className="text-[10px] text-[#5B6472]">{uso ? <span className="inline-flex items-center gap-0.5 font-semibold text-[#7C3AED]"><Icone nome="check" tamanho={11} traco={2.6} />usando</span> : tem ? "na sua conta" : brl(a.preco)}</div></div>
                       <button type="button" onClick={() => agir(a.id)} disabled={ocupado === a.id || (pixItem === chave && pix?.status === "pendente")} className={`rounded-lg px-2 py-1 text-[10px] font-bold disabled:opacity-50 ${tem ? (uso ? "bg-[#F1F3F6] text-[#5B6472]" : "bg-[#7C3AED] text-white") : "bg-[#16A34A] text-white"}`}>{ocupado === a.id ? "…" : tem ? (uso ? "Tirar" : "Usar") : "Comprar"}</button>
                     </div>
                     {pixItem === chave && <div className="col-span-2"><PixAberto chave={chave} /></div>}
@@ -323,12 +438,12 @@ function LojaAcessorios({ boneco, roupa }: { boneco: string; roupa: string }) {
 
 // Perfil profissional no formulário do personagem (11/11/2026): quem procura profissionais acha você em /encontrar
 function CamposPerfil({ perfil, aberto, abrir, mudar }: { perfil: Perfil; aberto: boolean; abrir: () => void; mudar: (p: Partial<Perfil>) => void }) {
-  if (!aberto) return <button type="button" onClick={abrir} className="mt-3 w-full rounded-xl border-2 border-dashed border-[#1D4ED8]/40 px-3 py-2 text-left text-xs font-semibold text-[#1D4ED8]">+ Sou profissional: aparecer na busca de profissionais<span className="block font-normal text-[#5B6472]">Diga o que você faz, onde atende e quanto cobra. Empresas e clientes acham você em Encontrar.</span></button>;
+  if (!aberto) return <button type="button" onClick={abrir} className="mt-5 flex w-full items-start gap-2 rounded-2xl border-2 border-dashed border-[#1D4ED8]/40 px-3 py-2.5 text-left text-xs font-semibold text-[#1D4ED8]"><Icone nome="maleta" tamanho={18} className="mt-px shrink-0" /><span>Sou profissional: aparecer na busca de profissionais<span className="block font-normal text-[#5B6472]">Diga o que você faz, onde atende e quanto cobra. Empresas e clientes acham você em Encontrar.</span></span></button>;
   const port = [...perfil.portfolio, { titulo: "", url: "" }].slice(0, 3);
   const campo = "mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal outline-none focus:border-[#1D4ED8]";
   return (
-    <div className="mt-3 rounded-2xl border border-[#1D4ED8]/20 bg-[#F5F8FF] p-3">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">Perfil profissional · aparece na busca</div>
+    <div className="mt-5 rounded-2xl border border-[#1D4ED8]/20 bg-[#F5F8FF] p-3">
+      <div className="text-[13px] font-semibold text-[#1D4ED8]">Perfil profissional<span className="ml-1 font-normal text-[#5B6472]">aparece na busca</span></div>
       <div className="mt-1 grid grid-cols-2 gap-2">
         <label className="block text-xs font-semibold text-[#5B6472]">O que você faz<input value={perfil.profissao} onChange={(e) => mudar({ profissao: e.target.value.slice(0, 60) })} placeholder="Ex.: Fotógrafa de produtos" className={campo} /></label>
         <label className="block text-xs font-semibold text-[#5B6472]">Área<select value={perfil.nicho} onChange={(e) => mudar({ nicho: e.target.value })} className={`${campo} bg-white`}><option value="">Escolha</option>{NICHOS.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}</select></label>

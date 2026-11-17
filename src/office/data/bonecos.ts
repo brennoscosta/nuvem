@@ -2,9 +2,12 @@
 // - Bonecos com `arquivo` usam o modelo 3D gerado no Higgsfield (já com esqueleto, ver scripts/bonecos).
 // - Bonecos sem arquivo usam o boneco provisório desenhado em código (mesmo esqueleto e mesmas animações).
 
-export type Cabelo = "curto" | "coque" | "longo" | "careca";
+// estilos de cabelo (16/11/2026: + cacheado, rabo de cavalo, topete e moicano)
+export type Cabelo = "curto" | "coque" | "longo" | "careca" | "cacheado" | "rabo" | "topete" | "moicano";
+export type Barba = "nenhuma" | "rala" | "cheia" | "bigode";
 
-export type Traje = "camisa" | "semCamisa" | "biquini" | "saida" | "blazer";
+// roupas: camisa (padrão), blazer, moletom, jaqueta, regata e vestido; semCamisa/biquini/saida = gente de praia
+export type Traje = "camisa" | "semCamisa" | "biquini" | "saida" | "blazer" | "moletom" | "jaqueta" | "regata" | "vestido";
 export interface Boneco {
   id: string;
   nome: string;
@@ -18,6 +21,8 @@ export interface Boneco {
   prancha?: string; // cor da prancha de surf debaixo do braço
   chapeu?: string; // chapéu de praia
   tenis?: string; // cor de destaque do tênis (sola escura e listra nessa cor); sem isso, tênis branco liso
+  calcado?: string; // cor do tênis (a parte de cima); padrão branco
+  barba?: Barba; // padrão: nenhuma (a cor é a do cabelo)
 }
 
 export const BONECOS: Boneco[] = [
@@ -73,3 +78,68 @@ export const TIPOS_AVATAR: TipoAvatar[] = [
   { id: "praia-m2", nome: "Surfista moreno", genero: "masculino", estilo: "praia", boneco: "surfista-2", roupa: "#E2575B" },
   { id: "neutro-1", nome: "Neutro", genero: "neutro", estilo: "casual", boneco: "suporte-1", roupa: "#64748B" },
 ];
+
+// ---------- personagem personalizável (16/11/2026) ----------
+// O visual escolhido no painel (pele, cabelo, roupa, calça, tênis, barba) vira um "id de boneco" codificado, v1:…,
+// gravado na coluna boneco do personagem. Assim ele chega a todo lugar que já recebe o boneco (mapa, amigos, busca,
+// conversas, avisos) sem mudar nenhuma rota. A coluna personagem.visual guarda o mesmo visual em JSON (fonte do painel).
+export interface Visual { pele?: string; cabelo?: string; estiloCabelo?: Cabelo; barba?: Barba; traje?: Traje; roupa?: string; calca?: string; calcado?: string; tenis?: string; oculos?: boolean }
+export const ESTILOS_CABELO: { id: Cabelo; nome: string }[] = [
+  { id: "curto", nome: "Curto com franja" }, { id: "topete", nome: "Topete" }, { id: "moicano", nome: "Moicano" }, { id: "cacheado", nome: "Cacheado" },
+  { id: "coque", nome: "Coque" }, { id: "rabo", nome: "Rabo de cavalo" }, { id: "longo", nome: "Longo" }, { id: "careca", nome: "Raspado" },
+];
+export const BARBAS: { id: Barba; nome: string }[] = [{ id: "nenhuma", nome: "Sem barba" }, { id: "rala", nome: "Rala" }, { id: "cheia", nome: "Cheia" }, { id: "bigode", nome: "Bigode" }];
+export const TRAJES_ESCOLHA: { id: Traje; nome: string }[] = [
+  { id: "camisa", nome: "Camiseta" }, { id: "blazer", nome: "Blazer" }, { id: "jaqueta", nome: "Jaqueta" },
+  { id: "moletom", nome: "Moletom" }, { id: "regata", nome: "Regata" }, { id: "vestido", nome: "Vestido" },
+];
+export const PELES = ["#FBE3D0", "#F5D6BC", "#F1C9A5", "#E7B48C", "#D9A072", "#C98E68", "#A86E4A", "#8D5B3E", "#6E4329", "#4A2C1C"];
+export const CORES_CABELO = ["#14110F", "#2A1E19", "#4A3121", "#7A4E2D", "#B5532D", "#D9A45B", "#EBD08B", "#9A9A9A", "#E8E8E8", "#3B5BDB", "#D6336C", "#7C3AED"];
+export const CORES_ROUPA = ["#F4F4F0", "#1F2329", "#1E3A5F", "#2563EB", "#0EA5A4", "#16A34A", "#84CC16", "#FACC15", "#F59E0B", "#E11D48", "#DB2777", "#7C3AED", "#6B2737", "#8B5E3C", "#64748B"];
+export const CORES_CALCA = ["#1F2329", "#2C3E50", "#3B5B8C", "#5B7DB1", "#6B7280", "#C8B79A", "#8B5E3C", "#F4F4F0", "#14532D", "#7F1D1D"];
+export const CORES_CALCADO = ["#F4F4F4", "#1F2227", "#9CA3AF", "#E11D48", "#2563EB", "#16A34A", "#FACC15", "#F59E0B", "#7C3AED", "#8B5E3C"];
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const ESTILOS_OK = new Set<string>(ESTILOS_CABELO.map((e) => e.id));
+const BARBAS_OK = new Set<string>(BARBAS.map((b) => b.id));
+const TRAJES_OK = new Set<string>(["camisa", "blazer", "moletom", "jaqueta", "regata", "vestido", "semCamisa", "biquini", "saida"]);
+// limpa o que veio de fora (cliente, banco): só cores #RRGGBB e opções conhecidas
+export function limparVisual(x: unknown): Visual {
+  const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+  const cor = (k: string) => (typeof o[k] === "string" && HEX.test(o[k] as string) ? (o[k] as string).toUpperCase() : undefined);
+  const v: Visual = { pele: cor("pele"), cabelo: cor("cabelo"), roupa: cor("roupa"), calca: cor("calca"), calcado: cor("calcado"), tenis: o.tenis === "" ? "" : cor("tenis") }; // tenis "" = tênis liso, sem listra
+  if (typeof o.estiloCabelo === "string" && ESTILOS_OK.has(o.estiloCabelo)) v.estiloCabelo = o.estiloCabelo as Cabelo;
+  if (typeof o.barba === "string" && BARBAS_OK.has(o.barba)) v.barba = o.barba as Barba;
+  if (typeof o.traje === "string" && TRAJES_OK.has(o.traje)) v.traje = o.traje as Traje;
+  if (typeof o.oculos === "boolean") v.oculos = o.oculos;
+  for (const k of Object.keys(v) as (keyof Visual)[]) if (v[k] === undefined) delete v[k];
+  return v;
+}
+// visual completo a partir de um boneco base (o tipo pronto) e do que a pessoa trocou
+export function visualCompleto(base: Boneco, roupa: string, v: Visual): Required<Omit<Visual, "tenis">> & { tenis: string } {
+  return { pele: v.pele ?? base.pele, cabelo: v.cabelo ?? base.cabelo, estiloCabelo: v.estiloCabelo ?? base.estiloCabelo, barba: v.barba ?? base.barba ?? "nenhuma",
+    traje: v.traje ?? base.traje ?? "camisa", roupa: v.roupa ?? roupa, calca: v.calca ?? base.calca, calcado: v.calcado ?? base.calcado ?? "#F4F4F4", tenis: v.tenis ?? base.tenis ?? "", oculos: v.oculos ?? !!base.oculos };
+}
+const semCerquilha = (c: string) => c.replace("#", "");
+// id do boneco com o visual dentro (a roupa vai na coluna roupa, como sempre). O boneco base (opcional) entra no fim
+// só para manter os extras dele que não são escolha do painel (prancha e chapéu de praia).
+export function codificarVisual(v: ReturnType<typeof visualCompleto>, baseId = "") {
+  return "v1:" + [semCerquilha(v.pele), semCerquilha(v.cabelo), v.estiloCabelo, v.barba, v.traje, semCerquilha(v.calca), semCerquilha(v.calcado), semCerquilha(v.tenis), v.oculos ? "o" : "", TODOS_BONECOS[baseId] ? baseId : ""].join("~");
+}
+const decodificados = new Map<string, Boneco>();
+function decodificar(id: string): Boneco | null {
+  const pronto = decodificados.get(id); if (pronto) return pronto;
+  const p = id.slice(3).split("~"); if (p.length < 8) return null;
+  const c = (x: string) => (/^[0-9a-fA-F]{6}$/.test(x) ? "#" + x.toUpperCase() : null);
+  const pele = c(p[0]), cabelo = c(p[1]), calca = c(p[5]), calcado = c(p[6]);
+  if (!pele || !cabelo || !calca || !calcado || !ESTILOS_OK.has(p[2]) || !BARBAS_OK.has(p[3]) || !TRAJES_OK.has(p[4])) return null;
+  const base = p[9] ? TODOS_BONECOS[p[9]] : undefined;
+  const b: Boneco = { id, nome: "Personalizado", arquivo: null, pele, cabelo, estiloCabelo: p[2] as Cabelo, barba: p[3] as Barba, traje: p[4] as Traje, calca, calcado, tenis: c(p[7]) ?? undefined,
+    oculos: p[8] === "o", prancha: base?.prancha, chapeu: base?.chapeu };
+  decodificados.set(id, b); return b;
+}
+// o boneco de um id: os do catálogo ou um visual codificado (v1:…). Sempre devolve um boneco válido.
+// Para um agente ou figurante com visual próprio: codificarVisual(visualCompleto(BONECO.classico, camisa, { pele, ... })).
+export function bonecoDe(id: string | null | undefined, padrao: Boneco = BONECOS[1]): Boneco {
+  if (!id) return padrao;
+  return TODOS_BONECOS[id] ?? (id.startsWith("v1:") ? decodificar(id) : null) ?? padrao;
+}

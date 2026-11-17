@@ -11,6 +11,7 @@ import { BotoesPersonagem } from "./BotoesPersonagem";
 import { Icone } from "./Icone";
 import { CHAVE_SEDE } from "../data/onestate";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
+import { abrirChatEquipe } from "./ChatEquipe";
 import { ChatLoja, Contatos, Estrelas, useLoja } from "./ChatLoja";
 import { AgendarLoja } from "./AgendarLoja";
 import { BotaoSeguir } from "./BotaoSeguir";
@@ -238,8 +239,9 @@ export function CartaoLote() {
           {ehMeu && ativo && pagamentoLigado && !pixAberto && <ResumoPreco cot={cot} preco={preco} />}
           {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
           {ehMeu && ativo && !ehAnexo && (
-            // a equipe de IA do lote trabalha de verdade desde 11/11/2026 (tela Minha equipe)
-            <a href="/app/equipe" className="mt-3 block w-full rounded-xl bg-[#1D2128] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-black"><Icone nome="conversar" tamanho={17} className="mr-1 inline align-[-3px]" />Falar com a minha equipe de IA</a>
+            // a equipe de IA do lote trabalha de verdade desde 11/11/2026; desde 16/11 a conversa abre aqui mesmo no mapa
+            // (src/office/ui/ChatEquipe.tsx), com a página Minha equipe como tela cheia
+            <button type="button" onClick={() => void abrirChatEquipe(chave)} className="mt-3 block w-full rounded-xl bg-[#1D2128] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-black"><Icone nome="conversar" tamanho={17} className="mr-1 inline align-[-3px]" />Falar com a equipe e dar tarefas</button>
           )}
           {ehMeu && ativo && terreno.escritorio && (
             // chão comprado: só opções de edição (prédio, setores, equipe, marca, treino, contratação)

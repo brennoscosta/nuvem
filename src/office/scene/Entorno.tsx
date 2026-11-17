@@ -8,7 +8,7 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { caixa, esfera, mat, plano, COR } from "./geo";
 import { BonecoProcedural, HIPS, useAnimacao, type BonecoHandle } from "./Boneco";
-import { BONECOS, TODOS_BONECOS } from "../data/bonecos";
+import { BONECOS, bonecoDe } from "../data/bonecos";
 import { ComFallback, ModeloInstanciado } from "./Modelos";
 import { ArvoreAvulsa, ArvoresMistas, type Mistura } from "./Arvores";
 const MISTURA_NUVEM: Mistura = { oiti: 0.45, frondosa: 0.4, ipeAmarelo: 0.15 };
@@ -69,7 +69,7 @@ export function Pedestre({ trajeto, velocidade, boneco, camisa, fase }: { trajet
     const p = velocidade * dt; o.position.x += (dx / dist) * p; o.position.z += (dz / dist) * p;
     const r = Math.atan2(dx, dz); let d = r - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.rotation.y += d * Math.min(1, dt * 8);
   });
-  const def = typeof boneco === "string" ? (TODOS_BONECOS[boneco] ?? BONECOS[0]) : BONECOS[boneco % BONECOS.length];
+  const def = typeof boneco === "string" ? bonecoDe(boneco, BONECOS[0]) : BONECOS[boneco % BONECOS.length];
   return <group ref={g} position={trajeto[0]}><BonecoProcedural ref={h} def={def} camisa={camisa} cracha="#B8C0CC" /><SombraContato r={0.36} /></group>;
 }
 

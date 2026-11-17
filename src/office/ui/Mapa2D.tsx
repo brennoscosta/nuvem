@@ -215,7 +215,7 @@ export function Mapa2D() {
               <rect x={cx - 11} y={cz - 11} width={22} height={16} rx={2} fill="#000" opacity={0.18} transform="translate(1.2 1.4)" />
               <rect x={cx - 11} y={cz - 11} width={22} height={16} rx={2} fill="#14110A" stroke="#D4A63A" strokeWidth={0.8} />
               {Array.from({ length: 4 }, (_, i) => Array.from({ length: 2 }, (_, k) => <rect key={`${i}${k}`} x={cx - 9 + i * 4.8} y={cz - 8.6 + k * 5.6} width={3.4} height={3.6} rx={0.5} fill="#E9C46A" opacity={0.55} />))}
-              <Rotulo x={cx} z={cz - 12} texto="OneState" sub="roleplay" cor="#14110A" />
+              <Rotulo x={cx} z={cz - 12} texto="Social RP" sub="roleplay" cor="#14110A" />
             </g>}
             {q.ocupante === "restaurante" && <g>
               <rect x={cx - 12} y={cz - 9} width={24} height={18} rx={2} fill="#000" opacity={0.18} transform="translate(1.2 1.4)" />

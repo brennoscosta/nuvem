@@ -20,6 +20,7 @@ import { Icone } from "./Icone";
 import { CartaoPraca, AvisoEventos } from "./Praca";
 import { MiniMapa } from "./MiniMapa";
 import { CartaoOneState } from "./CartaoOneState";
+import { ChatEquipe } from "./ChatEquipe";
 import { Sino } from "./Sino";
 import { VisitaGuiada } from "./VisitaGuiada";
 import { BotaoSom } from "./Som";
@@ -275,6 +276,7 @@ export function Painel() {
       <CartaoPraca />
       <CartaoOutdoor />
       <CartaoOneState />
+      <ChatEquipe />
       <PainelEmpresa />
       <PainelEscritorio />
       <PainelPersonagem />

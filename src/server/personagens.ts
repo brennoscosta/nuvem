@@ -1,7 +1,7 @@
 // Personagem do visitante: quem compra entra no mapa como um boneco com o nome num balãozinho, anda pela calçada,
 // vê quem mais está online e interage. Presença por "batida" (o navegador manda a posição a cada poucos segundos).
 import { sql, id, migrar } from "./db";
-import { TIPOS_AVATAR, TODOS_BONECOS } from "@/office/data/bonecos";
+import { TIPOS_AVATAR, TODOS_BONECOS, bonecoDe, codificarVisual, limparVisual, visualCompleto, type Visual } from "@/office/data/bonecos";
 import { ehAdmin } from "./terrenos";
 import { avisarRecado } from "./avisos";
 import type { Usuario } from "./usuarios";
@@ -15,10 +15,10 @@ export const SEGUNDOS_ONLINE = 25;
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
 // Perfil profissional (11/11/2026): o que a pessoa faz, para quem procura profissionais na busca (/encontrar)
 export interface Perfil { profissao: string; nicho: string; servicos: string; preco: string; local: string; portfolio: { titulo: string; url: string }[]; disponivel: boolean }
-export interface Personagem extends Perfil { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: Date | null; x: number; z: number; rot: number; destX: number | null; destZ: number | null; vel: number; vistoEm: Date | null; criadoEm: Date; acessorios: string[] }
+export interface Personagem extends Perfil { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: Date | null; x: number; z: number; rot: number; destX: number | null; destZ: number | null; vel: number; vistoEm: Date | null; criadoEm: Date; acessorios: string[]; visual: Visual }
 export interface PersonagemPublico { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino: [number, number] | null; vel: number; redes?: Redes; online: boolean; perfil?: Perfil | null; reputacao?: { media: number | null; n: number }; acessorios?: string[] }
 
-const CAMPOS = () => sql`usuario_id, nome, tipo, boneco, roupa, bio, redes, mostrar_redes, pago_ate, x, z, rot, dest_x, dest_z, vel, visto_em, criado_em, profissao, nicho, servicos, preco, local, portfolio, disponivel, acessorios`;
+const CAMPOS = () => sql`usuario_id, nome, tipo, boneco, roupa, bio, redes, mostrar_redes, pago_ate, x, z, rot, dest_x, dest_z, vel, visto_em, criado_em, profissao, nicho, servicos, preco, local, portfolio, disponivel, acessorios, visual`;
 const texto = (t: unknown, max: number, padrao = "") => (typeof t === "string" ? t.trim().slice(0, max) : padrao) || padrao;
 function limparPerfil(x: unknown, atual: Partial<Perfil> | null): Perfil {
   const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
@@ -39,21 +39,27 @@ export async function meuPersonagem(usuarioId: string): Promise<Personagem | nul
 export const personagemAtivo = (p: Personagem | null, u?: Usuario | null) => !!p && (!!(p.pagoAte && new Date(p.pagoAte).getTime() > Date.now()) || ehAdmin(u));
 
 // Cria ou edita (nome, tipo, bio, redes). Não mexe no pagamento.
-export async function salvarPersonagem(u: Usuario, d: { nome?: string; tipo?: string; bio?: string; redes?: unknown; mostrarRedes?: boolean; perfil?: unknown }) {
+// Desde 16/11/2026 aceita o visual personalizado (pele, cabelo, roupa, calça, tênis, barba, óculos): vai inteiro na coluna
+// visual e, codificado (v1:…), na coluna boneco, que é o que o mapa, a rede e a busca já leem.
+export async function salvarPersonagem(u: Usuario, d: { nome?: string; tipo?: string; bio?: string; redes?: unknown; mostrarRedes?: boolean; perfil?: unknown; visual?: unknown }) {
   await migrar();
   if (u.banidoEm) throw new Error("Conta suspensa.");
   const atual = await meuPersonagem(u.id);
   const tipo = TIPOS_AVATAR.find((t) => t.id === d.tipo) ?? TIPOS_AVATAR.find((t) => t.id === atual?.tipo) ?? TIPOS_AVATAR[0];
   const nome = texto(d.nome, 24, atual?.nome ?? u.nome.split(" ")[0]);
   if (nome.length < 2) throw new Error("Dê um nome ao seu personagem.");
-  const boneco = TODOS_BONECOS[tipo.boneco] ? tipo.boneco : "classico";
+  // visual: o que veio no pedido; sem ele (aplicativo antigo), mantém o salvo se o tipo não mudou
+  const v = limparVisual(d.visual !== undefined ? d.visual : atual && atual.tipo === tipo.id ? atual.visual : {});
+  const personalizado = Object.keys(v).length > 0;
+  const boneco = personalizado ? codificarVisual(visualCompleto(bonecoDe(tipo.boneco), tipo.roupa, v), tipo.boneco) : TODOS_BONECOS[tipo.boneco] ? tipo.boneco : "classico";
+  const roupa = v.roupa ?? tipo.roupa;
   const redes = sql.json(limparRedes(d.redes ?? atual?.redes ?? {}) as unknown as Parameters<typeof sql.json>[0]);
   const pf = limparPerfil(d.perfil, atual);
-  const [p] = await sql<Personagem[]>`INSERT INTO personagem (usuario_id, nome, tipo, boneco, roupa, bio, redes, mostrar_redes, profissao, nicho, servicos, preco, local, portfolio, disponivel)
-    VALUES (${u.id}, ${nome}, ${tipo.id}, ${boneco}, ${tipo.roupa}, ${texto(d.bio, 200, atual?.bio ?? "")}, ${redes}, ${d.mostrarRedes ?? atual?.mostrarRedes ?? false},
-            ${pf.profissao}, ${pf.nicho}, ${pf.servicos}, ${pf.preco}, ${pf.local}, ${sql.json(pf.portfolio as never)}, ${pf.disponivel})
+  const [p] = await sql<Personagem[]>`INSERT INTO personagem (usuario_id, nome, tipo, boneco, roupa, bio, redes, mostrar_redes, profissao, nicho, servicos, preco, local, portfolio, disponivel, visual)
+    VALUES (${u.id}, ${nome}, ${tipo.id}, ${boneco}, ${roupa}, ${texto(d.bio, 200, atual?.bio ?? "")}, ${redes}, ${d.mostrarRedes ?? atual?.mostrarRedes ?? false},
+            ${pf.profissao}, ${pf.nicho}, ${pf.servicos}, ${pf.preco}, ${pf.local}, ${sql.json(pf.portfolio as never)}, ${pf.disponivel}, ${sql.json(v as never)})
     ON CONFLICT (usuario_id) DO UPDATE SET nome = EXCLUDED.nome, tipo = EXCLUDED.tipo, boneco = EXCLUDED.boneco, roupa = EXCLUDED.roupa, bio = EXCLUDED.bio, redes = EXCLUDED.redes, mostrar_redes = EXCLUDED.mostrar_redes,
-      profissao = EXCLUDED.profissao, nicho = EXCLUDED.nicho, servicos = EXCLUDED.servicos, preco = EXCLUDED.preco, local = EXCLUDED.local, portfolio = EXCLUDED.portfolio, disponivel = EXCLUDED.disponivel, atualizado_em = now()
+      profissao = EXCLUDED.profissao, nicho = EXCLUDED.nicho, servicos = EXCLUDED.servicos, preco = EXCLUDED.preco, local = EXCLUDED.local, portfolio = EXCLUDED.portfolio, disponivel = EXCLUDED.disponivel, visual = EXCLUDED.visual, atualizado_em = now()
     RETURNING ${CAMPOS()}`;
   if (!atual) void registrar("cadastro", `${u.nome} montou o personagem "${nome}"`, { usuarioId: u.id });
   return p;

@@ -3,76 +3,45 @@
 // (a correção vira regra), pede o relatório da semana ao CEO, lê as conversas dos visitantes da loja e escreve o
 // "Sobre a empresa" que a equipe e a página pública usam. Dados: /api/workend/equipe* (src/server/equipeCliente.ts).
 // Aba Vagas (12/11/2026): o dono abre vagas e lê as candidaturas (src/server/cidade.ts).
+// 16/11/2026 (pedido do dono: "ainda não estou conseguindo usar meus agentes, conversar com eles e dar tarefas" e "preciso
+// que eles se comuniquem entre si"): equipe por departamento com busca (chefe primeiro, nível e cargo), quem responde a
+// quem, os pedidos internos dentro da conversa ("Helena pediu a Ricardo: …" e a resposta), a aba Conversas internas e um
+// passo a passo de como dar uma tarefa. A delegação roda em src/server/delegacao.ts; os tipos e o texto da IA são os mesmos
+// do painel do mapa (src/office/ui/equipeComum.tsx).
 import { CHAVE_SEDE } from "@/office/data/onestate";
+import { Icone } from "@/office/ui/Icone";
+import {
+  NIVEL_COR, NIVEL_ROTULO, agruparPorDepartamento, agruparPorTarefa, andamento, apiEquipe, brl, linhaDoTempo, quando, resumoNiveis, sugestoesTarefa, TextoIA,
+  type ContatosEquipe, type ConversaEquipe, type GrupoTarefa, type MembroEquipe, type MsgEquipe, type PainelEquipe, type RegraEquipe, type RespostaEnvio, type TrocaInterna,
+} from "@/office/ui/equipeComum";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { VagasDono } from "./_vagas-dono";
 
-type Regra = { id: string; texto: string };
-type Membro = {
-  membroId: string; nome: string; cargo: string; papel: "atendente" | "ceo" | "profissional"; setor: string; boneco: string; camisa: string;
-  foto: string | null; especialista: { cargo: string; habilidades: string[] } | null; saudacao: string; treino: string; atendeVisitantes: boolean;
-  ultima: { texto: string; deQuem: "voce" | "equipe"; em: string } | null; regras: Regra[];
-};
-type Contatos = { whatsapp?: string; instagram?: string; site?: string; email?: string };
-type Painel = {
-  lote: { chave: string; numero: number | null; empresaNome: string; cor: string; nicho: string; pagoAte: string | null };
-  sobre: string; contatos: Contatos; equipe: Membro[];
-  gasto: { mes: number; teto: number; aviso: boolean; esgotado: boolean };
-  visitantes: { total: number; ultimas24h: number }; ia: boolean;
-};
-type Msg = { id: string; papel: string; conteudo: string; avaliacao: number | null; correcao: string | null; em: string };
+type Regra = RegraEquipe;
+type Membro = MembroEquipe;
+type Contatos = ContatosEquipe;
+type Painel = PainelEquipe;
+type Msg = MsgEquipe;
 type Visitante = { visitanteId: string; nome: string | null; n: number; ultimaEm: string; ultimaFala: string | null };
 type FalaVisita = { id: string; papel: string; conteudo: string; quem: string; criadoEm: string };
 
-const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const quando = (iso: string) => {
-  const d = new Date(iso), dif = Date.now() - d.getTime();
-  if (dif < 60_000) return "agora";
-  if (dif < 3600_000) return `há ${Math.floor(dif / 60_000)} min`;
-  if (dif < 86400_000) return `há ${Math.floor(dif / 3600_000)} h`;
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-};
 const MES = () => new Date().toLocaleDateString("pt-BR", { month: "long" });
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(url, { ...init, headers: { "content-type": "application/json", ...(init?.headers ?? {}) }, cache: "no-store" });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error((j as { erro?: string }).erro || "Não deu certo agora. Tente de novo.");
-  return j as T;
-}
+const api = apiEquipe;
+const Texto = ({ t }: { t: string }) => <TextoIA t={t} className="text-[15px]" />;
 
-// sugestões de pedido por papel: o dono não começa da página em branco
-function sugestoes(m: Membro, empresa: string): string[] {
-  if (m.papel === "ceo") return [`Monte o plano desta semana para a ${empresa}`, "Quais 3 coisas eu devo resolver primeiro?", "O que a equipe precisa saber sobre a empresa?"];
-  if (m.papel === "atendente") return ["Como você responderia quem pede preço?", "Escreva a mensagem de boas-vindas da loja", "Quais perguntas os clientes mais fazem?"];
-  if (m.especialista) return m.especialista.habilidades.slice(0, 3).map((h) => `${h} para a ${empresa}`);
-  return [`O que você pode fazer pela ${empresa}?`, "Me mande um plano do seu trabalho para este mês"];
-}
-
-function Avatar({ m, tamanho = 44 }: { m: Pick<Membro, "nome" | "camisa" | "foto" | "papel">; tamanho?: number }) {
+function Avatar({ m, tamanho = 44 }: { m: Pick<Membro, "nome" | "camisa" | "foto" | "nivel">; tamanho?: number }) {
   if (m.foto) return <img src={m.foto} alt="" width={tamanho} height={tamanho} className="shrink-0 rounded-full object-cover shadow-[0_0_0_2px_#fff]" style={{ width: tamanho, height: tamanho }} />;
   return (
     <span className="relative grid shrink-0 place-items-center rounded-full font-bold text-white shadow-[0_0_0_2px_#fff]" style={{ width: tamanho, height: tamanho, background: m.camisa, fontSize: tamanho * 0.4 }}>
       {m.nome.slice(0, 1).toUpperCase()}
-      {m.papel !== "profissional" && <span className="absolute -bottom-0.5 -right-0.5 rounded-full px-1 text-[8px] font-black leading-[14px] text-white" style={{ background: m.papel === "ceo" ? "#D4A017" : "#16A34A" }}>{m.papel === "ceo" ? "CEO" : "ATD"}</span>}
+      {(m.nivel === "ceo" || m.nivel === "diretor" || m.nivel === "gerente") && tamanho >= 32 && <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white" style={{ background: NIVEL_COR[m.nivel] }} />}
     </span>
   );
 }
+const SeloNivel = ({ m }: { m: Pick<Membro, "nivel"> }) => <span className="rounded-full px-2 py-[1px] align-middle text-[10px] font-black uppercase tracking-wide text-white" style={{ background: NIVEL_COR[m.nivel] }}>{NIVEL_ROTULO[m.nivel]}</span>;
 
-// texto da IA: quebras de linha, **negrito** e listas simples, sem HTML vindo de fora
-function Texto({ t }: { t: string }) {
-  return (
-    <div className="space-y-1.5 text-[15px] leading-relaxed">
-      {t.split(/\n{2,}/).map((bloco, i) => (
-        <p key={i} className="whitespace-pre-wrap">
-          {bloco.replace(/^#{1,4}\s*/gm, "").split(/(\*\*[^*]+\*\*)/g).map((p, k) => (p.startsWith("**") && p.endsWith("**") ? <b key={k}>{p.slice(2, -2)}</b> : <span key={k}>{p}</span>))}
-        </p>
-      ))}
-    </div>
-  );
-}
-
-type AbaEquipe = "conversas" | "visitantes" | "vagas" | "sobre";
+type AbaEquipe = "conversas" | "internas" | "visitantes" | "vagas" | "sobre";
 export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chaveInicial: string | null; membroInicial: string | null; abaInicial?: AbaEquipe }) {
   const [p, setP] = useState<Painel | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -87,36 +56,45 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
   useEffect(() => {
     let vivo = true;
     api<Painel>(`/api/workend/equipe?${q}`)
-      .then((d) => { if (!vivo) return; setP(d); setErro(null); setSel((s) => s ?? d.equipe[0]?.membroId ?? null); })
+      .then((d) => { if (!vivo) return; setP(d); setErro(null); setSel((s) => (s && d.equipe.some((m) => m.membroId === s) ? s : (d.equipe.find((m) => m.nivel === "ceo") ?? d.equipe[0])?.membroId ?? null)); })
       .catch((e) => vivo && setErro((e as Error).message));
     return () => { vivo = false; };
   }, [q, versao]);
+  const abrirPessoa = useCallback((id: string) => { setSel(id); setAba("conversas"); }, []);
 
   if (erro && !p) return <div className="faixa mt-6"><div className="rounded-2xl bg-[var(--cinza)] p-7"><h2 className="text-[1.4rem]">Minha equipe</h2><p className="mt-2 text-[var(--tinta-2)]">{erro}</p><Link href="/mundo" className="btn btn-azul mt-5">Ir para o mapa</Link></div></div>;
   if (!p) return <div className="faixa mt-6 text-[var(--tinta-2)]">Carregando a sua equipe…</div>;
   const membro = p.equipe.find((m) => m.membroId === sel) ?? p.equipe[0];
   const pct = Math.min(100, (p.gasto.mes / p.gasto.teto) * 100);
+  const comEquipe = p.equipe.filter((m) => m.temEquipe).length;
 
   return (
     <div className="faixa mt-2">
       <section className="flex flex-wrap items-end justify-between gap-5">
         <div>
-          <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--azul)]">Lote {p.lote.numero} · {p.lote.nicho}</span>
+          <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--azul)]">{p.lote.numero ? `Lote ${p.lote.numero} · ` : ""}{p.lote.nicho}</span>
           <h1 className="mt-1 text-[2rem] lg:text-[2.6rem]">Equipe da {p.lote.empresaNome}</h1>
-          <p className="mt-2 max-w-[62ch] text-[var(--tinta-2)]">Converse com cada pessoa, aprove ou corrija o que ela entrega e peça o relatório da semana ao CEO. A atendente já responde quem entra na sua loja pelo mapa.</p>
+          <p className="mt-1 text-[15px] font-semibold text-[var(--tinta)]">{p.equipe.length} pessoas em {p.departamentos.length} áreas · {resumoNiveis(p.equipe)}</p>
+          <p className="mt-2 max-w-[66ch] text-[var(--tinta-2)]">
+            {comEquipe > 0
+              ? "Dê tarefas como daria a um funcionário. Quem comanda uma área divide o trabalho com a própria equipe, acompanha cada parte e entrega tudo junto para você."
+              : "Converse com cada pessoa, aprove ou corrija o que ela entrega e peça o relatório da semana ao CEO. A atendente já responde quem entra na sua loja pelo mapa."}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {p.lote.numero && <Link href={`/loja/${p.lote.numero}`} className="btn btn-linha">Ver minha loja</Link>}
-          {/* a sede do OneState tem um setor por área do site e não passa pelo editor */}
+          {/* a sede tem a equipe montada por departamento e não passa pelo editor */}
           {p.lote.chave !== CHAVE_SEDE && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="btn btn-claro">Montar escritório</Link>}
         </div>
       </section>
 
-      <section className="mt-6 grid gap-4 md:grid-cols-3">
+      {comEquipe > 0 && <ComoDarTarefa p={p} abrir={abrirPessoa} />}
+
+      <section className="mt-5 grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl bg-[var(--cinza)] p-5 md:col-span-2">
           <div className="flex items-baseline justify-between gap-3"><b>IA usada em {MES()}</b><span className="text-sm text-[var(--tinta-2)]">{brl(p.gasto.mes)} de {brl(p.gasto.teto)}</span></div>
           <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[var(--surface-dim)]"><div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.max(2, pct)}%`, background: p.gasto.esgotado ? "#E2575B" : p.gasto.aviso ? "#E8A317" : "var(--azul)" }} /></div>
-          <p className="mt-2 text-[13px] text-[var(--tinta-2)]">{p.gasto.esgotado ? "Os R$ 10 do mês acabaram: a equipe volta a responder no dia 1º. Os visitantes continuam deixando recado." : p.gasto.aviso ? "Perto do limite do mês. Prefira pedidos completos numa mensagem só." : "Cada lote tem R$ 10 de IA por mês, incluídos no aluguel. Uma conversa comum gasta poucos centavos."}</p>
+          <p className="mt-2 text-[13px] text-[var(--tinta-2)]">{p.gasto.esgotado ? `Os ${brl(p.gasto.teto)} do mês acabaram: a equipe volta a responder no dia 1º. Os visitantes continuam deixando recado.` : p.gasto.aviso ? "Perto do limite do mês. Prefira pedidos completos numa mensagem só." : `Cada lote tem ${brl(p.gasto.teto)} de IA por mês, incluídos no aluguel. Uma conversa comum gasta poucos centavos; uma tarefa dividida com a equipe gasta um pouco mais.`}</p>
         </div>
         <button type="button" onClick={() => setAba("visitantes")} className="rounded-2xl border border-[var(--linha)] bg-[var(--surface)] p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg">
           <b className="text-[2rem] leading-none">{p.visitantes.total}</b>
@@ -126,7 +104,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
       </section>
 
       <nav className="sem-barra mt-7 flex gap-1 overflow-x-auto rounded-xl bg-[var(--surface-dim)] p-1 text-sm font-semibold sm:w-max" aria-label="Seções da equipe">
-        {([["conversas", "Conversas com a equipe"], ["visitantes", `Visitantes (${p.visitantes.total})`], ["vagas", "Vagas"], ["sobre", "Sobre a empresa"]] as const).map(([k, t]) => (
+        {([["conversas", "Conversar e dar tarefas"], ["internas", "Conversas internas"], ["visitantes", `Visitantes (${p.visitantes.total})`], ["vagas", "Vagas"], ["sobre", "Sobre a empresa"]] as const).map(([k, t]) => (
           <button key={k} type="button" onClick={() => setAba(k)} className={`flex-1 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 transition sm:flex-none ${aba === k ? "bg-[var(--surface)] shadow" : "text-[var(--tinta-2)] hover:text-[var(--tinta)]"}`}>{t}</button>
         ))}
       </nav>
@@ -138,6 +116,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
       )}
 
       {aba === "conversas" && membro && <Conversas p={p} membro={membro} q={q} selecionar={setSel} recarregar={carregar} />}
+      {aba === "internas" && <Internas p={p} q={q} abrir={abrirPessoa} />}
       {aba === "visitantes" && <Visitantes q={q} />}
       {aba === "vagas" && <VagasDono empresa={p.lote.empresaNome} numero={p.lote.numero} />}
       {aba === "sobre" && <Sobre p={p} lote={p.lote.chave} salvo={carregar} />}
@@ -145,72 +124,154 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
   );
 }
 
+// passo a passo curto: para quem pedir, como pedir e onde acompanhar
+function ComoDarTarefa({ p, abrir }: { p: Painel; abrir: (id: string) => void }) {
+  const ceo = p.equipe.find((m) => m.nivel === "ceo");
+  const gerentes = p.equipe.filter((m) => m.temEquipe && (m.nivel === "gerente" || m.nivel === "diretor")).sort((a, b) => (a.nivel === "gerente" ? 0 : 1) - (b.nivel === "gerente" ? 0 : 1)).slice(0, 3);
+  const g1 = gerentes[0], g1equipe = g1 ? p.equipe.find((m) => m.chefeId === g1.membroId) : null;
+  const exemplo = ceo && g1 ? `${ceo.nome} pediu a ${g1.nome}…` : "o CEO pediu ao gerente…";
+  return (
+    <section className="mt-5 grid gap-3 rounded-2xl border border-[var(--linha)] bg-[var(--surface)] p-4 md:grid-cols-3" aria-label="Como dar uma tarefa">
+      <div className="flex gap-3">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--azul)] text-sm font-black text-white">1</span>
+        <div className="text-[14px]">
+          <b className="block">Escolha para quem pedir</b>
+          <span className="text-[var(--tinta-2)]">Pedidos grandes vão para {ceo ? <button type="button" onClick={() => abrir(ceo.membroId)} className="font-semibold text-[var(--azul)] hover:underline">{ceo.nome} (CEO)</button> : "o CEO"}. Algo de uma área só vai direto para quem comanda a área{gerentes.length ? <>: {gerentes.map((g, i) => <span key={g.membroId}>{i ? ", " : ""}<button type="button" onClick={() => abrir(g.membroId)} className="font-semibold text-[var(--azul)] hover:underline">{g.nome}</button></span>)}…</> : "."}</span>
+        </div>
+      </div>
+      <div className="flex gap-3">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--azul)] text-sm font-black text-white">2</span>
+        <div className="text-[14px]"><b className="block">Escreva como falaria com um funcionário</b><span className="text-[var(--tinta-2)]">Diga o que precisa, para quando e os detalhes que importam. Ex.: “Monte o plano da semana com o que cada departamento vai fazer”.</span></div>
+      </div>
+      <div className="flex gap-3">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--azul)] text-sm font-black text-white">3</span>
+        <div className="text-[14px]"><b className="block">Acompanhe a equipe trabalhando</b><span className="text-[var(--tinta-2)]">Você vê cada pedido interno (“{exemplo}”{g1 && g1equipe ? `, “${g1.nome} pediu a ${g1equipe.nome}…”` : ""}) e a resposta de cada um. A entrega final chega na mesma conversa, em 1 a 3 minutos.</span></div>
+      </div>
+    </section>
+  );
+}
+
+function ListaEquipe({ p, membro, selecionar }: { p: Painel; membro: Membro; selecionar: (id: string) => void }) {
+  const [busca, setBusca] = useState("");
+  const [fechados, setFechados] = useState<string[]>([]);
+  const grupos = useMemo(() => agruparPorDepartamento(p, busca), [p, busca]);
+  const alternar = (id: string) => setFechados((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
+  return (
+    <aside className="flex max-h-[360px] flex-col overflow-hidden rounded-2xl border border-[var(--linha)] bg-[var(--surface)] lg:max-h-[760px]" aria-label="Pessoas da equipe">
+      <label className="m-2.5 flex items-center gap-2 rounded-xl border border-[var(--line-strong)] bg-white px-3 py-2 text-[var(--tinta-2)] focus-within:border-[var(--azul)]">
+        <Icone nome="encontrar" tamanho={17} />
+        <input value={busca} onChange={(e) => setBusca(e.target.value.slice(0, 40))} placeholder="Buscar pessoa, cargo ou área" className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--tinta)] outline-none" />
+      </label>
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        {grupos.length === 0 && <p className="px-2 py-4 text-sm text-[var(--tinta-2)]">Ninguém com esse nome, cargo ou área.</p>}
+        {grupos.map(({ dep, pessoas }) => {
+          const fechado = !busca && fechados.includes(dep.id);
+          return (
+            <section key={dep.id} className="mb-1">
+              <button type="button" onClick={() => alternar(dep.id)} aria-expanded={!fechado} className="sticky top-0 z-[1] flex w-full items-center gap-2 rounded-lg bg-[var(--surface)] px-2 py-1.5 text-left text-[11.5px] font-black uppercase tracking-wide text-[var(--tinta-2)] hover:text-[var(--tinta)]">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: dep.cor }} />
+                <span className="flex-1">{dep.nome}</span>
+                <span className="font-semibold">{pessoas.length}</span>
+                <Icone nome="baixo" tamanho={14} className={`transition ${fechado ? "-rotate-90" : ""}`} />
+              </button>
+              {!fechado && pessoas.map((m) => {
+                const lider = m.temEquipe || m.nivel === "ceo";
+                return (
+                  <button key={m.membroId} type="button" data-membro={m.membroId} onClick={() => selecionar(m.membroId)}
+                    className={`flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition ${m.membroId === membro.membroId ? "bg-[#EEF3FF] shadow-[inset_0_0_0_1.5px_var(--azul)]" : "hover:bg-[var(--cinza)]"} ${lider ? "" : "pl-5"}`}>
+                    <Avatar m={m} tamanho={lider ? 38 : 32} />
+                    <span className="min-w-0 flex-1 leading-tight">
+                      <span className="flex items-center gap-1.5 truncate font-semibold">{m.nome}{lider && <SeloNivel m={m} />}</span>
+                      <span className="block truncate text-[12.5px] text-[var(--tinta-2)]">{m.cargo}</span>
+                      {m.ultima && <span className="block truncate text-[12px] text-[var(--tinta-2)] opacity-80">{m.ultima.deQuem === "voce" ? "Você: " : ""}{m.ultima.texto}</span>}
+                    </span>
+                    {m.ultima && <span className="self-start text-[11px] text-[var(--tinta-2)]">{quando(m.ultima.em)}</span>}
+                  </button>
+                );
+              })}
+            </section>
+          );
+        })}
+        {p.lote.chave !== CHAVE_SEDE && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="mt-2 block rounded-2xl border-2 border-dashed border-[var(--linha)] p-3 text-center text-sm font-semibold text-[var(--azul)]">+ Contratar especialista no mapa</Link>}
+      </div>
+    </aside>
+  );
+}
+
 function Conversas({ p, membro, q, selecionar, recarregar }: { p: Painel; membro: Membro; q: string; selecionar: (id: string) => void; recarregar: () => Promise<void> }) {
   // a conversa fica guardada com o id da pessoa: trocar de pessoa mostra "carregando" sem limpar o estado no efeito
-  const [conv, setConv] = useState<{ de: string; msgs: Msg[] } | null>(null);
-  const msgs = conv?.de === membro.membroId ? conv.msgs : null;
-  const setMsgs = (f: (m: Msg[] | null) => Msg[]) => setConv((c) => ({ de: membro.membroId, msgs: f(c?.de === membro.membroId ? c.msgs : null) }));
+  const [conv, setConvBruto] = useState<{ de: string; c: ConversaEquipe } | null>(null);
+  const c = conv?.de === membro.membroId ? conv.c : null;
+  const setC = (f: (c: ConversaEquipe | null) => ConversaEquipe | null) => setConvBruto((x) => { const n = f(x?.de === membro.membroId ? x.c : null); return n ? { de: membro.membroId, c: n } : null; });
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState<"msg" | "relatorio" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const fim = useRef<HTMLDivElement>(null);
+  const [versao, setVersao] = useState(0);
+  const [todosSubs, setTodosSubs] = useState(false);
+  const lista = useRef<HTMLDivElement>(null);
   const caixa = useRef<HTMLTextAreaElement>(null);
   const chave = p.lote.chave;
+  const trabalhando = !!c?.trabalhando;
 
   useEffect(() => {
     let vivo = true; const de = membro.membroId;
-    api<Msg[]>(`/api/workend/equipe/chat?${q}&membro=${encodeURIComponent(de)}`).then((m) => vivo && setConv({ de, msgs: m })).catch((e) => vivo && setErro((e as Error).message));
+    api<ConversaEquipe>(`/api/workend/equipe/chat?${q}&membro=${encodeURIComponent(de)}`).then((r) => { if (vivo) { setConvBruto({ de, c: r }); setErro(null); } }).catch((e) => vivo && setErro((e as Error).message));
     return () => { vivo = false; };
-  }, [q, membro.membroId]);
-  useEffect(() => { fim.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [msgs, enviando]);
+  }, [q, membro.membroId, versao]);
+  // enquanto a equipe trabalha, a conversa atualiza a cada 3 s; no fim, o painel (gasto, última mensagem) também
+  useEffect(() => {
+    if (!trabalhando) return;
+    const t = setInterval(() => setVersao((v) => v + 1), 3000);
+    return () => { clearInterval(t); void recarregar(); };
+  }, [trabalhando, recarregar]);
+  const itens = useMemo(() => linhaDoTempo(c, membro.membroId), [c, membro.membroId]);
+  const progresso = useMemo(() => andamento(c, membro.membroId), [c, membro.membroId]);
+  useEffect(() => { const el = lista.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); }, [itens.length, enviando]);
 
+  const chefe = membro.chefeId ? p.equipe.find((m) => m.membroId === membro.chefeId) : null;
+  const subs = p.equipe.filter((m) => m.chefeId === membro.membroId);
   const enviar = async (t = texto) => {
     const pedido = t.trim(); if (!pedido || enviando) return;
     setEnviando("msg"); setErro(null); setTexto("");
-    const provisoria: Msg = { id: `tmp-${Date.now()}`, papel: "user", conteudo: pedido, avaliacao: null, correcao: null, em: new Date().toISOString() };
-    setMsgs((m) => [...(m ?? []), provisoria]);
+    const agora = new Date().toISOString(), tmp = `tmp-${agora}`;
+    setC((x) => ({ mensagens: [...(x?.mensagens ?? []), { id: tmp, papel: "user", autor: "dono", deNome: null, conteudo: pedido, avaliacao: null, correcao: null, em: agora }], internas: x?.internas ?? [], trabalhando: x?.trabalhando ?? false }));
     try {
-      const r = await api<{ mensagem: Msg }>(`/api/workend/equipe/chat`, { method: "POST", body: JSON.stringify({ lote: chave, membro: membro.membroId, texto: pedido }) });
-      setMsgs((m) => [...(m ?? []), r.mensagem]);
+      const r = await api<RespostaEnvio>(`/api/workend/equipe/chat`, { method: "POST", body: JSON.stringify({ lote: chave, membro: membro.membroId, texto: pedido }) });
+      setC((x) => ({ mensagens: [...(x?.mensagens ?? []), r.mensagem], internas: x?.internas ?? [], trabalhando: r.delegados.length > 0 || !!x?.trabalhando }));
+      setVersao((v) => v + 1);
       void recarregar();
-    } catch (e) { setErro((e as Error).message); setTexto(pedido); setMsgs((m) => (m ?? []).filter((x) => x.id !== provisoria.id)); }
+    } catch (e) { setErro((e as Error).message); setTexto(pedido); setC((x) => x && { ...x, mensagens: x.mensagens.filter((m) => m.id !== tmp) }); }
     setEnviando(null);
   };
   const relatorio = async () => {
     setEnviando("relatorio"); setErro(null);
     try {
       const r = await api<{ membroId: string; mensagem: Msg }>(`/api/workend/equipe/relatorio`, { method: "POST", body: JSON.stringify({ lote: chave }) });
-      if (r.membroId !== membro.membroId) selecionar(r.membroId); else setMsgs((m) => [...(m ?? []), { id: `tmp-r-${Date.now()}`, papel: "user", conteudo: "Me mande o relatório da semana.", avaliacao: null, correcao: null, em: new Date().toISOString() }, r.mensagem]);
+      if (r.membroId !== membro.membroId) selecionar(r.membroId); else setVersao((v) => v + 1);
       void recarregar();
     } catch (e) { setErro((e as Error).message); }
     setEnviando(null);
   };
 
   return (
-    <section className="mt-5 grid gap-4 lg:grid-cols-[320px_1fr]">
-      <aside className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible" aria-label="Pessoas da equipe">
-        {p.equipe.map((m) => (
-          <button key={m.membroId} type="button" onClick={() => { setErro(null); selecionar(m.membroId); }}
-            className={`flex min-w-[230px] items-center gap-3 rounded-2xl border p-3 text-left transition lg:min-w-0 ${m.membroId === membro.membroId ? "border-[var(--azul)] bg-[var(--surface)] shadow-md" : "border-transparent bg-[var(--cinza)] hover:border-[var(--linha)]"}`}>
-            <Avatar m={m} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold">{m.nome} <span className="font-normal text-[var(--tinta-2)]">· {m.cargo}</span></span>
-              <span className="block truncate text-[12px] text-[var(--tinta-2)]">{m.ultima ? `${m.ultima.deQuem === "voce" ? "Você: " : ""}${m.ultima.texto}` : m.setor}</span>
-            </span>
-            {m.ultima && <span className="self-start text-[11px] text-[var(--tinta-2)]">{quando(m.ultima.em)}</span>}
-          </button>
-        ))}
-        <Link href={`/mundo?lote=${encodeURIComponent(chave)}`} className="hidden rounded-2xl border-2 border-dashed border-[var(--linha)] p-3 text-center text-sm font-semibold text-[var(--azul)] lg:block">+ Contratar especialista no mapa</Link>
-      </aside>
+    <section className="mt-5 grid gap-4 lg:grid-cols-[340px_1fr]">
+      <ListaEquipe p={p} membro={membro} selecionar={(id) => { setErro(null); selecionar(id); }} />
 
-      <div className="flex min-h-[560px] flex-col overflow-hidden rounded-2xl border border-[var(--linha)] bg-[var(--surface)]">
-        <header className="flex flex-wrap items-center gap-3 border-b border-[var(--linha)] p-4">
+      <div className="flex min-h-[600px] flex-col overflow-hidden rounded-2xl border border-[var(--linha)] bg-[var(--surface)] lg:h-[760px]">
+        <header className="flex flex-wrap items-start gap-3 border-b border-[var(--linha)] p-4">
           <Avatar m={membro} tamanho={52} />
           <div className="min-w-0 flex-1">
-            <b className="text-lg">{membro.nome}</b> <span className="text-[var(--tinta-2)]">· {membro.cargo}</span>
-            <p className="line-clamp-2 text-[13px] text-[var(--tinta-2)]">{membro.treino || (membro.atendeVisitantes ? "Atende quem chega na loja pelo mapa." : "Ainda sem treino: diga o que essa pessoa faz em Montar escritório.")}</p>
+            <div className="flex flex-wrap items-center gap-2"><b className="text-lg">{membro.nome}</b><SeloNivel m={membro} /></div>
+            <div className="text-[14px] text-[var(--tinta-2)]">{membro.cargo} · <b style={{ color: membro.setorCor }}>{membro.setor}</b></div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12.5px]">
+              {chefe && <button type="button" onClick={() => selecionar(chefe.membroId)} className="rounded-full bg-[var(--cinza)] px-2.5 py-1 text-[var(--tinta-2)] hover:text-[var(--tinta)]">Responde a <b className="text-[var(--tinta)]">{chefe.nome}</b> · {chefe.cargo}</button>}
+              {subs.length > 0 && <span className="text-[var(--tinta-2)]">Comanda:</span>}
+              {(todosSubs ? subs : subs.slice(0, 6)).map((s) => <button key={s.membroId} type="button" onClick={() => selecionar(s.membroId)} className="rounded-full bg-[#EEF3FF] px-2.5 py-1 font-semibold text-[var(--azul)] hover:bg-[#dfe8ff]">{s.nome}</button>)}
+              {subs.length > 6 && <button type="button" onClick={() => setTodosSubs((v) => !v)} className="rounded-full px-2 py-1 font-semibold text-[var(--tinta-2)] hover:text-[var(--tinta)]">{todosSubs ? "mostrar menos" : `+${subs.length - 6}`}</button>}
+            </div>
+            <p className="mt-1.5 line-clamp-2 text-[13px] text-[var(--tinta-2)]">{membro.treino || (membro.atendeVisitantes ? "Atende quem chega na loja pelo mapa." : "Ainda sem treino: diga o que essa pessoa faz em Montar escritório.")}</p>
           </div>
-          {membro.papel === "ceo" && <button type="button" onClick={relatorio} disabled={!!enviando || p.gasto.esgotado} className="btn btn-tinta !py-2.5 text-sm">{enviando === "relatorio" ? "Escrevendo o relatório…" : "Pedir relatório da semana"}</button>}
+          {membro.nivel === "ceo" && <button type="button" onClick={relatorio} disabled={!!enviando || p.gasto.esgotado} className="btn btn-tinta !py-2.5 text-sm">{enviando === "relatorio" ? "Escrevendo o relatório…" : "Pedir relatório da semana"}</button>}
         </header>
 
         {(membro.especialista || membro.regras.length > 0) && (
@@ -220,40 +281,145 @@ function Conversas({ p, membro, q, selecionar, recarregar }: { p: Painel; membro
           </div>
         )}
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
-          {msgs === null && !erro && <p className="text-sm text-[var(--tinta-2)]">Carregando a conversa…</p>}
-          {msgs?.length === 0 && (
-            <div className="mx-auto max-w-[46ch] py-8 text-center">
-              <Avatar m={membro} tamanho={72} />
+        <div ref={lista} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
+          {c === null && !erro && <p className="text-sm text-[var(--tinta-2)]">Carregando a conversa…</p>}
+          {c && itens.length === 0 && (
+            <div className="mx-auto max-w-[48ch] py-8 text-center">
+              <div className="mx-auto w-max"><Avatar m={membro} tamanho={72} /></div>
               <p className="mt-3 font-semibold">{membro.saudacao || `Oi! Sou ${membro.nome}. Em que posso ajudar a ${p.lote.empresaNome}?`}</p>
-              <p className="mt-1 text-sm text-[var(--tinta-2)]">Peça uma tarefa como pediria a um funcionário. Ela responde com o material pronto.</p>
+              <p className="mt-1 text-sm text-[var(--tinta-2)]">{subs.length ? `Peça uma tarefa como pediria a um funcionário. ${membro.nome} divide o trabalho com a própria equipe (${subs.length} ${subs.length === 1 ? "pessoa" : "pessoas"}) e entrega tudo junto aqui.` : "Peça uma tarefa como pediria a um funcionário. A resposta vem com o material pronto."}</p>
             </div>
           )}
-          {msgs?.map((m) => <Bolha key={m.id} m={m} membro={membro} lote={chave} mudou={recarregar} />)}
-          {enviando && <div className="flex items-center gap-2 text-sm text-[var(--tinta-2)]"><Avatar m={membro} tamanho={28} /><span className="equipe-digitando"><i /><i /><i /></span>{membro.nome} está {enviando === "relatorio" ? "escrevendo o relatório" : "trabalhando"}…</div>}
-          <div ref={fim} />
+          {itens.map((it) => it.tipo === "msg" ? <Bolha key={it.msg.id} m={it.msg} membro={membro} lote={chave} mudou={recarregar} /> : <GrupoInternas key={it.grupo.chave} g={it.grupo} p={p} abrir={selecionar} />)}
+          {(enviando || trabalhando) && (
+            <div className="flex items-center gap-2.5 rounded-xl bg-[var(--cinza)] px-3.5 py-2.5 text-sm text-[var(--tinta-2)]">
+              <Avatar m={membro} tamanho={28} /><span className="equipe-digitando"><i /><i /><i /></span>
+              {enviando === "relatorio" ? `${membro.nome} está escrevendo o relatório…` : enviando ? `${membro.nome} está lendo e organizando o pedido…` : progresso ? `A equipe está trabalhando: ${progresso.prontos} de ${progresso.total} ${progresso.total === 1 ? "pedido pronto" : "pedidos prontos"}. A entrega final chega aqui.` : `${membro.nome} está juntando as respostas da equipe…`}
+            </div>
+          )}
         </div>
 
         <footer className="border-t border-[var(--linha)] p-3">
           {erro && <p className="mb-2 rounded-lg bg-[#FDECEC] px-3 py-2 text-sm text-[#9B1C1C]">{erro}</p>}
-          {(msgs?.length ?? 0) < 2 && (
+          {(c?.mensagens.length ?? 0) < 2 && !p.gasto.esgotado && (
             <div className="mb-2 flex flex-wrap gap-1.5">
-              {sugestoes(membro, p.lote.empresaNome).map((s) => <button key={s} type="button" onClick={() => { setTexto(s); caixa.current?.focus(); }} className="rounded-full border border-[var(--linha)] px-3 py-1 text-[13px] hover:border-[var(--azul)] hover:text-[var(--azul)]">{s}</button>)}
+              {sugestoesTarefa(membro, p.lote.empresaNome).map((s) => <button key={s} type="button" onClick={() => { setTexto(s); caixa.current?.focus(); }} className="rounded-full border border-[var(--linha)] px-3 py-1 text-[13px] hover:border-[var(--azul)] hover:text-[var(--azul)]">{s}</button>)}
             </div>
           )}
           <form onSubmit={(e) => { e.preventDefault(); void enviar(); }} className="flex items-end gap-2">
             <textarea ref={caixa} value={texto} onChange={(e) => setTexto(e.target.value.slice(0, 4000))} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void enviar(); } }}
-              rows={2} placeholder={p.gasto.esgotado ? "Os R$ 10 de IA deste mês acabaram." : `Peça algo para ${membro.nome}…`} disabled={p.gasto.esgotado || !p.ia}
+              rows={2} placeholder={p.gasto.esgotado ? `Os ${brl(p.gasto.teto)} de IA deste mês acabaram.` : !p.ia ? "A IA está desligada no servidor agora." : `Dê uma tarefa para ${membro.nome}…`} disabled={p.gasto.esgotado || !p.ia}
               className="min-h-[52px] flex-1 resize-none rounded-xl border border-[var(--line-strong)] bg-white px-3 py-2.5 text-[15px] outline-none focus:border-[var(--azul)]" />
             <button type="submit" disabled={!texto.trim() || !!enviando || p.gasto.esgotado} className="btn btn-azul !py-3.5">Enviar</button>
           </form>
+          <p className="mt-1.5 text-[12px] text-[var(--tinta-2)]">{subs.length ? `${membro.nome} pode pedir partes da tarefa a ${subs.map((s) => s.nome).slice(0, 3).join(", ")}${subs.length > 3 ? " e outros" : ""}. Enter envia, Shift+Enter quebra a linha.` : "Enter envia, Shift+Enter quebra a linha."}</p>
         </footer>
       </div>
     </section>
   );
 }
 
-// resposta da equipe com aprovar / corrigir (a correção vira regra permanente daquela pessoa)
+const STATUS_INTERNA: Record<TrocaInterna["status"], { t: string; cor: string; fundo: string }> = {
+  pedido: { t: "trabalhando", cor: "#8A6A12", fundo: "#FFF3CC" },
+  respondido: { t: "respondeu", cor: "#166534", fundo: "#E3F6EA" },
+  erro: { t: "não respondeu", cor: "#9B1C1C", fundo: "#FDECEC" },
+};
+// "Helena pediu a Ricardo: …", o andamento e a resposta (aberta com um clique)
+function CartaoInterna({ t, p, abrir }: { t: TrocaInterna; p: Painel; abrir: (id: string) => void }) {
+  const de = p.equipe.find((m) => m.membroId === t.de), para = p.equipe.find((m) => m.membroId === t.para);
+  const st = STATUS_INTERNA[t.status] ?? STATUS_INTERNA.pedido;
+  return (
+    <div className="equipe-entra rounded-2xl border border-[var(--linha)] bg-white p-3.5 text-[14px]">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex items-center">{de && <Avatar m={de} tamanho={28} />}<Icone nome="seta" tamanho={15} className="mx-1 text-[var(--tinta-2)]" />{para && <Avatar m={para} tamanho={28} />}</span>
+        <span className="min-w-0 flex-1">
+          <button type="button" onClick={() => abrir(t.de)} className="font-semibold hover:underline">{t.deNome}</button> pediu a{" "}
+          <button type="button" onClick={() => abrir(t.para)} className="font-semibold hover:underline">{t.paraNome}</button>
+          <span className="text-[13px] text-[var(--tinta-2)]"> · {t.paraCargo}</span>
+        </span>
+        <span className="rounded-full px-2 py-0.5 text-[11.5px] font-bold" style={{ color: st.cor, background: st.fundo }}>{st.t}</span>
+        <span className="text-[11.5px] text-[var(--tinta-2)]">{quando(t.em)}</span>
+      </div>
+      <p className="mt-1.5 line-clamp-4 whitespace-pre-wrap text-[var(--tinta-2)]">{t.pedido}</p>
+      {t.resposta && t.status === "respondido" && (
+        <details className="mt-1.5">
+          <summary className="cursor-pointer select-none text-[13px] font-semibold text-[#0F766E]">Ver a resposta de {t.paraNome}</summary>
+          <div className="mt-1.5 rounded-xl bg-[var(--cinza)] p-3"><TextoIA t={t.resposta} className="text-[14px]" /></div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+// os pedidos internos de uma tarefa dentro da conversa: a cadeia em ordem, com o 2º nível recuado
+function GrupoInternas({ g, p, abrir }: { g: GrupoTarefa; p: Painel; abrir: (id: string) => void }) {
+  return (
+    <details open className="equipe-entra rounded-2xl border border-[var(--linha)] bg-[var(--cinza)] p-3">
+      <summary className="cursor-pointer select-none text-[13.5px] font-semibold">Pedidos internos desta tarefa · {g.prontos} de {g.total} {g.total === 1 ? "respondido" : "respondidos"}{g.prontos < g.total ? " · a equipe está trabalhando" : ""}</summary>
+      <div className="mt-2.5 space-y-2.5">{g.itens.map(({ t, nivel }) => <div key={t.id} className={nivel === 2 ? "ml-5 border-l-2 border-[var(--line-strong)] pl-3 sm:ml-8" : ""}><CartaoInterna t={t} p={p} abrir={abrir} /></div>)}</div>
+    </details>
+  );
+}
+
+// todas as conversas internas da empresa, com filtro por andamento e busca; atualiza sozinho enquanto há pedido aberto
+function Internas({ p, q, abrir }: { p: Painel; q: string; abrir: (id: string) => void }) {
+  const [lista, setLista] = useState<TrocaInterna[] | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [versao, setVersao] = useState(0);
+  const [filtro, setFiltro] = useState<"todas" | "pedido" | "respondido">("todas");
+  const [busca, setBusca] = useState("");
+  useEffect(() => {
+    let vivo = true;
+    api<{ internas: TrocaInterna[] }>(`/api/workend/equipe/internas?${q}`).then((r) => { if (vivo) { setLista(r.internas); setErro(null); } }).catch((e) => vivo && setErro((e as Error).message));
+    return () => { vivo = false; };
+  }, [q, versao]);
+  const aberto = !!lista?.some((t) => t.status === "pedido");
+  useEffect(() => { if (!aberto) return; const t = setInterval(() => setVersao((v) => v + 1), 4000); return () => clearInterval(t); }, [aberto]);
+  const visiveis = useMemo(() => {
+    const b = busca.trim().toLowerCase();
+    return (lista ?? []).filter((t) => (filtro === "todas" || t.status === filtro) && (!b || `${t.deNome} ${t.paraNome} ${t.paraCargo} ${t.pedido}`.toLowerCase().includes(b)));
+  }, [lista, filtro, busca]);
+  const ceo = p.equipe.find((m) => m.nivel === "ceo");
+  return (
+    <section className="mt-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="mr-auto max-w-[70ch] text-[14px] text-[var(--tinta-2)]">Quando você dá uma tarefa a quem comanda uma área, essa pessoa pede partes do trabalho a quem responde a ela. Aqui fica tudo o que a equipe pediu e respondeu entre si.</p>
+        <div className="flex gap-1 rounded-xl bg-[var(--surface-dim)] p-1 text-[13px] font-semibold">
+          {([["todas", "Todas"], ["pedido", "Em andamento"], ["respondido", "Respondidas"]] as const).map(([k, t]) => <button key={k} type="button" onClick={() => setFiltro(k)} className={`rounded-lg px-2.5 py-1.5 ${filtro === k ? "bg-[var(--surface)] shadow" : "text-[var(--tinta-2)]"}`}>{t}</button>)}
+        </div>
+        <input value={busca} onChange={(e) => setBusca(e.target.value.slice(0, 40))} placeholder="Buscar" className="w-40 rounded-xl border border-[var(--line-strong)] bg-white px-3 py-2 text-[14px] outline-none focus:border-[var(--azul)]" />
+      </div>
+      {erro && <p className="mt-3 rounded-lg bg-[#FDECEC] px-3 py-2 text-sm text-[#9B1C1C]">{erro}</p>}
+      {!lista && !erro && <p className="mt-4 text-[var(--tinta-2)]">Carregando…</p>}
+      {lista?.length === 0 && (
+        <div className="mt-4 rounded-2xl bg-[var(--cinza)] p-7">
+          <b>A equipe ainda não conversou entre si.</b>
+          <p className="mt-1 text-[var(--tinta-2)]">Dê uma tarefa ao CEO ou a quem comanda uma área: os pedidos que essa pessoa fizer à equipe aparecem aqui, com as respostas.</p>
+          {ceo && <button type="button" onClick={() => abrir(ceo.membroId)} className="btn btn-azul mt-4">Dar uma tarefa para {ceo.nome}</button>}
+        </div>
+      )}
+      {lista && lista.length > 0 && visiveis.length === 0 && <p className="mt-4 text-[var(--tinta-2)]">Nada com esse filtro.</p>}
+      <div className="mt-4 space-y-5">
+        {agruparPorTarefa(visiveis).map((g) => (
+          <article key={g.chave} className="rounded-2xl bg-[var(--cinza)] p-4">
+            <header className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-[12px] font-black uppercase tracking-wide text-[var(--azul)]">Tarefa que você deu a {g.quem.nome}</span>
+              <span className="text-[12.5px] text-[var(--tinta-2)]">{quando(g.em)} · {g.prontos} de {g.total} {g.total === 1 ? "pedido respondido" : "pedidos respondidos"}</span>
+              <button type="button" onClick={() => abrir(g.quem.id)} className="ml-auto text-[13px] font-semibold text-[var(--azul)] hover:underline">Ver a entrega na conversa</button>
+              {g.tarefa && <p className="w-full text-[15px] font-semibold text-[var(--tinta)]">“{g.tarefa}”</p>}
+            </header>
+            <div className="space-y-2.5">
+              {g.itens.map(({ t, nivel }) => <div key={t.id} className={nivel === 2 ? "ml-5 border-l-2 border-[var(--line-strong)] pl-3 sm:ml-10" : ""}><CartaoInterna t={t} p={p} abrir={abrir} /></div>)}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// resposta da equipe com aprovar / corrigir (a correção vira regra permanente daquela pessoa). Os pedidos internos do chefe
+// e as respostas da equipe juntadas também aparecem, cada um com o seu formato.
 function Bolha({ m, membro, lote, mudou }: { m: Msg; membro: Membro; lote: string; mudou: () => Promise<void> }) {
   const [av, setAv] = useState(m.avaliacao);
   const [corrigindo, setCorrigindo] = useState(false);
@@ -261,7 +427,19 @@ function Bolha({ m, membro, lote, mudou }: { m: Msg; membro: Membro; lote: strin
   const [regra, setRegra] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [copiado, setCopiado] = useState(false);
-  if (m.papel === "user") return <div className="equipe-entra ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-[var(--azul)] px-4 py-2.5 text-[15px] text-white"><p className="whitespace-pre-wrap">{m.conteudo}</p></div>;
+  if (m.autor === "dono") return <div className="equipe-entra ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-[var(--azul)] px-4 py-2.5 text-[15px] text-white"><p className="whitespace-pre-wrap">{m.conteudo}</p></div>;
+  if (m.autor === "chefe") return (
+    <div className="equipe-entra max-w-[88%] rounded-2xl border border-[#F2D58A] bg-[#FFF8E6] px-4 py-3 text-[#4A3A10]">
+      <div className="mb-1 text-[11.5px] font-black uppercase tracking-wide text-[#8A6A12]">Pedido interno de {m.deNome ?? "um chefe"}</div>
+      <TextoIA t={m.conteudo.replace(/^Pedido de [^\n]*:\n\n/, "")} className="text-[14.5px]" />
+    </div>
+  );
+  if (m.autor === "equipe") return (
+    <details className="equipe-entra max-w-[88%] rounded-2xl border border-[var(--linha)] bg-white px-4 py-2.5">
+      <summary className="cursor-pointer select-none text-[13px] font-semibold text-[#0F766E]">A equipe respondeu e {membro.nome} juntou tudo · ver as respostas de cada um</summary>
+      <TextoIA t={m.conteudo.replace(/^Respostas da sua equipe:\n\n/, "")} className="mt-2 text-[14px] text-[var(--tinta-2)]" />
+    </details>
+  );
   const treinar = async (avaliacao: 1 | -1, texto?: string) => {
     if (m.id.startsWith("tmp")) return;
     setOcupado(true);
@@ -275,9 +453,9 @@ function Bolha({ m, membro, lote, mudou }: { m: Msg; membro: Membro; lote: strin
     <div className="equipe-entra flex max-w-[92%] gap-2.5">
       <Avatar m={membro} tamanho={32} />
       <div className="min-w-0 flex-1">
-        <div className="rounded-2xl rounded-tl-md bg-[var(--cinza)] px-4 py-3"><Texto t={m.conteudo} /></div>
+        <div className="rounded-2xl rounded-tl-md border border-[var(--linha)] bg-white px-4 py-3"><Texto t={m.conteudo} /></div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12px]">
-          <button type="button" disabled={ocupado} onClick={() => treinar(1)} className={`rounded-full px-2.5 py-1 font-semibold ${av === 1 ? "bg-[#E3F6EA] text-[#166534]" : "text-[var(--tinta-2)] hover:bg-[var(--cinza)]"}`}>{av === 1 ? "✓ Aprovado" : "Aprovar"}</button>
+          <button type="button" disabled={ocupado} onClick={() => treinar(1)} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${av === 1 ? "bg-[#E3F6EA] text-[#166534]" : "text-[var(--tinta-2)] hover:bg-[var(--cinza)]"}`}>{av === 1 && <Icone nome="check" tamanho={13} />}{av === 1 ? "Aprovado" : "Aprovar"}</button>
           <button type="button" disabled={ocupado} onClick={() => setCorrigindo((v) => !v)} className={`rounded-full px-2.5 py-1 font-semibold ${av === -1 ? "bg-[#FDECEC] text-[#9B1C1C]" : "text-[var(--tinta-2)] hover:bg-[var(--cinza)]"}`}>{av === -1 ? "Corrigido" : "Corrigir"}</button>
           <button type="button" onClick={() => { void navigator.clipboard?.writeText(m.conteudo); setCopiado(true); setTimeout(() => setCopiado(false), 1500); }} className="rounded-full px-2.5 py-1 font-semibold text-[var(--tinta-2)] hover:bg-[var(--cinza)]">{copiado ? "Copiado!" : "Copiar"}</button>
           <span className="text-[var(--tinta-2)]">{quando(m.em)}</span>
@@ -302,7 +480,7 @@ function Regras({ membro, lote, mudou }: { membro: Membro; lote: string; mudou: 
       <button type="button" onClick={() => setAberto((v) => !v)} className="rounded-full bg-[var(--tinta)] px-2.5 py-1 font-semibold text-white">Já aprendeu {membro.regras.length} {membro.regras.length === 1 ? "regra" : "regras"}</button>
       {aberto && (
         <span className="absolute left-0 top-8 z-20 block w-[300px] rounded-xl border border-[var(--linha)] bg-[var(--surface)] p-3 shadow-xl">
-          {membro.regras.map((r) => <span key={r.id} className="flex items-start gap-2 py-1 text-[13px]"><span className="flex-1">{r.texto}</span><button type="button" onClick={() => remover(r.id)} className="text-[#E2575B]" title="Esquecer esta regra">✕</button></span>)}
+          {membro.regras.map((r) => <span key={r.id} className="flex items-start gap-2 py-1 text-[13px]"><span className="flex-1">{r.texto}</span><button type="button" onClick={() => remover(r.id)} className="text-[#E2575B]" title="Esquecer esta regra" aria-label="Esquecer esta regra"><Icone nome="fechar" tamanho={14} /></button></span>)}
         </span>
       )}
     </span>

@@ -1,4 +1,4 @@
-// Sede do OneState RP na cidade (16/11/2026, pedido do dono: "coloque um prédio desse para o OneState, com logo e todas
+// Sede da Social RP (antes OneState RP; o nome mudou em 16/11/2026) na cidade (16/11/2026, pedido do dono: "coloque um prédio desse para o OneState, com logo e todas
 // as áreas do site"). Ocupa o quarteirão 1,1 (sudeste) inteiro, como a Nuvem e a lanchonete: o último na ordem da planta,
 // então nenhum lote mudou de número. Térreo = saguão; do 1º ao 5º andar, cada sala é uma área do site, com o nome
 // iluminado na fachada (3 na frente sul e 2 no lado oeste, os lados que a câmera vê). Tocar no prédio abre o cartão com
@@ -6,7 +6,7 @@
 import { centroQuarteirao } from "./mundo";
 
 export const SITE_ONESTATE = "https://onestatebr.com.br";
-// a sede é o "lote" de uma conta (o dono): chave fora da lista de lotes à venda, sem número de loja (scripts/sede-onestate.mjs)
+// a sede é o "lote" de uma conta (o dono): chave fora da lista de lotes à venda, sem número de loja (equipe em scripts/sede-socialrp.mjs: departamentos com chefes)
 export const CHAVE_SEDE = "1,1,0";
 export const [OS_X, OS_Z] = centroQuarteirao(1, 1);
 // torre: 22 m de frente (x) por 16 m de fundo (z), recuada para o norte (a praça de entrada fica na frente, ao sul)

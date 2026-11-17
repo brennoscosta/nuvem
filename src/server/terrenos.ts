@@ -196,7 +196,7 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
   if (!t) throw new Error("Lote sem dono.");
   if (t.usuarioId !== u.id && !ehAdmin(u)) throw new Error("Esse chão não é seu.");
   if (t.status !== "ativo") throw new Error("Pague o 1º mês pra montar o escritório.");
-  if (chave === CHAVE_SEDE) throw new Error("A sede do OneState tem um setor para cada área do site e não é montada pelo editor.");
+  if (chave === CHAVE_SEDE) throw new Error("A sede da Social RP tem a equipe montada por departamento e não é montada pelo editor.");
   const base = t.escritorio ?? (await garantirEscritorio(chave)) ?? escritorioPadrao(t.empresaNome, t.cor);
   const e = normalizarEscritorio(dados, base);
   const detalhes: string[] = [];

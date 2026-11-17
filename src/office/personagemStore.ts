@@ -3,14 +3,14 @@
 // Presença por batida: a cada 3 s mando minha posição e recebo quem está por perto. Chat por consulta a cada 2,5 s.
 import { create } from "zustand";
 import { useMundo } from "./mundoStore";
-import type { TipoAvatar } from "./data/bonecos";
+import type { TipoAvatar, Visual } from "./data/bonecos";
 import { pontoNaCalcada } from "./data/mundo";
 import { useChamada, type ChamadaInfo } from "./chamadaStore";
 
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
 // perfil profissional (11/11/2026): aparece na ficha e na busca de profissionais
 export interface Perfil { profissao: string; nicho: string; servicos: string; preco: string; local: string; portfolio: { titulo: string; url: string }[]; disponivel: boolean }
-export interface MeuPersonagem extends Partial<Perfil> { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: string | null; x: number; z: number; rot: number; acessorios?: string[] }
+export interface MeuPersonagem extends Partial<Perfil> { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: string | null; x: number; z: number; rot: number; acessorios?: string[]; visual?: Visual }
 export type StatusRelacao = "nenhuma" | "pedi" | "pediram" | "amigos" | "recusada";
 export interface Outro { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number; redes?: Redes; online: boolean; relacao?: { status: StatusRelacao; id: string | null }; perfil?: Perfil | null; reputacao?: { media: number | null; n: number }; acessorios?: string[]; selos?: string[] }
 export interface Amigo { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; redes: Redes; online: boolean; desde: string }
@@ -42,7 +42,7 @@ interface Estado {
   vestir: (usando: string[]) => Promise<string | null>;
   comprarItem: (id: string) => Promise<string | null>;
   carregar: () => Promise<void>;
-  salvar: (d: { nome: string; tipo: string; bio: string; redes: Redes; mostrarRedes: boolean; perfil?: Perfil }) => Promise<string | null>;
+  salvar: (d: { nome: string; tipo: string; bio: string; redes: Redes; mostrarRedes: boolean; perfil?: Perfil; visual?: Visual }) => Promise<string | null>;
   pagar: (meses?: number) => Promise<string | null>;
   abrir: (painel: Estado["painel"]) => void;
   fechar: () => void;

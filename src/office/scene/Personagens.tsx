@@ -9,7 +9,7 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle } from "./Boneco";
 import { SombraContato } from "./SombraContato";
-import { TODOS_BONECOS, BONECOS } from "../data/bonecos";
+import { bonecoDe, BONECOS } from "../data/bonecos";
 import { MUNDO, passeioNaCalcada, pontoNaCalcada } from "../data/mundo";
 import { usePersonagem, minhaPos, type Outro } from "../personagemStore";
 import { modoMundo } from "../mundoStore";
@@ -17,7 +17,7 @@ import { modoMundo } from "../mundoStore";
 const VEL = 2.2; // m/s (um pouco mais rápido que os pedestres)
 const VEL_PASSEIO = 1.0; // quando passeia sozinho, anda no ritmo dos outros pedestres
 const PAUSA_PASSEIO = 9; // s parado antes de sair passeando pela calçada
-const def = (id: string) => TODOS_BONECOS[id] ?? BONECOS[1];
+const def = (id: string) => bonecoDe(id, BONECOS[1]); // catálogo ou visual personalizado (v1:…)
 
 function Nome({ nome, cor, eu = false, online = true, onClick }: { nome: string; cor: string; eu?: boolean; online?: boolean; onClick?: () => void }) {
   return (

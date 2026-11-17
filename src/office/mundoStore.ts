@@ -115,6 +115,9 @@ export const useMundo = create<Estado>((set, get) => ({
 
   carregar: async () => {
     void get().carregarOutdoors();
+    // ?sede= e ?lote= só valem na primeira carga: o carregar() repete a cada 30 s (Painel.tsx) e reabria o cartão da sede,
+    // puxava a câmera de volta e fechava a conversa com a equipe (16/11/2026)
+    const primeira = !get().carregado;
     try {
       const [t, u] = await Promise.all([
         fetch("/api/terrenos").then((r) => r.json()).catch(() => ({ terrenos: [], meu: null })),
@@ -124,7 +127,7 @@ export const useMundo = create<Estado>((set, get) => ({
       for (const x of (t.terrenos ?? []) as Terreno[]) terrenos[x.chave] = x;
       set({ terrenos, vagas: t.vagas ?? {}, meu: t.meu ?? null, usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? 99, fundador: t.fundador ?? null, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
       // veio do cadastro com ?lote=: já abre o lote escolhido
-      const busca = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const busca = primeira && typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
       if (busca?.get("sede")) get().selecionarLote(CHAVE_SEDE);
       const pedido = busca?.get("lote") ?? null;
       if (pedido && LOTE_POR_CHAVE[pedido] && !get().loteSelecionado) { get().selecionarLote(pedido); if (u && u.id && !terrenos[pedido] && pedido !== PRACA_CHAVE && !busca?.get("pagamento")) get().abrirPainel(); }

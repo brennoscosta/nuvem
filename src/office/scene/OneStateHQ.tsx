@@ -1,11 +1,11 @@
 "use client";
-// Sede do OneState RP (16/11/2026; dados em src/office/data/onestate.ts). Torre de 6 andares de vidro escuro com estrutura
+// Sede da Social RP, antes OneState RP (16/11/2026; dados em src/office/data/onestate.ts). Torre de 6 andares de vidro escuro com estrutura
 // grafite e frisos dourados (as cores da marca: ouro e prata sobre preto), logo grande no alto (sul, oeste e norte),
 // pórtico dourado com a logo na entrada, praça com totem e o balão. Cada andar de cada fachada é UMA imagem desenhada na
 // hora (salas acesas na cor da área, mesas e a placa com o nome): poucos objetos para o mapa desenhar. A fachada acende
 // à noite (brilhoSede, chamado a cada quadro). Tocar no prédio ou no balão abre o cartão com todas as áreas do site.
 import * as THREE from "three";
-import { useLoader, useFrame } from "@react-three/fiber";
+import { useLoader, useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Balao } from "./Lotes";
 import { caixa, cilindro, esfera, mat, plano } from "./geo";
 import { Estatico } from "./Estatico";
@@ -18,7 +18,7 @@ import { InteriorSede } from "./OneStateInterior";
 import { useEscritorio } from "../store";
 
 const OURO = "#D4A63A", GRAFITE = "#1E2228", PISO = "#4A4F57";
-const PROP_LOGO = 240 / 809; // altura / largura da logo do OneState (public/onestate/logo.png)
+const PROP_LOGO = 240 / 809; // altura / largura da logo da Social RP (public/socialrp/logo.png)
 const S = SEDE.z + SEDE.d / 2, N = SEDE.z - SEDE.d / 2, O = SEDE.x - SEDE.w / 2, L = SEDE.x + SEDE.w / 2; // faces
 
 // ---------- fachadas desenhadas em canvas ----------
@@ -177,7 +177,7 @@ function Estrutura({ parte }: { parte: "sempre" | "fora" }) {
 
 // ---------- a logo do OneState: no alto, no pórtico e no totem ----------
 function useLogos() {
-  const [logo, icone] = useLoader(THREE.TextureLoader, ["/onestate/logo.png", "/onestate/icone.png"]);
+  const [logo, icone] = useLoader(THREE.TextureLoader, ["/socialrp/logo.png", "/socialrp/icone.png"]);
   const placa = (t: THREE.Texture, w: number, h: number) => [
     <planeGeometry key="g" args={[w, h]} />,
     <meshBasicMaterial key="m" map={t} map-colorSpace={THREE.SRGBColorSpace} map-anisotropy={4} transparent alphaTest={0.08} toneMapped={false} />,
@@ -218,14 +218,17 @@ export function OneStateHQ() {
   useFrame(() => brilhoSede(ceu.noite));
   // vista por dentro (o mesmo botão que abre as lojas): a torre some e aparece a planta com a equipe (OneStateInterior)
   const fora = useEscritorio((s) => s.vista === "fora");
+  // o clique do prédio só vale por fora: por dentro a torre fica invisível, mas o raio ainda bate no teto dela e o clique
+  // abria o cartão no lugar da conversa com a pessoa tocada (16/11/2026). Por dentro, o cartão abre pelo balão.
+  const clique = fora ? { onClick: (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); abrirOneState(); }, onPointerOver: cursor("pointer"), onPointerOut: cursor("") } : {};
   return (
-    <group onClick={(e) => { e.stopPropagation(); abrirOneState(); }} onPointerOver={cursor("pointer")} onPointerOut={cursor("")}>
+    <group {...clique}>
       <Estatico><Estrutura parte="sempre" /></Estatico>
       <Estatico visivel={fora}><Estrutura parte="fora" /></Estatico>
       <group visible={fora}><Fachadas /></group>
       <ComFallback fallback={null}><Logos fora={fora} /></ComFallback>
       {!fora && <InteriorSede />}
-      <Balao position={[SEDE.x, ALTURA_SEDE + 10.5, SEDE.z]} nome="OneState" cor="#14110A" logo="/onestate/icone.png" subtitulo={`Roleplay · ${AREAS_ONESTATE.length} áreas`} onClick={abrirOneState} />
+      <Balao position={[SEDE.x, ALTURA_SEDE + 10.5, SEDE.z]} nome="Social RP" cor="#14110A" logo="/socialrp/icone.png" subtitulo={`Roleplay · ${AREAS_ONESTATE.length} áreas`} onClick={abrirOneState} />
     </group>
   );
 }

@@ -25,6 +25,7 @@ import { PecaArea } from "./PecasArea";
 import { Inauguracao, LOTES_EM_OBRA_VISTOS, INAUGURAR_TESTE, easeSubida } from "./ObraFesta";
 import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, andaresDoPredio, alturaPredio, pecaEfetiva, LED_PADRAO, type Led, MAX_ANDARES, MAX_ANDARES_KIT, COBERTURAS, DIM_LAYOUT, type CoberturaId, INTERIOR_PADRAO, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote } from "../data/escritorio";
 import { useMundo, useAgora, promocaoAtiva } from "../mundoStore";
+import { abrirChatEquipe } from "../ui/ChatEquipe";
 import { useFrame } from "@react-three/fiber";
 import { useEscritorio } from "../store";
 
@@ -302,9 +303,11 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
   useAnimacao(h, () => pose, fase, HIPS.procedural.base);
   const def = BONECO[m.boneco] ?? BONECO.classico;
   const [hover, setHover] = useState(false);
-  // NPC: sem balão de nome (só com o mouse em cima). Clicar abre o cartão da loja, com a conversa com a atendente de IA
-  // (desde 11/11/2026 não precisa de personagem: basta a conta; no próprio lote, o cartão leva à Minha equipe)
-  const clicar = () => { useMundo.getState().selecionarLote(chave); };
+  // NPC: sem balão de nome (só com o mouse em cima). Quem visita: clicar abre o cartão da loja, com a conversa com a
+  // atendente de IA (desde 11/11/2026 basta a conta). O dono do lote (16/11/2026): clicar abre a conversa com ESSA pessoa,
+  // para dar tarefas ali mesmo (src/office/ui/ChatEquipe.tsx).
+  const dono = useMundo((s) => !!s.usuario && s.terrenos[chave]?.usuarioId === s.usuario.id);
+  const clicar = () => { if (dono) void abrirChatEquipe(chave, m.id); else useMundo.getState().selecionarLote(chave); };
   return (
     <group position={lugar.pos} rotation={[0, lugar.rot, 0]}>
       <BonecoProcedural ref={h} def={def} camisa={m.camisa} headset={m.papel === "atendente"} cracha={m.papel === "ceo" ? "#D4A017" : "#1D4ED8"} />
@@ -313,7 +316,7 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
       </mesh>
       {hover && (
         <Html position={[0, 1.65, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
-          <div className="w-max select-none rounded-full bg-white/95 px-2.5 py-1 text-[12px] font-bold text-[#1D2128] shadow-md">{m.nome}<span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase text-white" style={{ background: m.papel === "ceo" ? "#D4A017" : m.papel === "atendente" ? "#16A34A" : "#1D4ED8" }}>{m.papel === "ceo" ? "CEO" : m.papel === "atendente" ? "Atendente" : m.cargo.slice(0, 14)}</span></div>
+          <div className="w-max select-none rounded-full bg-white/95 px-2.5 py-1 text-[12px] font-bold text-[#1D2128] shadow-md">{m.nome}<span className="ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase text-white" style={{ background: m.papel === "ceo" ? "#D4A017" : m.papel === "atendente" ? "#16A34A" : "#1D4ED8" }}>{m.papel === "ceo" ? "CEO" : m.papel === "atendente" ? "Atendente" : m.cargo.slice(0, 14)}</span>{dono && <span className="block text-center text-[10px] font-semibold text-[#1D4ED8]">Clique para conversar</span>}</div>
         </Html>
       )}
     </group>

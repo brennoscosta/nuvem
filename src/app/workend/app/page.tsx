@@ -105,7 +105,7 @@ function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; 
               {p.numero && <Link href={`/loja/${p.numero}`} className="btn pn-btn-vidro">Página da loja</Link>}
             </div>
           </div>
-          {p.sede ? <div className="pn-predio pn-predio-sede" aria-hidden="true"><img src="/onestate/logo.png" alt="" width={809} height={240} /></div> : <div className="pn-predio" aria-hidden="true">
+          {p.sede ? <div className="pn-predio pn-predio-sede" aria-hidden="true"><img src="/socialrp/logo.png" alt="" width={809} height={240} /></div> : <div className="pn-predio" aria-hidden="true">
             <span className="pn-balao">{p.logo ? <img src={p.logo} alt="" /> : <i>{empresa.slice(0, 1)}</i>}<b>{empresa}</b></span>
             <img src={`/workend/predios/${p.layout}.webp`} alt="" width={420} height={400} />
           </div>}

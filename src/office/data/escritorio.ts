@@ -54,7 +54,10 @@ export interface Setor { id: string; nome: string; cor: string; mesas: number } 
 export type PapelMembro = "atendente" | "ceo" | "profissional";
 export interface Treino { descricao: string; saudacao: string } // o que a pessoa sabe/faz e como cumprimenta (base do atendimento)
 // catalogoId: de qual agente do catálogo veio ("esp-<id>" = especialista de IA, com habilidades); vazio = criado do zero
-export interface Membro { id: string; nome: string; cargo: string; papel: PapelMembro; setorId: string | null; boneco: string; camisa: string; treino?: Treino; catalogoId?: string }
+// Hierarquia (16/11/2026, sede da Social RP): nível do cargo e chefe direto. Opcionais: lojas comuns continuam como antes
+// (todos respondem ao CEO). Com chefeId, quem é chefe pode passar partes de uma tarefa para a sua equipe.
+export type NivelMembro = "ceo" | "diretor" | "gerente" | "analista" | "assistente";
+export interface Membro { id: string; nome: string; cargo: string; papel: PapelMembro; setorId: string | null; boneco: string; camisa: string; treino?: Treino; catalogoId?: string; nivel?: NivelMembro; chefeId?: string | null }
 export interface Escritorio { layout: LayoutId; setores: Setor[]; equipe: Membro[]; trocasLayout?: number; creditosLayout?: number; decor?: Decoracao }
 
 // ---- Decoração do lote (11/11/2026: "novas formas de personalização de prédios" e "girar para outras posições") ----

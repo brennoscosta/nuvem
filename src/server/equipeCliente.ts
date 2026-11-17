@@ -12,14 +12,15 @@
 import { sql, migrar, id } from "./db";
 import type { Usuario } from "./usuarios";
 import { ehAdmin, obterTerreno, terrenoDoUsuario, type Terreno } from "./terrenos";
-import { avaliarMensagem, gravarMensagem, listarMensagens, salvarRegra, removerRegra, type RegraDB } from "./agentes";
+import { avaliarMensagem, gravarMensagem, listarMensagens, salvarRegra, removerRegra, type RegraDB, type AgenteDB } from "./agentes";
 import { conversar, destilarRegra, temIA } from "./motor";
 import { versoesAtivas, skillEfetiva } from "./evolucao";
 import { bloqueio, contar } from "./limite";
 import { contextoAgendaIA, aplicarMarcacaoDaAtendente, temMarcacao } from "./agenda";
 import { ESPECIALISTAS_IA, ESPECIALISTA_POR_ID, type EspecialistaIA } from "@/office/data/especialistas";
 import { LOTES, LOTE_POR_CHAVE, nomeNicho } from "@/office/data/mundo";
-import type { Membro } from "@/office/data/escritorio";
+import type { Membro, NivelMembro, Escritorio } from "@/office/data/escritorio";
+import { pedirComEquipe, trabalhando, trocasInternas, atividadeInterna } from "./delegacao";
 import type { AreaId, Nivel } from "@/office/data/org";
 
 export const TETO_IA_MES = 10; // R$ de IA por lote por mês
@@ -74,26 +75,52 @@ export async function garantirEmpresaDoLote(t: Terreno, forcar = false): Promise
   return empId;
 }
 
+// Hierarquia (16/11/2026): nível do cargo e chefe direto vêm do escritório (Membro.nivel e Membro.chefeId). Sem isso, como
+// sempre: CEO no topo e todos respondendo a ele.
+export function nivelDoMembro(m: Pick<Membro, "papel" | "nivel">): NivelMembro {
+  return m.nivel ?? (m.papel === "ceo" ? "ceo" : m.papel === "atendente" ? "assistente" : "analista");
+}
+const NIVEL_AGENTE: Record<NivelMembro, Nivel> = { ceo: "ceo", diretor: "diretor", gerente: "gerente", analista: "pleno", assistente: "junior" };
+export function chefeDoMembro(m: Pick<Membro, "id" | "papel" | "chefeId">, e: Pick<Escritorio, "equipe">): string | null {
+  if (m.papel === "ceo") return null;
+  if (m.chefeId && m.chefeId !== m.id && e.equipe.some((x) => x.id === m.chefeId)) return m.chefeId;
+  return e.equipe.find((x) => x.papel === "ceo")?.id ?? null;
+}
+// ordem de criação: o chefe antes de quem responde a ele (chefe_id aponta para um agente que já existe)
+function ordemPorChefe(e: Escritorio): Membro[] {
+  const feitos = new Set<string>(); const out: Membro[] = []; let resto = [...e.equipe];
+  while (resto.length) {
+    const prontos = resto.filter((m) => { const c = chefeDoMembro(m, e); return !c || feitos.has(c); });
+    if (!prontos.length) { out.push(...resto); break; } // ciclo: o resto entra respondendo ao CEO (ver abaixo)
+    for (const m of prontos) { feitos.add(m.id); out.push(m); }
+    resto = resto.filter((m) => !feitos.has(m.id));
+  }
+  return out;
+}
+
 async function sincronizarEquipe(t: Terreno, empId: string) {
   const e = t.escritorio!;
   const mapa = await versoesAtivas().catch(() => new Map());
   const existentes = new Set((await sql<{ id: string }[]>`SELECT id FROM agente WHERE empresa_id = ${empId}`).map((a) => a.id));
   const ceoId = agenteIdDe(empId, e.equipe.find((m) => m.papel === "ceo")?.id ?? "ceo");
-  // o CEO entra primeiro: os outros apontam para ele como chefe
-  const ordem = [...e.equipe].sort((a, b) => Number(b.papel === "ceo") - Number(a.papel === "ceo"));
-  for (const m of ordem) {
+  const criados = new Set<string>();
+  for (const m of ordemPorChefe(e)) {
     const esp = m.papel === "profissional" ? especialistaDe(m) : null;
     const setor = e.setores.find((s) => s.id === m.setorId);
     const area: AreaId = m.papel === "ceo" ? "diretoria" : m.papel === "atendente" ? "atendimento" : esp?.area ?? areaPorNome(`${setor?.nome ?? ""} ${m.cargo}`);
-    const nivel: Nivel = m.papel === "ceo" ? "ceo" : esp?.nivel ?? "pleno";
+    const nivel: Nivel = m.papel === "ceo" ? "ceo" : m.nivel ? NIVEL_AGENTE[m.nivel] : esp?.nivel ?? "pleno";
     const aid = agenteIdDe(empId, m.id);
+    const chefeMembro = chefeDoMembro(m, e);
+    const chefeAg = chefeMembro ? agenteIdDe(empId, chefeMembro) : null;
+    const chefe = chefeAg && (criados.has(chefeAg) || existentes.has(chefeAg)) ? chefeAg : m.papel === "ceo" ? null : ceoId;
     const config = { membroId: m.id, papel: m.papel, saudacao: m.treino?.saudacao || esp?.saudacao || "", especialista: esp?.id ?? null, atendeVisitantes: m.papel === "atendente" };
     await sql`INSERT INTO agente (id, empresa_id, nome, area, nivel, funcao, personalidade, tom_de_voz, descricao, modelo, boneco, chefe_id, teto_diario_brl, ativo, config)
       VALUES (${aid}, ${empId}, ${m.nome}, ${area}, ${nivel}, ${m.cargo}, ${esp?.personalidade ?? ""}, ${esp?.tomDeVoz ?? ""}, ${m.treino?.descricao || esp?.descricao || ""},
-              ${MODELO_CLIENTE}, ${m.boneco}, ${m.papel === "ceo" ? null : ceoId}, ${TETO_IA_MES}, true, ${sql.json(config)})
+              ${MODELO_CLIENTE}, ${m.boneco}, ${chefe}, ${TETO_IA_MES}, true, ${sql.json(config)})
       ON CONFLICT (id) DO UPDATE SET nome = EXCLUDED.nome, area = EXCLUDED.area, nivel = EXCLUDED.nivel, funcao = EXCLUDED.funcao,
         personalidade = EXCLUDED.personalidade, tom_de_voz = EXCLUDED.tom_de_voz, descricao = EXCLUDED.descricao, boneco = EXCLUDED.boneco,
         chefe_id = EXCLUDED.chefe_id, ativo = true, config = agente.config || EXCLUDED.config, atualizado_em = now()`;
+    criados.add(aid);
     // especialista contratado agora: habilidades na versão em vigor (assim a evolução atualiza a cópia) e limites do cargo
     if (!existentes.has(aid) && esp) {
       for (const [i, s] of esp.skills.entries()) {
@@ -162,17 +189,26 @@ export async function painelEquipe(u: Usuario, chave?: string | null) {
     const esp = ag?.config?.especialista ? ESPECIALISTA_POR_ID[ag.config.especialista] : null;
     const ult = ultimas.find((x) => x.agenteId === aid);
     const setor = t.escritorio?.setores.find((s) => s.id === m.setorId);
+    const e = t.escritorio!;
     return {
       membroId: m.id, nome: m.nome, cargo: m.cargo, papel: m.papel, setor: setor?.nome ?? (m.papel === "ceo" ? "Diretoria" : "Recepção"),
+      setorId: setor?.id ?? (m.papel === "ceo" ? "_diretoria" : "_recepcao"), setorCor: setor?.cor ?? (m.papel === "ceo" ? "#D4A63A" : "#9CA3AF"),
+      nivel: nivelDoMembro(m), chefeId: chefeDoMembro(m, e), temEquipe: e.equipe.some((x) => x.id !== m.id && chefeDoMembro(x, e) === m.id),
       boneco: m.boneco, camisa: m.camisa, foto: fotoDoEspecialista(esp), especialista: esp ? { cargo: esp.cargo, habilidades: esp.skills.map((s) => s.nome) } : null,
       saudacao: m.treino?.saudacao ?? "", treino: m.treino?.descricao ?? "", atendeVisitantes: m.papel === "atendente",
       ultima: ult ? { texto: ult.conteudo.slice(0, 140), deQuem: ult.papel === "user" ? "voce" : "equipe", em: ult.criadoEm } : null,
       regras: regras.filter((r) => r.agenteId === aid).map((r) => ({ id: r.id, texto: r.texto })),
     };
   });
+  // departamentos na ordem do escritório (a diretoria e a recepção sem setor entram no começo)
+  const departamentos = [
+    ...(equipe.some((m) => m.setorId === "_diretoria") ? [{ id: "_diretoria", nome: "Diretoria", cor: "#D4A63A" }] : []),
+    ...(equipe.some((m) => m.setorId === "_recepcao") ? [{ id: "_recepcao", nome: "Recepção", cor: "#9CA3AF" }] : []),
+    ...(t.escritorio?.setores ?? []).filter((s) => equipe.some((m) => m.setorId === s.id)).map((s) => ({ id: s.id, nome: s.nome, cor: s.cor })),
+  ];
   return {
     lote: { chave: t.chave, numero: LOTE_POR_CHAVE[t.chave]?.numero ?? null, empresaNome: t.empresaNome, cor: t.cor, nicho: nomeNicho(t.nicho), pagoAte: t.pagoAte },
-    sobre: emp?.sobre ?? "", contatos: emp?.contatos ?? {}, equipe,
+    sobre: emp?.sobre ?? "", contatos: emp?.contatos ?? {}, equipe, departamentos,
     gasto: { mes: gasto, teto: TETO_IA_MES, aviso: gasto >= TETO_IA_MES * AVISO_TETO, esgotado: gasto >= TETO_IA_MES },
     visitantes: { total: vis?.n ?? 0, ultimas24h: vis?.hoje ?? 0 }, ia: temIA(),
   };
@@ -193,7 +229,25 @@ export async function conversaDoDono(u: Usuario, chave: string | null, membroId:
   const empId = await garantirEmpresaDoLote(t);
   const a = await agenteDoMembro(empId, membroId);
   const msgs = await listarMensagens(a.id, 80, null);
-  return msgs.map((m) => ({ id: m.id, papel: m.papel, conteudo: m.conteudo, avaliacao: m.avaliacao, correcao: m.correcao, em: m.criadoEm }));
+  // quem escreveu cada mensagem: o dono, o chefe (pedido interno) ou o sistema juntando as respostas da equipe
+  const chefes = new Map((await sql<{ id: string; nome: string; funcao: string }[]>`SELECT id, nome, funcao FROM agente WHERE empresa_id = ${empId}`).map((x) => [x.id, x]));
+  const mensagens = msgs.map((m) => {
+    const autor = m.autor.startsWith("chefe:") ? "chefe" : m.autor.startsWith("sistema:") ? "equipe" : m.papel === "assistant" ? "agente" : "dono";
+    const c = autor === "chefe" ? chefes.get(m.autor.slice(6)) : null;
+    return { id: m.id, papel: m.papel, autor, deNome: c ? `${c.nome} (${c.funcao})` : null, conteudo: m.conteudo, avaliacao: m.avaliacao, correcao: m.correcao, em: m.criadoEm };
+  });
+  const internas = await trocasInternas(empId, { agenteId: a.id, limite: 40 });
+  return { mensagens, internas, trabalhando: trabalhando(a.id) || internas.some((x) => x.status === "pedido" && x.origemAgente === a.id) };
+}
+export async function internasDoDono(u: Usuario, chave: string | null) {
+  const t = await loteDoDono(u, chave);
+  const empId = await garantirEmpresaDoLote(t);
+  return { internas: await trocasInternas(empId, { limite: 60 }) };
+}
+export async function atividadeDoDono(u: Usuario, chave: string | null) {
+  const t = await loteDoDono(u, chave);
+  const empId = await garantirEmpresaDoLote(t);
+  return { trocas: await atividadeInterna(empId, 30) };
 }
 
 export async function falarComMembro(u: Usuario, chave: string | null, membroId: string, texto: string) {
@@ -207,9 +261,11 @@ export async function falarComMembro(u: Usuario, chave: string | null, membroId:
   const empId = await garantirEmpresaDoLote(t);
   const a = await agenteDoMembro(empId, membroId);
   const gasto = await gastoDoMes(empId);
+  if (gasto >= TETO_IA_MES) throw new ErroHttp(`A equipe já usou os R$ ${TETO_IA_MES.toFixed(2).replace(".", ",")} de IA deste mês. Ela volta a responder no dia 1º.`, 402);
   try {
-    const r = await conversar(a.id, pedido, `dono:${u.id}`, { modo: "dono", tetoMes: { gasto, teto: TETO_IA_MES } });
-    return { mensagem: { id: r.mensagem.id, papel: "assistant", conteudo: r.mensagem.conteudo, avaliacao: null, correcao: null, em: r.mensagem.criadoEm }, gasto: { mes: r.gastoHoje, teto: TETO_IA_MES } };
+    const [ag] = await sql<AgenteDB[]>`SELECT * FROM agente WHERE id = ${a.id}`;
+    const r = await pedirComEquipe({ empId, autorDono: `dono:${u.id}`, teto: async () => ({ gasto: await gastoDoMes(empId), teto: TETO_IA_MES }) }, ag, pedido);
+    return { mensagem: { id: r.mensagem.id, papel: "assistant", autor: "agente", deNome: null, conteudo: r.mensagem.conteudo, avaliacao: null, correcao: null, em: r.mensagem.criadoEm }, delegados: r.delegados, gasto: { mes: await gastoDoMes(empId), teto: TETO_IA_MES } };
   } catch (e) {
     throw new ErroHttp((e as Error).message, gasto >= TETO_IA_MES ? 402 : 502);
   }
@@ -240,15 +296,15 @@ export async function pedirRelatorio(u: Usuario, chave: string | null) {
   const ceoMembro = t.escritorio?.equipe.find((m) => m.papel === "ceo");
   if (!ceoMembro) throw new ErroHttp("O escritório está sem CEO.", 404);
   const ceo = await agenteDoMembro(empId, ceoMembro.id);
-  const conversa = await sql<{ nome: string; funcao: string; papel: string; conteudo: string; criadoEm: Date }[]>`SELECT a.nome, a.funcao, m.papel, m.conteudo, m.criado_em
+  const conversa = await sql<{ nome: string; funcao: string; papel: string; autor: string; conteudo: string; criadoEm: Date }[]>`SELECT a.nome, a.funcao, m.papel, m.autor, m.conteudo, m.criado_em
     FROM mensagem m JOIN agente a ON a.id = m.agente_id
-    WHERE a.empresa_id = ${empId} AND m.visitante_id IS NULL AND m.papel IN ('user','assistant') AND m.criado_em > now() - interval '7 days' AND a.id <> ${ceo.id}
+    WHERE a.empresa_id = ${empId} AND m.visitante_id IS NULL AND m.papel IN ('user','assistant') AND m.autor NOT LIKE 'sistema:%' AND m.criado_em > now() - interval '7 days' AND a.id <> ${ceo.id}
     ORDER BY m.criado_em DESC LIMIT 60`;
   const visitas = await sql<{ nome: string | null; conteudo: string; criadoEm: Date }[]>`SELECT COALESCE(p.nome, us.nome) AS nome, m.conteudo, m.criado_em
     FROM mensagem m JOIN agente a ON a.id = m.agente_id LEFT JOIN personagem p ON p.usuario_id = m.visitante_id LEFT JOIN usuario us ON us.id = m.visitante_id
     WHERE a.empresa_id = ${empId} AND m.visitante_id IS NOT NULL AND m.papel = 'user' AND m.criado_em > now() - interval '7 days'
     ORDER BY m.criado_em DESC LIMIT 40`;
-  const linhas = conversa.reverse().map((m) => `- ${m.papel === "user" ? `Dono pediu a ${m.nome} (${m.funcao})` : `${m.nome} entregou`}: ${m.conteudo.replace(/\s+/g, " ").slice(0, m.papel === "user" ? 220 : 360)}`);
+  const linhas = conversa.reverse().map((m) => `- ${m.papel === "user" ? (m.autor.startsWith("chefe:") ? `Pedido interno da equipe para ${m.nome} (${m.funcao})` : `Dono pediu a ${m.nome} (${m.funcao})`) : `${m.nome} entregou`}: ${m.conteudo.replace(/\s+/g, " ").slice(0, m.papel === "user" ? 220 : 360)}`);
   const vis = visitas.reverse().map((v) => `- ${v.nome ?? "Visitante"}: ${v.conteudo.replace(/\s+/g, " ").slice(0, 200)}`);
   const contexto = [
     "Material para o relatório da semana (últimos 7 dias). Use só este material; não invente resultados.",

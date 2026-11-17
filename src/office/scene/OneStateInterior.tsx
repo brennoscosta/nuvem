@@ -1,141 +1,299 @@
 "use client";
-// Sede do OneState por dentro (16/11/2026, pedido do dono: "não estou conseguindo ver minha empresa do OneState por
-// dentro"). Na vista por dentro (o mesmo botão que abre todas as lojas) a torre some e aparece a planta no térreo, aberta
-// como casa de bonecas: grade 5 × 5 com a recepção na entrada (sul), a sala do CEO e uma sala para cada área do site,
-// cada uma com o piso na cor da área, 3 mesas e os agentes da equipe da sede digitando (o escritório gravado no lote
-// da sede, src/office/data/onestate.ts › CHAVE_SEDE). Passar o mouse num agente mostra nome e cargo; clicar abre o
-// cartão da sede. No modo leve só um agente por sala anima (os outros lugares ficam com a mesa).
-import { useMemo, useRef, useState } from "react";
+// Sede da Social RP (antes OneState) por dentro. 16/11/2026, pedido do dono: "por que os bonecos das salas só ficam
+// parados e são todos iguais? Não faz sentido" e "que a empresa tenha suas áreas como assistentes, gerentes, CEO, setor
+// financeiro". Na vista por dentro a torre some e aparece a planta no térreo, aberta como casa de bonecas:
+//  - um corredor no meio (leste-oeste) com 6 salas de cada lado: os departamentos da equipe gravada no lote da sede
+//    (scripts/sede-socialrp.mjs), a recepção na entrada sul e a sala de reunião; café no corredor;
+//  - cada agente com aparência própria (pele, cabelo, roupa, calça e tênis tirados do id): chefes de blazer, a equipe de
+//    camisa na cor do departamento;
+//  - rotina viva: trabalham sentados um tempo, levantam, vão à mesa de um colega (chefe ou equipe) conversar com balão,
+//    vão à reunião ou ao café e voltam. Para o dono, as conversas internas de verdade (delegação de tarefas, endpoint
+//    /api/workend/equipe/atividade) também viram caminhada + balão com o texto real.
+// Tudo que se mexe é atualizado direto nos objetos (useFrame + refs); o React só redesenha quando um balão aparece.
+import * as THREE from "three";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Html } from "@react-three/drei";
-import { caixa, mat, plano } from "./geo";
+import { useFrame } from "@react-three/fiber";
+import { caixa, cilindro, mat, plano } from "./geo";
 import { Estatico } from "./Estatico";
-import { Mesa, Balcao, Sofa, Planta } from "./Moveis";
+import { Mesa, Balcao, Sofa, Planta, Cafe } from "./Moveis";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle, type Pose } from "./Boneco";
-import { BONECO } from "../data/bonecos";
+import type { Boneco as BonecoDef } from "../data/bonecos";
 import { leve } from "./qualidade";
 import { useMundo } from "../mundoStore";
-import { AREAS_ONESTATE, CHAVE_SEDE, OS_X, OS_Z } from "../data/onestate";
+import { abrirChatEquipe } from "../ui/ChatEquipe";
+import { CHAVE_SEDE, OS_X, OS_Z } from "../data/onestate";
 import type { Escritorio, Membro } from "../data/escritorio";
+import { W, D, X0, Z0, X1, Z1, CORREDOR, ZC, POR_FILEIRA, LARG, cx, montarSalas, type Sala } from "../data/plantaSede";
 
-// planta: 34 × 30 m no meio da praça, 5 colunas × 5 linhas; z cresce para o sul (a entrada)
-const W = 34, D = 30, COLS = 5, LINS = 5, CW = W / COLS, CD = D / LINS;
-const X0 = OS_X - W / 2, Z0 = OS_Z - D / 2;
+// ---------- planta (salas em src/office/data/plantaSede.ts) ----------
 const ALT = 1.15, ESP = 0.12, PORTA = 1.5;
-const RECEPCAO = { c: 2, r: 4 }, CEO = { c: 4, r: 4 };
-type Sala = { id: string; nome: string; cor: string; c: number; r: number; tipo: "area" | "recepcao" | "ceo" };
-const centro = (s: { c: number; r: number }): [number, number] => [X0 + (s.c + 0.5) * CW, Z0 + (s.r + 0.5) * CD];
+const zDentro = (s: Sala) => (s.norte ? s.z1 - 1.1 : s.z0 + 1.1);
+
 const clarear = (hex: string, k: number) => { const n = parseInt(hex.slice(1), 16); const f = (v: number) => Math.round(v + (255 - v) * k).toString(16).padStart(2, "0"); return `#${f((n >> 16) & 255)}${f((n >> 8) & 255)}${f(n & 255)}`; };
 
-// as salas: recepção e CEO fixas; as áreas, na ordem do menu do site, ocupando as outras células de cima para baixo
-const SALAS: Sala[] = (() => {
-  const lista: Sala[] = [{ id: "recepcao", nome: "Recepção", cor: "#E9C46A", ...RECEPCAO, tipo: "recepcao" }, { id: "ceo", nome: "Sala do CEO", cor: "#9CA3AF", ...CEO, tipo: "ceo" }];
-  let i = 0;
-  for (let r = 0; r < LINS; r++) for (let c = 0; c < COLS; c++) {
-    if ((c === RECEPCAO.c && r === RECEPCAO.r) || (c === CEO.c && r === CEO.r)) continue;
-    const a = AREAS_ONESTATE[i++]; if (a) lista.push({ id: a.id, nome: a.nome, cor: a.cor, c, r, tipo: "area" });
+// lugares de trabalho: todos olham para o sul (de frente para a câmera); o chefe na mesa maior, mais ao fundo
+type Lugar = { pos: [number, number, number]; mesa: [number, number, number]; chefe: boolean };
+function lugaresDaSala(s: Sala, n: number): Lugar[] {
+  const out: Lugar[] = [];
+  const fundoZ = s.norte ? s.z0 + 2.3 : s.z1 - 9.6; // fila do chefe (longe do corredor na fileira norte)
+  const linhas = s.norte ? [fundoZ, fundoZ + 3.6, fundoZ + 7.0] : [s.z0 + 3.4, s.z0 + 6.8, s.z0 + 10.2];
+  const vagas: { x: number; z: number; chefe: boolean }[] = [{ x: cx(s), z: linhas[0], chefe: true }];
+  for (const z of linhas.slice(1)) for (const dx of [-1.25, 1.25]) vagas.push({ x: cx(s) + dx, z, chefe: false });
+  for (let k = 0; k < Math.min(n, vagas.length); k++) {
+    const v = vagas[k];
+    out.push({ mesa: [v.x, 0, v.z], pos: [v.x, 0, v.z - 0.62], chefe: v.chefe });
   }
-  return lista;
-})();
-// 3 mesas por sala de área, encostadas no fundo (norte); quem senta olha para a entrada (sul), de frente para a câmera
-const mesasDa = (s: Sala) => { const [cx, cz] = centro(s); return [-2.1, 0, 2.1].map((dx) => [cx + dx, 0, cz - 0.4] as [number, number, number]); };
-const cadeira = (m: [number, number, number]): [number, number, number] => [m[0], 0, m[2] - 0.62];
-
-// paredes baixas: grade com uma porta no meio de cada trecho e a entrada larga na recepção
-function Paredes() {
-  const m = mat("#F4F1EB", { rough: 0.9 }), topo = mat("#D4A63A", { rough: 0.35, metal: 0.7 });
-  const pedacos: { x: number; z: number; w: number; d: number }[] = [];
-  const trechoX = (x0: number, x1: number, z: number, vao: number) => { const meio = (x0 + x1) / 2, a = meio - vao / 2, b = meio + vao / 2; if (vao <= 0) pedacos.push({ x: meio, z, w: x1 - x0, d: ESP }); else { pedacos.push({ x: (x0 + a) / 2, z, w: a - x0, d: ESP }); pedacos.push({ x: (b + x1) / 2, z, w: x1 - b, d: ESP }); } };
-  const trechoZ = (z0: number, z1: number, x: number, vao: number) => { const meio = (z0 + z1) / 2, a = meio - vao / 2, b = meio + vao / 2; if (vao <= 0) pedacos.push({ x, z: meio, w: ESP, d: z1 - z0 }); else { pedacos.push({ x, z: (z0 + a) / 2, w: ESP, d: a - z0 }); pedacos.push({ x, z: (b + z1) / 2, w: ESP, d: z1 - b }); } };
-  for (let c = 0; c < COLS; c++) {
-    const x0 = X0 + c * CW, x1 = x0 + CW;
-    trechoX(x0, x1, Z0, 0); // fundo (norte), fechado
-    trechoX(x0, x1, Z0 + D, c === RECEPCAO.c ? 3 : 0); // frente (sul): a entrada só na recepção
-    for (let r = 1; r < LINS; r++) trechoX(x0, x1, Z0 + r * CD, PORTA);
-  }
-  for (let r = 0; r < LINS; r++) {
-    const z0 = Z0 + r * CD, z1 = z0 + CD;
-    trechoZ(z0, z1, X0, 0); trechoZ(z0, z1, X0 + W, 0);
-    for (let c = 1; c < COLS; c++) trechoZ(z0, z1, X0 + c * CW, PORTA);
-  }
-  return (
-    <group>
-      {pedacos.map((p, i) => <mesh key={i} geometry={caixa(+p.w.toFixed(3), ALT, +p.d.toFixed(3))} material={m} position={[p.x, ALT / 2, p.z]} castShadow receiveShadow />)}
-      {pedacos.map((p, i) => <mesh key={`t${i}`} geometry={caixa(+p.w.toFixed(3), 0.05, +(p.d + 0.02).toFixed(3))} material={topo} position={[p.x, ALT + 0.025, p.z]} />)}
-    </group>
-  );
+  return out;
 }
 
-function Fixos() {
+// ---------- aparência de cada agente (tirada do id: estável e variada) ----------
+const PELES = ["#F3D2B3", "#F1C9A5", "#D9A882", "#C98E68", "#A8714F", "#8D5A3B", "#6B4029"];
+const CABELOS = ["#1E1A18", "#2A1E19", "#3B2A22", "#5A3B22", "#8A5A2B", "#B5532D", "#D9B26F", "#9CA3AF"];
+// penteados, barbas, roupas e tênis do boneco novo (frente "personagem", 16/11/2026): cada pessoa sai diferente
+const ESTILOS: BonecoDef["estiloCabelo"][] = ["curto", "longo", "coque", "cacheado", "rabo", "topete", "careca", "curto", "longo", "cacheado", "moicano"];
+const CALCAS = ["#1F2329", "#22252B", "#2F3542", "#3E4450", "#4B3B2E", "#1E3A5F", "#5A6472", "#C8B79A"];
+const TENIS = ["#E11D48", "#0A6CFF", "#16A34A", "#D4A63A", "#7C3AED", "#F97316", ""];
+const CALCADOS = ["#F4F4F4", "#F4F4F4", "#1F2329", "#E7E2D6", "#9CA3AF"];
+const BLAZERS = ["#1E3A5F", "#2B2F36", "#3F3F46", "#6B2737", "#1F2937", "#0F4C5C"];
+// equipe: camisa na maioria, mas também moletom, jaqueta e vestido (todos na cor do departamento)
+const TRAJES_EQUIPE: NonNullable<BonecoDef["traje"]>[] = ["camisa", "camisa", "moletom", "camisa", "jaqueta", "vestido", "camisa", "moletom"];
+const BARBAS: NonNullable<BonecoDef["barba"]>[] = ["nenhuma", "nenhuma", "rala", "nenhuma", "bigode", "rala", "cheia"]; // barba cheia fica pesada: mais rara
+const hash = (s: string) => Math.abs([...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7));
+function aparencia(m: Membro): { def: BonecoDef; camisa: string } {
+  const h = hash(m.id + m.nome), h2 = hash(m.nome + m.cargo);
+  const chefe = m.nivel === "ceo" || m.nivel === "diretor" || m.nivel === "gerente";
+  const estilo = ESTILOS[(h >> 6) % ESTILOS.length];
+  const curto = estilo === "curto" || estilo === "careca" || estilo === "topete" || estilo === "moicano";
+  const traje = chefe ? "blazer" : TRAJES_EQUIPE[h2 % TRAJES_EQUIPE.length];
+  const def: BonecoDef = {
+    id: `ag-${m.id}`, nome: m.nome, arquivo: null,
+    pele: PELES[h % PELES.length], cabelo: CABELOS[(h >> 3) % CABELOS.length], estiloCabelo: estilo,
+    calca: CALCAS[(h >> 9) % CALCAS.length], traje: traje === "vestido" && curto ? "camisa" : traje,
+    tenis: TENIS[(h >> 12) % TENIS.length] || undefined, calcado: CALCADOS[(h2 >> 3) % CALCADOS.length],
+    barba: curto ? BARBAS[(h2 >> 6) % BARBAS.length] : "nenhuma", oculos: (h2 >> 9) % 5 === 0,
+  };
+  return { def, camisa: chefe ? (m.nivel === "ceo" ? "#14110A" : BLAZERS[(h >> 4) % BLAZERS.length]) : m.camisa };
+}
+
+// frases da rotina (genéricas: os visitantes não veem nada da empresa); o dono vê as conversas de verdade
+const FRASES_CHEFE = ["Como está essa entrega?", "Preciso disso até o fim do dia.", "Bom trabalho, vamos fechar.", "Me manda o resumo depois.", "Prioridade agora é essa."];
+const FRASES_EQUIPE = ["Terminei a minha parte.", "Pode revisar pra mim?", "Tenho uma ideia pra isso.", "Já te mando os números.", "Fechado, sigo nisso."];
+
+// ---------- paredes e móveis (juntados num objeto só) ----------
+function Fixos({ salas, lugares }: { salas: Sala[]; lugares: Record<string, Lugar[]> }) {
+  const parede = mat("#F4F1EB", { rough: 0.9 }), friso = mat("#D4A63A", { rough: 0.35, metal: 0.7 });
+  const pedacos: { x: number; z: number; w: number; d: number }[] = [];
+  const muroX = (x0: number, x1: number, z: number, vaos: [number, number][] = []) => { let a = x0; for (const [c, l] of [...vaos].sort((p, q) => p[0] - q[0])) { if (c - l / 2 > a) pedacos.push({ x: (a + c - l / 2) / 2, z, w: c - l / 2 - a, d: ESP }); a = c + l / 2; } if (x1 > a) pedacos.push({ x: (a + x1) / 2, z, w: x1 - a, d: ESP }); };
+  const muroZ = (z0: number, z1: number, x: number) => pedacos.push({ x, z: (z0 + z1) / 2, w: ESP, d: z1 - z0 });
+  // fundo norte fechado; frente sul com a entrada da recepção; laterais
+  muroX(X0, X1, Z0);
+  const rec = salas.find((s) => s.tipo === "recepcao");
+  muroX(X0, X1, Z1, rec ? [[cx(rec), 3]] : []);
+  muroZ(Z0, Z1, X0); muroZ(Z0, Z1, X1);
+  // as duas paredes do corredor, com uma porta para cada sala
+  for (const norte of [true, false]) muroX(X0, X1, norte ? ZC - CORREDOR / 2 : ZC + CORREDOR / 2, salas.filter((s) => s.norte === norte).map((s) => [cx(s), PORTA]));
+  // divisórias entre as salas
+  for (let i = 1; i < POR_FILEIRA; i++) { const x = X0 + i * LARG; muroZ(Z0, ZC - CORREDOR / 2, x); muroZ(ZC + CORREDOR / 2, Z1, x); }
+  const reuniao = salas.find((s) => s.tipo === "reuniao");
   return (
     <group>
       <mesh geometry={caixa(W + 0.8, 0.1, D + 0.8)} material={mat("#D8D4CC", { rough: 0.95 })} position={[OS_X, 0.05, OS_Z]} receiveShadow />
-      {SALAS.map((s) => { const [cx, cz] = centro(s); return <mesh key={s.id} geometry={plano(CW - 0.1, CD - 0.1)} material={mat(clarear(s.cor, s.tipo === "area" ? 0.72 : 0.6), { rough: 0.9 })} position={[cx, 0.11, cz]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow />; })}
-      <Paredes />
-      {SALAS.filter((s) => s.tipo === "area").flatMap((s) => mesasDa(s).map((pos, k) => <Mesa key={`${s.id}${k}`} def={{ id: `${s.id}${k}`, sala: s.id, pos, rot: 0, tipo: "comum" }} cor={s.cor} />))}
-      {SALAS.filter((s) => s.tipo === "area").map((s) => { const [cx, cz] = centro(s); return <Planta key={`p${s.id}`} position={[cx + CW / 2 - 0.6, 0, cz + CD / 2 - 0.6]} pequena />; })}
-      {(() => { const [cx, cz] = centro(RECEPCAO); return <group><Balcao position={[cx, 0, cz - 0.6]} /><Sofa position={[cx - CW / 2 + 0.9, 0, cz + 0.8]} rotation={Math.PI / 2} cor="#D4A63A" largura={2} /><Planta position={[cx + CW / 2 - 0.6, 0, cz + CD / 2 - 0.7]} /></group>; })()}
-      {(() => { const [cx, cz] = centro(CEO); return <group><Mesa def={{ id: "ceo", sala: "ceo", pos: [cx, 0, cz - 0.3], rot: 0, tipo: "ceo" }} cor="#1F2630" /><Sofa position={[cx, 0, cz + CD / 2 - 0.8]} rotation={Math.PI} cor="#3A3F47" largura={2.2} /><Planta position={[cx + CW / 2 - 0.6, 0, cz - CD / 2 + 0.6]} /></group>; })()}
+      {/* corredor: piso de granito com friso dourado */}
+      <mesh geometry={plano(W - 0.1, CORREDOR - 0.1)} material={mat("#B9B3A8", { rough: 0.6 })} position={[OS_X, 0.11, ZC]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow />
+      {[-0.55, 0.55].map((dz) => <mesh key={dz} geometry={plano(W - 0.4, 0.06)} material={friso} position={[OS_X, 0.115, ZC + dz]} rotation={[-Math.PI / 2, 0, 0]} />)}
+      {salas.map((s) => <mesh key={s.id} geometry={plano(LARG - 0.1, s.z1 - s.z0 - 0.1)} material={mat(clarear(s.cor, s.tipo === "depto" ? 0.74 : 0.62), { rough: 0.9 })} position={[cx(s), 0.11, (s.z0 + s.z1) / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow />)}
+      {pedacos.map((p, i) => <mesh key={i} geometry={caixa(+p.w.toFixed(3), ALT, +p.d.toFixed(3))} material={parede} position={[p.x, ALT / 2, p.z]} castShadow receiveShadow />)}
+      {pedacos.map((p, i) => <mesh key={`t${i}`} geometry={caixa(+p.w.toFixed(3), 0.05, +(p.d + 0.02).toFixed(3))} material={friso} position={[p.x, ALT + 0.025, p.z]} />)}
+      {/* mesas de cada departamento (a do chefe é maior) e uma planta em cada sala */}
+      {salas.filter((s) => s.tipo === "depto").flatMap((s) => (lugares[s.id] ?? []).map((l, k) => <Mesa key={`${s.id}${k}`} def={{ id: `${s.id}${k}`, sala: s.id, pos: l.mesa, rot: 0, tipo: l.chefe ? "gerente" : "comum" }} cor={s.cor} />))}
+      {salas.filter((s) => s.tipo === "depto").map((s) => <Planta key={`p${s.id}`} position={[s.x1 - 0.55, 0, s.norte ? s.z0 + 0.6 : s.z1 - 0.6]} pequena />)}
+      {/* recepção: balcão de frente para a entrada, sofá e planta */}
+      {rec && <group><Balcao position={[cx(rec), 0, rec.z1 - 4.2]} /><Sofa position={[rec.x0 + 0.8, 0, rec.z1 - 2]} rotation={Math.PI / 2} cor="#D4A63A" largura={2} /><Planta position={[rec.x1 - 0.6, 0, rec.z1 - 0.7]} /></group>}
+      {/* sala de reunião: mesa comprida, cadeiras e a TV na parede do fundo */}
+      {reuniao && (
+        <group>
+          <mesh geometry={caixa(2.2, 0.08, 6.2)} material={mat("#3A3F47", { rough: 0.5 })} position={[cx(reuniao), 0.74, (reuniao.z0 + reuniao.z1) / 2 + 0.6]} castShadow />
+          <mesh geometry={cilindro(0.12, 0.18, 0.72, 10)} material={mat("#2A2D33")} position={[cx(reuniao), 0.36, (reuniao.z0 + reuniao.z1) / 2 + 0.6]} />
+          {[-2.2, -0.8, 0.6, 2.0].flatMap((dz) => [-1, 1].map((s) => <mesh key={`${dz}${s}`} geometry={caixa(0.5, 0.48, 0.5)} material={mat("#1F2937", { rough: 0.7 })} position={[cx(reuniao) + s * 1.5, 0.24, (reuniao.z0 + reuniao.z1) / 2 + 0.6 + dz]} castShadow />))}
+          <mesh geometry={caixa(2.4, 1.3, 0.08)} material={mat("#0B0F15", { emissive: "#1D4ED8", ei: 0.35 })} position={[cx(reuniao), 1.6, reuniao.z1 - 0.12]} />
+        </group>
+      )}
+      {/* café no corredor (ponta oeste) */}
+      <Cafe position={[X0 + 1.2, 0, ZC]} rotation={Math.PI / 2} />
+      <Planta position={[X1 - 0.6, 0, ZC]} />
     </group>
   );
 }
 
 function NomeSala({ s }: { s: Sala }) {
-  const [cx, cz] = centro(s);
   return (
-    <Html position={[cx, 2.1, cz + CD / 2 - 0.9]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-      <div className="select-none whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white shadow" style={{ background: "rgba(14,16,19,.82)", boxShadow: `inset 0 0 0 1.5px ${s.cor}` }}>{s.nome}</div>
+    <Html position={[cx(s), 2.2, s.norte ? s.z0 + 1.1 : s.z1 - 1.1]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+      <div className="select-none whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white shadow" style={{ background: "rgba(14,16,19,.84)", boxShadow: `inset 0 0 0 1.5px ${s.cor}` }}>{s.nome}</div>
     </Html>
   );
 }
 
-function Agente({ m, pos, rot, emPe }: { m: Membro; pos: [number, number, number]; rot: number; emPe?: boolean }) {
+// ---------- um agente com rotina ----------
+type Ponto = [number, number];
+// troca interna de verdade (rota /api/workend/equipe/atividade): quem fala vai até "para" com o texto
+type Aviso = { para: string; texto: string; tipo?: "pedido" | "resposta" };
+type Plano = { pts: Ponto[]; i: number; ate: number; pose: Pose; olhar?: number; fala?: string; fim?: "sentar" | "parado" };
+interface Contexto { salas: Sala[]; salaDe: Record<string, Sala>; lugarDe: Record<string, Lugar>; ordem: Membro[]; porId: Record<string, Membro>; lugares: Record<string, Lugar[]>; posNaSala: Record<string, number> }
+// caminho de um ponto numa sala até outro ponto noutra sala: sai pela porta, anda pelo corredor e entra pela outra porta
+function caminho(de: Ponto, salaA: Sala | undefined, para: Ponto, salaB: Sala | undefined): Ponto[] {
+  const pts: Ponto[] = [de];
+  if (salaA) { pts.push([cx(salaA), zDentro(salaA)]); pts.push([cx(salaA), ZC]); }
+  if (salaB) { pts.push([cx(salaB), ZC]); pts.push([cx(salaB), zDentro(salaB)]); } else pts.push([para[0], ZC]);
+  pts.push(para);
+  return pts;
+}
+
+function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: React.RefObject<Map<string, Aviso>>; dono: boolean }) {
+  const corpo = useRef<THREE.Group>(null);
   const h = useRef<BonecoHandle>(null);
-  const fase = useMemo(() => (m.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 97) / 10, [m.id]);
-  const pose: Pose = emPe ? "idle" : m.papel === "ceo" ? "think" : "type";
-  useAnimacao(h, () => pose, fase, HIPS.procedural.base);
+  const { def, camisa } = useMemo(() => aparencia(m), [m]);
+  const lugar = ctx.lugarDe[m.id];
+  const sala = ctx.salaDe[m.id];
+  const sentar: Plano = useMemo(() => ({ pts: lugar ? [[lugar.pos[0], lugar.pos[2]]] : [[OS_X, ZC]], i: 0, ate: 0, pose: m.nivel === "ceo" ? "think" : "type", fim: "sentar" }), [lugar, m.nivel]);
+  const plano = useRef<Plano>(sentar);
+  const [fala, setFala] = useState<string | null>(null);
+  const [real, setReal] = useState<string | null>(null); // conversa interna de verdade: nome de quem recebeu o pedido
+  const fase = useMemo(() => (hash(m.id) % 97) / 10, [m.id]);
+  useAnimacao(h, () => plano.current.pose, fase, HIPS.procedural.base);
   const [hover, setHover] = useState(false);
-  const def = BONECO[m.boneco] ?? BONECO.classico;
+
+  // escolhe o próximo passeio: colega (chefe ou alguém da equipe), reunião ou café; volta para a mesa depois
+  const novoPasseio = (agora: number, pedido?: Aviso) => {
+    const aqui = corpo.current ? ([corpo.current.position.x, corpo.current.position.z] as Ponto) : sentar.pts[0];
+    let destino: Ponto, salaB: Sala | undefined, texto: string | undefined, fica: number;
+    const colega = pedido ? ctx.porId[pedido.para] : (() => {
+      const opc = ctx.ordem.filter((o) => o.id !== m.id && (o.chefeId === m.id || o.id === m.chefeId || ctx.salaDe[o.id] === sala));
+      return opc.length ? opc[Math.floor(Math.random() * opc.length)] : null;
+    })();
+    const sorte = Math.random();
+    if (colega && ctx.lugarDe[colega.id] && (pedido || sorte < 0.6)) {
+      const l = ctx.lugarDe[colega.id]; destino = [l.pos[0] + 0.75, l.pos[2] + 0.55]; salaB = ctx.salaDe[colega.id];
+      texto = pedido?.texto ?? (m.nivel === "ceo" || m.nivel === "gerente" || m.nivel === "diretor" ? FRASES_CHEFE : FRASES_EQUIPE)[Math.floor(Math.random() * 5)];
+      fica = pedido ? 9 : 6 + Math.random() * 4;
+    } else if (sorte < 0.85) {
+      const r = ctx.salas.find((s) => s.tipo === "reuniao"); salaB = r;
+      destino = r ? [cx(r) + (Math.random() < 0.5 ? -1.5 : 1.5), (r.z0 + r.z1) / 2 + 0.6 + (Math.random() * 4 - 2)] : [OS_X, ZC];
+      fica = 14 + Math.random() * 10; texto = undefined;
+    } else { destino = [X0 + 2.2, ZC + (Math.random() - 0.5)]; salaB = undefined; fica = 6; texto = undefined; }
+    const ida = caminho(aqui, sala, destino, salaB);
+    plano.current = { pts: ida, i: 1, ate: agora, pose: "walk", fala: texto, fim: "parado", olhar: fica };
+    // pedido de verdade: o balão já aparece na saída (com para quem é), sem esperar a caminhada
+    if (pedido && colega) { setFala(pedido.texto); setReal(`${pedido.tipo === "resposta" ? "resposta para" : "pedido para"} ${colega.nome}`); }
+  };
+
+  useEffect(() => { plano.current = sentar; }, [sentar]);
+  const proxima = useRef(0);
+  useFrame((estado, dt) => {
+    const g = corpo.current; if (!g) return;
+    const t = estado.clock.elapsedTime, p = plano.current;
+    if (!proxima.current) proxima.current = t + 8 + (hash(m.id) % 30);
+    // pedido de verdade (dono): este agente vai até quem recebeu a tarefa
+    const real = avisos.current?.get(m.id);
+    if (real && p.fim === "sentar") { avisos.current?.delete(m.id); novoPasseio(t, real); return; }
+    if (p.pose === "walk") {
+      const alvo = p.pts[p.i];
+      const dx = alvo[0] - g.position.x, dz = alvo[1] - g.position.z, d = Math.hypot(dx, dz), passo = 1.35 * Math.min(dt, 0.1);
+      if (d > 0.05) { g.position.x += (dx / d) * Math.min(passo, d); g.position.z += (dz / d) * Math.min(passo, d); g.rotation.y = Math.atan2(dx, dz); return; }
+      if (p.i < p.pts.length - 1) { p.i++; return; }
+      // chegou
+      if (p.fim === "sentar") { p.pose = m.nivel === "ceo" ? "think" : "type"; g.rotation.y = 0; proxima.current = t + 18 + Math.random() * 30; setFala(null); setReal(null); return; }
+      p.pose = "idle"; p.ate = t + (p.olhar ?? 6); if (p.fala) setFala(p.fala);
+      return;
+    }
+    if (p.fim === "parado" && t > p.ate) {
+      // volta para a mesa
+      setFala(null); setReal(null);
+      const aqui: Ponto = [g.position.x, g.position.z];
+      const dest = sentar.pts[0];
+      const salaAqui = ctx.salas.find((s) => aqui[0] >= s.x0 && aqui[0] <= s.x1 && aqui[1] >= s.z0 && aqui[1] <= s.z1);
+      plano.current = { pts: caminho(aqui, salaAqui, dest, sala), i: 1, ate: 0, pose: "walk", fim: "sentar" };
+      return;
+    }
+    if (p.fim === "sentar" && t > proxima.current) { if (leve() && Math.random() < 0.5) { proxima.current = t + 25; return; } novoPasseio(t); }
+  });
+
+  const inicio = sentar.pts[0];
+  // dono: abre a conversa com esta pessoa no mapa (ChatEquipe); visitante: o cartão da sede
+  const clicar = () => { if (dono) void abrirChatEquipe(CHAVE_SEDE, m.id); else useMundo.getState().selecionarLote(CHAVE_SEDE); };
   return (
-    <group position={pos} rotation={[0, rot, 0]}>
-      <BonecoProcedural ref={h} def={def} camisa={m.camisa} headset={m.papel === "atendente"} cracha={m.papel === "ceo" ? "#D4A017" : "#1D4ED8"} />
-      <mesh position={[0, 0.7, 0]} onClick={(e) => { e.stopPropagation(); useMundo.getState().selecionarLote(CHAVE_SEDE); }}
+    <group ref={corpo} position={[inicio[0], 0, inicio[1]]}>
+      <BonecoProcedural ref={h} def={def} camisa={camisa} headset={m.papel === "atendente"} cracha={m.nivel === "ceo" ? "#D4A017" : "#1D4ED8"} />
+      <mesh position={[0, 0.7, 0]} onClick={(e) => { e.stopPropagation(); clicar(); }}
         onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = "pointer"; }} onPointerOut={() => { setHover(false); document.body.style.cursor = ""; }}>
         <cylinderGeometry args={[0.4, 0.4, 1.5, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-      {hover && (
-        <Html position={[0, 1.7, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
-          <div className="w-max select-none rounded-full bg-white/95 px-2.5 py-1 text-[12px] font-bold text-[#1D2128] shadow-md">{m.nome}<span className="ml-1.5 font-semibold text-[#5B6472]">{m.cargo}</span></div>
+      {(fala || hover) && (
+        <Html position={[0, 1.75, 0]} center zIndexRange={[6, 0]} style={{ pointerEvents: "none" }}>
+          <div className="w-max max-w-[220px] select-none rounded-2xl bg-white/95 px-2.5 py-1.5 text-[12px] leading-snug text-[#1D2128] shadow-md">
+            <b>{m.nome}</b><span className="ml-1 text-[#5B6472]">{hover && !fala ? m.cargo : ""}</span>
+            {fala && <span className="block font-medium">{fala}</span>}
+            {dono && fala && real && <span className="mt-0.5 block text-[10.5px] text-[#5B6472]">conversa interna · {real}</span>}
+            {dono && hover && <span className="mt-0.5 block text-[10.5px] font-semibold text-[#1D4ED8]">Toque para conversar</span>}
+          </div>
         </Html>
       )}
     </group>
   );
 }
 
-// onde cada pessoa da equipe fica: recepcionista atrás do balcão, CEO na mesa dele, especialistas nas mesas da sala da área
-function lugaresDa(e: Escritorio | null | undefined, poucos: boolean) {
-  const out: { m: Membro; pos: [number, number, number]; rot: number; emPe?: boolean }[] = [];
-  if (!e) return out;
-  const porSala: Record<string, number> = {};
-  for (const m of e.equipe) {
-    if (m.papel === "atendente") { const [cx, cz] = centro(RECEPCAO); out.push({ m, pos: [cx, 0, cz - 1.4], rot: 0, emPe: true }); continue; }
-    if (m.papel === "ceo") { const [cx, cz] = centro(CEO); out.push({ m, pos: cadeira([cx, 0, cz - 0.3]), rot: 0 }); continue; }
-    const s = SALAS.find((x) => x.id === m.setorId); if (!s) continue;
-    const k = porSala[s.id] ?? 0; porSala[s.id] = k + 1;
-    if (k > 2 || (poucos && k > 0)) continue;
-    out.push({ m, pos: cadeira(mesasDa(s)[k]), rot: 0 });
-  }
-  return out;
+// conversas internas de verdade (só o dono): a cada 15 s pergunta as últimas trocas e faz quem pediu ir até quem recebeu
+function useAtividade(dono: boolean, avisos: React.RefObject<Map<string, Aviso>>) {
+  useEffect(() => {
+    if (!dono) return;
+    let vivo = true; let ultimo = "";
+    const ler = async () => {
+      try {
+        const r = await fetch(`/api/workend/equipe/atividade?chave=${encodeURIComponent(CHAVE_SEDE)}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const j = await r.json();
+        // formato da rota: { trocas: [{ de, para, texto, em, tipo: "pedido" | "resposta" }] }
+        const lista: ({ de: string; em: string } & Aviso)[] = Array.isArray(j) ? j : j.trocas ?? j.atividade ?? j.itens ?? [];
+        const novos = lista.filter((x) => x.em > ultimo).sort((a, b) => (a.em < b.em ? -1 : 1));
+        if (ultimo) for (const x of novos.slice(-6)) avisos.current?.set(x.de, { para: x.para, texto: x.texto, tipo: x.tipo });
+        if (lista.length) ultimo = lista.reduce((a, x) => (x.em > a ? x.em : a), ultimo);
+      } catch { /* sem rede: tenta de novo */ }
+    };
+    void ler(); const id = setInterval(() => { if (vivo && document.visibilityState === "visible") void ler(); }, 15000);
+    return () => { vivo = false; clearInterval(id); };
+  }, [dono, avisos]);
 }
 
 export function InteriorSede() {
-  const e = useMundo((s) => s.terrenos[CHAVE_SEDE]?.escritorio ?? null);
+  const e: Escritorio | null = useMundo((s) => s.terrenos[CHAVE_SEDE]?.escritorio ?? null);
+  const dono = useMundo((s) => s.meu === CHAVE_SEDE);
   const poucos = useMemo(() => leve(), []);
-  const lugares = useMemo(() => lugaresDa(e, poucos), [e, poucos]);
+  const avisos = useRef(new Map<string, Aviso>());
+  useAtividade(dono, avisos);
+  const ctx = useMemo<Contexto | null>(() => {
+    if (!e) return null;
+    const salas = montarSalas(e.setores);
+    const porSala: Record<string, Membro[]> = {};
+    for (const m of e.equipe) { const s = m.setorId ?? (m.papel === "ceo" ? "diretoria" : "recepcao"); (porSala[s] ??= []).push(m); }
+    const salaDe: Record<string, Sala> = {}, lugarDe: Record<string, Lugar> = {}, lugares: Record<string, Lugar[]> = {}, posNaSala: Record<string, number> = {};
+    for (const s of salas) {
+      const membros = (porSala[s.id] ?? []).sort((a, b) => Number(b.nivel === "ceo" || b.nivel === "gerente") - Number(a.nivel === "ceo" || a.nivel === "gerente"));
+      if (s.tipo === "recepcao") { for (const m of membros) { salaDe[m.id] = s; lugarDe[m.id] = { pos: [cx(s), 0, s.z1 - 4.9], mesa: [cx(s), 0, s.z1 - 4.2], chefe: false }; } continue; }
+      if (s.tipo !== "depto") continue;
+      const ls = lugaresDaSala(s, membros.length); lugares[s.id] = ls;
+      membros.forEach((m, k) => { if (ls[k]) { salaDe[m.id] = s; lugarDe[m.id] = ls[k]; posNaSala[m.id] = k; } });
+    }
+    const ordem = e.equipe.filter((m) => lugarDe[m.id]);
+    return { salas, salaDe, lugarDe, ordem, porId: Object.fromEntries(ordem.map((m) => [m.id, m])), lugares, posNaSala };
+  }, [e]);
+  if (!e || !ctx) return null;
+  // gráficos leves: duas pessoas por sala (o chefe e mais uma), também andando, só que com menos frequência
+  const mostrar = poucos ? ctx.ordem.filter((m) => (ctx.posNaSala[m.id] ?? 0) < 2) : ctx.ordem;
   return (
     <group>
-      <Estatico><Fixos /></Estatico>
-      {SALAS.map((s) => <NomeSala key={s.id} s={s} />)}
-      {lugares.map((l) => <Agente key={l.m.id} {...l} />)}
+      <Estatico><Fixos salas={ctx.salas} lugares={ctx.lugares} /></Estatico>
+      {ctx.salas.map((s) => <NomeSala key={s.id} s={s} />)}
+      {mostrar.map((m) => <Agente key={m.id} m={m} ctx={ctx} avisos={avisos} dono={dono} />)}
     </group>
   );
 }
