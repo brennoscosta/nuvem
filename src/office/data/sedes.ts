@@ -6,9 +6,12 @@
 // A equipe de cada uma é gravada no terreno `chave` (scripts/sedes.mjs). A Social RP é só do Layon; as outras três são
 // divididas (titular + sócio, terreno.socios, migração 0037).
 import { centroQuarteirao } from "./mundo";
-import { AREAS_ONESTATE, CHAVE_SEDE, OS_X, OS_Z, SITE_ONESTATE, POR_ANDAR, type AreaOneState } from "./onestate";
+import { AREAS_ONESTATE, CHAVE_SEDE, OS_X, OS_Z, SITE_ONESTATE, POR_ANDAR, SEDE, type AreaOneState } from "./onestate";
 
 export type AreaSede = AreaOneState;
+// prédio de cada sede (17/11/2026, pedido do dono: "quero prédios diferentes, visuais; estão todos iguais"): a planta
+// térrea e a porta são as mesmas (interior, caminhos e entrada dependem delas); muda a casca (scene/SedeEstilos.tsx)
+export type EstiloSede = "classica" | "tech" | "festa" | "estudio";
 export interface Sede {
   id: string; nome: string; chave: string; i: number; j: number; x: number; z: number;
   cor: string; // destaque (frisos, pórtico, coroa, placas)
@@ -18,6 +21,7 @@ export interface Sede {
   site: string; dominio: string; areas: AreaSede[]; tipo: string; // "roleplay", "aplicativo"…
   resumo: string; numeroLoja: number; // número usado pela recepção para o atendimento do visitante (ui/Recepcao.tsx)
   nicho: string;
+  estilo: EstiloSede; andares: number; // casca do prédio e número de andares (4 m cada)
 }
 
 const a = (id: string, nome: string, href: string, cor: string): AreaSede => ({ id, nome, href, cor });
@@ -27,7 +31,7 @@ export const SEDES: Sede[] = [
     id: "socialrp", nome: "Social RP", chave: CHAVE_SEDE, i: 1, j: 1, x: OS_X, z: OS_Z,
     cor: "#D4A63A", corClara: "#F7E7B4", escura: "#14110A", logo: "/socialrp/logo.png", icone: "/socialrp/icone.png", propLogo: 240 / 809,
     site: SITE_ONESTATE, dominio: "onestatebr.com.br", areas: AREAS_ONESTATE, tipo: "roleplay",
-    resumo: "A sede da Social RP na cidade. Lá dentro, cada departamento trabalha com a sua equipe de agentes de IA.", numeroLoja: 0, nicho: "conteudo",
+    resumo: "A sede da Social RP na cidade. Lá dentro, cada departamento trabalha com a sua equipe de agentes de IA.", numeroLoja: 0, nicho: "conteudo", estilo: "classica", andares: 6,
   },
   {
     id: "appzone", nome: "AppZone", chave: "-1,-1,0", i: -1, j: -1, ...xz(-1, -1),
@@ -39,7 +43,7 @@ export const SEDES: Sede[] = [
       a("categorias", "Categorias", "/", "#FB923C"), a("perfil", "Perfil", "/profile", "#E5E7EB"), a("regras", "Regras", "/", "#94A3B8"),
       a("denuncias", "Denúncias", "/report", "#EF4444"), a("privacidade", "Privacidade", "/privacidade", "#CBD5E1"),
     ],
-    resumo: "A sede da AppZone na cidade. Lá dentro, engenharia, produto e atendimento trabalham com a equipe de agentes de IA.", numeroLoja: 901, nicho: "tecnologia",
+    resumo: "A sede da AppZone na cidade. Lá dentro, engenharia, produto e atendimento trabalham com a equipe de agentes de IA.", numeroLoja: 901, nicho: "tecnologia", estilo: "tech", andares: 8,
   },
   {
     id: "bday", nome: "bday.fm", chave: "-1,1,0", i: -1, j: 1, ...xz(-1, 1),
@@ -51,7 +55,7 @@ export const SEDES: Sede[] = [
       a("como", "Como funciona", "/#como-funciona", "#38BDF8"), a("sobre", "Sobre", "/sobre", "#E5E7EB"), a("termos", "Termos de uso", "/termos", "#94A3B8"),
       a("privacidade", "Privacidade", "/privacidade", "#CBD5E1"),
     ],
-    resumo: "A sede do bday.fm na cidade. Lá dentro, presentes, lives e parceiros trabalham com a equipe de agentes de IA.", numeroLoja: 902, nicho: "conteudo",
+    resumo: "A sede do bday.fm na cidade. Lá dentro, presentes, lives e parceiros trabalham com a equipe de agentes de IA.", numeroLoja: 902, nicho: "conteudo", estilo: "festa", andares: 6,
   },
   {
     id: "nuvcam", nome: "NUVCAM", chave: "1,-1,0", i: 1, j: -1, ...xz(1, -1),
@@ -62,7 +66,7 @@ export const SEDES: Sede[] = [
       a("perfil", "Perfil", "/home", "#E5E7EB"), a("seguranca", "Segurança", "/termos", "#22C55E"), a("moderacao", "Moderação", "/termos", "#FACC15"),
       a("suporte", "Suporte", "/", "#60A5FA"), a("termos", "Termos de uso", "/termos", "#94A3B8"), a("privacidade", "Privacidade", "/privacidade", "#CBD5E1"),
     ],
-    resumo: "A sede do NUVCAM na cidade. Lá dentro, vídeo ao vivo, segurança e atendimento trabalham com a equipe de agentes de IA.", numeroLoja: 903, nicho: "tecnologia",
+    resumo: "A sede do NUVCAM na cidade. Lá dentro, vídeo ao vivo, segurança e atendimento trabalham com a equipe de agentes de IA.", numeroLoja: 903, nicho: "tecnologia", estilo: "estudio", andares: 7,
   },
 ];
 function xz(i: number, j: number) { const [x, z] = centroQuarteirao(i, j); return { x, z }; }
@@ -79,6 +83,8 @@ export const sedeDoParametro = (v: string | null | undefined): Sede | null => (!
 export const deslocamento = (s: Sede): [number, number] => [s.x - OS_X, s.z - OS_Z];
 // torre: o centro dela fica 3 m ao norte do centro do quarteirão (data/onestate.ts › SEDE)
 export const centroTorre = (s: Sede): [number, number] => [s.x, s.z - 3];
+// altura da torre de cada sede (até a laje do terraço; balão, logos e mini-mapa seguem esta altura)
+export const alturaSede = (s: Sede) => SEDE.andar * s.andares;
 // fachada: 5 áreas por andar (3 na frente sul, 2 no lado oeste), do 1º andar para cima
 export const andaresComAreas = (s: Sede) => Math.ceil(s.areas.length / POR_ANDAR);
 export function areasDoAndarDe(s: Sede, andar: number) {

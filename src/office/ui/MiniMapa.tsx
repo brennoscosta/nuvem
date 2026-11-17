@@ -18,8 +18,7 @@ import { leve } from "../scene/qualidade";
 import { projetar, noChao, PROPORCAO, miniMapa, useVersaoMiniMapa } from "../miniMapa";
 import { Icone } from "./Icone";
 import { abrirSede } from "./CartaoOneState";
-import { ALTURA_SEDE } from "../data/onestate";
-import { SEDES, centroTorre } from "../data/sedes";
+import { SEDES, centroTorre, alturaSede } from "../data/sedes";
 
 const semAssinatura = () => () => {};
 const assinarLargura = (f: () => void) => { const m = window.matchMedia("(min-width: 640px)"); m.addEventListener("change", f); return () => m.removeEventListener("change", f); };
@@ -28,7 +27,7 @@ const VB = 1000, VBA = Math.round(VB / PROPORCAO); // caixa do desenho por cima 
 const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
 const Q = QUARTEIRAO + 2 * CALCADA;
 const LUGARES: { nome: string; x: number; y: number; z: number; estilo: "marco" | "agua" | "verde" | "areia" | "ouro"; alvo?: [number, number, number]; abrir?: () => void }[] = [
-  ...SEDES.map((sd) => { const [x, z] = centroTorre(sd); return { nome: sd.nome, x, y: ALTURA_SEDE, z, estilo: "ouro" as const, alvo: [x, 0.5, z + 6] as [number, number, number], abrir: () => abrirSede(sd.id) }; }),
+  ...SEDES.map((sd) => { const [x, z] = centroTorre(sd); return { nome: sd.nome, x, y: alturaSede(sd), z, estilo: "ouro" as const, alvo: [x, 0.5, z + 6] as [number, number, number], abrir: () => abrirSede(sd.id) }; }),
   { nome: "Nuvem", x: 0, y: 22, z: 0, estilo: "marco", alvo: [0, 0.5, 0] },
   { nome: "Lanchonete", x: 52, y: 12, z: 0, estilo: "marco", alvo: [52, 0.5, 0] },
   { nome: "Parque da Cidade", x: 0, y: 2, z: -128, estilo: "verde", alvo: [0, 0.5, -122] },
