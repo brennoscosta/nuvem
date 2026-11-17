@@ -18,13 +18,13 @@ export default function Esqueci() {
     <>
       <Topo />
       <section className="faixa grid gap-10 py-10 lg:grid-cols-[1fr_1fr] lg:py-16">
-        <div>
+        <div className="pg-claro">
           <h1 className="text-[2.2rem] lg:text-[2.8rem]">{ligado ? "Esqueceu a senha?" : "Vamos recuperar o seu acesso"}</h1>
           <p className="mt-5 max-w-[48ch] text-[var(--tinta-2)]">
             {ligado ? "Informe o e-mail da conta e enviamos um link para criar uma nova senha. O link vale 1 hora." : "Escolha o jeito que combina com a sua conta. Em poucos minutos você volta para o seu escritório."}
           </p>
         </div>
-        <div className="rounded-2xl bg-[var(--cinza)] p-6 lg:p-8">
+        <div className="pg-cartao p-6 shadow-[0_24px_60px_-40px_rgba(16,24,40,.45)] lg:p-8">
           {ligado ? <FormPedirSenha /> : (
             <div className="space-y-6">
               <div>

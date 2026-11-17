@@ -109,7 +109,7 @@ export function VitrineVisual({ d, compacto, previa }: { d: DadosVitrine; compac
   if (compacto) return (
     <div className="rounded-2xl border border-black/5 bg-[#F6F8FB] p-2">
       <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-[#5B6472]"><Icone nome="sacola" tamanho={13} className="mr-1 inline align-[-3px]" />Vitrine · {d.produtos.length} {d.produtos.length === 1 ? "produto" : "produtos"}</span>
+        <span className="text-[12px] font-bold text-[#5B6472]"><Icone nome="sacola" tamanho={13} className="mr-1 inline align-[-3px]" />Vitrine · {d.produtos.length} {d.produtos.length === 1 ? "produto" : "produtos"}</span>
         {!previa && <a href={`/loja/${d.numero}#vitrine`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#1D4ED8] hover:underline">Ver tudo</a>}
       </div>
       <ul className="sem-barra flex snap-x snap-mandatory gap-2 overflow-x-auto pb-0.5" aria-label={`Produtos da ${d.empresa}`}>

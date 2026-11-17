@@ -2,7 +2,7 @@
 // Botões da barra de cima: meu personagem (ou criar) e conversas com contador. 16/11/2026: ícones próprios, sem emoji.
 import { usePersonagem } from "../personagemStore";
 import { useMundo } from "../mundoStore";
-import { MiniAvatar } from "./Personagem";
+import { MiniAvatar } from "./MiniAvatar";
 import { Icone } from "./Icone";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });

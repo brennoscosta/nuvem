@@ -72,7 +72,7 @@ function Avatar({ m, tamanho = 34 }: { m: Pick<MembroEquipe, "nome" | "camisa" |
 }
 // três pontinhos de "trabalhando" (as classes equipe-digitando do site não valem no mapa)
 const Digitando = () => <span className="inline-flex gap-[3px]" aria-hidden="true">{[0, 150, 300].map((d) => <i key={d} className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#1D4ED8] motion-reduce:animate-none" style={{ animationDelay: `${d}ms` }} />)}</span>;
-const SeloNivel = ({ m }: { m: Pick<MembroEquipe, "nivel"> }) => <span className="rounded-full px-1.5 py-[1px] text-[9.5px] font-black uppercase tracking-wide text-white" style={{ background: NIVEL_COR[m.nivel] }}>{NIVEL_ROTULO[m.nivel]}</span>;
+const SeloNivel = ({ m }: { m: Pick<MembroEquipe, "nivel"> }) => <span className="rounded-full px-1.5 py-[1px] text-[12px] font-bold text-white" style={{ background: NIVEL_COR[m.nivel] }}>{NIVEL_ROTULO[m.nivel]}</span>;
 
 export function ChatEquipe() {
   const { aberto, painel: p, erro, carregando, aba, chave, membro: sel, vistaCelular } = useChatEquipe();
@@ -153,7 +153,7 @@ function ListaPessoas({ p, sel, oculta }: { p: PainelEquipe; sel: string | null;
         {grupos.length === 0 && <p className="px-2 py-4 text-[12.5px] text-[#5B6472]">Ninguém com esse nome ou cargo.</p>}
         {grupos.map(({ dep, pessoas }) => (
           <section key={dep.id} className="mb-1.5">
-            <h3 className="sticky top-0 z-[1] flex items-center gap-1.5 bg-white/95 px-1.5 py-1 text-[10.5px] font-black uppercase tracking-wide text-[#5B6472] backdrop-blur">
+            <h3 className="sticky top-0 z-[1] flex items-center gap-1.5 bg-white/95 px-1.5 py-1 text-[12px] font-bold text-[#5B6472] backdrop-blur">
               <span className="h-2 w-2 rounded-full" style={{ background: dep.cor }} />{dep.nome}<span className="font-semibold text-[#9AA1AC]">{pessoas.length}</span>
             </h3>
             {pessoas.map((m) => {
@@ -284,7 +284,7 @@ function Bolha({ m, membro }: { m: ConversaEquipe["mensagens"][number]; membro: 
   if (m.autor === "dono") return <div className="painel-entra ml-auto max-w-[82%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-[#1D4ED8] px-3.5 py-2 text-[13.5px] text-white">{m.conteudo}</div>;
   if (m.autor === "chefe") return (
     <div className="painel-entra max-w-[90%] rounded-2xl border border-[#F2D58A] bg-[#FFF8E6] px-3.5 py-2 text-[13px] text-[#4A3A10]">
-      <div className="mb-0.5 flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-[#8A6A12]"><Icone nome="negociar" tamanho={13} />Pedido interno de {m.deNome ?? "um chefe"}</div>
+      <div className="mb-0.5 flex items-center gap-1 text-[12px] font-bold text-[#8A6A12]"><Icone nome="negociar" tamanho={13} />Pedido interno de {m.deNome ?? "um chefe"}</div>
       <TextoIA t={m.conteudo.replace(/^Pedido de [^\n]*:\n\n/, "")} />
     </div>
   );
@@ -374,7 +374,7 @@ function FeedInternas({ chave, p }: { chave: string; p: PainelEquipe }) {
       {lista && agruparPorTarefa(lista).map((g) => (
         <section key={g.chave} className="rounded-2xl bg-[#EEF1F5] p-2.5">
           <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2 px-1">
-            <span className="text-[10.5px] font-black uppercase tracking-wide text-[#1D4ED8]">Tarefa que você deu a {g.quem.nome}</span>
+            <span className="text-[12px] font-bold text-[#1D4ED8]">Tarefa que você deu a {g.quem.nome}</span>
             <span className="text-[11px] text-[#7A828E]">{quando(g.em)} · {g.prontos} de {g.total} {g.total === 1 ? "respondido" : "respondidos"}</span>
             <button type="button" onClick={() => escolher(g.quem.id)} className="ml-auto text-[11.5px] font-semibold text-[#1D4ED8] hover:underline">Ver a entrega</button>
             {g.tarefa && <p className="line-clamp-2 w-full text-[12.5px] font-semibold text-[#1D2128]">“{g.tarefa}”</p>}

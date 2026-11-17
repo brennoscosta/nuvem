@@ -398,7 +398,7 @@ function SemLote({ fundador }: { fundador: { valor: number; vagas: number; resta
               <div className="pn-preco pn-preco-claro"><span>Por mês</span><b>{reais(PRECO_LOTE)}</b><small>Pix direto no mapa. Sem fidelidade.</small></div>
             )}
             <div className="mt-6 flex flex-wrap gap-2.5">
-              <Link href="/mundo" className="btn btn-azul btn-grande">Escolher meu lote no mapa</Link>
+              <Link prefetch={false} href="/mundo" className="btn btn-azul btn-grande">Escolher meu lote no mapa</Link>
               <a href={DEMO} target="_blank" rel="noreferrer" className="btn btn-linha btn-grande">Ver um escritório ao vivo</a>
             </div>
           </div>

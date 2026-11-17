@@ -4,6 +4,7 @@
 // Quem já marcou vê "Seus horários nesta loja" e pode cancelar. A atendente de IA também marca pela conversa.
 import { Icone } from "./Icone";
 import { useEffect, useState } from "react";
+import { CHEIA } from "./NotaEstrelas";
 
 type Servico = { id: string; nome: string; duracao: number; duracaoTexto: string; preco: string };
 type Meu = { id: string; servico: string; quando: string; status: string };
@@ -44,7 +45,7 @@ function AvaliarAtendimento({ itens, compacto, aoAvaliar }: { itens: ParaAvaliar
         <div key={a.id} className="mt-2">
           <div className={`${tam} text-[#5B6472]`}>{a.servico} · {a.quando}</div>
           <div className="mt-1 flex gap-1" role="radiogroup" aria-label="Nota de 1 a 5">
-            {[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" role="radio" aria-checked={nota[a.id] === n} aria-label={`${n} estrela${n > 1 ? "s" : ""}`} onClick={() => setNota((x) => ({ ...x, [a.id]: n }))} className={`${compacto ? "text-xl" : "text-2xl"} leading-none ${(nota[a.id] ?? 0) >= n ? "text-[#F59E0B]" : "text-[#D9DDE3]"}`}>★</button>)}
+            {[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" role="radio" aria-checked={nota[a.id] === n} aria-label={`${n} estrela${n > 1 ? "s" : ""}`} onClick={() => setNota((x) => ({ ...x, [a.id]: n }))} className={`${compacto ? "text-xl" : "text-2xl"} leading-none ${(nota[a.id] ?? 0) >= n ? "text-[#F59E0B]" : "text-[#D9DDE3]"}`}><Icone nome="estrela" tamanho={compacto ? 22 : 26} className={(nota[a.id] ?? 0) >= n ? CHEIA : ""} /></button>)}
           </div>
           {!!nota[a.id] && <textarea value={texto[a.id] ?? ""} onChange={(e) => setTexto((x) => ({ ...x, [a.id]: e.target.value.slice(0, 300) }))} rows={2} placeholder="Conte em poucas palavras (opcional)" className="mt-1.5 w-full rounded-lg border border-black/10 bg-white px-2 py-1.5 text-base sm:text-sm" />}
           {!!nota[a.id] && <button type="button" onClick={() => enviar(a.id)} disabled={enviando === a.id} className={`mt-1.5 rounded-lg bg-[#1D2128] px-3 py-1.5 ${tam} font-bold text-white disabled:opacity-50`}>{enviando === a.id ? "Enviando…" : "Enviar avaliação"}</button>}
@@ -145,7 +146,7 @@ export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: st
 
       {dados.meus.length > 0 && (
         <div className="mt-3">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">Seus horários nesta loja</div>
+          <div className="text-[12px] font-bold text-[#5B6472]">Seus horários nesta loja</div>
           <ul className="mt-1 space-y-1">
             {dados.meus.map((m) => (
               <li key={m.id} className={`flex items-center justify-between gap-2 rounded-xl bg-[#F1F3F6] px-3 py-1.5 ${tam}`}>
@@ -161,7 +162,7 @@ export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: st
         <p className={`mt-3 rounded-xl bg-[#EEF3FF] px-3 py-2 ${tam} text-[#1D4ED8]`}>Esta é a agenda da sua loja: os clientes marcam aqui. <a href="/app/agenda" className="font-bold underline">Ver os horários marcados</a></p>
       ) : (
         <>
-          <div className="mt-3 text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">1. Serviço</div>
+          <div className="mt-3 text-[12px] font-bold text-[#5B6472]">1. Serviço</div>
           <div className={`mt-1 grid gap-1.5 ${compacto ? "" : "sm:grid-cols-2"}`}>
             {dados.servicos.map((x) => {
               const sel = x.id === servico;
@@ -176,7 +177,7 @@ export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: st
 
           {s && (
             <>
-              <div className="mt-3 text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">2. Dia e horário</div>
+              <div className="mt-3 text-[12px] font-bold text-[#5B6472]">2. Dia e horário</div>
               {!sl ? <p className={`mt-1 ${tam} text-[#5B6472]`}>Procurando horários livres…</p>
                 : sl.erro ? <p className={`mt-1 ${tam} text-[#8A1C1C]`}>{sl.erro}</p>
                 : !dias?.length ? <p className={`mt-1 ${tam} text-[#5B6472]`}>Sem horário livre para {s.nome} nos próximos dias. Fale com a atendente para ver outra opção.</p>
@@ -206,7 +207,7 @@ export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: st
               <a href={linkEntrar} className={`mt-3 block rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-center ${tam} font-bold text-white hover:bg-[#1e40af]`}>Entre na sua conta para marcar</a>
             ) : (
               <form onSubmit={(e) => { e.preventDefault(); void confirmar(); }} className="mt-3 space-y-1.5">
-                <div className="text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">3. Seus dados</div>
+                <div className="text-[12px] font-bold text-[#5B6472]">3. Seus dados</div>
                 <input value={nomeCampo} onChange={(e) => setNome(e.target.value.slice(0, 60))} placeholder="Seu nome" aria-label="Seu nome" required minLength={2} className="w-full rounded-lg border border-black/15 px-3 py-2 text-[16px] sm:text-sm" />
                 <input value={contato} onChange={(e) => setContato(e.target.value.slice(0, 80))} placeholder="WhatsApp ou e-mail" aria-label="WhatsApp ou e-mail" required minLength={6} className="w-full rounded-lg border border-black/15 px-3 py-2 text-[16px] sm:text-sm" />
                 <input value={obs} onChange={(e) => setObs(e.target.value.slice(0, 300))} placeholder="Observação (opcional)" aria-label="Observação" className="w-full rounded-lg border border-black/15 px-3 py-2 text-[16px] sm:text-sm" />

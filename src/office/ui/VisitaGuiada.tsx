@@ -172,7 +172,7 @@ export function VisitaGuiada() {
         : <div key="veu" className="pointer-events-none absolute inset-0 bg-[#080B10]/30" />}
       <div ref={balao} className="absolute rounded-2xl bg-white p-4 text-[#1D2128] shadow-2xl" style={pos} aria-live="polite" onPointerEnter={(e) => { if (e.pointerType === "mouse") setPausado(true); }} onPointerLeave={() => setPausado(false)}>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-[#1D4ED8]">Visita guiada · {Math.min(i + 1, total)} de {total}</span>
+          <span className="text-[12px] font-bold text-[#1D4ED8]">Visita guiada · {Math.min(i + 1, total)} de {total}</span>
           {!passo.final && <button type="button" onClick={() => fechar(null)} className="rounded-full px-2 py-0.5 text-xs font-semibold text-[#5B6472] hover:bg-black/5">Pular</button>}
         </div>
         <h2 className="mt-1 text-[17px] font-bold leading-snug">{passo.titulo}</h2>

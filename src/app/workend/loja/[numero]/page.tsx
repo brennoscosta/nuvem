@@ -23,6 +23,7 @@ import { BotaoSeguir } from "@/office/ui/BotaoSeguir";
 import { PegarCupom } from "@/office/ui/PegarCupom";
 import { VitrineLoja } from "@/office/ui/VitrineLoja";
 import { Icone } from "@/office/ui/Icone";
+import { NotaEstrelas, EstrelaMedia } from "@/office/ui/NotaEstrelas";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ numero: string }> };
@@ -70,7 +71,7 @@ export default async function Loja({ params }: Props) {
           <div className="relative flex flex-wrap items-center gap-5">
             {l.logo ? <img src={l.logo} alt={`Logo da ${l.nome}`} className="h-20 w-20 rounded-2xl bg-white object-contain p-1.5 shadow-xl" /> : <span className="grid h-20 w-20 place-items-center rounded-2xl bg-white/15 text-3xl font-black">{l.nome.slice(0, 2).toUpperCase()}</span>}
             <div className="min-w-0">
-              <span className="text-[13px] font-semibold uppercase tracking-wide text-white/75">Lote {l.numero} · {l.nicho}</span>
+              <span className="text-[13px] font-semibold text-white/75">Lote {l.numero} · {l.nicho}</span>
               <h1 className="mt-1 text-[2.2rem] sm:text-[3rem]" style={{ color: "#fff" }}>{l.nome}</h1>
               <span className="mt-1 inline-block rounded-full bg-white/90 px-3 py-1"><EstrelasTexto media={l.avaliacao.media} n={l.avaliacao.n} /></span>
             </div>
@@ -78,7 +79,7 @@ export default async function Loja({ params }: Props) {
           {promo && <p className="relative mt-5 inline-flex flex-wrap items-center gap-2 rounded-full bg-[#E11D48] px-4 py-1.5 text-[15px] font-bold shadow-lg"><Icone nome="etiqueta" tamanho={17} />{promo.texto}<span className="font-semibold text-white/80">· até {new Date(promo.ate).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></p>}
           <div className="relative mt-6 flex flex-wrap gap-2">
             <BotaoSeguir numero={l.numero} claro />
-            <Link href={`/mundo?lote=${encodeURIComponent(l.chave)}`} className="btn" style={{ background: "#fff", color: "var(--ink)" }}>Ver no mapa 3D</Link>
+            <Link prefetch={false} href={`/mundo?lote=${encodeURIComponent(l.chave)}`} className="btn" style={{ background: "#fff", color: "var(--ink)" }}>Ver no mapa 3D</Link>
             {vagas.length > 0 && <a href="#vagas" className="btn border-white/40 bg-white/10" style={{ color: "#fff" }}><span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-[#FFD24A]" aria-hidden="true" />Estamos contratando · {vagas.length} {vagas.length === 1 ? "vaga" : "vagas"}</a>}
             {ehDono && <Link href="/app/equipe" className="btn border-white/40 bg-white/10" style={{ color: "#fff" }}>Esta é a sua loja · Minha equipe</Link>}
           </div>
@@ -119,7 +120,7 @@ export default async function Loja({ params }: Props) {
                 <ul className="mt-4 space-y-3">
                   {avals.map((a) => (
                     <li key={a.id} className="rounded-2xl border border-[var(--linha)] p-4">
-                      <div className="flex items-baseline justify-between gap-2"><b>{a.deNome}</b><span className="text-[#B7791F]">{"★".repeat(a.nota)}<span className="text-[var(--line)]">{"★".repeat(5 - a.nota)}</span></span></div>
+                      <div className="flex items-baseline justify-between gap-2"><b>{a.deNome}</b><NotaEstrelas nota={a.nota} /></div>
                       {a.texto && <p className="mt-1 text-[15px]">{a.texto}</p>}
                       <small className="text-[var(--tinta-2)]">{a.titulo} · {new Date(a.criadoEm).toLocaleDateString("pt-BR")}</small>
                     </li>
@@ -144,7 +145,7 @@ export default async function Loja({ params }: Props) {
 
 function EstrelasTexto({ media, n }: { media: number | null; n: number }) {
   if (!n || media == null) return <span className="text-[13px] font-semibold text-[var(--tinta-2)]">Sem avaliações ainda</span>;
-  return <span className="text-[13px] font-bold text-[#7A5A00]">★ {media.toFixed(1).replace(".", ",")} <span className="font-normal text-[var(--tinta-2)]">· {n} {n === 1 ? "avaliação" : "avaliações"}</span></span>;
+  return <span className="text-[13px] font-bold text-[#7A5A00]"><EstrelaMedia />{media.toFixed(1).replace(".", ",")} <span className="font-normal text-[var(--tinta-2)]">· {n} {n === 1 ? "avaliação" : "avaliações"}</span></span>;
 }
 function ContatosBloco({ c, numero }: { c: { whatsapp?: string; instagram?: string; site?: string; email?: string }; numero: number }) {
   const itens = [c.whatsapp && ["WhatsApp", `https://wa.me/${c.whatsapp.length <= 11 ? `55${c.whatsapp}` : c.whatsapp}`, c.whatsapp, "whatsapp"], c.instagram && ["Instagram", `https://instagram.com/${c.instagram}`, `@${c.instagram}`, "instagram"], c.site && ["Site", c.site, c.site.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""), "site"], c.email && ["E-mail", `mailto:${c.email}`, c.email, "email"]].filter(Boolean) as string[][];

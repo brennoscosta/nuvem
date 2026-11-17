@@ -3,6 +3,7 @@
 // antecedência e até quantos dias à frente; e a lista de quem marcou (cancelar, concluído, faltou).
 import { useEffect, useState } from "react";
 import { MAX_SERVICOS, DURACOES, PASSOS, ANTECEDENCIAS, DIAS_FRENTE, NOMES_DIAS, NOMES_STATUS, duracaoTexto, paraHHMM, type ConfigAgenda, type DiaAgenda } from "@/office/data/agenda";
+import { Icone } from "@/office/ui/Icone";
 
 type Ag = { id: string; servico: string; preco: string; inicio: string; quando: string; dia: string; nome: string; contato: string; obs: string; status: string; origem: string; canceladoPor: string | null; passou: boolean };
 type Dados = { config: ConfigAgenda; usavel: boolean; loja: { chave: string; numero: number | null; empresa: string } | null; proximos: Ag[]; historico: Ag[] };
@@ -67,17 +68,18 @@ export function AgendaDono() {
   return (
     <>
       <section className="faixa pt-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-[2rem] lg:text-[2.4rem]">Agenda da loja{dados.loja && <span className="text-[var(--tinta-2)]"> · {dados.loja.empresa}</span>}</h1>
-            <p className="mt-2 max-w-[62ch] text-[var(--tinta-2)]">Ligada, a agenda aparece no cartão da sua loja no mapa e na página da loja, e a atendente de IA passa a marcar horários pela conversa. Cada horário marcado chega no sino.</p>
+        <div className="pg-topo flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <span className="pg-rotulo"><Icone nome="agenda" tamanho={15} />{dados.loja ? dados.loja.empresa : "Sua loja"}</span>
+            <h1>Agenda da loja</h1>
+            <p className="pg-sub">Ligada, a agenda aparece no cartão da sua loja no mapa e na página da loja, e a atendente de IA passa a marcar horários pela conversa. Cada horário marcado chega no sino.</p>
           </div>
           {numero != null && <a href={`/loja/${numero}#agenda`} target="_blank" rel="noreferrer" className="btn btn-linha">Ver como o cliente vê</a>}
         </div>
       </section>
 
       <section className="faixa mt-6 grid gap-8 lg:grid-cols-[1.15fr_1fr]">
-        <form onSubmit={(e) => { e.preventDefault(); void salvar(c, c.ligada ? "Agenda salva. Os clientes já podem marcar." : "Agenda salva (desligada)."); }} className="min-w-0 self-start rounded-2xl bg-[var(--cinza)] p-5 sm:p-6">
+        <form onSubmit={(e) => { e.preventDefault(); void salvar(c, c.ligada ? "Agenda salva. Os clientes já podem marcar." : "Agenda salva (desligada)."); }} className="pg-cartao min-w-0 self-start p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-[1.4rem]">Como a sua agenda funciona</h2>
             <button type="button" role="switch" aria-checked={c.ligada} onClick={() => muda({ ligada: !c.ligada })} className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold ${c.ligada ? "bg-[#16A34A] text-white" : "bg-[var(--surface-dim)] text-[var(--tinta-2)]"}`}>
@@ -109,11 +111,11 @@ export function AgendaDono() {
               const h = c.horarios[String(d)], temPausa = !!(h.pausaIni && h.pausaFim);
               return (
                 <li key={d} className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl px-3 py-2 ${h.aberto ? "bg-[var(--surface)]" : "bg-transparent"}`}>
-                  <label className="flex w-28 items-center gap-2 text-[15px] font-semibold"><input type="checkbox" checked={h.aberto} onChange={(e) => mudaDia(d, { aberto: e.target.checked })} className="h-4 w-4" />{NOMES_DIAS[d]}</label>
+                  <label className="flex min-h-10 w-28 items-center gap-2 text-[15px] font-semibold"><input type="checkbox" checked={h.aberto} onChange={(e) => mudaDia(d, { aberto: e.target.checked })} className="h-5 w-5 accent-[var(--azul)]" />{NOMES_DIAS[d]}</label>
                   {h.aberto ? (
                     <>
                       <span className="flex items-center gap-1.5 text-sm"><HoraSelect valor={h.ini} mudar={(x) => mudaDia(d, { ini: x })} rotulo={`${NOMES_DIAS[d]}: abre às`} />às<HoraSelect valor={h.fim} mudar={(x) => mudaDia(d, { fim: x })} rotulo={`${NOMES_DIAS[d]}: fecha às`} /></span>
-                      <label className="flex items-center gap-1.5 text-sm text-[var(--tinta-2)]"><input type="checkbox" checked={temPausa} onChange={(e) => mudaDia(d, e.target.checked ? { pausaIni: "12:00", pausaFim: "13:00" } : { pausaIni: undefined, pausaFim: undefined })} />pausa</label>
+                      <label className="flex min-h-10 items-center gap-1.5 text-sm text-[var(--tinta-2)]"><input type="checkbox" checked={temPausa} onChange={(e) => mudaDia(d, e.target.checked ? { pausaIni: "12:00", pausaFim: "13:00" } : { pausaIni: undefined, pausaFim: undefined })} />pausa</label>
                       {temPausa && <span className="flex items-center gap-1.5 text-sm text-[var(--tinta-2)]"><HoraSelect valor={h.pausaIni} mudar={(x) => mudaDia(d, { pausaIni: x })} rotulo={`${NOMES_DIAS[d]}: pausa começa`} />às<HoraSelect valor={h.pausaFim} mudar={(x) => mudaDia(d, { pausaFim: x })} rotulo={`${NOMES_DIAS[d]}: pausa termina`} /></span>}
                     </>
                   ) : <span className="text-sm text-[var(--tinta-2)]">Fechado</span>}
@@ -152,7 +154,7 @@ export function AgendaDono() {
           <div className="mt-3 space-y-4">
             {grupos.map((g) => (
               <div key={g.dia}>
-                <div className="text-[12px] font-bold uppercase tracking-wide text-[var(--tinta-2)]">{g.rotulo}</div>
+                <div className="text-[12px] font-bold text-[var(--tinta-2)]">{g.rotulo}</div>
                 <ul className="mt-1.5 space-y-2">{g.itens.map((a) => <ItemAgenda key={a.id} a={a} acao={acao} />)}</ul>
               </div>
             ))}

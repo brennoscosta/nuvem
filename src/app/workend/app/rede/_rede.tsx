@@ -9,6 +9,7 @@ import { PainelMissoes } from "./_missoes";
 import { ComoFunciona } from "./_como";
 import { Inclina } from "./_inclina";
 import { Icone, type NomeIcone } from "@/office/ui/Icone";
+import { NotaEstrelas, CHEIA } from "@/office/ui/NotaEstrelas";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
@@ -201,11 +202,11 @@ function CartaoNegocio({ n, euId, conversar }: { n: Negociacao; euId: string; co
         <button onClick={conversar} className="inline-flex items-center gap-1 rounded-lg bg-[#EEF3FF] px-3 py-1.5 text-[#1D4ED8]"><Icone nome="conversar" tamanho={15} />Conversar</button>
       </div>
       {n.status === "concluida" && (n.minhaNota ? (
-        <div className="mt-3 text-sm text-[var(--tinta-2)]">Você avaliou {n.outroNome}: <span className="text-[#B7791F]">{"★".repeat(n.minhaNota)}</span></div>
+        <div className="mt-3 text-sm text-[var(--tinta-2)]">Você avaliou {n.outroNome}: <NotaEstrelas nota={n.minhaNota} /></div>
       ) : (
         <div className="mt-3 rounded-xl bg-[var(--cinza)] p-3">
           <div className="text-sm font-semibold">Como foi negociar com {n.outroNome}?</div>
-          <div className="mt-1 flex gap-1" role="radiogroup" aria-label="Nota de 1 a 5">{[1, 2, 3, 4, 5].map((k) => <button key={k} type="button" role="radio" aria-checked={nota === k} onClick={() => setNota(k)} className={`text-2xl transition ${k <= nota ? "scale-110 text-[#E8A317]" : "text-[var(--line-strong)] hover:text-[#E8A317]"}`}>★</button>)}</div>
+          <div className="mt-1 flex gap-1" role="radiogroup" aria-label="Nota de 1 a 5">{[1, 2, 3, 4, 5].map((k) => <button key={k} type="button" role="radio" aria-checked={nota === k} onClick={() => setNota(k)} className={`text-2xl transition ${k <= nota ? "scale-110 text-[#E8A317]" : "text-[var(--line-strong)] hover:text-[#E8A317]"}`}><Icone nome="estrela" tamanho={26} className={k <= nota ? CHEIA : ""} /></button>)}</div>
           <input value={texto} onChange={(e) => setTexto(e.target.value.slice(0, 400))} placeholder="Conte em uma frase (opcional; aparece no perfil dela)" className="mt-2 w-full rounded-lg border border-[var(--linha)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--azul)]" />
           <button type="button" disabled={!nota || enviando} onClick={() => void enviarNota()} className="btn btn-azul mt-2 !py-2 text-sm">{enviando ? "Enviando…" : "Enviar avaliação"}</button>
         </div>

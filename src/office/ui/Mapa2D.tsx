@@ -115,7 +115,7 @@ function Lote2D({ l, t, principal, anexoMeio, sel, vagas, promo, vivo }: { l: Lo
       {l.lote.tipo === "casa" ? <Casa x={x} z={z - 1} cor={({ casaVelha: "#9C6B4E", casaTerrea: "#C0623A", casaSobrado: "#8A8F98", casaColonial: "#B5552F", casaModerna: "#6B7280" } as Record<string, string>)[l.lote.modelo] ?? "#C0623A"} /> : l.lote.tipo === "vazio" && l.lote.arvore ? <Arvore x={x + 3} z={z - 2} r={2.6} /> : null}
       <g style={{ pointerEvents: "none" }}>
         <rect x={x - (10 + String(l.numero).length * 1.3) / 2} y={z + 4.4} width={10 + String(l.numero).length * 1.3} height={3.4} rx={0.6} fill="#FFFFFF" stroke="#1D4ED8" strokeWidth={0.3} />
-        <text x={x} y={z + 6.75} textAnchor="middle" fontSize={1.9} fontWeight={800} fill="#1D4ED8">À VENDA · {l.numero}</text>
+        <text x={x} y={z + 6.75} textAnchor="middle" fontSize={1.9} fontWeight={800} fill="#1D4ED8">À venda · {l.numero}</text>
       </g>
       {borda}
     </g>
@@ -130,7 +130,7 @@ function Rotulo({ x, z, texto, sub, cor }: { x: number; z: number; texto: string
       <rect x={x - w / 2} y={z - h} width={w} height={h} rx={1.4} fill={cor} stroke="#fff" strokeWidth={0.35} />
       <path d={`M${x - 1} ${z} L${x} ${z + 1.2} L${x + 1} ${z} Z`} fill={cor} />
       <text x={x} y={z - h + 2.7} textAnchor="middle" fontSize={2.3 * k} fontWeight={900} fill="#fff">{t}</text>
-      {sub && <text x={x} y={z - h + 4.6} textAnchor="middle" fontSize={1.5} fontWeight={700} fill="#fff" opacity={0.85}>{sub.toUpperCase()}</text>}
+      {sub && <text x={x} y={z - h + 4.6} textAnchor="middle" fontSize={1.5} fontWeight={700} fill="#fff" opacity={0.85}>{sub}</text>}
     </g>
   );
 }
@@ -143,7 +143,8 @@ export function Mapa2D() {
   const alvo = useMundo((s) => s.alvoCamera);
   const agora = useAgora();
   // vista: centro (m) e escala (1 = a cidade inteira na tela)
-  const [vista, setVista] = useState({ x: 0, z: 6, esc: 1.15 });
+  // abre com a cidade inteira na tela (17/11/2026, revisão geral: no computador abria mostrando só uns dois lotes)
+  const [vista, setVista] = useState({ x: 0, z: 6, esc: 1 });
   const caixa = useRef<SVGSVGElement>(null);
   const toques = useRef(new Map<number, { x: number; y: number }>());
   const arrasto = useRef({ moveu: 0, dist: 0 });
@@ -164,7 +165,7 @@ export function Mapa2D() {
   for (const t of Object.values(terrenos)) if (t.anexoDe && t.status === "ativo") { const a = LOTES.find((l) => l.chave === t.chave), p = LOTES.find((l) => l.chave === t.anexoDe); if (a && p) anexos[p.chave] = (a.centro[0] + p.centro[0]) / 2; }
   return (
     <div className="absolute inset-0 overflow-hidden bg-[#7FB6D9]">
-      <svg ref={caixa} viewBox={`${vista.x - lado / 2} ${vista.z - lado / 2} ${lado} ${lado}`} preserveAspectRatio="xMidYMid slice" className="h-full w-full touch-none select-none"
+      <svg ref={caixa} viewBox={`${vista.x - lado / 2} ${vista.z - lado / 2} ${lado} ${lado}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full touch-none select-none"
         role="img" aria-label="Mapa simples da cidade do WorkEnd"
         onWheel={(e) => zoom(e.deltaY < 0 ? 1.15 : 1 / 1.15)}
         onPointerDown={(e) => { toques.current.set(e.pointerId, { x: e.clientX, y: e.clientY }); arrasto.current.moveu = 0; if (toques.current.size === 2) { const [a, b] = [...toques.current.values()]; arrasto.current.dist = Math.hypot(a.x - b.x, a.y - b.y); } }}

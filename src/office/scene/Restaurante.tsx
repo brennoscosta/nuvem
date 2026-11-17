@@ -231,10 +231,10 @@ function LanchoneteFixa() {
   );
 }
 
-// Letreiros com a logo "Burgers" (public/lanchonete/logo.png, fundo transparente). A frente olha pro oeste (pra Nuvem).
+// Letreiros com a logo "Burgers" (public/lanchonete/logo.webp, fundo transparente). A frente olha pro oeste (pra Nuvem).
 const PROP_LOGO = 309 / 512; // altura / largura da imagem
 function useMaterialLogo() {
-  const logo = useLoader(THREE.TextureLoader, "/lanchonete/logo.png");
+  const logo = useLoader(THREE.TextureLoader, "/lanchonete/logo.webp");
   // devolve geometria + material pra pôr dentro de um <mesh> (não é componente, é só um pedaço de JSX)
   const placa = (w: number, h: number) => [
     <planeGeometry key="g" args={[w, h]} />,
@@ -292,7 +292,7 @@ export function Restaurante() {
         <ComFallback fallback={null}><LetreirosPredio /></ComFallback>
       </group>
       <ComFallback fallback={null}><LetreiroTotem x={CX - 17} z={CZ + 17.5} /></ComFallback>
-      <Balao position={[LANCH.centro[0], LANCH.altura + 5, LANCH.centro[1]]} nome="Burgers" cor="#4A2A1A" logo="/lanchonete/logo.png" subtitulo="Alimentação" />
+      <Balao position={[LANCH.centro[0], LANCH.altura + 5, LANCH.centro[1]]} nome="Burgers" cor="#4A2A1A" logo="/lanchonete/logo.webp" subtitulo="Alimentação" />
       <Estatico visivel={!fora}><LanchoneteFixa /></Estatico>
       <ComFallback fallback={null}>
         <ModeloInstanciado nome="carroSedan" itens={estacionados.sedan} />

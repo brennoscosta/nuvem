@@ -1,5 +1,6 @@
 // Peças compartilhadas do site WorkEnd: topo, rodapé e dados do catálogo de setores/especialistas.
 import Link from "next/link";
+import { usuarioAtual } from "@/server/usuarios";
 import { Logotipo } from "./_marca";
 import { AREAS, AREAS_OPERACIONAIS, FUNCOES, type AreaId } from "@/office/data/org";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
@@ -28,7 +29,8 @@ export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
   );
 }
 
-export function Rodape() {
+export async function Rodape() {
+  const logado = !!(await usuarioAtual().catch(() => null)); // quem já entrou não vê "Criar conta" nem "Entrar" (17/11/2026)
   return (
     <footer className="rodape">
       <div className="faixa flex flex-wrap items-start gap-x-16 gap-y-7 pb-14 pt-10 text-[15px] text-[var(--muted)]">
@@ -36,9 +38,8 @@ export function Rodape() {
           <div className="mb-3 py-1"><Logotipo altura={24} /></div>
           <p className="max-w-[40ch]">O endereço da sua empresa numa cidade 3D aberta 24 horas.</p>
         </div>
-        <nav className="flex flex-col gap-[11px]" aria-label="Rodapé">
-          <Link href="/cadastro">Criar conta</Link>
-          <Link href="/entrar">Entrar</Link>
+        <nav className="flex flex-col [&_a]:py-2" aria-label="Rodapé">
+          {logado ? <Link href="/app">Meu escritório</Link> : <><Link href="/cadastro">Criar conta</Link><Link href="/entrar">Entrar</Link></>}
           <Link prefetch={false} href="/mundo">Passear pelo mapa</Link>
           <Link prefetch={false} href={DEMO}>Conhecer uma empresa por dentro</Link>
           <Link href="/politicas">Políticas de uso</Link>

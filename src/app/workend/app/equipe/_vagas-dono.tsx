@@ -53,7 +53,7 @@ export function VagasDono({ empresa, numero }: { empresa: string; numero: number
 
   return (
     <section className="mt-5 grid gap-6 lg:grid-cols-[1fr_1.25fr]">
-      <form onSubmit={(e) => { e.preventDefault(); if (podeCriar) void salvar(r, editando ? "Vaga atualizada." : "Vaga aberta! A placa “Estamos contratando” já aparece no seu prédio."); }} className="self-start rounded-2xl bg-[var(--cinza)] p-6">
+      <form onSubmit={(e) => { e.preventDefault(); if (podeCriar) void salvar(r, editando ? "Vaga atualizada." : "Vaga aberta! A placa “Estamos contratando” já aparece no seu prédio."); }} className="self-start pg-cartao p-6">
         <h2 className="text-[1.4rem]">{editando ? "Editar a vaga" : "Abrir uma vaga"}</h2>
         <p className="mt-1 text-sm text-[var(--tinta-2)]">Enquanto a {empresa} tiver vaga aberta, o prédio ganha a placa <b>“Estamos contratando”</b> na fachada do mapa, e a vaga aparece na busca de profissionais (Encontrar › Vagas){numero != null && <> e na <a href={`/loja/${numero}#vagas`} className="font-semibold text-[var(--azul)] hover:underline">página da loja</a></>}. Até {MAX} vagas abertas.</p>
         <div className="mt-4 space-y-3">

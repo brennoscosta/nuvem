@@ -3,7 +3,7 @@
 import { Icone } from "./Icone";
 import { useEffect, useRef, useState } from "react";
 import { useChamada } from "../chamadaStore";
-import { MiniAvatar } from "./Personagem";
+import { MiniAvatar } from "./MiniAvatar";
 
 function Video({ stream, mudo = false, className }: { stream: MediaStream | null; mudo?: boolean; className?: string }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -33,7 +33,7 @@ export function JanelaChamada() {
   const temVideoRemoto = !!remoto && remoto.getVideoTracks().some((t) => t.enabled);
   if (fase === "tocando") return (
     <div className="fixed inset-x-0 top-20 z-40 mx-auto w-[22rem] rounded-2xl bg-[#111418] p-4 text-white shadow-2xl ring-1 ring-white/10">
-      <div className="flex items-center gap-3"><MiniAvatar boneco={c.outroBoneco ?? "classico"} roupa={c.outroRoupa ?? "#1D4ED8"} tamanho={48} /><div><div className="text-[10px] font-bold uppercase tracking-wide text-[#16A34A]"><Icone nome="chamada" tamanho={13} className="mr-1 inline align-[-3px]" />Chamada chegando</div><div className="text-lg font-bold leading-tight">{nome}</div><div className="text-xs text-white/60">{c.video ? "vídeo e áudio" : "só áudio"}</div></div></div>
+      <div className="flex items-center gap-3"><MiniAvatar boneco={c.outroBoneco ?? "classico"} roupa={c.outroRoupa ?? "#1D4ED8"} tamanho={48} /><div><div className="text-[12px] font-bold text-[#16A34A]"><Icone nome="chamada" tamanho={13} className="mr-1 inline align-[-3px]" />Chamada chegando</div><div className="text-lg font-bold leading-tight">{nome}</div><div className="text-xs text-white/60">{c.video ? "vídeo e áudio" : "só áudio"}</div></div></div>
       {erro && <div className="mt-2 text-xs font-semibold text-[#FCA5A5]">{erro}</div>}
       <div className="mt-3 flex gap-2"><button onClick={() => void desligar("Chamada recusada.")} className="flex-1 rounded-xl bg-white/10 px-3 py-2.5 text-sm font-bold">Recusar</button><button onClick={() => void atender()} className="flex-1 rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold">Atender</button></div>
     </div>

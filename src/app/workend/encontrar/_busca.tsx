@@ -4,8 +4,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ListaVagas, type VagaLista } from "../_vagas";
 import { NICHOS } from "@/office/data/mundo";
-import { MiniAvatar } from "@/office/ui/Personagem";
+import { MiniAvatar } from "@/office/ui/MiniAvatar";
 import type { Perfil, Redes } from "@/office/personagemStore";
+import { EstrelaMedia } from "@/office/ui/NotaEstrelas";
 
 type Prof = { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; redes?: Redes; online: boolean; perfil: Perfil; nichoNome: string | null; reputacao: { media: number | null; n: number } };
 type Emp = { numero: number; chave: string; nome: string; cor: string; nicho: string; nichoNome: string; logo: string | null; sobre: string; contatos: { whatsapp?: string; instagram?: string; site?: string; email?: string }; equipe: number; atendente: string | null; reputacao: { media: number | null; n: number } };
@@ -14,7 +15,7 @@ const ROTULO: Record<Tipo, string> = { profissionais: "Profissionais", empresas:
 
 function Nota({ r }: { r: { media: number | null; n: number } }) {
   if (!r.n || r.media == null) return <span className="text-[12px] text-[var(--tinta-2)]">sem avaliações</span>;
-  return <span className="text-[12px] font-semibold text-[#7A5A00]">★ {r.media.toFixed(1).replace(".", ",")} <span className="font-normal text-[var(--tinta-2)]">({r.n})</span></span>;
+  return <span className="text-[12px] font-semibold text-[#7A5A00]"><EstrelaMedia />{r.media.toFixed(1).replace(".", ",")} <span className="font-normal text-[var(--tinta-2)]">({r.n})</span></span>;
 }
 
 export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string | null; inicial: { tipo: Tipo; nicho: string; q: string } }) {

@@ -2,7 +2,7 @@
 // UI do personagem: montar/pagar (nome, gênero, tipo, bio, redes), ficha de outro personagem com as opções
 // (conversar, negociar, fazer uma call, amizade), chat (com propostas) e caixa de entrada. Desde 12/11/2026: loja de
 // roupas e acessórios do personagem (Pix por item) e os selos das missões de visitante na ficha.
-import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { usePersonagem, type Redes, type Outro, type Mensagem, type Perfil } from "../personagemStore";
 import { NICHOS } from "../data/mundo";
 import { useMundo } from "../mundoStore";
@@ -19,32 +19,10 @@ import { Cores, Opcoes, Interruptor } from "./EditorVisual";
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR");
 
-// Mini avatar: retrato em SVG do visual do personagem (ui/RetratoBoneco.tsx); com acessórios, o ícone de cada um
-// aparece no lugar dele
-const POS_ICONE: Record<LugarAcessorio, (t: number) => CSSProperties> = {
-  cabeca: (t) => ({ left: "50%", top: -t * 0.2, transform: "translateX(-50%)", fontSize: t * 0.42 }),
-  rosto: (t) => ({ left: "50%", top: t * 0.2, transform: "translateX(-50%)", fontSize: t * 0.3 }),
-  pescoco: (t) => ({ left: "50%", top: t * 0.56, transform: "translateX(-50%)", fontSize: t * 0.28 }),
-  costas: (t) => ({ right: -t * 0.14, bottom: -t * 0.04, fontSize: t * 0.32 }),
-};
-export function MiniAvatar({ boneco, roupa, tamanho = 40, acessorios }: { boneco: string; roupa: string; tamanho?: number; acessorios?: string[] }) {
-  const usados = (acessorios ?? []).map((i) => ACESSORIO_POR_ID[i]).filter(Boolean);
-  const avatar = <AvatarRetrato boneco={boneco} roupa={roupa} tamanho={tamanho} />;
-  if (!usados.length) return avatar;
-  return (
-    <span className="relative inline-block shrink-0" style={{ width: tamanho, height: tamanho }}>
-      {avatar}
-      {usados.map((a) => { const st = POS_ICONE[a.lugar](tamanho), t = Number(st.fontSize) || tamanho * 0.3; return <span key={a.id} aria-hidden className="pointer-events-none absolute grid select-none place-items-center leading-none" style={{ ...st, fontSize: undefined, color: a.cor === "#FFFFFF" ? "#8C97A6" : a.cor, filter: "drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff)" }}><Icone nome={ICONE_ACESSORIO[a.id] ?? "mais"} tamanho={Math.round(t * 1.15)} traco={2.2} /></span>; })}
-    </span>
-  );
-}
-function AvatarRetrato({ boneco, roupa, tamanho }: { boneco: string; roupa: string; tamanho: number }) {
-  return (
-    <span className="relative inline-block shrink-0 overflow-hidden rounded-full" style={{ width: tamanho, height: tamanho }}>
-      <RetratoBoneco def={bonecoDe(boneco, TODOS_BONECOS.classico)} roupa={roupa} tamanho={tamanho} />
-    </span>
-  );
-}
+// o mini avatar mora em ui/MiniAvatar.tsx (sem three.js); continua exportado daqui para quem já importava
+import { MiniAvatar } from "./MiniAvatar";
+import { EstrelaMedia } from "./NotaEstrelas";
+export { MiniAvatar };
 
 // ---------- painel "Meu personagem" (refeito em 16/11/2026) ----------
 // Prévia 3D girando em cima, nome, e abas: Visual pronto, Corpo, Cabelo, Roupa, Calça e tênis, Acessórios, Perfil e
@@ -93,7 +71,7 @@ export function PainelPersonagem() {
   useEffect(() => { if (painel === "montar" && meu && carregadoDe.current !== meu.usuarioId) { carregadoDe.current = meu.usuarioId; setF({ nome: meu.nome, tipo: meu.tipo, bio: meu.bio, redes: meu.redes ?? {}, mostrarRedes: meu.mostrarRedes, perfil: { profissao: meu.profissao ?? "", nicho: meu.nicho ?? "", servicos: meu.servicos ?? "", preco: meu.preco ?? "", local: meu.local ?? "", portfolio: meu.portfolio ?? [], disponivel: meu.disponivel ?? true }, visual: meu.visual ?? {} }); setAbrirPerfil(!!meu.profissao); } }, [painel, meu]);
   if (painel !== "montar") return null;
   if (!usuario) return (
-    <div className={`${FLUTUANTE} ${ESTREITO} painel-entra overflow-y-auto p-4`}>
+    <div className={`${FLUTUANTE} ${ESTREITO} painel-entra overflow-y-auto p-4`} role="dialog" aria-label="Criar personagem">
       <div className="text-lg font-bold">Seu personagem no mundo</div>
       <p className="mt-1 text-sm text-[#5B6472]">Quem não tem personagem só olha. Com o seu, você anda pelo mapa, fala com a equipe das lojas, conversa com quem está online, faz amigos, negocia e faz calls.</p>
       <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm"><span className="text-[#5B6472] line-through">{brl(precoCheio)}</span> <b className="text-[#16A34A]">{brl(preco)}/mês</b></div>
@@ -136,7 +114,7 @@ export function PainelPersonagem() {
   );
   const pixAberto = pix?.lote === "personagem";
   return (
-    <div className="painel-entra absolute inset-x-0 bottom-0 z-20 flex h-[86dvh] flex-col overflow-hidden rounded-t-3xl bg-white text-[#1D2128] shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-20 sm:h-[min(46rem,calc(100dvh-7rem))] sm:w-[26rem] sm:rounded-3xl">
+    <div role="dialog" aria-label="Meu personagem" className="painel-entra absolute inset-x-0 bottom-0 z-20 flex h-[86dvh] flex-col overflow-hidden rounded-t-3xl bg-white text-[#1D2128] shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-20 sm:h-[min(46rem,calc(100dvh-7rem))] sm:w-[26rem] sm:rounded-3xl">
       {salvo && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/95">
           <svg viewBox="0 0 64 64" className="salvo-pop h-20 w-20"><circle cx="32" cy="32" r="30" fill="#16A34A" /><path d="M18 33 L28 43 L46 23" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" className="salvo-risco" /></svg>
@@ -307,7 +285,7 @@ export function FichaPersonagem() {
       </div>
       {ficha?.selos && ficha.selos.length > 0 && <Selos ids={ficha.selos} />}
       {ficha?.perfil && <PerfilNaFicha perfil={ficha.perfil} reputacao={ficha.reputacao} />}
-      {!ficha?.perfil && ficha?.reputacao && ficha.reputacao.n > 0 && <div className="mt-1 text-xs font-semibold text-[#7A5A00]">★ {ficha.reputacao.media?.toFixed(1).replace(".", ",")} · {ficha.reputacao.n} {ficha.reputacao.n === 1 ? "avaliação" : "avaliações"}</div>}
+      {!ficha?.perfil && ficha?.reputacao && ficha.reputacao.n > 0 && <div className="mt-1 text-xs font-semibold text-[#7A5A00]"><EstrelaMedia />{ficha.reputacao.media?.toFixed(1).replace(".", ",")} · {ficha.reputacao.n} {ficha.reputacao.n === 1 ? "avaliação" : "avaliações"}</div>}
       {p.bio && <p className="mt-2 text-sm text-[#1D2128]">{p.bio}</p>}
       {!souEu && !negociando && (
         <div className="mt-3 grid grid-cols-2 gap-1.5 text-center text-[12px] font-semibold">
@@ -320,7 +298,7 @@ export function FichaPersonagem() {
       {negociando && <FormNegociar para={p} aoFechar={() => setNegociando(false)} aoEnviar={(msg) => { setNegociando(false); setAviso(msg); }} />}
       {redes && (
         <div className="mt-3 rounded-2xl bg-[#F1F3F6] p-3 text-sm">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">Redes sociais</div>
+          <div className="text-[12px] font-bold text-[#5B6472]">Redes sociais</div>
           <LinksRedes redes={redes} />
         </div>
       )}
@@ -469,7 +447,7 @@ function CamposPerfil({ perfil, aberto, abrir, mudar }: { perfil: Perfil; aberto
 function PerfilNaFicha({ perfil, reputacao }: { perfil: Perfil; reputacao?: { media: number | null; n: number } }) {
   return (
     <div className="mt-2 rounded-2xl bg-[#F5F8FF] p-3 text-sm">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><b>{perfil.profissao || "Profissional"}</b>{perfil.disponivel ? <span className="rounded-full bg-[#E3F6EA] px-1.5 py-0.5 text-[10px] font-bold text-[#166534]">disponível</span> : <span className="rounded-full bg-[#F1F3F6] px-1.5 py-0.5 text-[10px] font-bold text-[#5B6472]">agenda cheia</span>}{reputacao && reputacao.n > 0 && <span className="text-xs font-semibold text-[#7A5A00]">★ {reputacao.media?.toFixed(1).replace(".", ",")} ({reputacao.n})</span>}</div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><b>{perfil.profissao || "Profissional"}</b>{perfil.disponivel ? <span className="rounded-full bg-[#E3F6EA] px-1.5 py-0.5 text-[10px] font-bold text-[#166534]">disponível</span> : <span className="rounded-full bg-[#F1F3F6] px-1.5 py-0.5 text-[10px] font-bold text-[#5B6472]">agenda cheia</span>}{reputacao && reputacao.n > 0 && <span className="text-xs font-semibold text-[#7A5A00]"><EstrelaMedia />{reputacao.media?.toFixed(1).replace(".", ",")} ({reputacao.n})</span>}</div>
       {(perfil.local || perfil.preco) && <div className="text-xs text-[#5B6472]">{[perfil.local, perfil.preco].filter(Boolean).join(" · ")}</div>}
       {perfil.servicos && <p className="mt-1 whitespace-pre-line text-xs text-[#1D2128]">{perfil.servicos}</p>}
       {perfil.portfolio.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1.5">{perfil.portfolio.map((p) => <a key={p.url} href={p.url} target="_blank" rel="noreferrer nofollow" className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#1D4ED8]">{p.titulo}</a>)}</div>}
@@ -497,7 +475,7 @@ export function FormNegociar({ para, aoFechar, aoEnviar }: { para: { usuarioId: 
   const enviar = async () => { setEnviando(true); const e = await negociar(para.usuarioId, f); setEnviando(false); if (e) setErro(e); else aoEnviar(`Proposta enviada pra ${para.nome}. Acompanhe em Minha rede › Negociações.`); };
   return (
     <div className="mt-3 rounded-2xl border border-[#D97706]/30 bg-[#FFFBEB] p-3">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-[#7A5A00]"><Icone nome="negociar" tamanho={13} className="mr-1 inline align-[-2px]" />Proposta pra {para.nome}</div>
+      <div className="text-[12px] font-bold text-[#7A5A00]"><Icone nome="negociar" tamanho={13} className="mr-1 inline align-[-2px]" />Proposta pra {para.nome}</div>
       <input value={f.titulo} onChange={(e) => setF({ ...f, titulo: e.target.value.slice(0, 80) })} placeholder="O que você propõe? Ex.: Parceria de fornecimento" className="mt-2 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#D97706]" />
       <textarea value={f.texto} onChange={(e) => setF({ ...f, texto: e.target.value.slice(0, 1000) })} rows={3} placeholder="Detalhes: prazos, o que cada um faz, condições…" className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#D97706]" />
       <input value={f.valor} onChange={(e) => setF({ ...f, valor: e.target.value.replace(/[^\d.,]/g, "").slice(0, 12) })} placeholder="Valor em R$ (opcional)" inputMode="decimal" className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#D97706]" />
@@ -519,7 +497,7 @@ function Bolha({ m, minha, outroNome, status }: { m: Mensagem; minha: boolean; o
     return (
       <div className={`flex ${minha ? "justify-end" : "justify-start"}`}>
         <div className="max-w-[88%] rounded-2xl border-2 bg-white px-3 py-2 text-sm text-[#1D2128]" style={{ borderColor: cor }}>
-          <div className="text-[9px] font-black uppercase" style={{ color: cor }}><Icone nome="negociar" tamanho={12} className="mr-1 inline align-[-2px]" />{rotulo}</div>
+          <div className="text-[12px] font-bold" style={{ color: cor }}><Icone nome="negociar" tamanho={12} className="mr-1 inline align-[-2px]" />{rotulo}</div>
           <div className="font-bold">{d.titulo}</div>
           {d.texto && <div className="text-xs text-[#5B6472]">{d.texto}</div>}
           {d.valor != null && <div className="mt-0.5 text-xs font-bold">{brl(Number(d.valor))}</div>}

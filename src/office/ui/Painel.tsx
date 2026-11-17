@@ -58,6 +58,7 @@ export function BarraTopo() {
   const total = ordem.length;
   const trabalhando = ordem.filter((id) => agentes[id]?.status === "trabalhando").length;
   const gasto = ordem.reduce((a, id) => a + (agentes[id]?.gastoHoje ?? 0), 0);
+  const temLote = useMundo((s) => !!s.meu); // quem já tem lote não vê o convite para reservar
   // No mundo do WorkEnd a barra é enxuta (sem os agentes nem o estado do servidor da Nuvem) e rola de lado no celular
   // No mundo do WorkEnd (16/11/2026): duas ilhas de vidro, a marca à esquerda e as ações à direita, com ícones próprios.
   // No celular as ações que não cabem rolam de lado; o som e os ajustes ficam na barra de baixo.
@@ -66,7 +67,7 @@ export function BarraTopo() {
       <div className="hud-ilha pointer-events-auto flex shrink-0 items-center gap-3 px-3.5 py-2.5">
         <Link href="/" aria-label="WorkEnd, início" className="py-0.5"><Logotipo altura={18} claro /></Link>
         <span className="hud-sep hidden lg:block" aria-hidden="true" />
-        <span className="hidden text-[11.5px] leading-tight text-white/55 lg:block">Toque num lote à venda<br />para reservar o seu</span>
+        {!temLote && <span className="hidden text-[12px] leading-tight text-white/60 lg:block">Clique num lote à venda<br />para reservar o seu</span>}
       </div>
       <div className="hud-ilha pointer-events-auto flex min-w-0 items-center gap-1 p-1.5">
         <div className="sem-barra flex min-w-0 items-center gap-1 overflow-x-auto">
@@ -101,7 +102,7 @@ export function BarraTopo() {
               className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-xs transition ${selecionado === id ? "border-white bg-white/15" : "border-white/10 bg-white/5 hover:bg-white/10"}`}>
               <span className="h-2 w-2 rounded-full" style={{ background: st.cor, boxShadow: `0 0 8px ${st.cor}` }} />
               <span className="font-medium">{a.nome}</span>
-              <span className="rounded-full px-1.5 text-[9px] font-bold uppercase" style={{ background: NIVEL[a.nivel].cor, color: "#111" }}>{NIVEL[a.nivel].nome}</span>
+              <span className="rounded-full px-1.5 text-[12px] font-bold" style={{ background: NIVEL[a.nivel].cor, color: "#111" }}>{NIVEL[a.nivel].nome}</span>
             </button>); })}
           {total === 0 && <span className="text-xs text-white/50">{admin || !online ? "Escritório vazio. Clique em “Contratar agente” pra trazer o primeiro." : "Escritório vazio."}</span>}
         </div>
@@ -300,7 +301,8 @@ export function Painel() {
       <AvisoPagamento />
       <AvisoEventos />
       {!mapa2d && <MiniMapa />}
-      <VisitaGuiada />
+      {/* a visita guiada fala do 3D: no mapa simples ela ficava por cima */}
+      {!mapa2d && <VisitaGuiada />}
       <ModalLogin />
       <ModalContratar />
       {/* celular: girar, início, drone, andar e ajustes; no computador a barra da câmera tem tudo (ControlesCamera) */}

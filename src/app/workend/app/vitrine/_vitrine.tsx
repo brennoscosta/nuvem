@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { VitrineVisual, precoBR, type DadosVitrine, type ProdutoVitrine } from "@/office/ui/VitrineLoja";
 import { rotuloLoja } from "@/office/data/numeroLoja";
+import { Icone } from "@/office/ui/Icone";
 
 type Produto = ProdutoVitrine & { ativo: boolean; ordem: number };
 type Dados = { lote: { chave: string; numero: number | null; ativo: boolean; empresa: string; cor: string } | null; whatsapp: string | null; max: number; produtos: Produto[] };
@@ -117,15 +118,17 @@ export function VitrinePainel() {
   return (
     <>
       <section className="faixa pt-4">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--azul)]">{numero != null ? `${rotuloLoja(numero)} · ` : ""}{lote?.empresa}</span>
-            <h1 className="mt-1 text-[2rem] lg:text-[2.5rem]">Vitrine da loja</h1>
-            <p className="mt-2 max-w-[62ch] text-[var(--tinta-2)]">Até {max} produtos com foto e preço. Eles aparecem no cartão da sua loja no mapa e na página da loja, com o botão <b>Pedir no WhatsApp</b>. O pagamento você combina direto com o cliente: o WorkEnd não passa dinheiro adiante.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {numero != null && <a href={`/loja/${numero}#vitrine`} target="_blank" rel="noreferrer" className="btn btn-linha">Ver a página da loja</a>}
-            {lote && <Link href={`/mundo?lote=${encodeURIComponent(lote.chave)}`} className="btn btn-claro">Ver no mapa</Link>}
+        <div className="pg-topo" style={lote ? ({ "--marca": lote.cor } as React.CSSProperties) : undefined}>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0">
+              <span className="pg-rotulo"><Icone nome="sacola" tamanho={15} />{numero != null ? `${rotuloLoja(numero)} · ` : ""}{lote?.empresa}</span>
+              <h1>Vitrine da loja</h1>
+              <p className="pg-sub">Até {max} produtos com foto e preço. Eles aparecem no cartão da sua loja no mapa e na página da loja, com o botão <b>Pedir no WhatsApp</b>. O pagamento você combina direto com o cliente: o WorkEnd não passa dinheiro adiante.</p>
+            </div>
+            <div className="pg-acoes">
+              {numero != null && <a href={`/loja/${numero}#vitrine`} target="_blank" rel="noreferrer" className="btn btn-linha">Ver a página da loja</a>}
+              {lote && <Link prefetch={false} href={`/mundo?lote=${encodeURIComponent(lote.chave)}`} className="btn btn-claro">Ver no mapa</Link>}
+            </div>
           </div>
         </div>
         {!dados.whatsapp && (
@@ -191,8 +194,8 @@ export function VitrinePainel() {
             {produtos.map((p, i) => (
               <li key={p.id} className={`flex flex-wrap items-center gap-3 rounded-2xl border p-3 transition ${r?.id === p.id ? "border-[var(--azul)] shadow-md" : "border-[var(--linha)]"} ${p.ativo ? "bg-[var(--surface)]" : "bg-[var(--cinza)] opacity-80"}`}>
                 <div className="flex flex-col gap-0.5">
-                  <button type="button" onClick={() => void mover(i, -1)} disabled={i === 0} aria-label={`Subir ${p.nome}`} className="rounded-md px-1.5 text-sm leading-none text-[var(--tinta-2)] hover:bg-black/5 disabled:opacity-30">▲</button>
-                  <button type="button" onClick={() => void mover(i, 1)} disabled={i === produtos.length - 1} aria-label={`Descer ${p.nome}`} className="rounded-md px-1.5 text-sm leading-none text-[var(--tinta-2)] hover:bg-black/5 disabled:opacity-30">▼</button>
+                  <button type="button" onClick={() => void mover(i, -1)} disabled={i === 0} aria-label={`Subir ${p.nome}`} className="grid h-10 w-10 place-items-center rounded-lg text-[var(--tinta-2)] hover:bg-black/5 disabled:opacity-30"><Icone nome="baixo" tamanho={18} className="rotate-180" /></button>
+                  <button type="button" onClick={() => void mover(i, 1)} disabled={i === produtos.length - 1} aria-label={`Descer ${p.nome}`} className="grid h-10 w-10 place-items-center rounded-lg text-[var(--tinta-2)] hover:bg-black/5 disabled:opacity-30"><Icone nome="baixo" tamanho={18} /></button>
                 </div>
                 {p.foto ? <img src={p.foto} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" /> : <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl text-lg font-black text-white" style={{ background: lote?.cor ?? "#1D4ED8" }}>{p.nome.slice(0, 1).toUpperCase()}</span>}
                 <div className="min-w-0 flex-1">
@@ -221,7 +224,7 @@ export function VitrinePainel() {
           <div className="mt-3 rounded-2xl bg-[#E9EDF2] p-3 sm:p-4">
             {lista.length === 0 ? <p className="py-8 text-center text-sm text-[var(--tinta-2)]">Os produtos à mostra aparecem aqui como o visitante vê.</p>
               : previa === "mapa"
-                ? <div className="mx-auto max-w-[20rem] rounded-2xl bg-white p-3 text-[#1D2128] shadow-xl"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · {numero != null ? rotuloLoja(numero) : "sua loja"}</div><div className="mb-2 text-lg font-bold">{lote?.empresa}</div><VitrineVisual d={dPrevia} compacto previa /></div>
+                ? <div className="mx-auto max-w-[20rem] rounded-2xl bg-white p-3 text-[#1D2128] shadow-xl"><div className="mb-2 text-[12px] font-bold text-[#1D4ED8]">WorkEnd · {numero != null ? rotuloLoja(numero) : "sua loja"}</div><div className="mb-2 text-lg font-bold">{lote?.empresa}</div><VitrineVisual d={dPrevia} compacto previa /></div>
                 : <div className="rounded-2xl bg-white p-3"><VitrineVisual d={dPrevia} previa /></div>}
           </div>
           {produtos.some((p) => !p.ativo) && <p className="mt-2 text-xs text-[var(--tinta-2)]">Produtos escondidos não aparecem para os visitantes.</p>}

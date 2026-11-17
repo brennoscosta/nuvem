@@ -41,7 +41,7 @@ export function CartaoPraca() {
     <div data-tour="praca" className={`${FLUTUANTE} ${LARGO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-[#0F766E]">WorkEnd · praça da cidade</div>
+          <div className="text-[12px] font-bold text-[#0F766E]">WorkEnd · praça da cidade</div>
           <div className="text-lg font-bold">Praça de Eventos</div>
           <div className="text-xs text-[#5B6472]">Palco para lives e lançamentos · feira aos sábados, das {FEIRA_ABRE}h às {FEIRA_FECHA}h</div>
         </div>
@@ -88,7 +88,7 @@ function Agenda({ agenda, agora, podeMarcar, logado, temLote, aoMudar }: { agend
             <li key={e.id} className={`relative overflow-hidden rounded-2xl border px-3 py-2.5 pl-4 text-sm ${aoVivo ? "border-[#E11D48]/40 bg-[#FFF1F3]" : "border-black/5 bg-white"}`}>
               <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: e.empresa.cor }} />
               <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#5B6472]">
-                <span>{aoVivo ? <span className="mr-1 rounded-full bg-[#E11D48] px-1.5 py-0.5 text-[9px] font-black uppercase text-white">ao vivo</span> : null}{quando(e)}</span>
+                <span>{aoVivo ? <span className="mr-1 rounded-full bg-[#E11D48] px-1.5 py-0.5 text-[12px] font-bold text-white">ao vivo</span> : null}{quando(e)}</span>
                 {e.meu ? <button onClick={() => cancelar(e.id)} className="text-[11px] font-semibold text-[#E2575B]">Cancelar</button>
                   : !aoVivo && logado && <button onClick={() => lembrar(e.id)} aria-pressed={lembretes.includes(e.id)} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${lembretes.includes(e.id) ? "bg-[#0F766E] text-white" : "bg-[#E6F4F1] text-[#0F766E]"}`}><Icone nome="sino" tamanho={13} className="mr-1 inline align-[-3px]" />{lembretes.includes(e.id) ? "Vou ser avisado" : "Me avise"}</button>}
               </div>
@@ -177,13 +177,13 @@ function Feira({ barracas, dia, preco, logado, podeAlugar, pixAberto, aoMudar }:
     <div className="mt-3">
       <div className="rounded-2xl bg-[#FFF8E6] px-3 py-2 text-xs text-[#7A5A00]">Sábado, {dataCurta(dia)}, das {FEIRA_ABRE}h às {FEIRA_FECHA}h. Barraca por <b>{brl(preco)}</b> o sábado, para quem ainda não tem lote: seu nome na placa, seus contatos aqui e as pessoas passando na praça.</div>
       <div className="mt-3 rounded-2xl bg-[#ECE7DD] p-2">
-        <div className="mx-auto mb-2 w-3/5 rounded-md bg-[#3B2A1E] py-1 text-center text-[9px] font-bold uppercase tracking-wide text-white/80">palco</div>
+        <div className="mx-auto mb-2 w-3/5 rounded-md bg-[#3B2A1E] py-1 text-center text-[12px] font-bold text-white/80">palco</div>
         <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-2">
           <div className="flex flex-col-reverse gap-1.5">{barracas.slice(0, 3).map((x) => <Toldo key={x.vaga} x={x} />)}</div>
-          <div className="flex items-center justify-center rounded-lg bg-[#E0D9CB] text-center text-[9px] font-semibold uppercase tracking-wide text-[#7A7366]">plateia<br />e corredor</div>
+          <div className="flex items-center justify-center rounded-lg bg-[#E0D9CB] text-center text-[12px] font-semibold text-[#7A7366]">plateia<br />e corredor</div>
           <div className="flex flex-col-reverse gap-1.5">{barracas.slice(3, 6).map((x) => <Toldo key={x.vaga} x={x} />)}</div>
         </div>
-        <div className="mt-2 text-center text-[9px] font-semibold uppercase tracking-wide text-[#7A7366]">rua · em frente à Nuvem</div>
+        <div className="mt-2 text-center text-[12px] font-semibold text-[#7A7366]">rua · em frente à Nuvem</div>
       </div>
       {b && b.status === "paga" && !b.meu && (
         <div className="mt-3 rounded-2xl border border-black/5 bg-white px-3 py-2.5 text-sm">
@@ -270,7 +270,7 @@ export function AvisoEventos() {
       <div className="flex items-start gap-3">
         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${comecou ? "animate-pulse bg-[#E11D48]" : "bg-[#FACC15]"}`} />
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-white/60">{comecou ? "Começou agora na praça" : `Às ${hora} na praça`}</div>
+          <div className="text-[12px] font-bold text-white/60">{comecou ? "Começou agora na praça" : `Às ${hora} na praça`}</div>
           <div className="truncate text-sm font-bold">{e.titulo}</div>
           <div className="truncate text-xs text-white/70">por {e.empresa.nome}</div>
         </div>

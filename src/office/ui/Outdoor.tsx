@@ -49,7 +49,7 @@ export function CartaoOutdoor() {
   return (
     <div className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
-        <div><div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · Outdoor</div><div className="text-lg font-bold">{vaga.nome}</div><div className="text-xs text-[#5B6472]">14,4 × 7,2 m, com refletores à noite · {brl(preco)} por {DIAS_OUTDOOR} dias</div></div>
+        <div><div className="text-[12px] font-bold text-[#1D4ED8]">WorkEnd · Outdoor</div><div className="text-lg font-bold">{vaga.nome}</div><div className="text-xs text-[#5B6472]">14,4 × 7,2 m, com refletores à noite · {brl(preco)} por {DIAS_OUTDOOR} dias</div></div>
         <button onClick={() => abrir(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
       </div>
 

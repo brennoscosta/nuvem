@@ -41,7 +41,7 @@
 .we .btn:active { transform: translateY(1px); }
 .we .btn-azul { background: var(--azul); color: #fff; }
 .we .btn-azul:hover { background: var(--azul-escuro); }
-.we .btn-claro { background: var(--azul-claro); color: var(--azul); }
+.we .btn-claro { background: var(--azul-claro); color: var(--azul-escuro); } /* 4,9:1 (era 3,3:1 com o azul claro) */
 .we .btn-claro:hover { background: var(--line); }
 .we .btn-linha { background: transparent; border-color: var(--linha); color: var(--tinta); }
 .we .btn-linha:hover { background: var(--cinza); }
@@ -178,3 +178,31 @@
 @keyframes cab-pop { from { opacity: 0; transform: translateY(-6px) scale(.96); } }
 @keyframes cab-desce { from { opacity: 0; transform: translateY(-8px); } }
 @keyframes cab-item { from { opacity: 0; transform: translateY(8px); } }
+
+/* ---------- visual novo das páginas antigas (17/11/2026, revisão geral) ----------
+   Topo escuro como em Meu escritório e Minha equipe (.pg-topo), cartões brancos de borda suave (.pg-cartao) e o topo claro
+   das páginas públicas (.pg-claro). Em @layer components: as classes do Tailwind de cada tela continuam mandando. */
+@layer components {
+  .we .pg-topo { position: relative; isolation: isolate; overflow: hidden; border-radius: 24px; background: var(--night); color: #fff;
+    padding: clamp(1.25rem, 3.2vw, 2.2rem); animation: pg-entra .55s cubic-bezier(.2,.8,.2,1) both; }
+  .we .pg-topo::before { content: ""; position: absolute; z-index: -1; width: 70%; height: 150%; right: -16%; top: -45%;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--marca, var(--blue)) 55%, transparent), transparent 70%); opacity: .5; }
+  .we .pg-topo::after { content: ""; position: absolute; z-index: -1; inset: 0;
+    background-image: linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+    background-size: 40px 40px; mask-image: radial-gradient(ellipse at 80% 30%, #000 8%, transparent 68%); -webkit-mask-image: radial-gradient(ellipse at 80% 30%, #000 8%, transparent 68%); }
+  .we .pg-topo h1 { color: #fff; font-size: clamp(1.9rem, 4.2vw, 2.8rem); line-height: 1.05; margin-top: .45rem; overflow-wrap: anywhere; }
+  .we .pg-rotulo { display: inline-flex; align-items: center; gap: .4rem; font-size: 13.5px; font-weight: 600; color: rgba(255,255,255,.68); }
+  .we .pg-sub { margin-top: .6rem; max-width: 64ch; color: rgba(255,255,255,.74); font-size: 16px; line-height: 1.5; }
+  .we .pg-sub b { color: #fff; }
+  .we .pg-acoes { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .we .pg-cartao { border-radius: 20px; background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 0 rgba(16,24,40,.03); }
+  .we .pg-claro h1 { font-size: clamp(2rem, 4.6vw, 3rem); line-height: 1.05; }
+  .we .pg-claro .pg-rotulo { color: var(--blue-dark); }
+  @keyframes pg-entra { from { opacity: 0; transform: translateY(10px); } }
+  @media (prefers-reduced-motion: reduce) { .we .pg-topo { animation: none; } }
+}
+
+/* botões dentro do topo escuro: fora da camada, para valer por cima de .we .btn-linha/.btn-claro (também fora dela) */
+.we .pg-topo .btn-linha, .we .pg-topo .btn-claro { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.24); }
+.we .pg-topo .btn-linha:hover, .we .pg-topo .btn-claro:hover { background: rgba(255,255,255,.18); }
+.we .pg-topo .btn-tinta { background: #fff; color: var(--ink); }

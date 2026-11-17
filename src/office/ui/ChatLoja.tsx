@@ -3,6 +3,7 @@
 // que responde só sobre a empresa e anota o contato para o dono. Usado no cartão do lote no mapa e na página /loja/N.
 import { useEffect, useRef, useState } from "react";
 import { avisarClique, type TipoClique } from "./LinkRastreado";
+import { EstrelaMedia } from "./NotaEstrelas";
 
 export type LojaInfo = {
   numero: number; chave: string; nome: string; cor: string; nicho: string; logo: string | null; donoId: string; sobre: string;
@@ -40,7 +41,7 @@ export function Contatos({ c, claro = false, numero }: { c: LojaInfo["contatos"]
 
 export function Estrelas({ media, n }: { media: number | null; n: number }) {
   if (!n || media == null) return <span className="text-[12px] text-[#5B6472]">Sem avaliações ainda</span>;
-  return <span className="text-[12px] font-semibold text-[#7A5A00]">★ {media.toFixed(1).replace(".", ",")} <span className="font-normal text-[#5B6472]">({n} {n === 1 ? "avaliação" : "avaliações"})</span></span>;
+  return <span className="text-[12px] font-semibold text-[#7A5A00]"><EstrelaMedia />{media.toFixed(1).replace(".", ",")} <span className="font-normal text-[#5B6472]">({n} {n === 1 ? "avaliação" : "avaliações"})</span></span>;
 }
 
 export function ChatLoja({ loja, logado, linkEntrar, alto = 320 }: { loja: LojaInfo; logado: boolean; linkEntrar: string; alto?: number }) {
@@ -76,7 +77,7 @@ export function ChatLoja({ loja, logado, linkEntrar, alto = 320 }: { loja: LojaI
     <div className="flex flex-col overflow-hidden rounded-2xl border border-black/10 bg-white">
       <div className="flex items-center gap-2 border-b border-black/5 px-3 py-2">
         <span className="grid h-8 w-8 place-items-center rounded-full text-sm font-bold text-white" style={{ background: at.camisa }}>{at.nome.slice(0, 1)}</span>
-        <div className="min-w-0 leading-tight"><div className="truncate text-sm font-bold text-[#1D2128]">{at.nome}</div><div className="text-[11px] text-[#16A34A]">● {at.cargo} · responde na hora</div></div>
+        <div className="min-w-0 leading-tight"><div className="truncate text-sm font-bold text-[#1D2128]">{at.nome}</div><div className="flex items-center gap-1 text-[12px] text-[#15803D]"><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" />{at.cargo} · responde na hora</div></div>
       </div>
       <div className="space-y-2 overflow-y-auto p-3" style={{ maxHeight: alto, minHeight: Math.min(alto, 160) }}>
         <div className="max-w-[88%] rounded-2xl rounded-tl-md bg-[#F1F3F6] px-3 py-2 text-[13px] text-[#1D2128]">{at.saudacao}</div>

@@ -40,7 +40,7 @@
 .wi .wi-redondo:active { transform: scale(.94); }
 
 /* ---------- topo ---------- */
-.wi .wi-topo { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--papel) 80%, transparent); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid var(--linha); }
+.wi .wi-topo { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--papel) 95%, transparent); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid var(--linha); }
 .wi .wi-topo-linha { display: flex; align-items: center; justify-content: space-between; gap: 1rem; height: 64px; }
 .wi .wi-logo img { height: 28px; width: auto; display: block; }
 .wi .wi-nav { display: none; gap: 1.8rem; font-size: .94rem; font-weight: 500; color: var(--tinta-2); }
@@ -422,3 +422,7 @@
 
 /* preço de fundador (12/11/2026) */
 .wi-fundador { margin: .4rem 0 .2rem; padding: .55rem .8rem; border-radius: 14px; background: #EAF7EE; color: #166534; font-size: 14px; line-height: 1.4; }
+
+/* contraste (17/11/2026, revisão geral): o botão de vidro sobre o vídeo claro ficava branco no claro */
+.wi .wi-btn-vidro.wc-btn { background: rgba(10, 14, 22, .55); border-color: rgba(255, 255, 255, .35); text-shadow: 0 1px 2px rgba(0, 0, 0, .45); }
+.wi .wi-btn-vidro.wc-btn:hover { background: rgba(10, 14, 22, .7); }

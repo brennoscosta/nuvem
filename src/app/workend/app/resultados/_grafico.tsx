@@ -46,7 +46,7 @@ export function GraficoResultados({ metricas, dias }: { metricas: Metrica[]; dia
           <button key={x.id} role="tab" aria-selected={x.id === m.id} onClick={() => { setSel(x.id); setFoco(null); }}
             className={`min-w-[9.5rem] shrink-0 rounded-2xl border px-4 py-3 text-left transition-colors ${x.id === m.id ? "border-transparent text-white" : "border-[var(--linha)] bg-white hover:bg-[var(--cinza)]"}`}
             style={x.id === m.id ? { background: x.cor } : undefined}>
-            <div className={`text-[12px] font-semibold uppercase tracking-wide ${x.id === m.id ? "text-white/80" : "text-[var(--tinta-2)]"}`}>{x.nome}</div>
+            <div className={`text-[12px] font-semibold ${x.id === m.id ? "text-white/80" : "text-[var(--tinta-2)]"}`}>{x.nome}</div>
             <div className="mt-0.5 text-[1.9rem] font-bold leading-none tabular-nums">{x.total.toLocaleString("pt-BR")}</div>
           </button>
         ))}

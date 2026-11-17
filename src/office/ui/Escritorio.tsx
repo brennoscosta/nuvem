@@ -46,7 +46,7 @@ function CartaoMembro({ m, e, set, podeRemover, abrirTreino = false }: { m: Memb
         <Avatar id={m.boneco} camisa={m.camisa} ativo={false} onClick={() => setAbrir((v) => !v)} />
         <div className="min-w-0 flex-1">
           <input value={m.nome} onChange={(ev) => mudar({ nome: ev.target.value.slice(0, 24) })} className="w-full rounded-md border border-black/10 px-2 py-1 text-sm font-semibold" placeholder="Nome" />
-          <div className="mt-1 flex items-center gap-1 text-[11px] text-[#5B6472]"><span className="rounded-full px-1.5 py-0.5 font-bold uppercase text-white" style={{ background: m.papel === "ceo" ? "#D4A017" : m.papel === "atendente" ? "#16A34A" : "#1D4ED8" }}>{rotulo}</span><input value={m.cargo} onChange={(ev) => mudar({ cargo: ev.target.value.slice(0, 40) })} className="min-w-0 flex-1 rounded-md border border-black/10 px-2 py-0.5" placeholder="Cargo" /></div>
+          <div className="mt-1 flex items-center gap-1 text-[11px] text-[#5B6472]"><span className="rounded-full px-1.5 py-0.5 font-bold text-white" style={{ background: m.papel === "ceo" ? "#D4A017" : m.papel === "atendente" ? "#16A34A" : "#1D4ED8" }}>{rotulo}</span><input value={m.cargo} onChange={(ev) => mudar({ cargo: ev.target.value.slice(0, 40) })} className="min-w-0 flex-1 rounded-md border border-black/10 px-2 py-0.5" placeholder="Cargo" /></div>
         </div>
         <button type="button" onClick={() => setAbrir((v) => !v)} className="rounded-lg bg-[#F1F3F6] px-2 py-1 text-xs">{abrir ? "▲" : "Aparência e treino"}</button>
       </div>
@@ -113,7 +113,7 @@ export function PainelEscritorio() {
   return (
     <div className={`${FLUTUANTE} ${LARGO} painel-entra !z-10 flex flex-col overflow-hidden`}>
       <div className="flex items-start justify-between p-4 pb-2">
-        <div><div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">Montar escritório</div><div className="text-lg font-bold">Seu prédio, do seu jeito</div><div className="text-xs text-[#5B6472]">O mapa mostra as mudanças na hora. Use “Ver por dentro” pra ver as salas.</div></div>
+        <div><div className="text-[12px] font-bold text-[#1D4ED8]">Montar escritório</div><div className="text-lg font-bold">Seu prédio, do seu jeito</div><div className="text-xs text-[#5B6472]">O mapa mostra as mudanças na hora. Use “Ver por dentro” pra ver as salas.</div></div>
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5" aria-label="Fechar"><Icone nome="fechar" tamanho={16} /></button>
       </div>
       <div className="mx-4 flex gap-1 rounded-xl bg-[#F1F3F6] p-1 text-xs font-semibold">
@@ -130,7 +130,7 @@ export function PainelEscritorio() {
             {[...LAYOUTS.filter((L) => L.kit), ...LAYOUTS.filter((L) => !L.kit)].map((L) => (
               <button key={L.id} type="button" onClick={() => set({ ...e, layout: L.id })} className={`flex w-full items-center gap-3 rounded-xl border-2 p-2 text-left ${e.layout === L.id ? "border-[#1D4ED8] bg-[#EEF3FF]" : "border-black/10 hover:bg-black/[0.03]"}`}>
                 <MiniLayout id={L.id} />
-                <div className="min-w-0"><div className="flex items-center gap-1.5 text-sm font-bold">{L.nome}{L.kit && <span className="rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#166534]">Novo</span>}</div><div className="text-[11px] leading-snug text-[#5B6472]">{L.descricao}</div></div>
+                <div className="min-w-0"><div className="flex items-center gap-1.5 text-sm font-bold">{L.nome}{L.kit && <span className="rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[12px] font-bold text-[#166534]">Novo</span>}</div><div className="text-[11px] leading-snug text-[#5B6472]">{L.descricao}</div></div>
               </button>
             ))}
             <div className={`rounded-xl px-3 py-2 text-[11px] ${restantes > 0 ? "bg-[#F1F3F6] text-[#5B6472]" : "bg-[#FFF4D6] text-[#7A5A00]"}`}>
@@ -222,7 +222,7 @@ function PosicaoPredio({ k, e, set }: { k: number; e: Escritorio; set: (e: Escri
   const girar = (delta: number) => set({ ...e, decor: { ...d, giro: (((d.giro + delta) % 4) + 4) % 4 as Decoracao["giro"] } });
   return (
     <div className="rounded-xl border border-black/10 bg-white p-3">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">Posição no lote</div>
+      <div className="text-[12px] font-bold text-[#5B6472]">Posição no lote</div>
       <div className="mt-1.5 flex items-center gap-3">
         <button type="button" onClick={() => girar(1)} className="grid h-10 w-10 place-items-center rounded-xl bg-[#EEF3FF] text-lg font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]" title="Girar para a esquerda" aria-label="Girar o prédio para a esquerda">⟲</button>
         {/* mini planta do lote: a seta mostra para onde fica a porta */}
@@ -278,7 +278,7 @@ function AbaInterior({ e, set, temLogo, marca }: { e: Escritorio; set: (e: Escri
   const muda = (p: Partial<Interior>) => set({ ...e, decor: { ...d, interior: { ...i, ...p, estilo: null } } });
   const decoracao = new Set(i.decoracao ?? DECORACAO_DISCRETA);
   const alternar = (item: ItemDecoracao) => { const n = new Set(decoracao); if (n.has(item)) n.delete(item); else n.add(item); muda({ decoracao: ITENS_DECORACAO.map((x) => x.id).filter((x) => n.has(x)) }); };
-  const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-[#5B6472] first:mt-0">{t}</div>;
+  const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[12px] font-bold text-[#5B6472] first:mt-0">{t}</div>;
   return (
     <div>
       {titulo("Estilo pronto")}
@@ -342,7 +342,7 @@ function AlturaFachada({ e, set, corMarca }: { e: Escritorio; set: (e: Escritori
   const lim = limitesAndares(e.layout), nativo = lim.base, atual = andaresDoPredio(e), kit = ehKit(e.layout);
   const material = d.material ?? "original", cobertura = d.cobertura ?? "nenhuma";
   const corF = d.corFachada ?? corMarca;
-  const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">{t}</div>;
+  const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[12px] font-bold text-[#5B6472]">{t}</div>;
   return (
     <div className="rounded-xl border border-black/10 p-2.5">
       {titulo("Andares")}
@@ -384,7 +384,7 @@ const HORAS = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).
 function AbaVisual({ e, set, corMarca, nicho }: { e: Escritorio; set: (e: Escritorio) => void; corMarca: string; nicho: string }) {
   const d = e.decor ?? DECOR_PADRAO;
   const muda = (p: Partial<Decoracao>) => set({ ...e, decor: { ...d, ...p } });
-  const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-[#5B6472] first:mt-0">{t}</div>;
+  const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[12px] font-bold text-[#5B6472] first:mt-0">{t}</div>;
   const led = d.led ?? LED_PADRAO;
   const mudaLed = (p: Partial<Led>) => muda({ led: { ...led, ...p } });
   const pecaAuto = PECAS.find((p) => p.id === PECA_POR_NICHO[nicho]) ?? PECAS.find((p) => p.id === "relogio")!;

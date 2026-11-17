@@ -73,7 +73,7 @@ export function BarraApp({ atual, email, admin }: { atual: AtualApp; email?: str
           <div ref={trilho} className="cab-trilho" onMouseLeave={voltar}>
             <span ref={luz} className="cab-luz" aria-hidden="true" />
             {itens.map((i) => (
-              <Link key={i.id} href={i.href} className="cab-item" aria-current={atual === i.id ? "page" : undefined} onMouseEnter={(e) => levar(e.currentTarget)} onFocus={(e) => levar(e.currentTarget)} onBlur={voltar}>
+              <Link key={i.id} href={i.href} prefetch={i.href.startsWith("/mundo") ? false : undefined} className="cab-item" aria-current={atual === i.id ? "page" : undefined} onMouseEnter={(e) => levar(e.currentTarget)} onFocus={(e) => levar(e.currentTarget)} onBlur={voltar}>
                 <Icone nome={i.icone} tamanho={18} />{i.rotulo}
               </Link>
             ))}
@@ -115,7 +115,7 @@ export function BarraApp({ atual, email, admin }: { atual: AtualApp; email?: str
           <ul className="cab-folha-lista">
             {itens.map((i, n) => (
               <li key={i.id} style={{ ["--i" as string]: n }}>
-                <Link href={i.href} className="cab-folha-item" aria-current={atual === i.id ? "page" : undefined} onClick={() => setMenu(false)}>
+                <Link href={i.href} prefetch={i.href.startsWith("/mundo") ? false : undefined} className="cab-folha-item" aria-current={atual === i.id ? "page" : undefined} onClick={() => setMenu(false)}>
                   <span className="cab-folha-ico"><Icone nome={i.icone} tamanho={22} /></span>
                   <span className="min-w-0"><b>{i.rotulo}</b><small>{i.desc}</small></span>
                 </Link>

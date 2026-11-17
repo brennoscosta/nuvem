@@ -468,7 +468,7 @@ export function PainelEmpresa() {
     <div className={`${FLUTUANTE} ${LARGO} painel-entra overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">Lote {l?.numero} · {editando ? "sua placa" : "montar minha empresa"}</div>
+          <div className="text-[12px] font-bold text-[#1D4ED8]">Lote {l?.numero} · {editando ? "sua placa" : "montar minha empresa"}</div>
           <div className="text-lg font-bold">{editando ? "Editar a placa" : "Como vai se chamar?"}</div>
           <div className="text-xs text-[#5B6472]">Olhe o lote no mapa: a placa e o tapume mudam enquanto você preenche.</div>
         </div>

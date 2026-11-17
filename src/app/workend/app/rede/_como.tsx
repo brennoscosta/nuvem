@@ -3,7 +3,7 @@
 // (src/office/ui/Personagem.tsx › PainelPersonagem). Cada passo tem uma cena animada feita com os bonecos de verdade
 // (MiniAvatar) e os ícones próprios; nada de imagem pronta com letras. Setas do teclado trocam de passo, Esc fecha.
 import { useEffect, useRef, useState } from "react";
-import { MiniAvatar } from "@/office/ui/Personagem";
+import { MiniAvatar } from "@/office/ui/MiniAvatar";
 import { Icone, ICONE_ACESSORIO, type NomeIcone } from "@/office/ui/Icone";
 import { TIPOS_AVATAR } from "@/office/data/bonecos";
 import { ACESSORIOS } from "@/office/data/acessorios";

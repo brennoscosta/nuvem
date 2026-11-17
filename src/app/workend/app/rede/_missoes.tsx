@@ -43,7 +43,7 @@ export function PainelMissoes() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <b className="truncate">{m.nome}</b>
-                  <span className={`shrink-0 text-[12px] font-bold ${m.completa ? "" : "text-[var(--tinta-2)]"}`} style={m.completa ? { color: m.cor } : undefined}>{m.completa ? "Selo conquistado" : `${m.feito} de ${m.meta}`}</span>
+                  <span className={`inline-flex shrink-0 items-center gap-1 text-[12px] font-bold ${m.completa ? "text-[var(--tinta)]" : "text-[var(--tinta-2)]"}`}>{m.completa ? <><span aria-hidden className="h-2 w-2 rounded-full" style={{ background: m.cor }} />Selo conquistado</> : `${m.feito} de ${m.meta}`}</span>
                 </div>
                 <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--surface-dim)]">
                   <div className="missao-barra h-full rounded-full" style={{ width: `${Math.max(pct, 3)}%`, background: m.cor, animationDelay: `${i * 70}ms`, opacity: pct ? 1 : 0.35 }} />

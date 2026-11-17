@@ -74,7 +74,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas
   useEffect(() => { const t = setInterval(() => { if (document.visibilityState === "visible") setVersaoInt((v) => v + 1); }, abertas || envios ? 4000 : 15000); return () => clearInterval(t); }, [abertas, envios]);
   const enviado = useCallback((id: string) => { setEnvios((n) => n + 1); setVersao((v) => v + 1); setVersaoInt((v) => v + 1); setSel(id); setAba("conversas"); setTimeout(() => document.getElementById("eq-trabalho")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80); }, []);
 
-  if (erro && !p) return <div className="faixa mt-6"><div className="rounded-2xl bg-[var(--cinza)] p-7"><h2 className="text-[1.4rem]">Minha equipe</h2><p className="mt-2 text-[var(--tinta-2)]">{erro}</p><Link href="/mundo" className="btn btn-azul mt-5">Ir para o mapa</Link></div></div>;
+  if (erro && !p) return <div className="faixa mt-6"><div className="rounded-2xl bg-[var(--cinza)] p-7"><h2 className="text-[1.4rem]">Minha equipe</h2><p className="mt-2 text-[var(--tinta-2)]">{erro}</p><Link prefetch={false} href="/mundo" className="btn btn-azul mt-5">Ir para o mapa</Link></div></div>;
   if (!p) return <div className="faixa mt-6 text-[var(--tinta-2)]">Carregando a sua equipe…</div>;
   const membro = p.equipe.find((m) => m.membroId === sel) ?? p.equipe[0];
   const sede = ehSede(p.lote.chave);
@@ -94,18 +94,18 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas
       <FaixaEquipe p={p} internas={internas} abrir={abrirPessoa} irPara={(a) => { setAba(a); document.getElementById("eq-trabalho")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />
 
       <div id="eq-trabalho" className="scroll-mt-24" />
+      <div className="mt-2 flex flex-wrap justify-end gap-x-4 gap-y-1 text-[14px]">
+        {p.lote.numero != null && <Link href={`/loja/${p.lote.numero}`} className="eq-link">{sede ? "Página da sede" : "Ver minha loja"}</Link>}
+        {/* a sede tem a equipe montada por departamento e não passa pelo editor */}
+        {!sede && <Link prefetch={false} href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="eq-link">Montar escritório</Link>}
+        {sede && <Link prefetch={false} href={`/mundo?sede=${sedeDe(p.lote.chave)?.id ?? "1"}`} className="eq-link">Ver a sede no mapa</Link>}
+      </div>
       <nav className="eq-abas" role="tablist" aria-label="Seções da equipe">
         {abas.map(([k, t, ic, n, vivo]) => (
           <button key={k} type="button" role="tab" aria-selected={aba === k} onClick={() => setAba(k)} className="eq-aba">
             <Icone nome={ic} tamanho={17} />{t}{n !== null && n > 0 && <span className={`eq-aba-num ${vivo ? "eq-aba-num-vivo" : ""}`}>{n}</span>}
           </button>
         ))}
-        <span className="ml-auto flex shrink-0 items-center gap-2 pb-1.5 pl-3">
-          {p.lote.numero != null && <Link href={`/loja/${p.lote.numero}`} className="eq-link">{p.lote.numero === 0 ? "Página da sede" : "Ver minha loja"}</Link>}
-          {/* a sede tem a equipe montada por departamento e não passa pelo editor */}
-          {!sede && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="eq-link">Montar escritório</Link>}
-          {sede && <Link href={`/mundo?sede=${sedeDe(p.lote.chave)?.id ?? "1"}`} className="eq-link">Ver a sede no mapa</Link>}
-        </span>
       </nav>
 
       {!p.sobre && aba !== "sobre" && aba !== "conectores" && (
@@ -169,7 +169,7 @@ function ListaEquipe({ p, membro, selecionar }: { p: Painel; membro: Membro; sel
             </section>
           );
         })}
-        {!ehSede(p.lote.chave) && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="mt-2 block rounded-2xl border-2 border-dashed border-[var(--linha)] p-3 text-center text-sm font-semibold text-[var(--azul)]">+ Contratar especialista no mapa</Link>}
+        {!ehSede(p.lote.chave) && <Link prefetch={false} href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="mt-2 block rounded-2xl border-2 border-dashed border-[var(--linha)] p-3 text-center text-sm font-semibold text-[var(--azul)]">+ Contratar especialista no mapa</Link>}
       </div>
     </aside>
   );
@@ -519,7 +519,7 @@ function Sobre({ p, lote, salvo }: { p: Painel; lote: string; salvo: () => Promi
   const campo = (k: keyof Contatos, rotulo: string, ph: string) => <label className="campo">{rotulo}<input value={c[k] ?? ""} onChange={(e) => setC({ ...c, [k]: e.target.value })} placeholder={ph} /></label>;
   return (
     <section className="mt-5 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
-      <div className="rounded-2xl bg-[var(--cinza)] p-6">
+      <div className="pg-cartao p-6">
         <h2 className="text-[1.4rem]">Sobre a {p.lote.empresaNome}</h2>
         <p className="mt-1 text-sm text-[var(--tinta-2)]">Toda a equipe lê este texto antes de responder, e a atendente usa só ele para falar com os visitantes. Ele também aparece na página pública da loja.</p>
         <label className="campo mt-4">O que a empresa faz, para quem, preços, horários, onde atende e como contratar
@@ -527,7 +527,7 @@ function Sobre({ p, lote, salvo }: { p: Painel; lote: string; salvo: () => Promi
         </label>
         <p className="mt-1 text-right text-[12px] text-[var(--tinta-2)]">{sobre.length} de 3000</p>
       </div>
-      <div className="rounded-2xl border border-[var(--linha)] p-6">
+      <div className="pg-cartao p-6">
         <h2 className="text-[1.2rem]">Contatos públicos</h2>
         <p className="mt-1 text-sm text-[var(--tinta-2)]">Aparecem na página da loja e na busca. Deixe em branco o que não quiser mostrar.</p>
         <div className="mt-4 space-y-3">

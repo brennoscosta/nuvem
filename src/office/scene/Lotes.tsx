@@ -240,7 +240,7 @@ export function Balao({ position, nome, cor, logo, subtitulo, onClick, apagado =
         {promo && <div className={`balao-promo ${selo ? "mb-1" : "-mb-1.5"} flex items-center gap-1 rounded-full bg-[#E11D48] px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-white shadow-md ring-2 ring-white`}><Icone nome="etiqueta" tamanho={13} traco={2.2} />{promo}</div>}
         {selo && <div className="-mb-1.5 rounded-full bg-[#FACC15] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#1D2128] shadow-md ring-2 ring-white">{selo}</div>}
         <div className={`pointer-events-auto flex items-center gap-2.5 rounded-2xl px-4 py-2 shadow-xl ${onClick ? "cursor-pointer" : ""}`} style={{ background: cor }} onClick={(e) => { e.stopPropagation(); onClick?.(); }}>
-          {logo && <img src={logo} alt="" className="h-9 w-9 rounded-lg bg-white/95 object-contain p-0.5" />}
+          {logo && <img src={logo} alt="" crossOrigin="anonymous" className="h-9 w-9 rounded-lg bg-white/95 object-contain p-0.5" />}
           <div className="leading-tight">
             <div className="text-[20px] font-black tracking-tight text-white drop-shadow">{nome.trim() || "Sua empresa"}</div>
             <div className="text-[11px] font-semibold uppercase tracking-wide text-white/80">{subtitulo}</div>

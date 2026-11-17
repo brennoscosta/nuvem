@@ -54,17 +54,19 @@ export default async function Resultados({ searchParams }: Props) {
     <>
       <CabecalhoApp atual="resultados" email={u.email} admin={ehAdmin(u)} />
       <section className="faixa pt-4">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--azul)]">Resultados da loja{temNumero(r.lote?.numero) ? ` · ${rotuloLoja(r.lote.numero)}` : ""}</span>
-            <h1 className="mt-1 text-[2rem] lg:text-[2.4rem]">{ativo ? `O que a ${ativo.empresaNome} trouxe` : "Resultados da sua loja"}</h1>
+        <div className="pg-topo" style={ativo ? ({ "--marca": ativo.cor } as React.CSSProperties) : undefined}>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0">
+              <span className="pg-rotulo"><Icone nome="resultados" tamanho={15} />Resultados da loja{temNumero(r.lote?.numero) ? ` · ${rotuloLoja(r.lote.numero)}` : ""}</span>
+              <h1>{ativo ? `O que a ${ativo.empresaNome} trouxe` : "Resultados da sua loja"}</h1>
+            </div>
+            <nav className="pg-acoes" aria-label="Período">
+              {[7, 30, 90].map((d) => <Link key={d} href={`/app/resultados?dias=${d}`} aria-current={r.dias === d ? "page" : undefined} className={`btn !px-4 !py-2 text-sm ${r.dias === d ? "btn-tinta" : "btn-claro"}`}>{d} dias</Link>)}
+            </nav>
           </div>
-          <nav className="flex gap-1.5" aria-label="Período">
-            {[7, 30, 90].map((d) => <Link key={d} href={`/app/resultados?dias=${d}`} className={`btn !px-4 !py-2 text-sm ${r.dias === d ? "btn-tinta" : "btn-claro"}`}>{d} dias</Link>)}
-          </nav>
+          {ativo && <p className="pg-sub"><b className="inline-flex items-center gap-1.5"><Icone nome="estrela" tamanho={16} className="text-[#F5C542]" />{seguidores.total} {seguidores.total === 1 ? "pessoa segue" : "pessoas seguem"} a sua loja</b>{seguidores.novos > 0 ? ` · ${seguidores.novos} ${seguidores.novos === 1 ? "nova" : "novas"} em ${r.dias} dias` : ""}. Quem segue recebe um aviso quando você liga uma promoção, marca um evento ou põe um produto novo.</p>}
+          {!ativo && <p className="mt-4 max-w-[60ch] rounded-2xl bg-[#FFF4DB] px-4 py-3 text-[#5B4300]">Você ainda não tem uma loja aberta no mapa. Os números começam a contar quando o 1º mês do lote for pago. <Link prefetch={false} href="/mundo" className="font-semibold underline">Escolher meu lote</Link></p>}
         </div>
-        {ativo && <p className="mt-3 text-[15px] text-[var(--tinta-2)]"><b className="inline-flex items-center gap-1.5 text-[var(--tinta)]"><Icone nome="estrela" tamanho={16} className="text-[#B7791F]" />{seguidores.total} {seguidores.total === 1 ? "pessoa segue" : "pessoas seguem"} a sua loja</b>{seguidores.novos > 0 ? ` · ${seguidores.novos} ${seguidores.novos === 1 ? "nova" : "novas"} em ${r.dias} dias` : ""}. Quem segue recebe um aviso quando você liga uma promoção, marca um evento ou põe um produto novo.</p>}
-        {!ativo && <p className="mt-4 max-w-[60ch] rounded-2xl bg-[#FFF4DB] px-4 py-3 text-[#7A5200]">Você ainda não tem uma loja aberta no mapa. Os números começam a contar quando o 1º mês do lote for pago. <Link href="/mundo" className="font-semibold underline">Escolher meu lote</Link></p>}
       </section>
 
       <section className="faixa mt-6">
@@ -72,7 +74,7 @@ export default async function Resultados({ searchParams }: Props) {
       </section>
 
       <section className="faixa mt-6 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-[var(--linha)] p-5">
+        <div className="pg-cartao p-5">
           <h2 className="!text-[1.2rem] !leading-tight">De onde vieram as visitas</h2>
           {origemTotal ? (
             <>
@@ -89,7 +91,7 @@ export default async function Resultados({ searchParams }: Props) {
             </>
           ) : <p className="mt-2 text-[var(--tinta-2)]">Ainda sem visitas neste período. Divulgue o link da sua página e ligue uma promoção na fachada.</p>}
         </div>
-        <div className="rounded-2xl border border-[var(--linha)] p-5">
+        <div className="pg-cartao p-5">
           <h2 className="!text-[1.2rem] !leading-tight">O que mais tocaram</h2>
           {cliquesTipos.length ? (
             <ul className="mt-3 space-y-2">
@@ -136,7 +138,7 @@ export default async function Resultados({ searchParams }: Props) {
 
       <section id="indicacao" className="faixa mt-8 scroll-mt-6">
         <div className="rounded-2xl bg-[#EAF2FF] p-6 sm:p-7">
-          <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--azul)]">Indique um vizinho</span>
+          <span className="text-[13px] font-semibold text-[var(--azul)]">Indique um vizinho</span>
           <h2 className="mt-1 !text-[1.7rem]">Traga outra empresa para a cidade e pague menos</h2>
           <p className="mt-2 max-w-[62ch] text-[var(--tinta-2)]">Quem chega pelo seu link tem 10% no 1º mês. Quando a empresa pagar, você ganha <b className="text-[var(--tinta)]">{brl(CREDITO_INDICACAO)} de desconto</b> na sua mensalidade (até metade de cada pagamento; o que sobrar fica para a próxima).{!ativo && " O link vale quando a sua loja estiver aberta no mapa."}</p>
           {codigo && ativo && <CompartilharIndicacao link={`https://workend.online/?ind=${codigo}`} codigo={codigo} />}
