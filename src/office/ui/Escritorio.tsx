@@ -224,7 +224,7 @@ function PosicaoPredio({ k, e, set }: { k: number; e: Escritorio; set: (e: Escri
     <div className="rounded-xl border border-black/10 bg-white p-3">
       <div className="text-[12px] font-bold text-[#5B6472]">Posição no lote</div>
       <div className="mt-1.5 flex items-center gap-3">
-        <button type="button" onClick={() => girar(1)} className="grid h-10 w-10 place-items-center rounded-xl bg-[#EEF3FF] text-lg font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]" title="Girar para a esquerda" aria-label="Girar o prédio para a esquerda">⟲</button>
+        <button type="button" onClick={() => girar(1)} className="grid h-10 w-10 place-items-center rounded-xl bg-[#EEF3FF] text-lg font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]" title="Girar para a esquerda" aria-label="Girar o prédio para a esquerda"><Icone nome="girarEsq" tamanho={20} /></button>
         {/* mini planta do lote: a seta mostra para onde fica a porta */}
         <svg viewBox="-12 -12 24 24" className="h-14 w-14 shrink-0" aria-hidden="true">
           <rect x="-10" y="-10" width="20" height="20" rx="2" fill="#F1F3F6" stroke="#C3CCD7" />
@@ -234,7 +234,7 @@ function PosicaoPredio({ k, e, set }: { k: number; e: Escritorio; set: (e: Escri
           <path d={`M0 0 L${f.fx * 8} ${f.fz * 8}`} stroke="#fff" strokeWidth="2" strokeLinecap="round" />
           <circle cx={f.fx * 8} cy={f.fz * 8} r="2" fill="#16A34A" />
         </svg>
-        <button type="button" onClick={() => girar(-1)} className="grid h-10 w-10 place-items-center rounded-xl bg-[#EEF3FF] text-lg font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]" title="Girar para a direita" aria-label="Girar o prédio para a direita">⟳</button>
+        <button type="button" onClick={() => girar(-1)} className="grid h-10 w-10 place-items-center rounded-xl bg-[#EEF3FF] text-lg font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]" title="Girar para a direita" aria-label="Girar o prédio para a direita"><Icone nome="girarDir" tamanho={20} /></button>
         <div className="min-w-0 text-[12px] leading-snug">
           <b>Frente para o {NOMES_LADO[f.lado as keyof typeof NOMES_LADO]}</b>
           <div className={f.temRua ? "text-[#166534]" : "text-[#7A5A00]"}>{f.temRua ? "A porta dá para a rua: quem passa vê a sua fachada." : "A porta fica virada para o vizinho; a rua vê a lateral do prédio."}</div>

@@ -14,6 +14,7 @@ import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 import { abrirChatEquipe } from "./ChatEquipe";
 import { ChatLoja, Contatos, Estrelas, useLoja } from "./ChatLoja";
 import { BotaoEntrar } from "./Recepcao";
+import { usePersonagem } from "../personagemStore";
 import { AgendarLoja } from "./AgendarLoja";
 import { BotaoSeguir } from "./BotaoSeguir";
 import { PegarCupom } from "./PegarCupom";
@@ -110,7 +111,7 @@ export function PixAberto({ chave }: { chave: string }) {
   if (pix.tipo === "layout" && !painelEsc) return null; // o Pix da troca de prédio aparece dentro do painel do escritório
   const copiar = async () => { try { await navigator.clipboard.writeText(pix.codigo); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { window.prompt("Copie o código Pix:", pix.codigo); } };
   if (pix.status === "aprovado") return (
-    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]"><div className="font-bold"><Icone nome="check" tamanho={16} className="mr-1 inline align-[-3px]" />Pagamento confirmado!</div><div className="mt-1 text-xs">{pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : pix.tipo === "personagem" ? "Seu personagem está ativo por 30 dias. Clique no chão pra andar e nos outros pra conversar." : pix.tipo === "outdoor" ? "Seu anúncio já está no outdoor por 30 dias. Quem clicar nele vem até a sua loja." : pix.tipo === "barraca" ? "Sua barraca está garantida no sábado. Ela aparece na praça das 8h às 18h, com o seu nome na placa." : pix.tipo === "item" ? "Item liberado: o seu personagem já está usando." : "O chão é seu por 30 dias. Monte seu escritório pelos botões de edição."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white">Fechar</button></div>
+    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]"><div className="font-bold"><Icone nome="check" tamanho={16} className="mr-1 inline align-[-3px]" />Pagamento confirmado!</div><div className="mt-1 text-xs">{pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : pix.tipo === "personagem" ? "Seu personagem está ativo por 30 dias. Clique no chão pra andar e nos outros pra conversar." : pix.tipo === "outdoor" ? "Seu anúncio já está no outdoor por 30 dias. Quem clicar nele vem até a sua loja." : pix.tipo === "barraca" ? "Sua barraca está garantida no sábado. Ela aparece na praça das 8h às 18h, com o seu nome na placa." : pix.tipo === "item" ? "Item liberado: o seu personagem já está usando." : "O chão é seu por 30 dias. Próximo passo: toque em Montar escritório para escolher o prédio, as salas e a equipe."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white">Fechar</button></div>
   );
   if (pix.status !== "pendente") return (
     <div className="mt-3 rounded-2xl bg-[#FDE8E8] px-3 py-3 text-sm text-[#8A2A2A]"><div className="font-bold">{pix.status === "expirado" ? "Este Pix expirou." : "Pagamento não aprovado."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-bold text-white">Gerar outro Pix</button></div>
@@ -248,6 +249,7 @@ export function CartaoLote() {
             <>
               <button type="button" onClick={() => void abrirChatEquipe(chave)} className="mt-3 block w-full rounded-xl bg-[#1D2128] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-black"><Icone nome="conversar" tamanho={17} className="mr-1 inline align-[-3px]" />Falar com a equipe e dar tarefas</button>
               <BotaoEntrar chave={chave} className="mt-2" />
+              <PrimeirosPassos chave={chave} reservadoEm={terreno.reservadoEm} montar={() => abrirEscritorio("predio")} />
             </>
           )}
           {ehMeu && ativo && terreno.escritorio && (
@@ -570,5 +572,46 @@ export function MenuConta() {
         </div>
       )}
     </div>
+  );
+}
+
+// Primeiros passos de quem acabou de abrir a empresa (17/11/2026, jornada do cliente novo: depois do Pix o cartão não
+// dizia o que fazer agora). Aparece nos 7 primeiros dias, com o que falta: montar o prédio e a equipe, contar o que a
+// empresa faz (a atendente usa esse texto), criar o personagem e dar a primeira tarefa.
+// Cada passo aberto por aqui fica marcado (guardado neste aparelho); o personagem conta pelo estado real. Com os 4 feitos
+// o bloco some.
+const chavePassos = (c: string) => `we-passos-${c}`;
+function lerPassos(c: string): string[] { try { const v = JSON.parse(localStorage.getItem(chavePassos(c)) ?? "[]"); return Array.isArray(v) ? v : []; } catch { return []; } }
+function PrimeirosPassos({ chave, reservadoEm, montar }: { chave: string; reservadoEm: string; montar: () => void }) {
+  const agora = useAgora();
+  const personagem = usePersonagem((s) => s.ativo);
+  const [vistos, setVistos] = useState<string[]>(() => lerPassos(chave));
+  const marcar = (id: string) => { if (vistos.includes(id)) return; const n = [...vistos, id]; setVistos(n); try { localStorage.setItem(chavePassos(chave), JSON.stringify(n)); } catch { /* sem armazenamento: só não lembra */ } };
+  if (!agora || !reservadoEm || agora - new Date(reservadoEm).getTime() > 7 * 86_400_000) return null;
+  const passos: { id: string; t: string; d: string; feito?: boolean; acao: () => void }[] = [
+    { id: "montar", t: "Monte o prédio e as salas", d: "Tipo de prédio, fachada, interior e setores.", feito: vistos.includes("montar"), acao: montar },
+    { id: "sobre", t: "Conte o que a empresa faz", d: "Preços, horários e serviços: a atendente responde com isso.", feito: vistos.includes("sobre"), acao: () => { window.location.href = `/app/equipe?lote=${encodeURIComponent(chave)}&aba=sobre`; } },
+    { id: "personagem", t: "Crie seu personagem", d: "Para andar pela cidade e entrar no prédio.", feito: personagem, acao: () => usePersonagem.getState().abrir("montar") },
+    { id: "tarefa", t: "Dê a primeira tarefa à equipe", d: "Peça ao CEO um plano da semana, por exemplo.", feito: vistos.includes("tarefa"), acao: () => void abrirChatEquipe(chave) },
+  ];
+  const feitos = passos.filter((p) => p.feito).length;
+  if (feitos === passos.length) return null;
+  return (
+    <details open className="group mt-2 rounded-2xl border border-[#D7E3FF] bg-[#F5F8FF] px-3 py-2">
+      <summary className="flex cursor-pointer list-none items-center justify-between py-0.5 text-[13px] font-bold text-[#1D2128]">
+        <span>Primeiros passos · {feitos} de {passos.length}</span>
+        <Icone nome="baixo" tamanho={15} className="transition group-open:rotate-180" />
+      </summary>
+      <ol className="mt-1.5 space-y-1">
+        {passos.map((p, i) => (
+          <li key={p.id}>
+            <button type="button" onClick={() => { marcar(p.id); p.acao(); }} className="flex w-full items-start gap-2.5 rounded-xl px-1.5 py-1.5 text-left hover:bg-white">
+              <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold ${p.feito ? "bg-[#16A34A] text-white" : "bg-white text-[#1D4ED8] ring-1 ring-[#C7D7FE]"}`}>{p.feito ? <Icone nome="check" tamanho={14} /> : i + 1}</span>
+              <span className="min-w-0"><span className={`block text-[13px] font-semibold ${p.feito ? "text-[#5B6472] line-through" : "text-[#1D2128]"}`}>{p.t}</span><span className="block text-[12px] leading-snug text-[#5B6472]">{p.d}</span></span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }

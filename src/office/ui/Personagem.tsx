@@ -58,6 +58,10 @@ export function PainelPersonagem() {
   const usuario = useMundo((s) => s.usuario);
   const [genero, setGenero] = useState<Genero | "todos">("todos");
   const [f, setF] = useState({ nome: "", tipo: TIPOS_AVATAR[0].id, bio: "", redes: {} as Redes, mostrarRedes: false, perfil: PERFIL_VAZIO as Perfil, visual: {} as Visual });
+  // o nome do balãozinho já vem com o primeiro nome da conta até a pessoa mexer no campo (17/11/2026, jornada:
+  // o painel abre antes de a conta carregar, então o valor inicial nascia vazio; calcular na hora de mostrar resolve)
+  const [mexeuNome, setMexeuNome] = useState(false);
+  const nome = f.nome || (!meu && !mexeuNome ? (usuario?.nome ?? "").trim().split(/\s+/)[0]?.slice(0, 24) ?? "" : "");
   const [aba, setAba] = useState<Aba>("pronto");
   const [perto, setPerto] = useState<boolean | null>(null); // null = a câmera segue a aba (rosto em Corpo e Cabelo)
   const [abrirPerfil, setAbrirPerfil] = useState(false);
@@ -99,12 +103,12 @@ export function PainelPersonagem() {
   const retrato = (d: Partial<BonecoDef>, t = 54) => <RetratoBoneco def={{ ...def, ...d }} roupa={camisa} tamanho={t} />;
   // salvar: mostra o "salvo com sucesso" e fecha sozinho (se ainda não pagou, fica aberto no Pix)
   const clicarSalvar = async () => {
-    setErro(null); setSalvando(true); const e = await salvar(f); setSalvando(false);
+    setErro(null); setSalvando(true); const e = await salvar({ ...f, nome }); setSalvando(false);
     if (e) { setErro(e); return; }
     if (!usePersonagem.getState().ativo) { setAviso("Personagem salvo! Agora é só ativar no Pix pra entrar no mapa."); return; }
     setSalvo(true); setTimeout(() => { setSalvo(false); fechar(); }, 1300);
   };
-  const clicarPagar = async () => { setErro(null); setPagando(true); const e1 = meu ? null : await salvar(f); if (e1) { setErro(e1); setPagando(false); return; } const e = await pagar(1); setPagando(false); if (e) setErro(e); };
+  const clicarPagar = async () => { setErro(null); setPagando(true); const e1 = meu ? null : await salvar({ ...f, nome }); if (e1) { setErro(e1); setPagando(false); return; } const e = await pagar(1); setPagando(false); if (e) setErro(e); };
   const setRede = (k: keyof Redes, v: string) => setF({ ...f, redes: { ...f.redes, [k]: v } });
   const campoRede = (k: keyof Redes, icone: NomeIcone, dica: string) => (
     <label className="flex items-center gap-2 rounded-xl border border-black/10 px-3 py-2 focus-within:border-[#1D4ED8]">
@@ -125,8 +129,8 @@ export function PainelPersonagem() {
       <div className="relative h-[30dvh] max-h-[15.5rem] min-h-[10.5rem] shrink-0 sm:h-[15.5rem]" style={{ background: `radial-gradient(120% 95% at 50% 100%, ${clarear(camisa, 0.62)} 0%, #F6F8FB 64%)` }}>
         <PreviaBoneco def={def} camisa={camisa} acessorios={usando} perto={pertoAgora} className="absolute inset-0" />
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start gap-3 p-4">
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-lg font-bold leading-tight">{f.nome.trim() || (meu ? meu.nome : "Seu personagem")}</div>
+          <div className="min-w-0 max-w-[38%] flex-1">
+            <div className="truncate text-lg font-bold leading-tight">{nome.trim() || (meu ? meu.nome : "Seu personagem")}</div>
             <div className="mt-0.5 text-xs text-[#5B6472]">{ativo ? `Ativo até ${meu?.pagoAte ? dataBR(meu.pagoAte) : "—"}` : meu ? "Falta ativar para entrar no mapa" : "Monte o seu e entre no mapa"}</div>
           </div>
           <button onClick={fechar} aria-label="Fechar" className={`pointer-events-auto ${BOTAO_PREVIA}`}><Icone nome="fechar" tamanho={18} /></button>
@@ -143,7 +147,7 @@ export function PainelPersonagem() {
       <div className="shrink-0 border-b border-black/5 px-4 pt-3">
         <label className="flex items-center gap-2 rounded-2xl bg-[#F4F6F9] px-3 py-2 focus-within:ring-2 focus-within:ring-[#1D4ED8]/30">
           <span className="shrink-0 text-xs font-semibold text-[#5B6472]">Nome no balãozinho</span>
-          <input value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value.slice(0, 24) })} placeholder="Ex.: Bia" className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:font-normal" />
+          <input value={nome} onChange={(e) => { setMexeuNome(true); setF({ ...f, nome: e.target.value.slice(0, 24) }); }} placeholder="Ex.: Bia" className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:font-normal" />
         </label>
         <div role="tablist" aria-label="Partes do personagem" className="mt-2 flex flex-wrap gap-1 pb-2.5">
           {ABAS.map((a) => (
@@ -233,8 +237,9 @@ export function PainelPersonagem() {
         )}
         <div className="flex gap-2">
           <button onClick={fechar} className="rounded-xl bg-[#F1F3F6] px-4 py-2.5 text-sm font-semibold text-[#5B6472]">Fechar</button>
-          <button onClick={clicarSalvar} disabled={salvando || f.nome.trim().length < 2} title={f.nome.trim().length < 2 ? "Dê um nome ao seu personagem" : undefined} className="flex-1 rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50">{salvando ? "Salvando…" : meu ? "Salvar personagem" : "Criar personagem"}</button>
+          <button onClick={clicarSalvar} disabled={salvando || nome.trim().length < 2} title={nome.trim().length < 2 ? "Dê um nome ao seu personagem" : undefined} className="flex-1 rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50">{salvando ? "Salvando…" : meu ? "Salvar personagem" : "Criar personagem"}</button>
         </div>
+        {nome.trim().length < 2 && <p className="mt-1.5 text-center text-[12px] text-[#5B6472]">Escreva o nome do balãozinho lá em cima para continuar.</p>}
       </div>
     </div>
   );
