@@ -10,6 +10,7 @@ import { avisar } from "./avisos";
 import { bloqueio, contar } from "./limite";
 import { LOTES, LOTE_POR_CHAVE } from "@/office/data/mundo";
 import { CONFIG_PADRAO, MAX_FUTUROS_CLIENTE, faixasDoDia, limparConfig, agendaUsavel, paraHHMM, paraMin, duracaoTexto, type ConfigAgenda, type ServicoAgenda } from "@/office/data/agenda";
+import { numeroDaLoja, chaveDaLoja } from "@/office/data/numeroLoja";
 
 export class ErroAgenda extends Error { constructor(msg: string, public status = 400) { super(msg); } }
 export const statusAgenda = (e: unknown) => (e instanceof ErroAgenda ? e.status : 500);
@@ -43,11 +44,11 @@ export function quando(inicio: Date, fim: Date) { const d = diaDe(inicio); retur
 
 // ---------- loja e configuração ----------
 async function lojaAberta(numero: number): Promise<{ chave: string; donoId: string; empresa: string; numero: number } | null> {
-  const l = LOTES.find((x) => x.numero === numero); if (!l) return null;
-  let t = await obterTerreno(l.chave);
+  const chave = chaveDaLoja(numero); if (!chave) return null; // 0 = a sede da Social RP
+  let t = await obterTerreno(chave);
   if (t?.anexoDe) t = await obterTerreno(t.anexoDe); // lote duplo: a ampliação usa a loja principal
   if (!t || t.status !== "ativo") return null;
-  return { chave: t.chave, donoId: t.usuarioId, empresa: t.empresaNome, numero: LOTE_POR_CHAVE[t.chave]?.numero ?? numero };
+  return { chave: t.chave, donoId: t.usuarioId, empresa: t.empresaNome, numero: numeroDaLoja(t) ?? numero };
 }
 export async function configDe(donoId: string): Promise<ConfigAgenda> {
   await migrar();
@@ -105,7 +106,7 @@ export async function agendaDoDono(u: Usuario) {
   ]);
   return {
     config, usavel: agendaUsavel(config),
-    loja: t && t.status === "ativo" ? { chave: t.chave, numero: LOTE_POR_CHAVE[t.chave]?.numero ?? null, empresa: t.empresaNome } : null,
+    loja: t && t.status === "ativo" ? { chave: t.chave, numero: numeroDaLoja(t), empresa: t.empresaNome } : null,
     proximos: proximos.map(paraTela), historico: historico.map(paraTela),
   };
 }
@@ -201,7 +202,7 @@ export async function mudarStatus(u: Usuario, agId: string, acao: unknown) {
   if (!a) throw new ErroAgenda("Horário não encontrado.", 404);
   const ehDono = a.donoId === u.id, ehCliente = a.clienteId === u.id;
   if (!ehDono && !ehCliente) throw new ErroAgenda("Esse horário não é seu.", 403);
-  const numero = a.terrenoChave ? LOTE_POR_CHAVE[a.terrenoChave]?.numero ?? null : null;
+  const numero = a.terrenoChave ? numeroDaLoja({ chave: a.terrenoChave }) : null;
   const q = quando(new Date(a.inicio), new Date(a.fim));
   if (acao === "cancelar") {
     if (a.status !== "marcado") throw new ErroAgenda("Esse horário não está mais marcado.");
@@ -245,7 +246,7 @@ export async function avaliarAtendimento(u: Usuario, agId: string, d: { nota?: u
   const r = await sql`INSERT INTO avaliacao (id, negociacao_id, agendamento_id, de_id, para_id, nota, texto, servico)
     VALUES (${id("av")}, NULL, ${agId}, ${u.id}, ${a.donoId}, ${nota}, ${texto}, ${a.servico}) ON CONFLICT (agendamento_id) WHERE agendamento_id IS NOT NULL DO NOTHING`;
   if (!r.count) throw new ErroAgenda("Você já avaliou este atendimento. Obrigado!", 409);
-  void avisar(a.donoId, { tipo: "agendamento", ref: `agenda:avaliado:${agId}`, titulo: `Nova avaliação: ${"★".repeat(nota)}${"☆".repeat(5 - nota)}`, texto: `${a.nome} · ${a.servico}${texto ? ` · “${texto.slice(0, 90)}”` : ""}`, link: "/app/agenda" });
+  void avisar(a.donoId, { tipo: "agendamento", ref: `agenda:avaliado:${agId}`, titulo: `Nova avaliação: nota ${nota} de 5`, texto: `${a.nome} · ${a.servico}${texto ? ` · “${texto.slice(0, 90)}”` : ""}`, link: "/app/agenda" });
   return { ok: true };
 }
 
@@ -257,7 +258,7 @@ export async function lembretesDaAgenda(usuarioId: string): Promise<void> {
     sql<LinhaAg[]>`SELECT * FROM agendamento WHERE dono_id = ${usuarioId} AND status = 'marcado' AND inicio > now() - interval '5 minutes' AND inicio <= now() + interval '15 minutes'`,
   ]);
   for (const a of cli) {
-    const numero = a.terrenoChave ? LOTE_POR_CHAVE[a.terrenoChave]?.numero ?? null : null;
+    const numero = a.terrenoChave ? numeroDaLoja({ chave: a.terrenoChave }) : null;
     await avisar(usuarioId, { tipo: "agendamento", ref: `agenda:lembrete:${a.id}`, titulo: `Lembrete: ${a.servico} às ${horaDe(new Date(a.inicio))} · ${a.empresa}`, texto: `${quando(new Date(a.inicio), new Date(a.fim))}. Se não puder ir, cancele na loja.`, link: numero ? `/loja/${numero}#agenda` : "/mundo" });
   }
   for (const a of dono) await avisar(usuarioId, { tipo: "agendamento", ref: `agenda:chegando:${a.id}`, titulo: `${a.nome} tem horário às ${horaDe(new Date(a.inicio))}`, texto: `${a.servico} · ${a.contato}`, link: "/app/agenda" });
@@ -334,11 +335,11 @@ export async function aplicarMarcacaoDaAtendente(resposta: string, u: Usuario, n
   for (const x of m[1].matchAll(/(\w+)\s*=\s*"([^"]*)"/g)) at[x[1].toLowerCase()] = x[2];
   try {
     const r = await marcar(u, numero, { servicoId: at.servico, inicio: at.inicio, nome: at.nome || u.nome, contato: at.contato, obs: at.obs }, "atendente");
-    limpo += `\n\n✅ Horário marcado: ${r.servico}, ${r.quando}. Você recebe um lembrete no sino 1 hora antes. Para cancelar, toque em “Agendar horário” no cartão da loja.`;
+    limpo += `\n\nHorário marcado: ${r.servico}, ${r.quando}. Você recebe um lembrete no sino 1 hora antes. Para cancelar, toque em “Agendar horário” no cartão da loja.`;
   } catch (e) {
     const ini = lerInicio(at.inicio);
     const extra = at.servico ? await sugestoes(numero, at.servico, ini ? diaDe(ini) : null).catch(() => "") : "";
-    limpo += `\n\n⚠️ Não consegui marcar: ${(e as Error).message}${extra}`;
+    limpo += `\n\nNão consegui marcar: ${(e as Error).message}${extra}`;
   }
   return limpo.trim();
 }

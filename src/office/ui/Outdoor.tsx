@@ -6,6 +6,7 @@ import { OUTDOOR_POR_ID, MAX_FRASE_OUTDOOR, DIAS_OUTDOOR } from "../data/outdoor
 import { nomeNicho } from "../data/mundo";
 import { PixAberto } from "./Lote";
 import { FLUTUANTE, ESTREITO } from "./estilo";
+import { Icone } from "./Icone";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
@@ -49,7 +50,7 @@ export function CartaoOutdoor() {
     <div className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div><div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · Outdoor</div><div className="text-lg font-bold">{vaga.nome}</div><div className="text-xs text-[#5B6472]">14,4 × 7,2 m, com refletores à noite · {brl(preco)} por {DIAS_OUTDOOR} dias</div></div>
-        <button onClick={() => abrir(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
+        <button onClick={() => abrir(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
       </div>
 
       {ativoOutro && o?.empresa && (
@@ -57,7 +58,7 @@ export function CartaoOutdoor() {
           <Previa nome={o.empresa.nome} cor={o.empresa.cor} frase={o.frase} nicho={o.empresa.nicho} logo={o.empresa.logo} />
           <div className="mt-3 flex gap-2">
             {o.empresa.chave && <button onClick={() => selecionarLote(o.empresa!.chave)} className="flex-1 rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white">Ir até a loja</button>}
-            {o.empresa.numero && <a href={`/loja/${o.empresa.numero}`} target="_blank" rel="noreferrer" className="rounded-xl bg-[#F1F3F6] px-3 py-2.5 text-sm font-semibold text-[#1D4ED8]">Página ↗</a>}
+            {o.empresa.numero && <a href={`/loja/${o.empresa.numero}`} target="_blank" rel="noreferrer" className="rounded-xl bg-[#F1F3F6] px-3 py-2.5 text-sm font-semibold text-[#1D4ED8]">Página</a>}
           </div>
           {o.pagoAte && <div className="mt-2 text-center text-[11px] text-[#5B6472]">Este outdoor fica livre a partir de {dataBR(o.pagoAte)}.</div>}
         </>

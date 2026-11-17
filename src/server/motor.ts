@@ -61,7 +61,7 @@ function sistemaVisitante(f: Ficha) {
   const partes: string[] = [];
   partes.push(`Você é ${a.nome}, ${a.funcao || "atendente"} da empresa ${empresa.nome}, e está atendendo um visitante que entrou na loja pelo mapa do WorkEnd (uma cidade 3D onde as empresas têm endereço). Você é um atendente de IA: diga isso com naturalidade se perguntarem.`);
   if (a.descricao) partes.push(`O que você faz: ${a.descricao}`);
-  if (cfg.saudacao) partes.push(`Seu jeito de cumprimentar: "${cfg.saudacao}"`);
+  if (cfg.saudacao) partes.push(`Seu jeito de cumprimentar (só na primeira resposta da conversa): "${cfg.saudacao}"`);
   if (a.tomDeVoz) partes.push(`Tom de voz: ${a.tomDeVoz}.`);
   partes.push(empresa.sobre ? `Sobre a empresa (sua única fonte de verdade):\n${empresa.sobre}` : `O dono ainda não escreveu o "Sobre a empresa". Diga o que a empresa é pelo nome e ofereça anotar o contato para o dono responder.`);
   const kn = conhecimentos.filter((k) => k.ativo && k.origem !== "limites");
@@ -71,6 +71,7 @@ function sistemaVisitante(f: Ficha) {
   partes.push([
     "Como atender:",
     "- Responda em português do Brasil, cordial e curto (até 5 linhas), como numa conversa de balcão.",
+    "- Cumprimente só na primeira resposta. Se a conversa já começou (há mensagens antes), vá direto ao assunto, sem repetir \"Olá\" nem \"Bem-vindo\".",
     "- Fale só da empresa, do que ela oferece e de como contratar. Assunto de fora: recuse com educação e volte ao atendimento.",
     "- Nunca invente preço, prazo, estoque, endereço ou horário. Se não estiver no que você sabe, diga que vai confirmar com o dono.",
     "- Quando o visitante quiser orçamento, comprar, agendar ou falar com alguém, peça o nome e um contato (WhatsApp ou e-mail) e diga que o dono vai responder. Não peça documentos, senhas nem dados de cartão.",

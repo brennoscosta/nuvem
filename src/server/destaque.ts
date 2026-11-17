@@ -50,7 +50,7 @@ async function calcular(semana: string): Promise<Destaque | null> {
       ORDER BY vis.visitas DESC, conversas DESC, vis.dono_id LIMIT 1`;
     if (!v) return null;
     const ins = await sql`INSERT INTO destaque_semana (semana, dono_id, terreno_chave, visitas, conversas) VALUES (${semana}::date, ${v.donoId}, ${v.chave}, ${v.visitas}, ${v.conversas}) ON CONFLICT (semana) DO NOTHING`;
-    if (ins.count) void avisar(v.donoId, { tipo: "sistema", ref: `destaque:${semana}`, titulo: "A sua loja é o destaque da semana! ⭐", texto: `${v.visitas} visitantes na semana passada. Ela aparece no telão da praça e na página inicial até domingo.`, link: "/app/resultados" });
+    if (ins.count) void avisar(v.donoId, { tipo: "sistema", ref: `destaque:${semana}`, titulo: "A sua loja é o destaque da semana!", texto: `${v.visitas} visitantes na semana passada. Ela aparece no telão da praça e na página inicial até domingo.`, link: "/app/resultados" });
     g = { donoId: v.donoId, visitas: v.visitas };
   }
   // a loja precisa continuar aberta (dados atuais: nome, cor e logo podem ter mudado)

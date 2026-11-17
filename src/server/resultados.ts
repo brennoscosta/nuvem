@@ -8,6 +8,8 @@ import { bloqueio, contar } from "./limite";
 import type { Usuario } from "./usuarios";
 import { LOTES, LOTE_POR_CHAVE } from "@/office/data/mundo";
 import type { Terreno } from "./terrenos";
+import { numeroDaLoja } from "@/office/data/numeroLoja";
+import { chaveDaLoja } from "@/office/data/numeroLoja";
 
 export const diaBR = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d); // AAAA-MM-DD
 export function visitanteDe(h: Headers, usuarioId?: string | null) {
@@ -21,9 +23,9 @@ const ehRobo = (h: Headers) => { const ua = h.get("user-agent") ?? ""; return !/
 
 // a loja (lote principal) de um número de lote; uma ampliação conta para o lote principal
 export async function lojaDoNumero(numero: number): Promise<{ chave: string; donoId: string } | null> {
-  const l = LOTES.find((x) => x.numero === numero); if (!l) return null;
+  const chave = chaveDaLoja(numero); if (!chave) return null; // 0 = a sede da Social RP
   await migrar();
-  const [t] = await sql<{ chave: string; usuarioId: string; status: string; anexoDe: string | null }[]>`SELECT chave, usuario_id, status, anexo_de FROM terreno WHERE chave = ${l.chave}`;
+  const [t] = await sql<{ chave: string; usuarioId: string; status: string; anexoDe: string | null }[]>`SELECT chave, usuario_id, status, anexo_de FROM terreno WHERE chave = ${chave}`;
   if (!t || t.status !== "ativo") return null;
   if (t.anexoDe) { const [p] = await sql<{ chave: string; usuarioId: string }[]>`SELECT chave, usuario_id FROM terreno WHERE chave = ${t.anexoDe} AND status = 'ativo'`; return p ? { chave: p.chave, donoId: p.usuarioId } : null; }
   return { chave: t.chave, donoId: t.usuarioId };
@@ -120,7 +122,7 @@ export async function resultadosDoDono(u: Usuario, terreno: Terreno | null, dias
   const top = sVis.reduce<{ dia: string; n: number } | null>((m, x) => (x.n > (m?.n ?? 0) ? x : m), null);
   return {
     dias, desde,
-    lote: terreno ? { chave: terreno.chave, numero: LOTE_POR_CHAVE[terreno.chave]?.numero ?? null, empresa: terreno.empresaNome } : null,
+    lote: terreno ? { chave: terreno.chave, numero: numeroDaLoja(terreno), empresa: terreno.empresaNome } : null,
     visitas: { total: soma(sVis), anterior: visAnt[0]?.n ?? 0, serie: sVis, mapa: visOrigem[0]?.mapa ?? 0, pagina: visOrigem[0]?.pagina ?? 0, logados: visOrigem[0]?.logados ?? 0 },
     conversas: { total: soma(sConv), anterior: convAnt[0]?.n ?? 0, serie: sConv, mensagens: conv.reduce((a, x) => a + x.msgs, 0) },
     candidaturas: { total: soma(sCand), anterior: candAnt[0]?.n ?? 0, serie: sCand, vagasAbertas: vagas[0]?.n ?? 0 },

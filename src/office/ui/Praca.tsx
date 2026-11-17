@@ -45,7 +45,7 @@ export function CartaoPraca() {
           <div className="text-lg font-bold">Praça de Eventos</div>
           <div className="text-xs text-[#5B6472]">Palco para lives e lançamentos · feira aos sábados, das {FEIRA_ABRE}h às {FEIRA_FECHA}h</div>
         </div>
-        <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
+        <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5" aria-label="Fechar"><Icone nome="fechar" tamanho={16} /></button>
       </div>
       <div className="mt-3 flex gap-1 rounded-xl bg-[#F1F3F6] p-1 text-xs font-semibold">
         {([["agenda", vivo ? "Palco ao vivo" : "Agenda do palco"], ["feira", `Feira de sábado${praca ? ` · ${dataCurta(praca.feira.dia)}` : ""}`]] as const).map(([k, t]) => <button key={k} onClick={() => setAba(k)} className={`flex-1 rounded-lg px-2 py-1.5 ${aba === k ? "bg-white shadow" : "text-[#5B6472]"}`}>{t}</button>)}
@@ -96,7 +96,7 @@ function Agenda({ agenda, agora, podeMarcar, logado, temLote, aoMudar }: { agend
               {e.descricao && <div className="mt-0.5 text-xs text-[#5B6472]">{e.descricao}</div>}
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold">
                 {e.empresa.chave && LOTE_POR_CHAVE[e.empresa.chave] ? <button onClick={() => useMundo.getState().selecionarLote(e.empresa.chave)} className="text-[#1D4ED8]">{e.empresa.nome} · ver no mapa</button> : <span className="text-[#5B6472]">{e.empresa.nome}</span>}
-                {e.link && <a href={e.link} target="_blank" rel="noreferrer nofollow" className={aoVivo ? "rounded-full bg-[#E11D48] px-2.5 py-1 text-white" : "text-[#1D4ED8]"}>{aoVivo ? "Assistir agora ↗" : "Link do evento ↗"}</a>}
+                {e.link && <a href={e.link} target="_blank" rel="noreferrer nofollow" className={aoVivo ? "rounded-full bg-[#E11D48] px-2.5 py-1 text-white" : "text-[#1D4ED8]"}>{aoVivo ? "Assistir agora" : "Link do evento"}</a>}
               </div>
             </li>
           );
@@ -190,8 +190,8 @@ function Feira({ barracas, dia, preco, logado, podeAlugar, pixAberto, aoMudar }:
           <div className="font-bold">{b.nome}</div>
           {b.descricao && <div className="mt-0.5 text-xs text-[#5B6472]">{b.descricao}</div>}
           <div className="mt-1.5 flex gap-3 text-xs font-semibold">
-            {b.contato.whatsapp && <a href={`https://wa.me/${b.contato.whatsapp.length <= 11 ? `55${b.contato.whatsapp}` : b.contato.whatsapp}`} target="_blank" rel="noreferrer" className="text-[#16A34A]">WhatsApp ↗</a>}
-            {b.contato.instagram && <a href={`https://instagram.com/${b.contato.instagram}`} target="_blank" rel="noreferrer" className="text-[#DB2777]">@{b.contato.instagram} ↗</a>}
+            {b.contato.whatsapp && <a href={`https://wa.me/${b.contato.whatsapp.length <= 11 ? `55${b.contato.whatsapp}` : b.contato.whatsapp}`} target="_blank" rel="noreferrer" className="text-[#16A34A]">WhatsApp</a>}
+            {b.contato.instagram && <a href={`https://instagram.com/${b.contato.instagram}`} target="_blank" rel="noreferrer" className="text-[#DB2777]">@{b.contato.instagram}</a>}
             {!b.contato.whatsapp && !b.contato.instagram && <span className="text-[#5B6472]">Passe na praça no sábado.</span>}
           </div>
         </div>
@@ -274,11 +274,11 @@ export function AvisoEventos() {
           <div className="truncate text-sm font-bold">{e.titulo}</div>
           <div className="truncate text-xs text-white/70">por {e.empresa.nome}</div>
         </div>
-        <button onClick={() => setAviso(null)} aria-label="Fechar" className="rounded-full px-1.5 text-white/60 hover:bg-white/10">✕</button>
+        <button onClick={() => setAviso(null)} aria-label="Fechar" className="rounded-full px-1.5 text-white/60 hover:bg-white/10"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
       </div>
       <div className="mt-2 flex gap-2">
         <button onClick={() => { useMundo.getState().selecionarLote(PRACA_CHAVE); setAviso(null); }} className="flex-1 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold hover:bg-white/15">Ir para a praça</button>
-        {e.link && <a href={e.link} target="_blank" rel="noreferrer nofollow" onClick={() => setAviso(null)} className="flex-1 rounded-xl bg-[#E11D48] px-3 py-2 text-center text-xs font-bold text-white">{comecou ? "Assistir agora ↗" : "Abrir o link ↗"}</a>}
+        {e.link && <a href={e.link} target="_blank" rel="noreferrer nofollow" onClick={() => setAviso(null)} className="flex-1 rounded-xl bg-[#E11D48] px-3 py-2 text-center text-xs font-bold text-white">{comecou ? "Assistir agora" : "Abrir o link"}</a>}
       </div>
     </div>
   );

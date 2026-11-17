@@ -110,7 +110,7 @@ export function VitrineVisual({ d, compacto, previa }: { d: DadosVitrine; compac
     <div className="rounded-2xl border border-black/5 bg-[#F6F8FB] p-2">
       <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
         <span className="text-[11px] font-bold uppercase tracking-wide text-[#5B6472]"><Icone nome="sacola" tamanho={13} className="mr-1 inline align-[-3px]" />Vitrine · {d.produtos.length} {d.produtos.length === 1 ? "produto" : "produtos"}</span>
-        {!previa && <a href={`/loja/${d.numero}#vitrine`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#1D4ED8] hover:underline">Ver tudo ↗</a>}
+        {!previa && <a href={`/loja/${d.numero}#vitrine`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#1D4ED8] hover:underline">Ver tudo</a>}
       </div>
       <ul className="sem-barra flex snap-x snap-mandatory gap-2 overflow-x-auto pb-0.5" aria-label={`Produtos da ${d.empresa}`}>
         {d.produtos.map((p) => (
@@ -149,7 +149,7 @@ export function VitrineLoja({ numero, compacto }: { numero: number; compacto?: b
   // guardado com o número: trocar de loja não mostra os produtos da anterior
   const [estado, setEstado] = useState<{ numero: number; d: DadosVitrine | null } | null>(null);
   useEffect(() => {
-    if (!numero) return;
+    if (numero == null) return; // 0 = a sede da Social RP
     let vivo = true;
     fetch(`/api/workend/loja/${numero}/vitrine`).then((r) => (r.ok ? r.json() : null)).then((j) => vivo && setEstado({ numero, d: j?.produtos ? (j as DadosVitrine) : null })).catch(() => vivo && setEstado({ numero, d: null }));
     return () => { vivo = false; };

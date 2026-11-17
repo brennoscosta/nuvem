@@ -72,7 +72,7 @@ export function AgendaDono() {
             <h1 className="text-[2rem] lg:text-[2.4rem]">Agenda da loja{dados.loja && <span className="text-[var(--tinta-2)]"> · {dados.loja.empresa}</span>}</h1>
             <p className="mt-2 max-w-[62ch] text-[var(--tinta-2)]">Ligada, a agenda aparece no cartão da sua loja no mapa e na página da loja, e a atendente de IA passa a marcar horários pela conversa. Cada horário marcado chega no sino.</p>
           </div>
-          {numero != null && <a href={`/loja/${numero}#agenda`} target="_blank" rel="noreferrer" className="btn btn-linha">Ver como o cliente vê ↗</a>}
+          {numero != null && <a href={`/loja/${numero}#agenda`} target="_blank" rel="noreferrer" className="btn btn-linha">Ver como o cliente vê</a>}
         </div>
       </section>
 

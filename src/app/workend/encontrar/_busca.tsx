@@ -101,7 +101,7 @@ export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string
               {p.perfil.preco && <span className="rounded-full bg-[#EEF3FF] px-2 py-0.5 font-semibold text-[var(--azul)]">{p.perfil.preco}</span>}
             </div>
             {(p.perfil.servicos || p.bio) && <p className="mt-2 line-clamp-3 text-[14px] text-[var(--tinta-2)]">{p.perfil.servicos || p.bio}</p>}
-            {p.perfil.portfolio.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{p.perfil.portfolio.slice(0, 3).map((t) => <a key={t.url} href={t.url} target="_blank" rel="noreferrer nofollow" className="text-[12px] font-semibold text-[var(--azul)] hover:underline">{t.titulo} ↗</a>)}</div>}
+            {p.perfil.portfolio.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{p.perfil.portfolio.slice(0, 3).map((t) => <a key={t.url} href={t.url} target="_blank" rel="noreferrer nofollow" className="text-[12px] font-semibold text-[var(--azul)] hover:underline">{t.titulo}</a>)}</div>}
             {p.usuarioId !== euId && (
               <div className="mt-auto flex gap-2 pt-4">
                 <a href={entrar(`/app/rede?com=${p.usuarioId}`)} className="btn btn-azul flex-1 !py-2.5 text-sm">Conversar</a>

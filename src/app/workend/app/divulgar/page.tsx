@@ -10,6 +10,7 @@ import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { meta } from "../../seo";
 import { Divulgar } from "./_divulgar";
+import { numeroDaLoja, temNumero } from "@/office/data/numeroLoja";
 
 export const metadata = meta({ titulo: "Divulgar a loja — WorkEnd", caminho: "/app/divulgar", indexar: false });
 export const dynamic = "force-dynamic";
@@ -21,8 +22,8 @@ export default async function PaginaDivulgar() {
   const u = await usuarioAtual().catch(() => null);
   if (!u) redirect("/entrar?destino=/app/divulgar");
   const t = await terrenoDoUsuario(u.id).catch(() => null);
-  const numero = t?.status === "ativo" ? LOTE_POR_CHAVE[t.chave]?.numero ?? null : null;
-  const codigo = numero ? await meuCodigo(u).catch(() => null) : null;
+  const numero = t?.status === "ativo" ? numeroDaLoja(t) : null; // 0 = a sede da Social RP
+  const codigo = temNumero(numero) ? await meuCodigo(u).catch(() => null) : null;
   const promo = promocaoValendo(t?.promocao ?? null);
   return (
     <>
@@ -32,7 +33,7 @@ export default async function PaginaDivulgar() {
         <h1 className="mt-1 text-[2rem] lg:text-[2.4rem]">Leve gente para a sua loja</h1>
         <p className="mt-2 max-w-[62ch] text-[var(--tinta-2)]">Poste a imagem nos Stories e cole o adesivo no balcão. O QR Code abre a página da sua loja; cada visita entra nos seus resultados, e quem abrir uma loja pelo seu código dá desconto na sua mensalidade.</p>
       </section>
-      {t && numero && codigo ? (
+      {t && temNumero(numero) && codigo ? (
         <Divulgar dados={{ numero, empresa: t.empresaNome, cor: t.cor, nicho: nomeNicho(t.nicho), logo: t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null, predio: `/workend/predios/${t.escritorio?.layout ?? "moderno"}.webp`, promo, link: `https://workend.online/loja/${numero}?ind=${codigo}`, endereco: `workend.online/loja/${numero}` }} />
       ) : (
         <section className="faixa mt-8"><p className="max-w-[60ch] rounded-2xl bg-[#FFF4DB] px-4 py-3 text-[#7A5200]">O material de divulgação aparece quando a sua loja estiver aberta no mapa. <Link href="/mundo" className="font-semibold underline">Escolher meu lote</Link></p></section>

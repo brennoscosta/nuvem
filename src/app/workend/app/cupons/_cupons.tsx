@@ -96,11 +96,11 @@ export function PainelCupons() {
                 <div className="text-[13px] text-[var(--tinta-2)]">{m.numero ? <a href={`/loja/${m.numero}`} className="font-semibold text-[var(--azul)] hover:underline">{m.empresa}</a> : m.empresa}</div>
                 <b className="text-[16px] text-[#9F1239]">{m.titulo}</b>
                 <div className="mt-1 font-mono text-[19px] tracking-widest">{m.codigo}</div>
-                <div className="text-[12px] text-[var(--tinta-2)]">{m.usado ? "Usado ✓" : m.vencido ? `Venceu em ${dataBR(m.validade)}` : `Vale até ${dataBR(m.validade)}`}{m.regra ? ` · ${m.regra}` : ""}</div>
+                <div className="text-[12px] text-[var(--tinta-2)]">{m.usado ? "Usado" : m.vencido ? `Venceu em ${dataBR(m.validade)}` : `Vale até ${dataBR(m.validade)}`}{m.regra ? ` · ${m.regra}` : ""}</div>
               </li>
             ))}
           </ul>
-        ) : <p className="mt-2 text-[var(--tinta-2)]">Você ainda não pegou nenhum cupom. Procure o selo 🎟️ nas lojas do mapa.</p>}
+        ) : <p className="mt-2 text-[var(--tinta-2)]">Você ainda não pegou nenhum cupom. Procure o selo de cupom nas lojas do mapa.</p>}
       </section>
     </>
   );

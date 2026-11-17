@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Icone } from "@/office/ui/Icone";
 import { apiEquipe, brl, quando, sugestoesTarefa, type MembroEquipe, type PainelEquipe, type RespostaEnvio, type TrocaInterna } from "@/office/ui/equipeComum";
 import { Rosto } from "./_rosto";
+import { rotuloLoja } from "@/office/data/numeroLoja";
 
 type Membro = MembroEquipe;
 const ehChefe = (m: Membro) => m.nivel === "ceo" || m.nivel === "diretor" || m.nivel === "gerente";
@@ -38,7 +39,7 @@ export function TopoEquipe({ p, internas, abrir, enviado, comoFunciona, empresas
             : <img className="eq-logo" src={`/api/terrenos/${encodeURIComponent(p.lote.chave)}/logo`} alt="" onError={() => setSemLogo(true)} />}
           <div className="eq-selos">
             <span className="eq-selo"><Icone nome="etiqueta" tamanho={13} />{p.lote.nicho}</span>
-            {p.lote.numero && <span className="eq-selo">Lote {p.lote.numero}</span>}
+            {p.lote.numero != null && p.lote.numero > 0 && <span className="eq-selo">{rotuloLoja(p.lote.numero)}</span>}
             <span className={`eq-selo eq-vivo ${abertos ? "eq-vivo-ocupado" : ""}`}><i />{abertos ? `trabalhando em ${abertos} ${abertos === 1 ? "pedido" : "pedidos"}` : "equipe disponível"}</span>
           </div>
           <button type="button" onClick={comoFunciona} className="eq-ajuda"><Icone nome="ajuda" tamanho={15} />Como funciona</button>

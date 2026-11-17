@@ -45,7 +45,7 @@ export async function avisarSeguidores(donoId: string, tipo: TipoNovidade, a: { 
     const [loja] = await sql<{ chave: string; empresa: string }[]>`SELECT chave, empresa_nome AS empresa FROM terreno WHERE usuario_id = ${donoId} AND status = 'ativo' AND anexo_de IS NULL ORDER BY reservado_em LIMIT 1`;
     if (!loja) return 0;
     const numero = LOTE_POR_CHAVE[loja.chave]?.numero;
-    const titulo = tipo === "promocao" ? `🏷️ ${loja.empresa} ligou uma promoção` : tipo === "evento" ? `🎤 ${loja.empresa} marcou um evento na praça` : `🛍️ ${loja.empresa} pôs um produto novo`;
+    const titulo = tipo === "promocao" ? `${loja.empresa} ligou uma promoção` : tipo === "evento" ? `${loja.empresa} marcou um evento na praça` : `${loja.empresa} pôs um produto novo`;
     const link = tipo === "evento" ? "/mundo?praca=1" : tipo === "produto" && numero ? `/loja/${numero}#vitrine` : `/mundo?lote=${encodeURIComponent(loja.chave)}`;
     const quem = await sql<{ usuarioId: string }[]>`SELECT usuario_id FROM seguidor WHERE dono_id = ${donoId} ORDER BY criado_em LIMIT ${MAX_AVISADOS}`;
     const ref = `seg:${tipo}:${donoId}:${a.ref ?? new Date().toISOString().slice(0, 13)}`;

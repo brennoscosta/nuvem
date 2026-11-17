@@ -13,6 +13,8 @@ import { CabecalhoApp } from "../../_cabecalho";
 import { meta } from "../../seo";
 import { GraficoResultados, CompartilharIndicacao, type Metrica } from "./_grafico";
 import { resumoCupons } from "@/server/cupons";
+import { temNumero, rotuloLoja } from "@/office/data/numeroLoja";
+import { Icone } from "@/office/ui/Icone";
 
 export const metadata = meta({ titulo: "Resultados da loja — WorkEnd", caminho: "/app/resultados", indexar: false });
 export const dynamic = "force-dynamic";
@@ -43,7 +45,7 @@ export default async function Resultados({ searchParams }: Props) {
     !r.agendaLigada && { t: "Abra a agenda", d: "Barbearia, clínica, aulas: o cliente escolhe o horário e a atendente também marca.", href: "/app/agenda", acao: "Abrir agenda" },
     !r.candidaturas.vagasAbertas && { t: "Está contratando? Abra uma vaga", d: "A placa “Estamos contratando” aparece no seu prédio e a vaga entra na busca.", href: "/app/equipe?aba=vagas", acao: "Abrir vaga" },
     r.visitas.total > 0 && !r.conversas.total && { t: "Treine a atendente", d: "Gente está abrindo a loja e ninguém conversou: dê uma saudação e o que ela deve oferecer.", href: ativo ? `/mundo?lote=${encodeURIComponent(ativo.chave)}` : "/mundo", acao: "Treinar no mapa" },
-    { t: "Divulgue o endereço da loja", d: "Mande o link da sua página no WhatsApp e no Instagram: cada visita entra aqui.", href: r.lote?.numero ? `/loja/${r.lote.numero}` : "/mundo", acao: "Abrir minha página" },
+    { t: "Divulgue o endereço da loja", d: "Mande o link da sua página no WhatsApp e no Instagram: cada visita entra aqui.", href: temNumero(r.lote?.numero) ? `/loja/${r.lote.numero}` : "/mundo", acao: "Abrir minha página" },
   ].filter(Boolean).slice(0, 4) as { t: string; d: string; href: string; acao: string }[];
   const cliquesTipos = Object.entries(r.cliques.porTipo).sort((a, b) => b[1] - a[1]);
   const maxClique = Math.max(1, ...cliquesTipos.map(([, n]) => n));
@@ -54,14 +56,14 @@ export default async function Resultados({ searchParams }: Props) {
       <section className="faixa pt-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--azul)]">Resultados da loja{r.lote?.numero ? ` · Lote ${r.lote.numero}` : ""}</span>
+            <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--azul)]">Resultados da loja{temNumero(r.lote?.numero) ? ` · ${rotuloLoja(r.lote.numero)}` : ""}</span>
             <h1 className="mt-1 text-[2rem] lg:text-[2.4rem]">{ativo ? `O que a ${ativo.empresaNome} trouxe` : "Resultados da sua loja"}</h1>
           </div>
           <nav className="flex gap-1.5" aria-label="Período">
             {[7, 30, 90].map((d) => <Link key={d} href={`/app/resultados?dias=${d}`} className={`btn !px-4 !py-2 text-sm ${r.dias === d ? "btn-tinta" : "btn-claro"}`}>{d} dias</Link>)}
           </nav>
         </div>
-        {ativo && <p className="mt-3 text-[15px] text-[var(--tinta-2)]"><b className="text-[var(--tinta)]">⭐ {seguidores.total} {seguidores.total === 1 ? "pessoa segue" : "pessoas seguem"} a sua loja</b>{seguidores.novos > 0 ? ` · ${seguidores.novos} ${seguidores.novos === 1 ? "nova" : "novas"} em ${r.dias} dias` : ""}. Quem segue recebe um aviso quando você liga uma promoção, marca um evento ou põe um produto novo.</p>}
+        {ativo && <p className="mt-3 text-[15px] text-[var(--tinta-2)]"><b className="inline-flex items-center gap-1.5 text-[var(--tinta)]"><Icone nome="estrela" tamanho={16} className="text-[#B7791F]" />{seguidores.total} {seguidores.total === 1 ? "pessoa segue" : "pessoas seguem"} a sua loja</b>{seguidores.novos > 0 ? ` · ${seguidores.novos} ${seguidores.novos === 1 ? "nova" : "novas"} em ${r.dias} dias` : ""}. Quem segue recebe um aviso quando você liga uma promoção, marca um evento ou põe um produto novo.</p>}
         {!ativo && <p className="mt-4 max-w-[60ch] rounded-2xl bg-[#FFF4DB] px-4 py-3 text-[#7A5200]">Você ainda não tem uma loja aberta no mapa. Os números começam a contar quando o 1º mês do lote for pago. <Link href="/mundo" className="font-semibold underline">Escolher meu lote</Link></p>}
       </section>
 
@@ -122,11 +124,11 @@ export default async function Resultados({ searchParams }: Props) {
       {ativo && cupons && (
         <section className="faixa mt-6 grid gap-3 sm:grid-cols-2">
           <Link href="/app/cupons" className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-[#E11D48]/50 bg-[#FFF5F7] p-5 hover:bg-[#ffe9ee]">
-            <span><b className="text-[17px] text-[#9F1239]">🎟️ Cupons</b><span className="mt-0.5 block text-[14px] text-[var(--tinta-2)]"><b className="text-[var(--tinta)] tabular-nums">{cupons.pegos}</b> pegos · <b className="text-[var(--tinta)] tabular-nums">{cupons.usados}</b> usados no período</span></span>
+            <span><b className="inline-flex items-center gap-1.5 text-[17px] text-[#9F1239]"><Icone nome="cupom" tamanho={18} />Cupons</b><span className="mt-0.5 block text-[14px] text-[var(--tinta-2)]"><b className="text-[var(--tinta)] tabular-nums">{cupons.pegos}</b> pegos · <b className="text-[var(--tinta)] tabular-nums">{cupons.usados}</b> usados no período</span></span>
             <span className="text-[14px] font-semibold text-[#9F1239]">Criar e validar →</span>
           </Link>
           <Link href="/app/divulgar" className="flex items-center justify-between gap-3 rounded-2xl bg-[#1D2128] p-5 text-white hover:bg-black">
-            <span><b className="text-[17px]">📣 Divulgar a loja</b><span className="mt-0.5 block text-[14px] text-white/70">Imagem para Stories e adesivo com QR Code</span></span>
+            <span><b className="inline-flex items-center gap-1.5 text-[17px]"><Icone nome="placa" tamanho={18} />Divulgar a loja</b><span className="mt-0.5 block text-[14px] text-white/70">Imagem para Stories e adesivo com QR Code</span></span>
             <span className="text-[14px] font-semibold">Abrir →</span>
           </Link>
         </section>

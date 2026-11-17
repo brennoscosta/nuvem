@@ -9,6 +9,7 @@ import { terrenoDoUsuario, obterTerreno, ehAdmin } from "./terrenos";
 import { empresaIdDe, ErroHttp, type Contatos } from "./equipeCliente";
 import { lojaDoNumero } from "./resultados";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
+import { numeroDaLoja } from "@/office/data/numeroLoja";
 
 export const MAX_PRODUTOS = 12;
 export const MAX_FOTO = 200 * 1024;
@@ -84,7 +85,7 @@ export async function vitrineDoDono(u: Usuario) {
   const t = await terrenoDoUsuario(u.id);
   const produtos = await sql<Linha[]>`SELECT ${CAMPOS()} FROM produto WHERE usuario_id = ${u.id} ORDER BY ordem, criado_em`;
   return {
-    lote: t ? { chave: t.chave, numero: LOTE_POR_CHAVE[t.chave]?.numero ?? null, ativo: t.status === "ativo", empresa: t.empresaNome, cor: t.cor } : null,
+    lote: t ? { chave: t.chave, numero: numeroDaLoja(t), ativo: t.status === "ativo", empresa: t.empresaNome, cor: t.cor } : null,
     whatsapp: t ? await whatsappDe(u.id, t.chave) : null,
     max: MAX_PRODUTOS,
     produtos: produtos.map((p): ProdutoDono => ({ ...paraPublico(p), ativo: p.ativo, ordem: p.ordem })),

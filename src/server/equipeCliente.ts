@@ -24,6 +24,7 @@ import type { Membro, NivelMembro, Escritorio } from "@/office/data/escritorio";
 import { pedirComEquipe, trabalhando, trocasInternas, atividadeInterna } from "./delegacao";
 import type { AreaId, Nivel } from "@/office/data/org";
 import { avisar, contatosNaFala } from "./conectores";
+import { numeroDaLoja } from "@/office/data/numeroLoja";
 
 export const TETO_IA_MES = 10; // R$ de IA por lote por mês
 export const AVISO_TETO = 0.8; // a partir de 80% o painel avisa
@@ -212,7 +213,7 @@ export async function painelEquipe(u: Usuario, chave?: string | null) {
     ...(t.escritorio?.setores ?? []).filter((s) => equipe.some((m) => m.setorId === s.id)).map((s) => ({ id: s.id, nome: s.nome, cor: s.cor })),
   ];
   return {
-    lote: { chave: t.chave, numero: LOTE_POR_CHAVE[t.chave]?.numero ?? null, empresaNome: t.empresaNome, cor: t.cor, nicho: nomeNicho(t.nicho), pagoAte: t.pagoAte },
+    lote: { chave: t.chave, numero: numeroDaLoja(t), empresaNome: t.empresaNome, cor: t.cor, nicho: nomeNicho(t.nicho), pagoAte: t.pagoAte },
     sobre: emp?.sobre ?? "", contatos: emp?.contatos ?? {}, equipe, departamentos,
     gasto: { mes: gasto, teto: TETO_IA_MES, aviso: gasto >= TETO_IA_MES * AVISO_TETO, esgotado: gasto >= TETO_IA_MES },
     visitantes: { total: vis?.n ?? 0, ultimas24h: vis?.hoje ?? 0 }, ia: temIA(),

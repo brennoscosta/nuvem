@@ -8,6 +8,7 @@ import { SALA } from "../data/layout";
 import { useEscritorio, type Status } from "../store";
 import { SKILLS_PRONTAS } from "../data/skillsProntas";
 import { AbaTarefas } from "./AbaTarefas";
+import { Icone } from "./Icone";
 
 export const STATUS: Record<Status, { nome: string; cor: string }> = {
   chegando: { nome: "Chegando", cor: "#9AA3AD" }, disponivel: { nome: "Disponível", cor: "#3FBFA8" }, trabalhando: { nome: "Trabalhando", cor: "#4F7DF3" },
@@ -61,7 +62,7 @@ export function PainelAgente() {
           <div className="text-xs text-[#5B6472]">{nv.nome} · {a.funcao} · {area.nome} · {SALA[a.sala]?.nome}</div>
           <div className="mt-1 flex items-center gap-2 text-xs"><span className="h-2 w-2 rounded-full" style={{ background: st.cor }} />{st.nome}{a.fala ? <span className="text-[#5B6472]">· “{a.fala}”</span> : null}</div>
         </div>
-        <button onClick={() => selecionar(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
+        <button onClick={() => selecionar(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
       </div>
       {!a.real && <div className="mx-4 mt-3 rounded-xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">Agente simulado (sem banco). Os agentes reais ficam disponíveis quando o servidor está com banco e IA configurados.</div>}
       {a.real && !online && <div className="mx-4 mt-3 rounded-xl bg-[#FDE8E8] px-3 py-2 text-xs text-[#8A2A2A]">Servidor sem banco no momento.</div>}

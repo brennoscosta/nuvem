@@ -102,7 +102,7 @@ export function CompartilharIndicacao({ link, codigo }: { link: string; codigo: 
   return (
     <div className="mt-4 flex flex-wrap items-center gap-2">
       <code className="min-w-0 max-w-full truncate rounded-xl bg-white px-3 py-2 text-[14px] text-[var(--tinta)]">{link}</code>
-      <button onClick={copiar} className="btn btn-azul !py-2">{copiado ? "Copiado ✓" : "Copiar link"}</button>
+      <button onClick={copiar} className="btn btn-azul !py-2">{copiado ? "Copiado" : "Copiar link"}</button>
       <a href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer" className="btn btn-linha !py-2">Mandar no WhatsApp</a>
       <span className="text-[13px] text-[var(--tinta-2)]">ou passe o código <b className="tracking-wider text-[var(--tinta)]">{codigo}</b></span>
     </div>

@@ -26,7 +26,7 @@ export function BotoesPersonagem() {
           <button onClick={() => abrir("montar")} className="hud-btn hud-btn-icone" title="Editar personagem" aria-label="Editar personagem"><Icone nome="editar" tamanho={18} /></button>
         </>
       ) : (
-        <button onClick={() => abrir("montar")} className="hud-cta"><Icone nome="pessoa" tamanho={18} /><span>{meu ? "Ativar personagem" : "Criar personagem"}</span><span className="hud-preco">{brl(preco)}</span></button>
+        <button onClick={() => abrir("montar")} className="hud-cta" aria-label={meu ? "Ativar personagem" : "Criar personagem"} title={meu ? "Ativar personagem" : "Criar personagem"}><Icone nome="pessoa" tamanho={18} /><span className="hud-rotulo">{meu ? "Ativar personagem" : "Criar personagem"}</span><span className="hud-preco">{brl(preco)}</span></button>
       )}
     </div>
   );

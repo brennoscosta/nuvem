@@ -17,14 +17,18 @@ export function proxy(req: NextRequest) {
 function rotaWorkend(req: NextRequest) {
   const p = req.nextUrl.pathname;
   const url = req.nextUrl.clone();
+  // marca a requisição como do WorkEnd para as páginas lerem (17/11/2026): o mapa e o "não encontrado" são da raiz,
+  // compartilhada com o escritório da Nuvem, e o cabeçalho de domínio nem sempre chega igual até a página
+  const h = new Headers(req.headers); h.set("x-site", "workend");
+  const reescrever = (u: URL) => NextResponse.rewrite(u, { request: { headers: h } });
   const noindex = (r: NextResponse) => { r.headers.set("x-robots-tag", "noindex, nofollow"); return r; };
   if (p === "/admin" || p === "/admin/") { url.pathname = "/"; return noindex(NextResponse.rewrite(url)); }
-  if (p === "/mundo" || p === "/mundo/") { url.pathname = "/"; return NextResponse.rewrite(url); }
-  if (p === "/app" || p.startsWith("/app/")) { url.pathname = "/workend" + p; return noindex(NextResponse.rewrite(url)); }
+  if (p === "/mundo" || p === "/mundo/") { url.pathname = "/"; return reescrever(url); }
+  if (p === "/app" || p.startsWith("/app/")) { url.pathname = "/workend" + p; return noindex(reescrever(url)); }
   // busca de profissionais e empresas e a página pública de cada loja (11/11/2026)
-  if (p === "/encontrar" || /^\/loja\/\d{1,4}$/.test(p)) { url.pathname = "/workend" + p; return NextResponse.rewrite(url); }
-  if (p === "/" || p === "/cadastro" || p === "/entrar" || p === "/politicas" || p === "/esqueci" || p === "/redefinir") { url.pathname = "/workend" + (p === "/" ? "" : p); return NextResponse.rewrite(url); }
-  return NextResponse.next();
+  if (p === "/encontrar" || /^\/loja\/\d{1,4}$/.test(p)) { url.pathname = "/workend" + p; return reescrever(url); }
+  if (p === "/" || p === "/cadastro" || p === "/entrar" || p === "/politicas" || p === "/esqueci" || p === "/redefinir") { url.pathname = "/workend" + (p === "/" ? "" : p); return reescrever(url); }
+  return NextResponse.next({ request: { headers: h } });
 }
 
 export const config = {

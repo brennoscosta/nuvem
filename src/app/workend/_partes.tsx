@@ -4,7 +4,8 @@ import { Logotipo } from "./_marca";
 import { AREAS, AREAS_OPERACIONAIS, FUNCOES, type AreaId } from "@/office/data/org";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 
-export const DEMO = "https://nuvem.nuvemhost.cloud/?vista=fora";
+// demonstração dentro do próprio WorkEnd (17/11/2026): a sede da Social RP, com a equipe trabalhando por dentro
+export const DEMO = "/mundo?sede=1";
 
 export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
   return (
@@ -38,8 +39,8 @@ export function Rodape() {
         <nav className="flex flex-col gap-[11px]" aria-label="Rodapé">
           <Link href="/cadastro">Criar conta</Link>
           <Link href="/entrar">Entrar</Link>
-          <Link href="/mundo">Passear pelo mapa</Link>
-          <a href={DEMO} target="_blank" rel="noreferrer">Escritório de demonstração</a>
+          <Link prefetch={false} href="/mundo">Passear pelo mapa</Link>
+          <Link prefetch={false} href={DEMO}>Conhecer uma empresa por dentro</Link>
           <Link href="/politicas">Políticas de uso</Link>
         </nav>
         <div className="flex flex-col gap-[11px]">

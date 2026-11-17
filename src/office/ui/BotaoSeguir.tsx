@@ -23,7 +23,7 @@ export function BotaoSeguir({ numero, claro = false }: { numero: number; claro?:
   const cor = est.seguindo
     ? (claro ? "bg-white/20 text-white" : "bg-[#FFF7DB] text-[#7A5A00] ring-[#F5C542]/60")
     : (claro ? "bg-white text-[#1D2128]" : "bg-white text-[#1D4ED8] ring-[#1D4ED8]/30 hover:bg-[#EEF3FF]");
-  if (!est.logado) return <a href={`/entrar?destino=${encodeURIComponent(`/loja/${numero}`)}`} className={`${base} ${cor}`}>☆ Seguir <span className="font-semibold opacity-70">· {est.seguidores}</span></a>;
+  if (!est.logado) return <a href={`/entrar?destino=${encodeURIComponent(`/loja/${numero}`)}`} className={`${base} ${cor}`}><Icone nome="estrela" tamanho={14} />Seguir <span className="font-semibold opacity-70">· {est.seguidores}</span></a>;
   const alternar = async () => {
     setOcupado(true); setErro(null);
     try {
@@ -35,7 +35,7 @@ export function BotaoSeguir({ numero, claro = false }: { numero: number; claro?:
   return (
     <span className="inline-flex flex-col">
       <button onClick={alternar} disabled={ocupado} aria-pressed={est.seguindo} title={est.seguindo ? "Você recebe os avisos desta loja. Toque para deixar de seguir." : "Receba um aviso quando a loja ligar uma promoção, marcar um evento ou puser um produto novo."} className={`${base} ${cor} disabled:opacity-60`}>
-        {est.seguindo ? "★ Seguindo" : "☆ Seguir"} <span className="font-semibold opacity-70">· {est.seguidores}</span>
+        <Icone nome="estrela" tamanho={14} className={est.seguindo ? "fill-current" : ""} />{est.seguindo ? "Seguindo" : "Seguir"} <span className="font-semibold opacity-70">· {est.seguidores}</span>
       </button>
       {erro && <span className={`mt-1 text-[11px] font-semibold ${claro ? "text-white" : "text-[#B42318]"}`}>{erro}</span>}
     </span>

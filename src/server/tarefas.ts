@@ -136,10 +136,10 @@ export async function executarPublicacao(tid: string, baseUrl: string, ajustes?:
   if (okPlat.length) {
     const links = okPlat.map((p) => `${p}: ${(resultado[p] as { url: string }).url}`).join(" · ");
     const redes = okPlat.map((p) => ({ youtube: "YouTube", instagram: "Instagram", tiktok: "TikTok" }[p] ?? p)).join(", ");
-    const fala = `Acabei de publicar um vídeo novo no ${redes} 🎬`;
+    const fala = `Acabei de publicar um vídeo novo no ${redes}`;
     await salvarFalaPublica(t.agenteId, fala);
     await gravarEvento(f.agente.empresaId, t.agenteId, "aprovado", fala, { links });
-    await gravarMural({ autorTipo: "agente", autorNome: f.agente.nome, agenteId: t.agenteId, texto: `Publiquei "${plano.titulo}" — ${links}${erros.length ? ` (pendente: ${erros.join("; ")})` : ""}`, publico: `${f.agente.nome} publicou um vídeo novo 🎬` });
+    await gravarMural({ autorTipo: "agente", autorNome: f.agente.nome, agenteId: t.agenteId, texto: `Publiquei "${plano.titulo}" — ${links}${erros.length ? ` (pendente: ${erros.join("; ")})` : ""}`, publico: `${f.agente.nome} publicou um vídeo novo` });
   } else {
     await gravarEvento(f.agente.empresaId, t.agenteId, "bloqueado", "A publicação falhou, preciso de ajuda do dono.");
   }
@@ -215,10 +215,10 @@ export async function executarArte(tid: string, baseUrl: string, ajustes?: Parti
     const { arquivo, custoBrl } = await gerarImagem({ agenteId: t.agenteId, prompt: plano.prompt, formato: plano.formato ?? "quadrado", referencias: refs, nome: plano.titulo });
     const url = `${baseUrl}/api/arquivos/${arquivo.id}/raw`;
     const resultado = { arquivoId: arquivo.id, arquivoNome: arquivo.nome, url, custoBrl, modelo: "gpt-image-2", formato: plano.formato };
-    const fala = `Terminei a arte "${plano.titulo}" 🎨`;
+    const fala = `Terminei a arte "${plano.titulo}"`;
     await salvarFalaPublica(t.agenteId, fala);
     await gravarEvento(f.agente.empresaId, t.agenteId, "concluido", `Arte pronta: ${plano.titulo}`, { tarefaId: tid, url });
-    await gravarMural({ autorTipo: "agente", autorNome: f.agente.nome, agenteId: t.agenteId, texto: `Arte "${plano.titulo}" pronta (R$ ${custoBrl.toFixed(2)}).`, publico: `${f.agente.nome} terminou uma arte nova 🎨` });
+    await gravarMural({ autorTipo: "agente", autorNome: f.agente.nome, agenteId: t.agenteId, texto: `Arte "${plano.titulo}" pronta (R$ ${custoBrl.toFixed(2)}).`, publico: `${f.agente.nome} terminou uma arte nova` });
     const tarefa = await atualizar(tid, { status: "concluida", resultado });
     // ação automática configurada no agente: encaminhar pro gerente de outro setor
     const destino = f.agente.config?.aoConcluir?.encaminharPara;

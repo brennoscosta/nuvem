@@ -24,6 +24,7 @@ import { useEscritorio } from "../store";
 import { useMundo, modoMundo } from "../mundoStore";
 import { MESA } from "../data/layout";
 import type { Evento } from "../data/eventos";
+import { useCartaoAberto } from "../ui/cartaoAberto";
 
 // Entrega os eventos da fila pros agentes
 function Despachante() {
@@ -209,6 +210,9 @@ function Progresso() {
 }
 function AvisoQualidade({ tipo, aoFechar }: { tipo: "baixou" | "travou"; aoFechar: () => void }) {
   useEffect(() => { if (tipo !== "baixou") return; const t = setTimeout(aoFechar, 9000); return () => clearTimeout(t); }, [tipo, aoFechar]);
+  // com cartão ou editor aberto o aviso espera: no celular ele cobria o topo deles (17/11/2026)
+  const cartao = useCartaoAberto();
+  if (cartao) return null;
   return (
     <div className="hud-ilha pointer-events-auto absolute left-1/2 top-40 z-20 w-[min(24rem,calc(100%-1.5rem))] -translate-x-1/2 p-3.5 text-[12.5px] sm:bottom-24 sm:top-auto" role="status">
       {tipo === "baixou" ? (

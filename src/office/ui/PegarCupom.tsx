@@ -15,7 +15,7 @@ export function PegarCupom({ numero, compacto }: { numero: number; compacto?: bo
   const [erro, setErro] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
   useEffect(() => {
-    if (!numero) return;
+    if (numero == null) return; // 0 = a sede da Social RP
     let vivo = true;
     fetch(`/api/workend/cupons/loja/${numero}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((j) => vivo && setEstado({ numero, v: versao, d: j as Dados | null })).catch(() => vivo && setEstado({ numero, v: versao, d: null }));
     return () => { vivo = false; };
@@ -36,7 +36,7 @@ export function PegarCupom({ numero, compacto }: { numero: number; compacto?: bo
   return (
     <div id={compacto ? undefined : "cupons"} className={`scroll-mt-6 ${compacto ? "" : "rounded-2xl border border-[var(--linha,#E3E6EB)] bg-white p-5"}`}>
       {!compacto && <b className="text-[17px] text-[#1D2128]"><Icone nome="cupom" tamanho={18} className="mr-1 inline align-[-3px]" />Cupons da loja</b>}
-      {d.ehDono && <a href="/app/cupons" className={`mt-1 block rounded-xl bg-[#FFF8E6] px-3 py-2 ${t} font-semibold text-[#7A5200]`}><Icone nome="cupom" tamanho={15} className="mr-1 inline align-[-3px]" />Sua loja tem {d.cupons.length} cupom{d.cupons.length > 1 ? "s" : ""} ativo{d.cupons.length > 1 ? "s" : ""} · Validar um código ↗</a>}
+      {d.ehDono && <a href="/app/cupons" className={`mt-1 block rounded-xl bg-[#FFF8E6] px-3 py-2 ${t} font-semibold text-[#7A5200]`}><Icone nome="cupom" tamanho={15} className="mr-1 inline align-[-3px]" />Sua loja tem {d.cupons.length} cupom{d.cupons.length > 1 ? "s" : ""} ativo{d.cupons.length > 1 ? "s" : ""} · Validar um código</a>}
       {!d.ehDono && (
         <ul className={`${compacto ? "space-y-1.5" : "mt-3 space-y-2"}`}>
           {d.cupons.map((c) => (
@@ -52,8 +52,8 @@ export function PegarCupom({ numero, compacto }: { numero: number; compacto?: bo
               </div>
               {c.meu && (
                 <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5">
-                  <span className={`${t} text-[#5B6472]`}>{c.usado ? "Usado ✓" : "Seu código:"} <b className={`font-mono ${compacto ? "text-[14px]" : "text-[17px]"} tracking-wider text-[#1D2128] ${c.usado ? "line-through opacity-60" : ""}`}>{c.meu}</b></span>
-                  {!c.usado && <button type="button" onClick={() => copiar(c.meu as string)} className={`${t} font-semibold text-[#1D4ED8]`}>{copiado === c.meu ? "Copiado ✓" : "Copiar"}</button>}
+                  <span className={`${t} text-[#5B6472]`}>{c.usado ? "Usado" : "Seu código:"} <b className={`font-mono ${compacto ? "text-[14px]" : "text-[17px]"} tracking-wider text-[#1D2128] ${c.usado ? "line-through opacity-60" : ""}`}>{c.meu}</b></span>
+                  {!c.usado && <button type="button" onClick={() => copiar(c.meu as string)} className={`${t} font-semibold text-[#1D4ED8]`}>{copiado === c.meu ? "Copiado" : "Copiar"}</button>}
                 </div>
               )}
             </li>

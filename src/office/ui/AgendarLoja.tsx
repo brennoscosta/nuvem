@@ -137,7 +137,7 @@ export function AgendarLoja({ numero, cor, compacto }: { numero: number; cor: st
           <div className={`${compacto ? "text-sm" : "text-[1.15rem]"} font-bold`}><Icone nome="agenda" tamanho={17} className="mr-1 inline align-[-3px]" />Agendar horário</div>
           <div className={`${compacto ? "text-[11px]" : "text-[13px]"} text-[#5B6472]`}>Escolha o serviço, o dia e o horário. A {dados.empresa} recebe na hora.</div>
         </div>
-        {compacto && <button onClick={() => setAberto(false)} aria-label="Fechar a agenda" className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>}
+        {compacto && <button onClick={() => setAberto(false)} aria-label="Fechar a agenda" className="rounded-full px-2 text-[#5B6472] hover:bg-black/5"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>}
       </div>
 
       {feito && <div className={`mt-2 rounded-xl bg-[#E8F7EE] px-3 py-2 ${tam} font-semibold text-[#14532D]`}><Icone nome="check" tamanho={15} className="mr-1 inline align-[-3px]" />{feito}{feito.startsWith("Horário marcado") && <span className="block font-normal">Você recebe um lembrete no sino 1 hora antes.</span>}</div>}

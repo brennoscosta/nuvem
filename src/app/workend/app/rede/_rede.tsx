@@ -112,8 +112,9 @@ export function RedeDashboard({ nome }: { nome: string }) {
 
       <PainelMissoes />
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_380px]">
-        <div>
+      {/* minmax(0,1fr): a linha de abas rola por dentro e não alarga a página no celular (17/11/2026) */}
+      <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="min-w-0">
           <div className="sem-barra flex gap-1 overflow-x-auto border-b border-[var(--linha)] whitespace-nowrap">
             {([["amigos", `Amigos · ${amigos.length}`, "amizade"], ["conversas", `Conversas · ${conversas.length}`, "conversar"], ["negociacoes", `Negociações${abertas.length ? ` · ${abertas.length} aberta${abertas.length > 1 ? "s" : ""}` : ""}`, "negociar"]] as [Aba, string, NomeIcone][]).map(([id, t, ic]) => <button key={id} onClick={() => setAba(id)} className={`-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-semibold sm:px-4 ${aba === id ? "border-[var(--azul)] text-[var(--azul)]" : "border-transparent text-[var(--tinta-2)]"}`}><Icone nome={ic} tamanho={17} />{t}</button>)}
           </div>

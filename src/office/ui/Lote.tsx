@@ -3,7 +3,7 @@
 // que reflete ao vivo na placa e no tapume do lote. Reservar precisa da conta do WorkEnd.
 import { useEffect, useRef, useState } from "react";
 import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES_EMPRESA, useAgora, promocaoAtiva } from "../mundoStore";
-import { NICHOS, bairroDoLote } from "../data/mundo";
+import { NICHOS, bairroDoLote, nomeNicho } from "../data/mundo";
 import { NomearRua } from "./NomearRua";
 import { FotoPredio } from "./FotoPredio";
 import { useEscritorio } from "../store";
@@ -168,6 +168,7 @@ export function CartaoLote() {
   // lote duplo (12/11/2026): este lote pode ser a ampliação de um vizinho (anexo) ou ter uma ampliação
   const principal = terreno?.anexoDe ? terrenos[terreno.anexoDe] : null;
   const ehAnexo = !!terreno?.anexoDe;
+  const numeroPrincipal = (principal ? LOTE_POR_CHAVE[principal.chave]?.numero : null) ?? l.numero;
   const anexoDeste = !ehAnexo && terreno ? Object.values(terrenos).find((t) => t.anexoDe === chave) ?? null : null;
   const vizinho = `${l.i},${l.j},${l.k ^ 1}`; const vizinhoInfo = LOTE_POR_CHAVE[vizinho];
   const vizinhoLivre = !!vizinhoInfo && vizinhoInfo.lote.tipo !== "praca" && !terrenos[vizinho];
@@ -180,13 +181,15 @@ export function CartaoLote() {
     <div data-tour="cartao-loja" className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · Lote {l.numero}</div>
+          {/* um número só por loja: a ampliação do lote duplo mostra o número da loja principal (17/11/2026) */}
+          <div className="text-[12px] font-semibold text-[#1D4ED8]">Lote {numeroPrincipal}</div>
           <div className="text-lg font-bold">{livre ? "À venda" : ehAnexo ? (ehMeu ? "Ampliação do seu prédio" : principal?.empresaNome ?? terreno.empresaNome) : ehMeu ? "Seu chão" : terreno.empresaNome}</div>
-          <div className="text-xs text-[#5B6472]">20 × 20 m · {descricaoLote(l)}</div>
+          {/* loja aberta não mostra a descrição do terreno antigo ("terreno vazio com uma árvore") */}
+          <div className="text-xs text-[#5B6472]">{livre ? `20 × 20 m · ${descricaoLote(l)}` : terreno?.status === "ativo" ? `${nomeNicho((principal ?? terreno)?.nicho)} · loja aberta` : "Reservado · em obras"}</div>
           {/* bairro do quarteirão (12/11/2026): só identidade visual, qualquer área compra em qualquer bairro */}
           {(() => { const b = bairroDoLote(chave); return b ? <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: b.cor }}>{b.nome}</span> : null; })()}
         </div>
-        <button onClick={() => selecionarLote(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
+        <button onClick={() => selecionarLote(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
       </div>
 
       {livre && (
@@ -249,22 +252,26 @@ export function CartaoLote() {
           )}
           {ehMeu && ativo && terreno.escritorio && (
             // chão comprado: só opções de edição (prédio, setores, equipe, marca, treino, contratação)
-            <div className="mt-3">
-              <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#5B6472]">Editar minha empresa</div>
-              <div className="grid grid-cols-3 gap-1.5 text-center text-[11px] font-semibold">
-                <button onClick={() => abrirEscritorio("predio")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="grid place-items-center"><Icone nome="escritorio" tamanho={20} /></div>Prédio</button>
-                <button onClick={() => abrirEscritorio("setores")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="grid place-items-center"><Icone nome="camadas" tamanho={20} /></div>Setores · {terreno.escritorio.setores.length}</button>
-                <button onClick={() => abrirEscritorio("equipe")} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><div className="grid place-items-center"><Icone nome="equipe" tamanho={20} /></div>Equipe · {terreno.escritorio.equipe.length}</button>
-                <button onClick={() => abrirEscritorio("contratar")} className="rounded-xl bg-[#E3F6EA] px-2 py-2 text-[#166534] hover:bg-[#d2efdc]"><div className="grid place-items-center"><Icone nome="amizade" tamanho={20} /></div>Contratar agentes</button>
-                <button onClick={() => abrirEscritorio("treinar")} className="rounded-xl bg-[#FFF4D6] px-2 py-2 text-[#7A5A00] hover:bg-[#ffeab8]"><div className="grid place-items-center"><Icone nome="selo" tamanho={20} /></div>Treinar</button>
-                <button onClick={abrirPainel} className="rounded-xl bg-[#F1F3F6] px-2 py-2 text-[#1D2128] hover:bg-[#e6e9ee]"><div className="grid place-items-center"><Icone nome="brilho" tamanho={20} /></div>Marca e logo</button>
+            <div className="mt-2">
+              {/* três ações principais (falar, entrar, montar) e o resto em "Mais opções" (17/11/2026, revisão geral:
+                  eram 14 botões em 6 cores) */}
+              <button onClick={() => abrirEscritorio("predio")} className="block w-full rounded-xl bg-[#EEF3FF] px-3 py-2.5 text-center text-sm font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]"><Icone nome="escritorio" tamanho={17} className="mr-1 inline align-[-3px]" />Montar escritório</button>
+              <details className="group mt-2 rounded-2xl bg-[#F6F7F9] px-2.5 py-1.5">
+                <summary className="flex cursor-pointer list-none items-center justify-between py-1 text-[13px] font-semibold text-[#1D2128]"><span className="inline-flex items-center gap-1.5"><Icone nome="ajustes" tamanho={16} />Mais opções da empresa</span><Icone nome="baixo" tamanho={15} className="transition group-open:rotate-180" /></summary>
+                <div className="pb-1.5 pt-1">
+              <div className="grid grid-cols-3 gap-1.5 text-center text-[12px] font-semibold">
+                <button onClick={() => abrirEscritorio("setores")} className="rounded-xl bg-white px-2 py-2 text-[#1D2128] ring-1 ring-black/5 hover:bg-[#EEF3FF] hover:text-[#1D4ED8]"><div className="grid place-items-center"><Icone nome="camadas" tamanho={20} /></div>Setores · {terreno.escritorio.setores.length}</button>
+                <button onClick={() => abrirEscritorio("equipe")} className="rounded-xl bg-white px-2 py-2 text-[#1D2128] ring-1 ring-black/5 hover:bg-[#EEF3FF] hover:text-[#1D4ED8]"><div className="grid place-items-center"><Icone nome="equipe" tamanho={20} /></div>Equipe · {terreno.escritorio.equipe.length}</button>
+                <button onClick={() => abrirEscritorio("contratar")} className="rounded-xl bg-white px-2 py-2 text-[#1D2128] ring-1 ring-black/5 hover:bg-[#EEF3FF] hover:text-[#1D4ED8]"><div className="grid place-items-center"><Icone nome="amizade" tamanho={20} /></div>Contratar agentes</button>
+                <button onClick={() => abrirEscritorio("treinar")} className="rounded-xl bg-white px-2 py-2 text-[#1D2128] ring-1 ring-black/5 hover:bg-[#EEF3FF] hover:text-[#1D4ED8]"><div className="grid place-items-center"><Icone nome="selo" tamanho={20} /></div>Treinar</button>
+                <button onClick={abrirPainel} className="rounded-xl bg-white px-2 py-2 text-[#1D2128] ring-1 ring-black/5 hover:bg-[#EEF3FF] hover:text-[#1D4ED8]"><div className="grid place-items-center"><Icone nome="brilho" tamanho={20} /></div>Marca e logo</button>
               </div>
-              <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-center text-[11px] font-semibold">
-                <button onClick={() => abrirEscritorio("interior")} className="rounded-xl bg-[#F6EEDF] px-2 py-2 text-[#7A4E1F] hover:bg-[#efe3cc]"><Icone nome="casa" tamanho={15} className="mr-1 inline align-[-3px]" />Interior</button>
-                <a href="/app/equipe?aba=vagas" className="rounded-xl bg-[#FFF8D6] px-2 py-2 text-[#7A5A00] hover:bg-[#fff0b3]"><Icone nome="candidato" tamanho={15} className="mr-1 inline align-[-3px]" />Vagas{vagasDoLote > 0 ? ` · ${vagasDoLote}` : ""}</a>
-                <a href="/app/agenda" className="rounded-xl bg-[#EAF7EE] px-2 py-2 text-[#166534] hover:bg-[#d8f0e0]"><Icone nome="agenda" tamanho={15} className="mr-1 inline align-[-3px]" />Agenda</a>
-                <a href="/app/vitrine" className="rounded-xl bg-[#FCE7F3] px-2 py-2 text-[#9D174D] hover:bg-[#fbd5ea]"><Icone nome="sacola" tamanho={15} className="mr-1 inline align-[-3px]" />Vitrine</a>
-                <a href="/app/resultados" className="col-span-2 rounded-xl bg-[#1D2128] px-2 py-2 text-white hover:bg-black"><Icone nome="resultados" tamanho={15} className="mr-1 inline align-[-3px]" />Resultados da loja</a>
+              <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-center text-[12px] font-semibold">
+                <button onClick={() => abrirEscritorio("interior")} className="rounded-xl bg-white px-2 py-2 text-[#1D2128] ring-1 ring-black/5 hover:bg-[#EEF3FF] hover:text-[#1D4ED8]"><Icone nome="casa" tamanho={15} className="mr-1 inline align-[-3px]" />Interior</button>
+                <a href="/app/equipe?aba=vagas" className="rounded-xl bg-white px-2 py-2 text-[#1D2128] ring-1 ring-black/5 hover:bg-[#EEF3FF] hover:text-[#1D4ED8]"><Icone nome="candidato" tamanho={15} className="mr-1 inline align-[-3px]" />Vagas{vagasDoLote > 0 ? ` · ${vagasDoLote}` : ""}</a>
+                <a href="/app/agenda" className="rounded-xl bg-white px-2 py-2 text-[#1D2128] ring-1 ring-black/5 hover:bg-[#EEF3FF] hover:text-[#1D4ED8]"><Icone nome="agenda" tamanho={15} className="mr-1 inline align-[-3px]" />Agenda</a>
+                <a href="/app/vitrine" className="rounded-xl bg-white px-2 py-2 text-[#1D2128] ring-1 ring-black/5 hover:bg-[#EEF3FF] hover:text-[#1D4ED8]"><Icone nome="sacola" tamanho={15} className="mr-1 inline align-[-3px]" />Vitrine</a>
+                <a href="/app/resultados" className="col-span-2 rounded-xl bg-white px-2 py-2 text-[#1D2128] ring-1 ring-black/5 hover:bg-[#EEF3FF] hover:text-[#1D4ED8]"><Icone nome="resultados" tamanho={15} className="mr-1 inline align-[-3px]" />Resultados da loja</a>
               </div>
               <PromocaoDono chave={chave} />
               <div className="mt-1.5"><FotoPredio chave={chave} /></div>
@@ -279,6 +286,8 @@ export function CartaoLote() {
                   <button onClick={ampliar} disabled={ampliando} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{ampliando ? "Reservando…" : `Reservar o Lote ${vizinhoInfo.numero} para ampliar`}</button>
                 </div>
               ) : null}
+                </div>
+              </details>
             </div>
           )}
           {ehMeu && !ativo ? (
@@ -289,9 +298,9 @@ export function CartaoLote() {
                 : <button onClick={() => setConfirma(chave)} className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm font-semibold text-[#5B6472]">Desistir</button>}
             </div>
           ) : ehMeu ? (admin ? <AcoesAdminLote chave={chave} /> : null) : admin ? (
-            <><LojaNoMapa numero={l.numero} ativo={ativo} chave={principal?.chave ?? chave} /><AcoesAdminLote chave={chave} /></>
+            <><LojaNoMapa numero={numeroPrincipal} ativo={ativo} chave={principal?.chave ?? chave} /><AcoesAdminLote chave={chave} /></>
           ) : (
-            <LojaNoMapa numero={l.numero} ativo={ativo} chave={principal?.chave ?? chave} />
+            <LojaNoMapa numero={numeroPrincipal} ativo={ativo} chave={principal?.chave ?? chave} />
           )}
         </>
       )}
@@ -364,14 +373,14 @@ function LojaNoMapa({ numero, ativo, chave }: { numero: number; ativo: boolean; 
       <div className="flex items-center justify-between gap-2"><span className="rounded-full bg-[#EEF3FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">{loja.nicho}</span><span className="flex items-center gap-2"><BotaoSeguir numero={numero} /><Estrelas media={loja.avaliacao.media} n={loja.avaliacao.n} /></span></div>
       {loja.sobre ? <p className="line-clamp-4 whitespace-pre-line text-xs text-[#1D2128]">{loja.sobre}</p> : <p className="text-xs text-[#5B6472]">A empresa ainda não contou o que faz. Pergunte à atendente.</p>}
       <Contatos c={loja.contatos} numero={numero} />
-      {vagas > 0 && <a href={`/loja/${numero}#vagas`} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-[#FFF8D6] px-3 py-2 text-xs font-bold text-[#7A5A00] hover:bg-[#fff0b3]"><span><Icone nome="candidato" tamanho={14} className="mr-1 inline align-[-3px]" />Estamos contratando · {vagas} {vagas === 1 ? "vaga" : "vagas"}</span><span>Ver e me candidatar ↗</span></a>}
+      {vagas > 0 && <a href={`/loja/${numero}#vagas`} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-xl bg-[#FFF8D6] px-3 py-2 text-xs font-bold text-[#7A5A00] hover:bg-[#fff0b3]"><span><Icone nome="candidato" tamanho={14} className="mr-1 inline align-[-3px]" />Estamos contratando · {vagas} {vagas === 1 ? "vaga" : "vagas"}</span><span>Ver e me candidatar</span></a>}
       <VitrineLoja numero={numero} compacto />
       <PegarCupom numero={numero} compacto />
       <AgendarLoja numero={numero} cor={loja.cor} compacto />
       {conversa
         ? <ChatLoja loja={loja} logado={!!usuario} linkEntrar={`/entrar?destino=${encodeURIComponent(`/loja/${numero}`)}`} alto={240} />
         : loja.atendente && <button onClick={() => setConversa(true)} className="w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d]"><Icone nome="conversar" tamanho={17} className="mr-1 inline align-[-3px]" />Conversar com {loja.atendente.nome}</button>}
-      <a href={`/loja/${numero}`} target="_blank" rel="noreferrer" className="block text-center text-[11px] font-semibold text-[#1D4ED8]">Abrir a página da loja ↗</a>
+      <a href={`/loja/${numero}`} target="_blank" rel="noreferrer" className="block text-center text-[11px] font-semibold text-[#1D4ED8]">Abrir a página da loja</a>
     </div>
   );
 }
@@ -421,7 +430,7 @@ export function AvisoPagamento() {
   const cor = aviso.tipo === "ok" ? "bg-[#16A34A]" : aviso.tipo === "falhou" ? "bg-[#E2575B]" : "bg-[#D97706]";
   return (
     <div className={`pointer-events-auto absolute left-1/2 top-20 z-30 flex -translate-x-1/2 items-center gap-3 rounded-2xl ${cor} px-4 py-2.5 text-sm font-semibold text-white shadow-2xl`}>
-      {aviso.texto}<button onClick={() => setAviso(null)} className="rounded-full bg-white/20 px-2">✕</button>
+      {aviso.texto}<button onClick={() => setAviso(null)} className="rounded-full bg-white/20 px-2"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
     </div>
   );
 }
@@ -463,7 +472,7 @@ export function PainelEmpresa() {
           <div className="text-lg font-bold">{editando ? "Editar a placa" : "Como vai se chamar?"}</div>
           <div className="text-xs text-[#5B6472]">Olhe o lote no mapa: a placa e o tapume mudam enquanto você preenche.</div>
         </div>
-        <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
+        <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5" aria-label="Fechar"><Icone nome="fechar" tamanho={16} /></button>
       </div>
 
       <label className="mt-3 block text-xs font-semibold text-[#5B6472]">Nome da empresa

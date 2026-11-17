@@ -3,7 +3,9 @@
 // Desde 12/11/2026 mostra também as vagas abertas ("Estamos contratando", com candidatura).
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
+import { LOTES } from "@/office/data/mundo";
+import { NaoEncontrada } from "../../_nao-encontrada";
 import { usuarioAtual } from "@/server/usuarios";
 import { lojaPublica } from "@/server/equipeCliente";
 import { avaliacoesRecebidas } from "@/server/rede";
@@ -20,6 +22,7 @@ import { AgendarLoja } from "@/office/ui/AgendarLoja";
 import { BotaoSeguir } from "@/office/ui/BotaoSeguir";
 import { PegarCupom } from "@/office/ui/PegarCupom";
 import { VitrineLoja } from "@/office/ui/VitrineLoja";
+import { Icone } from "@/office/ui/Icone";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ numero: string }> };
@@ -36,8 +39,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Loja({ params }: Props) {
   const { numero } = await params;
+  const n = Number(numero) | 0;
+  const lote = LOTES.find((x) => x.numero === n) ?? null;
+  // lote duplo: o número da ampliação leva ao número da loja principal (um número só por loja, 17/11/2026)
+  const t0 = lote ? await obterTerreno(lote.chave).catch(() => null) : null;
+  const principal = t0?.anexoDe ? LOTES.find((x) => x.chave === t0.anexoDe) : null;
+  if (principal) permanentRedirect(`/loja/${principal.numero}`);
   const l = await carregar(numero);
-  if (!l) notFound();
+  if (!l) {
+    if (!lote) notFound();
+    // a loja não está aberta: endereço livre (dá para reservar) ou empresa montando o escritório
+    const livre = !t0 || (t0.status !== "ativo" && t0.status !== "reservado");
+    return livre
+      ? <NaoEncontrada livre chaveLote={lote.chave} titulo={`O lote ${n} está livre`} texto="Ninguém abriu loja neste endereço ainda. Reserve no mapa e ponha a marca da sua empresa na placa, com equipe de IA atendendo quem chega." />
+      : <NaoEncontrada chaveLote={lote.chave} titulo="Esta loja não está aberta agora" texto="A empresa deste endereço está montando o escritório ou com o aluguel em dia por pagar. Enquanto isso, passeie pela cidade e conheça as outras lojas." />;
+  }
   const u = await usuarioAtual().catch(() => null);
   // painel de resultados do dono: uma visita por pessoa por dia (o próprio dono não conta)
   void registrarVisitaDia(await headers(), { chave: l.chave, donoId: l.donoId }, u?.id ?? null, "pagina");
@@ -59,7 +75,7 @@ export default async function Loja({ params }: Props) {
               <span className="mt-1 inline-block rounded-full bg-white/90 px-3 py-1"><EstrelasTexto media={l.avaliacao.media} n={l.avaliacao.n} /></span>
             </div>
           </div>
-          {promo && <p className="relative mt-5 inline-flex flex-wrap items-center gap-2 rounded-full bg-[#E11D48] px-4 py-1.5 text-[15px] font-bold shadow-lg">🏷️ {promo.texto}<span className="font-semibold text-white/80">· até {new Date(promo.ate).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></p>}
+          {promo && <p className="relative mt-5 inline-flex flex-wrap items-center gap-2 rounded-full bg-[#E11D48] px-4 py-1.5 text-[15px] font-bold shadow-lg"><Icone nome="etiqueta" tamanho={17} />{promo.texto}<span className="font-semibold text-white/80">· até {new Date(promo.ate).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></p>}
           <div className="relative mt-6 flex flex-wrap gap-2">
             <BotaoSeguir numero={l.numero} claro />
             <Link href={`/mundo?lote=${encodeURIComponent(l.chave)}`} className="btn" style={{ background: "#fff", color: "var(--ink)" }}>Ver no mapa 3D</Link>

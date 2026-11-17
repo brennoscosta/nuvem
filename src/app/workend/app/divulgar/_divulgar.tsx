@@ -2,6 +2,7 @@
 // Desenha o material no navegador (canvas) e baixa em PNG: Stories 1080×1920 e adesivo quadrado de 15 cm (1772 px, 300 dpi).
 import { useEffect, useRef, useState } from "react";
 import { gerarQR, desenharQR } from "@/lib/qr";
+import { rotuloLoja } from "@/office/data/numeroLoja";
 
 export type DadosDivulgar = { numero: number; empresa: string; cor: string; nicho: string; logo: string | null; predio: string; promo: string | null; link: string; endereco: string };
 
@@ -48,8 +49,8 @@ function desenharStories(c: HTMLCanvasElement, d: DadosDivulgar, predio: HTMLIma
   g.fillStyle = "#FFFFFF"; g.font = "900 92px Inter, Arial, sans-serif";
   const linhas = quebrar(g, d.empresa, W - 160); linhas.forEach((l, i) => g.fillText(l, 80, 1100 + i * 100));
   let y = 1100 + linhas.length * 100 - 30;
-  g.font = "600 40px Inter, Arial, sans-serif"; g.fillStyle = "rgba(255,255,255,.8)"; g.fillText(`${d.nicho} · Lote ${d.numero}`, 80, y + 20); y += 40;
-  if (d.promo) { g.font = "900 44px Inter, Arial, sans-serif"; const tw = g.measureText(`🏷️ ${d.promo}`).width + 64; g.fillStyle = "#E11D48"; retanguloRedondo(g, 80, y + 26, tw, 80, 40); g.fill(); g.fillStyle = "#FFFFFF"; g.fillText(`🏷️ ${d.promo}`, 112, y + 82); }
+  g.font = "600 40px Inter, Arial, sans-serif"; g.fillStyle = "rgba(255,255,255,.8)"; g.fillText(`${d.nicho} · ${rotuloLoja(d.numero)}`, 80, y + 20); y += 40;
+  if (d.promo) { g.font = "900 44px Inter, Arial, sans-serif"; const tw = g.measureText(`${d.promo}`).width + 64; g.fillStyle = "#E11D48"; retanguloRedondo(g, 80, y + 26, tw, 80, 40); g.fill(); g.fillStyle = "#FFFFFF"; g.fillText(`${d.promo}`, 112, y + 82); }
   // QR num cartão branco embaixo
   const qy = 1440; g.save(); g.shadowColor = "rgba(0,0,0,.4)"; g.shadowBlur = 40; g.fillStyle = "#FFFFFF"; retanguloRedondo(g, 80, qy, W - 160, 380, 40); g.fill(); g.restore();
   desenharQR(g, qr, 110, qy + 30, 320);
@@ -67,7 +68,7 @@ function desenharAdesivo(c: HTMLCanvasElement, d: DadosDivulgar, logo: HTMLImage
   g.font = "500 54px Inter, Arial, sans-serif"; g.fillStyle = "rgba(255,255,255,.85)"; g.fillText("a cidade 3D das empresas", L / 2, 296);
   logoQuadrado(g, logo, 120, 450, 220, d.cor, d.empresa);
   g.textAlign = "left"; g.fillStyle = "#1D2128"; g.font = "900 100px Inter, Arial, sans-serif"; quebrar(g, d.empresa, L - 520, 1).forEach((l) => g.fillText(l, 390, 560, L - 520));
-  g.font = "600 56px Inter, Arial, sans-serif"; g.fillStyle = "#5B6472"; g.fillText(`${d.nicho} · Lote ${d.numero}`, 390, 640, L - 520);
+  g.font = "600 56px Inter, Arial, sans-serif"; g.fillStyle = "#5B6472"; g.fillText(`${d.nicho} · ${rotuloLoja(d.numero)}`, 390, 640, L - 520);
   desenharQR(g, qr, (L - 860) / 2, 740, 860);
   g.textAlign = "center"; g.fillStyle = "#1D2128"; g.font = "700 64px Inter, Arial, sans-serif"; g.fillText("Aponte a câmera do celular", L / 2, 1680, L - 160);
   g.font = "700 56px Inter, Arial, sans-serif"; g.fillStyle = d.cor; g.fillText(d.endereco, L / 2, 1748 - 8, L - 160);
@@ -109,7 +110,7 @@ export function Divulgar({ dados }: { dados: DadosDivulgar }) {
           {foto ? "Trocar a foto" : "Usar a foto do meu prédio"}
           <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { const a = e.target.files?.[0]; if (a) setFoto(URL.createObjectURL(a)); e.target.value = ""; }} />
         </label>
-        <p className="mt-1.5 text-[13px] text-[var(--tinta-2)]">Dica: no mapa, abra o cartão da sua loja e toque em “📸 Foto do meu prédio”. A foto sai com o seu nome na placa; depois é só escolher aqui. Também vale uma foto de verdade da loja.</p>
+        <p className="mt-1.5 text-[13px] text-[var(--tinta-2)]">Dica: no mapa, abra o cartão da sua loja e toque em “Foto do meu prédio”. A foto sai com o seu nome na placa; depois é só escolher aqui. Também vale uma foto de verdade da loja.</p>
         <button type="button" onClick={() => baixar(stories.current, `${nomeArq}-stories.png`)} disabled={!pronto} className="btn btn-azul mt-3 w-full !py-2.5 disabled:opacity-50">Baixar imagem para Stories</button>
       </div>
       <div className="rounded-2xl border border-[var(--linha)] p-5">
@@ -121,7 +122,7 @@ export function Divulgar({ dados }: { dados: DadosDivulgar }) {
       <div className="lg:col-span-2 flex flex-wrap items-center gap-2 rounded-2xl bg-[var(--cinza)] px-5 py-4">
         <span className="text-[14px] text-[var(--tinta-2)]">O QR Code leva para</span>
         <code className="min-w-0 max-w-full truncate rounded-lg bg-white px-2 py-1 text-[14px]">{dados.link}</code>
-        <button type="button" onClick={copiar} className="btn btn-claro !px-3 !py-1.5 text-sm">{copiado ? "Copiado ✓" : "Copiar link"}</button>
+        <button type="button" onClick={copiar} className="btn btn-claro !px-3 !py-1.5 text-sm">{copiado ? "Copiado" : "Copiar link"}</button>
       </div>
     </section>
   );

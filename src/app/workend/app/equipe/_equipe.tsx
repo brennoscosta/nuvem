@@ -101,7 +101,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas
           </button>
         ))}
         <span className="ml-auto flex shrink-0 items-center gap-2 pb-1.5 pl-3">
-          {p.lote.numero && <Link href={`/loja/${p.lote.numero}`} className="eq-link">Ver minha loja</Link>}
+          {p.lote.numero != null && <Link href={`/loja/${p.lote.numero}`} className="eq-link">{p.lote.numero === 0 ? "Página da sede" : "Ver minha loja"}</Link>}
           {/* a sede tem a equipe montada por departamento e não passa pelo editor */}
           {!sede && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="eq-link">Montar escritório</Link>}
           {sede && <Link href={`/mundo?sede=${sedeDe(p.lote.chave)?.id ?? "1"}`} className="eq-link">Ver a sede no mapa</Link>}
@@ -231,7 +231,7 @@ function Conversas({ p, membro, q, selecionar, recarregar }: { p: Painel; membro
   };
 
   return (
-    <section className="mt-5 grid gap-4 lg:grid-cols-[340px_1fr]">
+    <section className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
       <ListaEquipe p={p} membro={membro} selecionar={(id) => { setErro(null); selecionar(id); }} />
 
       <div className="flex min-h-[600px] flex-col overflow-hidden rounded-2xl border border-[var(--linha)] bg-[var(--surface)] lg:h-[760px]">
@@ -480,11 +480,11 @@ function Visitantes({ q }: { q: string }) {
   if (!lista) return <p className="mt-6 text-[var(--tinta-2)]">Carregando…</p>;
   if (!lista.length) return <div className="mt-5 rounded-2xl bg-[var(--cinza)] p-7"><b>Ninguém conversou com a loja ainda.</b><p className="mt-1 text-[var(--tinta-2)]">Quando alguém clicar na sua atendente no mapa ou abrir a página da loja, a conversa aparece aqui, com o contato que a pessoa deixar.</p></div>;
   return (
-    <section className="mt-5 grid gap-4 lg:grid-cols-[320px_1fr]">
+    <section className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
       <ul className="space-y-2">
         {lista.map((v) => (
           <li key={v.visitanteId}><button type="button" onClick={() => setAberto(v.visitanteId)} className={`w-full rounded-2xl border p-3 text-left transition ${aberto === v.visitanteId ? "border-[var(--azul)] bg-[var(--surface)] shadow-md" : "border-transparent bg-[var(--cinza)] hover:border-[var(--linha)]"}`}>
-            <span className="flex items-baseline justify-between gap-2"><b>{v.nome ?? "Visitante"}</b><span className="text-[11px] text-[var(--tinta-2)]">{quando(v.ultimaEm)}</span></span>
+            <span className="flex min-w-0 items-baseline justify-between gap-2"><b className="truncate">{v.nome ?? "Visitante"}</b><span className="text-[11px] text-[var(--tinta-2)]">{quando(v.ultimaEm)}</span></span>
             <span className="block truncate text-[13px] text-[var(--tinta-2)]">{v.ultimaFala ?? "—"}</span>
           </button></li>
         ))}

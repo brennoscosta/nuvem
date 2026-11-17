@@ -114,7 +114,7 @@ export function PainelEscritorio() {
     <div className={`${FLUTUANTE} ${LARGO} painel-entra !z-10 flex flex-col overflow-hidden`}>
       <div className="flex items-start justify-between p-4 pb-2">
         <div><div className="text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">Montar escritório</div><div className="text-lg font-bold">Seu prédio, do seu jeito</div><div className="text-xs text-[#5B6472]">O mapa mostra as mudanças na hora. Use “Ver por dentro” pra ver as salas.</div></div>
-        <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
+        <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5" aria-label="Fechar"><Icone nome="fechar" tamanho={16} /></button>
       </div>
       <div className="mx-4 flex gap-1 rounded-xl bg-[#F1F3F6] p-1 text-xs font-semibold">
         {([["predio", "Prédio"], ["visual", "Fachada"], ["interior", "Interior"], ["setores", `Setores ${e.setores.length}`], ["equipe", `Equipe ${e.equipe.length}`]] as const).map(([k, t]) => <button key={k} onClick={() => setAba(k)} className={`flex-1 whitespace-nowrap rounded-lg px-1 py-1.5 ${aba === k ? "bg-white shadow" : "text-[#5B6472]"}`}>{t}</button>)}
@@ -152,7 +152,7 @@ export function PainelEscritorio() {
                   <span className="h-6 w-6 shrink-0 rounded-md border border-black/10" style={{ background: s.cor }} />
                   <input list="cargos-sugeridos" value={s.nome} onChange={(ev) => mudarSetor(s.id, { nome: ev.target.value.slice(0, 28) })} className="min-w-0 flex-1 rounded-md border border-black/10 px-2 py-1 text-sm font-semibold" placeholder="Nome do setor" />
                   <label className="flex items-center gap-1 text-[11px] text-[#5B6472]">mesas<select value={s.mesas} onChange={(ev) => mudarSetor(s.id, { mesas: Number(ev.target.value) })} className="rounded-md border border-black/10 px-1 py-0.5 text-xs">{Array.from({ length: MAX_MESAS_SETOR }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
-                  {e.setores.length > 1 && <button type="button" onClick={() => removerSetor(s.id)} className="rounded-md px-1.5 text-[#E2575B]" title="Remover setor">✕</button>}
+                  {e.setores.length > 1 && <button type="button" onClick={() => removerSetor(s.id)} className="rounded-md px-1.5 text-[#E2575B]" title="Remover setor"><Icone nome="fechar" tamanho={15} /><span className="sr-only">Remover setor</span></button>}
                 </div>
                 <div className="mt-1.5 flex gap-1">{CORES_SETOR.map((c) => <button key={c} type="button" onClick={() => mudarSetor(s.id, { cor: c })} className={`h-4 w-4 rounded-full border ${s.cor === c ? "border-black" : "border-black/10"}`} style={{ background: c }} />)}</div>
               </div>

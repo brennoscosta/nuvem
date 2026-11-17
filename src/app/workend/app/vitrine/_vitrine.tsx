@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { VitrineVisual, precoBR, type DadosVitrine, type ProdutoVitrine } from "@/office/ui/VitrineLoja";
+import { rotuloLoja } from "@/office/data/numeroLoja";
 
 type Produto = ProdutoVitrine & { ativo: boolean; ordem: number };
 type Dados = { lote: { chave: string; numero: number | null; ativo: boolean; empresa: string; cor: string } | null; whatsapp: string | null; max: number; produtos: Produto[] };
@@ -118,12 +119,12 @@ export function VitrinePainel() {
       <section className="faixa pt-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--azul)]">{numero != null ? `Lote ${numero} · ` : ""}{lote?.empresa}</span>
+            <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--azul)]">{numero != null ? `${rotuloLoja(numero)} · ` : ""}{lote?.empresa}</span>
             <h1 className="mt-1 text-[2rem] lg:text-[2.5rem]">Vitrine da loja</h1>
             <p className="mt-2 max-w-[62ch] text-[var(--tinta-2)]">Até {max} produtos com foto e preço. Eles aparecem no cartão da sua loja no mapa e na página da loja, com o botão <b>Pedir no WhatsApp</b>. O pagamento você combina direto com o cliente: o WorkEnd não passa dinheiro adiante.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {numero != null && <a href={`/loja/${numero}#vitrine`} target="_blank" rel="noreferrer" className="btn btn-linha">Ver a página da loja ↗</a>}
+            {numero != null && <a href={`/loja/${numero}#vitrine`} target="_blank" rel="noreferrer" className="btn btn-linha">Ver a página da loja</a>}
             {lote && <Link href={`/mundo?lote=${encodeURIComponent(lote.chave)}`} className="btn btn-claro">Ver no mapa</Link>}
           </div>
         </div>
@@ -220,7 +221,7 @@ export function VitrinePainel() {
           <div className="mt-3 rounded-2xl bg-[#E9EDF2] p-3 sm:p-4">
             {lista.length === 0 ? <p className="py-8 text-center text-sm text-[var(--tinta-2)]">Os produtos à mostra aparecem aqui como o visitante vê.</p>
               : previa === "mapa"
-                ? <div className="mx-auto max-w-[20rem] rounded-2xl bg-white p-3 text-[#1D2128] shadow-xl"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · {numero != null ? `Lote ${numero}` : "sua loja"}</div><div className="mb-2 text-lg font-bold">{lote?.empresa}</div><VitrineVisual d={dPrevia} compacto previa /></div>
+                ? <div className="mx-auto max-w-[20rem] rounded-2xl bg-white p-3 text-[#1D2128] shadow-xl"><div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[#1D4ED8]">WorkEnd · {numero != null ? rotuloLoja(numero) : "sua loja"}</div><div className="mb-2 text-lg font-bold">{lote?.empresa}</div><VitrineVisual d={dPrevia} compacto previa /></div>
                 : <div className="rounded-2xl bg-white p-3"><VitrineVisual d={dPrevia} previa /></div>}
           </div>
           {produtos.some((p) => !p.ativo) && <p className="mt-2 text-xs text-[var(--tinta-2)]">Produtos escondidos não aparecem para os visitantes.</p>}

@@ -5,6 +5,7 @@ import { AREAS, NIVEL } from "../data/org";
 import { SALA } from "../data/layout";
 import { useEscritorio } from "../store";
 import { STATUS } from "./PainelAgente";
+import { Icone } from "./Icone";
 
 export function ModalLogin() {
   const aberto = useEscritorio((s) => s.modalLogin);
@@ -47,7 +48,7 @@ export function CartaoPublico() {
           <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{ background: nv.cor }} /><span className="text-lg font-bold">{a.nome}</span></div>
           <div className="text-xs text-[#5B6472]">{nv.nome} · {a.funcao} · {area.nome} · {SALA[a.sala]?.nome}</div>
         </div>
-        <button onClick={() => selecionar(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5">✕</button>
+        <button onClick={() => selecionar(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
       </div>
       <div className="mt-3 flex items-center gap-2 text-xs"><span className="h-2 w-2 rounded-full" style={{ background: st.cor }} />{st.nome}</div>
       <div className="mt-2 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm italic">“{fala}”</div>

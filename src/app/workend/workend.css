@@ -18,11 +18,16 @@
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-.we h1, .we h2, .we h3, .we .display { font-family: var(--corpo); letter-spacing: -0.03em; line-height: 1.02; font-weight: 700; color: var(--tinta); }
-.we h1 { font-size: clamp(2.6rem, 7vw, 5.4rem); font-weight: 800; }
-.we h2 { font-size: clamp(1.9rem, 4vw, 3rem); }
-.we h3 { font-size: clamp(1.25rem, 2vw, 1.6rem); letter-spacing: -0.02em; line-height: 1.15; }
-.we a { color: inherit; }
+/* títulos e links padrão na camada base (17/11/2026, revisão geral): fora de camada eles venciam as classes do Tailwind
+   (text-[2rem], text-[#1D2128]…), o que deixava títulos gigantes e o botão "Seguir" branco no branco. As classes .pn-, .eq-
+   e companhia (fora de camada) continuam mandando; o Tailwind também, quando a tela pede um tamanho ou cor. */
+@layer base {
+  .we h1, .we h2, .we h3, .we .display { font-family: var(--corpo); letter-spacing: -0.03em; line-height: 1.02; font-weight: 700; color: var(--tinta); }
+  .we h1 { font-size: clamp(2.6rem, 7vw, 5.4rem); font-weight: 800; }
+  .we h2 { font-size: clamp(1.9rem, 4vw, 3rem); }
+  .we h3 { font-size: clamp(1.25rem, 2vw, 1.6rem); letter-spacing: -0.02em; line-height: 1.15; }
+  .we a { color: inherit; }
+}
 .we .faixa { width: min(1180px, calc(100% - 2.5rem)); margin-inline: auto; }
 .we .secao { padding-block: clamp(3.5rem, 8vw, 7rem); }
 
