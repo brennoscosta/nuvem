@@ -33,3 +33,37 @@ export function centroDaSala(setores: Setor[], id: string): [number, number] | n
   const s = montarSalas(setores).find((x) => x.id === id);
   return s ? [cx(s), (s.z0 + s.z1) / 2] : null;
 }
+
+// ---------- paredes e lugares de trabalho (17/11/2026): os mesmos números da cena 3D (scene/OneStateInterior.tsx ›
+// Fixos) e do andar por dentro (data/plantaInterna.ts), para a parede desenhada ser a mesma que barra o personagem ----------
+export const ESP_PAREDE = 0.12, PORTA_SALA = 1.5, PORTA_RUA = 3;
+export type Pedaco = { x: number; z: number; w: number; d: number }; // centro e tamanho (x = largura, z = profundidade)
+export function paredesDaSede(salas: Sala[]): Pedaco[] {
+  const pedacos: Pedaco[] = [];
+  const muroX = (x0: number, x1: number, z: number, vaos: [number, number][] = []) => { let a = x0; for (const [c, l] of [...vaos].sort((p, q) => p[0] - q[0])) { if (c - l / 2 > a) pedacos.push({ x: (a + c - l / 2) / 2, z, w: c - l / 2 - a, d: ESP_PAREDE }); a = c + l / 2; } if (x1 > a) pedacos.push({ x: (a + x1) / 2, z, w: x1 - a, d: ESP_PAREDE }); };
+  const muroZ = (z0: number, z1: number, x: number) => pedacos.push({ x, z: (z0 + z1) / 2, w: ESP_PAREDE, d: z1 - z0 });
+  // fundo norte fechado; frente sul com a entrada da recepção; laterais
+  muroX(X0, X1, Z0);
+  const rec = salas.find((s) => s.tipo === "recepcao");
+  muroX(X0, X1, Z1, rec ? [[cx(rec), PORTA_RUA]] : []);
+  muroZ(Z0, Z1, X0); muroZ(Z0, Z1, X1);
+  // as duas paredes do corredor, com uma porta para cada sala
+  for (const norte of [true, false]) muroX(X0, X1, norte ? ZC - CORREDOR / 2 : ZC + CORREDOR / 2, salas.filter((s) => s.norte === norte).map((s) => [cx(s), PORTA_SALA]));
+  // divisórias entre as salas
+  for (let i = 1; i < POR_FILEIRA; i++) { const x = X0 + i * LARG; muroZ(Z0, ZC - CORREDOR / 2, x); muroZ(ZC + CORREDOR / 2, Z1, x); }
+  return pedacos;
+}
+// lugares de trabalho: todos olham para o sul (de frente para a câmera); o chefe na mesa maior, mais ao fundo
+export type LugarSede = { pos: [number, number, number]; mesa: [number, number, number]; chefe: boolean };
+export function lugaresDaSala(s: Sala, n: number): LugarSede[] {
+  const out: LugarSede[] = [];
+  const fundoZ = s.norte ? s.z0 + 2.3 : s.z1 - 9.6; // fila do chefe (longe do corredor na fileira norte)
+  const linhas = s.norte ? [fundoZ, fundoZ + 3.6, fundoZ + 7.0] : [s.z0 + 3.4, s.z0 + 6.8, s.z0 + 10.2];
+  const vagas: { x: number; z: number; chefe: boolean }[] = [{ x: cx(s), z: linhas[0], chefe: true }];
+  for (const z of linhas.slice(1)) for (const dx of [-1.25, 1.25]) vagas.push({ x: cx(s) + dx, z, chefe: false });
+  for (let k = 0; k < Math.min(n, vagas.length); k++) {
+    const v = vagas[k];
+    out.push({ mesa: [v.x, 0, v.z], pos: [v.x, 0, v.z - 0.62], chefe: v.chefe });
+  }
+  return out;
+}

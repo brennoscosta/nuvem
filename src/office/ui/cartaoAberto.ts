@@ -8,7 +8,7 @@ import { useChatEquipe } from "./ChatEquipe";
 export function useCartaoAberto() {
   const mundo = useMundo((s) => !!s.loteSelecionado || s.painelEmpresa || s.painelEscritorio || !!s.outdoorSelecionado);
   const sede = useSede((s) => s.aberto);
-  const personagem = usePersonagem((s) => s.painel !== null || s.predio?.fase === "recepcao");
+  const personagem = usePersonagem((s) => s.painel !== null || (s.predio?.fase === "recepcao" || s.predio?.fase === "dentro"));
   const chat = useChatEquipe((s) => s.aberto);
   return mundo || sede || personagem || chat;
 }

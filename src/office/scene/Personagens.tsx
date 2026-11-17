@@ -23,6 +23,8 @@ function passouPor(ponto: [number, number]) {
   if (p.fase === "indo" && perto(ponto, p.fora)) { usePersonagem.setState({ predio: { ...p, fase: "entrando" } }); useEscritorio.getState().setVista("dentro"); useMundo.setState({ alvoCamera: [p.espera[0], 0.5, p.espera[1]] }); }
   // saindo: passou pela porta, a vista volta para fora
   else if (p.fase === "saindo" && perto(ponto, p.porta)) useEscritorio.getState().setVista("fora");
+  // saindo e passou pela calçada (tocou na rua estando dentro): a visita acaba aqui e ele segue pela rua
+  else if (p.fase === "saindo" && perto(ponto, p.fora)) usePersonagem.setState({ predio: null, falaRecepcao: null });
 }
 // chegou no balcão: o dono é reconhecido na hora; o visitante espera a vez (mais 4 s por pessoa na frente dele)
 function chegouNoBalcao() {

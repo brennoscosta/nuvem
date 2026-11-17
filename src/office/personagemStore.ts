@@ -9,12 +9,15 @@ import { useChamada, type ChamadaInfo } from "./chamadaStore";
 import { rota } from "./data/caminhos";
 import type { Entrada } from "./data/entradas";
 import { useSede } from "./sedeStore";
+import { plantaPorChave, rotaDentro, dentroDoPredio, areaDaEquipe, portaDentroMundo } from "./data/plantaInterna";
 
 // Dentro de um prédio (17/11/2026, pedido do dono: "preciso que possa entrar, e que apareça uma porta ou se direcione para a
 // recepção onde será atendido"): o personagem vai pela rua até a calçada da porta (indo), passa pela porta e anda até o
 // balcão (entrando; a vista vira "por dentro"), fica na recepção (o dono é reconhecido; o visitante espera a vez e é
 // atendido pela atendente) e sai pelo mesmo caminho (saindo). Quem anda é scene/Personagens.tsx; o balcão é ui/Recepcao.tsx.
-export type FasePredio = "indo" | "entrando" | "recepcao" | "saindo";
+// "dentro": andando livre por dentro (17/11/2026, data/plantaInterna.ts): dono e sócio por todo o prédio; visitante na
+// recepção, no hall e no corredor/café
+export type FasePredio = "indo" | "entrando" | "recepcao" | "dentro" | "saindo";
 export type PredioAtual = Pick<Entrada, "chave" | "nome" | "numero" | "fora" | "porta" | "espera" | "olhar" | "centro"> & { fase: FasePredio; visita: number; fila: number; esperaMs: number };
 
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
@@ -60,6 +63,9 @@ interface Estado {
   falaRecepcao: { chave: string; texto: string } | null; // o que a atendente está dizendo (balão na cena)
   entrarNoPredio: (e: Entrada) => void;
   sairDoPredio: () => void;
+  andarNoPredio: (x: number, z: number) => void; // tocar no chão estando dentro (ou fora: sai pela porta e segue na rua)
+  voltarRecepcao: () => void;
+  avisoPredio: { texto: string; n: number } | null; // "Área só da equipe" e afins (ui/Recepcao.tsx mostra por uns segundos)
   fechar: () => void;
   irPara: (x: number, z: number) => void;
   setPosicao: (x: number, z: number, rot: number) => void;
@@ -85,7 +91,7 @@ export const minhaPos = { x: 0, z: 21.3, rot: 0, vel: 0 };
 let batidaPendente: ReturnType<typeof setTimeout> | null = null;
 
 export const usePersonagem = create<Estado>((set, get) => ({
-  carregado: false, meu: null, ativo: false, preco: 5.9, precoCheio: 19.9, pagamentoLigado: false, outros: [], naoLidas: 0, pedidos: 0, amigos: [], listaPedidos: [], negociacoes: [], destino: null, rota: [], predio: null, falaRecepcao: null, passeio: false, posicao: [0, 21.3, 0], painel: null, outroSelecionado: null, mensagens: [], conversas: [], erro: null, itens: null,
+  carregado: false, meu: null, ativo: false, preco: 5.9, precoCheio: 19.9, pagamentoLigado: false, outros: [], naoLidas: 0, pedidos: 0, amigos: [], listaPedidos: [], negociacoes: [], destino: null, rota: [], predio: null, falaRecepcao: null, avisoPredio: null, passeio: false, posicao: [0, 21.3, 0], painel: null, outroSelecionado: null, mensagens: [], conversas: [], erro: null, itens: null,
 
   carregarItens: async () => {
     const r = await fetch("/api/workend/itens", { cache: "no-store" }).catch(() => null);
@@ -139,8 +145,10 @@ export const usePersonagem = create<Estado>((set, get) => ({
   // tocar no chão: caminho pelas ruas e calçadas, sem atravessar prédio (17/11/2026)
   irPara: (x, z) => {
     const st = get(); if (!st.ativo) return;
-    // dentro do prédio não atravessa parede: sai pelo botão "Sair do prédio" (a caminho da porta, um toque cancela a entrada)
-    if (st.predio && st.predio.fase !== "indo") return;
+    // dentro do prédio anda pelo caminho interno (paredes e portas, data/plantaInterna.ts); entrando ou saindo, espera
+    // chegar; a caminho da porta, um toque cancela a entrada
+    if (st.predio && (st.predio.fase === "entrando" || st.predio.fase === "saindo")) return;
+    if (st.predio && (st.predio.fase === "recepcao" || st.predio.fase === "dentro")) { st.andarNoPredio(x, z); return; }
     const [primeiro, ...resto] = rota([minhaPos.x, minhaPos.z], [x, z]);
     set({ destino: primeiro ?? null, rota: resto, passeio: false, predio: null }); get().avisarMovimento();
   },
@@ -148,7 +156,9 @@ export const usePersonagem = create<Estado>((set, get) => ({
     const st = get(); if (!st.ativo) return;
     if (st.predio && st.predio.fase !== "indo" && st.predio.chave !== e.chave) return; // primeiro sai do prédio em que está
     if (st.predio?.chave === e.chave && st.predio.fase !== "indo") return;
-    const [primeiro, ...resto] = [...rota([minhaPos.x, minhaPos.z], e.fora), e.porta, e.espera];
+    const pl = plantaPorChave(e.chave, useMundo.getState().terrenos);
+    const porDentro = pl ? [portaDentroMundo(pl), ...(rotaDentro(pl, portaDentroMundo(pl), e.espera, false) ?? [e.espera])] : [e.espera];
+    const [primeiro, ...resto] = [...rota([minhaPos.x, minhaPos.z], e.fora), e.porta, ...porDentro];
     set({ destino: primeiro, rota: resto, passeio: false, falaRecepcao: null,
       predio: { chave: e.chave, nome: e.nome, numero: e.numero, fora: e.fora, porta: e.porta, espera: e.espera, olhar: e.olhar, centro: e.centro, fase: "indo", visita: (st.predio?.visita ?? 0) + 1, fila: 0, esperaMs: 0 } });
     useMundo.setState({ loteSelecionado: null, alvoCamera: [e.fora[0], 0.5, e.fora[1]] });
@@ -158,7 +168,45 @@ export const usePersonagem = create<Estado>((set, get) => ({
   sairDoPredio: () => {
     const p = get().predio; if (!p) return;
     if (p.fase === "indo") { set({ predio: null, destino: null, rota: [], falaRecepcao: null }); return; }
-    set({ destino: p.porta, rota: [p.fora], passeio: false, predio: { ...p, fase: "saindo" }, falaRecepcao: null }); get().avisarMovimento();
+    // de onde estiver por dentro até a porta, pelo caminho interno, e então para a calçada
+    const pl = plantaPorChave(p.chave, useMundo.getState().terrenos);
+    const publico = !useMundo.getState().meus.includes(p.chave);
+    const ate = pl ? rotaDentro(pl, [minhaPos.x, minhaPos.z], portaDentroMundo(pl), publico) ?? [portaDentroMundo(pl)] : [];
+    const [primeiro, ...resto] = [...ate, p.porta, p.fora];
+    set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "saindo" }, falaRecepcao: null }); get().avisarMovimento();
+  },
+  andarNoPredio: (x, z) => {
+    const st = get(), p = st.predio; if (!p) return;
+    const mundo = useMundo.getState();
+    const pl = plantaPorChave(p.chave, mundo.terrenos); if (!pl) return;
+    const publico = !mundo.meus.includes(p.chave);
+    const de: [number, number] = [minhaPos.x, minhaPos.z];
+    const avisar = (texto: string) => set({ avisoPredio: { texto, n: (st.avisoPredio?.n ?? 0) + 1 } });
+    if (dentroDoPredio(pl, x, z)) {
+      // visitante: salas da equipe, do CEO e de reunião são só da equipe
+      if (publico && areaDaEquipe(pl, x, z)) { avisar("Área só da equipe"); return; }
+      const r = rotaDentro(pl, de, [x, z], publico);
+      if (!r || !r.length) { avisar("Não dá para chegar aí por dentro"); return; }
+      const [primeiro, ...resto] = r;
+      set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "dentro" }, falaRecepcao: null });
+      // a câmera vai de leve até onde o personagem vai (quem arrasta continua mandando)
+      useMundo.setState({ alvoCamera: [x, 0.5, z] });
+      get().avisarMovimento(); return;
+    }
+    // tocou fora do prédio: sai pela porta e segue pela rua até o ponto tocado
+    const ate = rotaDentro(pl, de, portaDentroMundo(pl), publico) ?? [portaDentroMundo(pl)];
+    const [primeiro, ...resto] = [...ate, p.porta, p.fora, ...rota(p.fora, [x, z])];
+    set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "saindo" }, falaRecepcao: null });
+    get().avisarMovimento();
+  },
+  voltarRecepcao: () => {
+    const p = get().predio; if (!p || p.fase !== "dentro") return;
+    const mundo = useMundo.getState();
+    const pl = plantaPorChave(p.chave, mundo.terrenos);
+    const r = pl ? rotaDentro(pl, [minhaPos.x, minhaPos.z], p.espera, !mundo.meus.includes(p.chave)) : null;
+    const [primeiro, ...resto] = r && r.length ? r : [p.espera];
+    // "entrando": ao chegar no balcão a recepção atende de novo (scene/Personagens.tsx › chegouNoBalcao)
+    set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "entrando" } }); get().avisarMovimento();
   },
   setPosicao: (x, z, rot) => { minhaPos.x = x; minhaPos.z = z; minhaPos.rot = rot; set({ posicao: [x, z, rot] }); },
   // mudou o destino (clique, passeio ou chegada): manda a batida logo, pra quem olha de fora acompanhar sem atraso

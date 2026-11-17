@@ -68,17 +68,39 @@ export function Recepcao() {
   const chatAberto = useChatEquipe((s) => s.aberto);
   if (!predio) return <PertoDaPorta />;
   if (predio.fase !== "recepcao" || chatAberto) {
-    const t = predio.fase === "indo" ? `A caminho de ${predio.nome}…` : predio.fase === "entrando" ? `Entrando em ${predio.nome}…` : predio.fase === "saindo" ? `Saindo de ${predio.nome}…` : `Na recepção de ${predio.nome}`;
+    const t = predio.fase === "indo" ? `A caminho de ${predio.nome}…` : predio.fase === "entrando" ? `Entrando em ${predio.nome}…` : predio.fase === "saindo" ? `Saindo de ${predio.nome}…` : predio.fase === "dentro" ? `Dentro de ${predio.nome}` : `Na recepção de ${predio.nome}`;
     return (
-      <div className={`${CAIXA} flex justify-center`}>
-        <div className="hud-ilha inline-flex items-center gap-3 rounded-full py-1.5 pl-4 pr-1.5 text-sm font-semibold text-white shadow-xl">
-          <span>{t}</span>
-          {predio.fase !== "saindo" && <button type="button" onClick={() => usePersonagem.getState().sairDoPredio()} className="rounded-full bg-white/10 px-3 py-1.5 text-[13px] hover:bg-white/20">{predio.fase === "indo" ? "Cancelar" : "Sair do prédio"}</button>}
+      <>
+        <AvisoPredio />
+        <div className={`${CAIXA} flex justify-center`}>
+          <div className="hud-ilha inline-flex max-w-full items-center gap-2 rounded-full py-1.5 pl-4 pr-1.5 text-sm font-semibold text-white shadow-xl">
+            <span className="min-w-0 truncate">{t}</span>
+            {/* andando por dentro (data/plantaInterna.ts): toque no chão para ir a outro lugar; voltar ao balcão ou sair */}
+            {predio.fase === "dentro" && <button type="button" onClick={() => usePersonagem.getState().voltarRecepcao()} className="shrink-0 whitespace-nowrap rounded-full bg-white/10 px-3 py-1.5 text-[13px] hover:bg-white/20">Ir à recepção</button>}
+            {predio.fase !== "saindo" && <button type="button" onClick={() => usePersonagem.getState().sairDoPredio()} className="shrink-0 whitespace-nowrap rounded-full bg-white/10 px-3 py-1.5 text-[13px] hover:bg-white/20">{predio.fase === "indo" ? "Cancelar" : "Sair do prédio"}</button>}
+          </div>
         </div>
-      </div>
+      </>
     );
   }
-  return <Balcao key={predio.visita} />;
+  return <><AvisoPredio /><Balcao key={predio.visita} /></>;
+}
+
+// aviso curto por cima ("Área só da equipe", "Não dá para chegar aí por dentro"), some sozinho
+function AvisoPredio() {
+  const aviso = usePersonagem((s) => s.avisoPredio);
+  const [visto, setVisto] = useState(0);
+  useEffect(() => {
+    if (!aviso) return;
+    const t = setTimeout(() => setVisto(aviso.n), 2600);
+    return () => clearTimeout(t);
+  }, [aviso]);
+  if (!aviso || visto === aviso.n) return null;
+  return (
+    <div className="pointer-events-none absolute inset-x-2 top-24 z-30 flex justify-center" role="status">
+      <span className="hud-ilha inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-xl"><Icone nome="chave" tamanho={15} />{aviso.texto}</span>
+    </div>
+  );
 }
 
 // no balcão da recepção

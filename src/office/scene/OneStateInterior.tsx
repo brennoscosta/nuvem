@@ -26,28 +26,15 @@ import { aparenciaAgente, hash } from "../data/aparenciaAgente";
 import { OS_X, OS_Z } from "../data/onestate";
 import type { Sede } from "../data/sedes";
 import type { Escritorio, Membro } from "../data/escritorio";
-import { W, D, X0, Z0, X1, Z1, CORREDOR, ZC, POR_FILEIRA, LARG, cx, montarSalas, type Sala } from "../data/plantaSede";
+import { W, D, X0, Z0, X1, Z1, CORREDOR, ZC, POR_FILEIRA, LARG, cx, montarSalas, paredesDaSede, lugaresDaSala, type Sala, type LugarSede } from "../data/plantaSede";
 
 // ---------- planta (salas em src/office/data/plantaSede.ts) ----------
-const ALT = 1.15, ESP = 0.12, PORTA = 1.5;
+const ALT = 1.15;
 const zDentro = (s: Sala) => (s.norte ? s.z1 - 1.1 : s.z0 + 1.1);
 
 const clarear = (hex: string, k: number) => { const n = parseInt(hex.slice(1), 16); const f = (v: number) => Math.round(v + (255 - v) * k).toString(16).padStart(2, "0"); return `#${f((n >> 16) & 255)}${f((n >> 8) & 255)}${f(n & 255)}`; };
 
-// lugares de trabalho: todos olham para o sul (de frente para a câmera); o chefe na mesa maior, mais ao fundo
-type Lugar = { pos: [number, number, number]; mesa: [number, number, number]; chefe: boolean };
-function lugaresDaSala(s: Sala, n: number): Lugar[] {
-  const out: Lugar[] = [];
-  const fundoZ = s.norte ? s.z0 + 2.3 : s.z1 - 9.6; // fila do chefe (longe do corredor na fileira norte)
-  const linhas = s.norte ? [fundoZ, fundoZ + 3.6, fundoZ + 7.0] : [s.z0 + 3.4, s.z0 + 6.8, s.z0 + 10.2];
-  const vagas: { x: number; z: number; chefe: boolean }[] = [{ x: cx(s), z: linhas[0], chefe: true }];
-  for (const z of linhas.slice(1)) for (const dx of [-1.25, 1.25]) vagas.push({ x: cx(s) + dx, z, chefe: false });
-  for (let k = 0; k < Math.min(n, vagas.length); k++) {
-    const v = vagas[k];
-    out.push({ mesa: [v.x, 0, v.z], pos: [v.x, 0, v.z - 0.62], chefe: v.chefe });
-  }
-  return out;
-}
+type Lugar = LugarSede; // lugares de trabalho: data/plantaSede.ts › lugaresDaSala (o andar por dentro usa os mesmos)
 
 // frases da rotina (genéricas: os visitantes não veem nada da empresa); o dono vê as conversas de verdade
 const FRASES_CHEFE = ["Como está essa entrega?", "Preciso disso até o fim do dia.", "Bom trabalho, vamos fechar.", "Me manda o resumo depois.", "Prioridade agora é essa."];
@@ -56,18 +43,9 @@ const FRASES_EQUIPE = ["Terminei a minha parte.", "Pode revisar pra mim?", "Tenh
 // ---------- paredes e móveis (juntados num objeto só) ----------
 function Fixos({ salas, lugares, sede }: { salas: Sala[]; lugares: Record<string, Lugar[]>; sede: Sede }) {
   const parede = mat("#F4F1EB", { rough: 0.9 }), friso = mat(sede.cor, { rough: 0.35, metal: 0.7 });
-  const pedacos: { x: number; z: number; w: number; d: number }[] = [];
-  const muroX = (x0: number, x1: number, z: number, vaos: [number, number][] = []) => { let a = x0; for (const [c, l] of [...vaos].sort((p, q) => p[0] - q[0])) { if (c - l / 2 > a) pedacos.push({ x: (a + c - l / 2) / 2, z, w: c - l / 2 - a, d: ESP }); a = c + l / 2; } if (x1 > a) pedacos.push({ x: (a + x1) / 2, z, w: x1 - a, d: ESP }); };
-  const muroZ = (z0: number, z1: number, x: number) => pedacos.push({ x, z: (z0 + z1) / 2, w: ESP, d: z1 - z0 });
-  // fundo norte fechado; frente sul com a entrada da recepção; laterais
-  muroX(X0, X1, Z0);
+  // paredes: data/plantaSede.ts › paredesDaSede (as mesmas que barram o personagem por dentro, data/plantaInterna.ts)
+  const pedacos = paredesDaSede(salas);
   const rec = salas.find((s) => s.tipo === "recepcao");
-  muroX(X0, X1, Z1, rec ? [[cx(rec), 3]] : []);
-  muroZ(Z0, Z1, X0); muroZ(Z0, Z1, X1);
-  // as duas paredes do corredor, com uma porta para cada sala
-  for (const norte of [true, false]) muroX(X0, X1, norte ? ZC - CORREDOR / 2 : ZC + CORREDOR / 2, salas.filter((s) => s.norte === norte).map((s) => [cx(s), PORTA]));
-  // divisórias entre as salas
-  for (let i = 1; i < POR_FILEIRA; i++) { const x = X0 + i * LARG; muroZ(Z0, ZC - CORREDOR / 2, x); muroZ(ZC + CORREDOR / 2, Z1, x); }
   const reuniao = salas.find((s) => s.tipo === "reuniao");
   return (
     <group>
@@ -307,11 +285,17 @@ function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: Re
 
   const inicio = sentar.pts[0];
   // dono: abre a conversa com esta pessoa no mapa (ChatEquipe); visitante: o cartão da sede
-  const clicar = () => { if (dono) void abrirChatEquipe(ctx.sede.chave, m.id); else useMundo.getState().selecionarLote(ctx.sede.chave); };
+  // estando dentro deste prédio (17/11/2026), clicar numa pessoa também leva o personagem até ela (data/plantaInterna.ts)
+  const dentroDaqui = () => { const p = usePersonagem.getState().predio; return !!p && p.chave === ctx.sede.chave && (p.fase === "recepcao" || p.fase === "dentro"); };
+  const clicar = (px: number, pz: number) => {
+    if (dono) { void abrirChatEquipe(ctx.sede.chave, m.id); if (dentroDaqui()) usePersonagem.getState().irPara(px, pz); }
+    else if (dentroDaqui()) usePersonagem.getState().irPara(px, pz);
+    else useMundo.getState().selecionarLote(ctx.sede.chave);
+  };
   return (
     <group ref={corpo} position={[inicio[0], 0, inicio[1]]}>
       <BonecoProcedural ref={h} def={def} camisa={camisa} headset={m.papel === "atendente"} cracha={m.nivel === "ceo" ? "#D4A017" : "#1D4ED8"} />
-      <mesh position={[0, 0.7, 0]} onClick={(e) => { e.stopPropagation(); clicar(); }}
+      <mesh position={[0, 0.7, 0]} onClick={(e) => { e.stopPropagation(); clicar(e.point.x, e.point.z); }}
         onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = "pointer"; }} onPointerOut={() => { setHover(false); document.body.style.cursor = ""; }}>
         <cylinderGeometry args={[0.4, 0.4, 1.5, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>

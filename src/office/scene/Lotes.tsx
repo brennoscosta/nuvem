@@ -17,6 +17,7 @@ import { Estatico } from "./Estatico";
 import { QUARTEIROES, centroLote, frenteDoLote, LOTE, nomeNicho, type ModeloCasa } from "../data/mundo";
 import { useMundo, LOTES, LOTE_POR_CHAVE, useAgora, promocaoAtiva, type Rascunho } from "../mundoStore";
 import { useDestaque } from "../destaque";
+import { usePersonagem } from "../personagemStore";
 
 // Altura real (m) e pra onde o modelo olha (rotação que leva a frente do GLB pro +z)
 const CASA: Record<ModeloCasa, { altura: number; frente: number }> = {
@@ -180,7 +181,13 @@ function AlvoLote({ chave, centro, estado }: { chave: string; centro: [number, n
   return (
     <group position={[centro[0], 0, centro[1]]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]} geometry={plano(LOTE - 0.8, LOTE - 0.8)} visible={false}
-        onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); selecionarLote(chave); }}
+        onClick={(e: ThreeEvent<MouseEvent>) => {
+          e.stopPropagation();
+          // dentro deste prédio (17/11/2026): tocar no chão anda por dentro (data/plantaInterna.ts), não abre o cartão
+          const st = usePersonagem.getState(), p = st.predio, principal = useMundo.getState().terrenos[chave]?.anexoDe ?? chave;
+          if (p && p.chave === principal && (p.fase === "recepcao" || p.fase === "dentro")) { st.irPara(e.point.x, e.point.z); return; }
+          selecionarLote(chave);
+        }}
         onPointerOver={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setLoteHover(chave); document.body.style.cursor = "pointer"; }}
         onPointerOut={() => { setLoteHover(null); document.body.style.cursor = ""; }} />
       {estado && (

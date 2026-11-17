@@ -260,7 +260,8 @@ export function InteriorFixo({ e, cor, logo = null }: { e: Escritorio; cor: stri
       {/* divisórias da frente: recepção | hall | CEO (vidro na do CEO) */}
       {/* divisória recepção | hall, com uma passagem perto da frente: o visitante vem da porta da rua até o balcão */}
       {P({ de: [-2.2, Z0 + 1.5], ate: [-2.2, zMeio] })}
-      <ParedeBaixa de={[2.2, Z0]} ate={[2.2, zMeio]} cor="#CFE6EE" />
+      {/* vidro do CEO com porta (17/11/2026: o dono anda por dentro, data/plantaInterna.ts) */}
+      <ParedeComPorta de={[2.2, Z0]} ate={[2.2, zMeio]} vao={1.2} cor="#CFE6EE" />
       {/* divisa frente/fundo com porta pra cada sala do fundo */}
       {planta.salas.filter((s) => s.tipo === "setor").map((s) => (
         <group key={s.id}>
@@ -275,8 +276,9 @@ export function InteriorFixo({ e, cor, logo = null }: { e: Escritorio; cor: stri
       <MesaBaixa position={[X0 + 2.2, 0, -2.6]} />
       {it.plantas && <Planta position={[X0 + 0.6, 0, Z0 + 0.7]} />}
       {!it.quadros && <Quadro position={[X0 + 0.07, 1.0, -4.6]} rotation={Math.PI / 2} largura={1.4} cor={cor} />}
-      {/* hall: café */}
-      <Cafe position={[0, 0, zMeio - 0.6]} rotation={Math.PI} />
+      {/* hall: café no canto oeste do fundo, encostado na divisória (17/11/2026: no meio do fundo ele tapava a porta das
+          salas de trás e o personagem não passava; data/plantaInterna.ts) */}
+      <Cafe position={[-1.85, 0, zMeio - 0.85]} rotation={Math.PI / 2} />
       {/* sala do CEO */}
       {it.plantas && <Planta position={[X1 - 0.7, 0, Z0 + 0.7]} />}
       {!it.quadros && <Quadro position={[X1 - 0.07, 1.0, -4.4]} rotation={-Math.PI / 2} largura={1.6} cor="#F6EEDF" />}
@@ -382,7 +384,13 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
   // atendente de IA (desde 11/11/2026 basta a conta). O dono do lote (16/11/2026): clicar abre a conversa com ESSA pessoa,
   // para dar tarefas ali mesmo (src/office/ui/ChatEquipe.tsx).
   const dono = useMundo((s) => !!s.usuario && (s.terrenos[chave]?.usuarioId === s.usuario.id || s.meus.includes(chave)));
-  const clicar = () => { if (dono) void abrirChatEquipe(chave, m.id); else useMundo.getState().selecionarLote(chave); };
+  // estando dentro deste prédio (17/11/2026), clicar numa pessoa também leva o personagem até ela (data/plantaInterna.ts)
+  const dentroDaqui = () => { const p = usePersonagem.getState().predio; return !!p && p.chave === chave && (p.fase === "recepcao" || p.fase === "dentro"); };
+  const clicar = (px: number, pz: number) => {
+    if (dono) { void abrirChatEquipe(chave, m.id); if (dentroDaqui()) usePersonagem.getState().irPara(px, pz); }
+    else if (dentroDaqui()) usePersonagem.getState().irPara(px, pz);
+    else useMundo.getState().selecionarLote(chave);
+  };
   // a atendente fala com quem chega na recepção (17/11/2026, ui/Recepcao.tsx)
   const falaRec = usePersonagem((s) => (m.papel === "atendente" && s.falaRecepcao?.chave === chave ? s.falaRecepcao.texto : null));
   return (
@@ -393,7 +401,7 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
         </Html>
       )}
       <BonecoProcedural ref={h} def={def} camisa={m.camisa} headset={m.papel === "atendente"} cracha={m.papel === "ceo" ? "#D4A017" : "#1D4ED8"} />
-      <mesh position={[0, 0.7, 0]} onClick={(e) => { e.stopPropagation(); clicar(); }} onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = "pointer"; }} onPointerOut={() => { setHover(false); document.body.style.cursor = ""; }}>
+      <mesh position={[0, 0.7, 0]} onClick={(e) => { e.stopPropagation(); clicar(e.point.x, e.point.z); }} onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = "pointer"; }} onPointerOut={() => { setHover(false); document.body.style.cursor = ""; }}>
         <cylinderGeometry args={[0.4, 0.4, 1.5, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
       {hover && (

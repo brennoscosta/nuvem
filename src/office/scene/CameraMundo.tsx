@@ -16,6 +16,7 @@ import { useMundo } from "../mundoStore";
 import { LOTE_POR_CHAVE, PASSO, MEIO_Q, MUNDO, N } from "../data/mundo";
 import { PRACA_CHAVE } from "../data/praca";
 import { caminhar, livre } from "../data/caminhos";
+import { plantaPorChave, caminharDentro, livreDentro, dentroDoPredio, paraMundo } from "../data/plantaInterna";
 import { registrarPonte, tirarFotoPredio } from "./fotoPredio";
 
 const MIN_RAIO = 6, MAX_RAIO = 119;
@@ -204,19 +205,25 @@ function quadroAndar(x: Ctx, dt: number) {
   frenteV.set(t.x - camera.position.x, 0, t.z - camera.position.z).normalize(); ladoV.set(-frenteV.z, 0, frenteV.x);
   mov.set(0, 0, 0).addScaledVector(frenteV, fy).addScaledVector(ladoV, fx);
   const agora = performance.now();
-  // dentro de um prédio (recepção) o teclado não anda: sai pelo botão "Sair do prédio" (17/11/2026)
-  const pd = usePersonagem.getState().predio, preso = !!pd && pd.fase !== "indo";
+  // dentro de um prédio (17/11/2026): o teclado anda pela planta interna (paredes e portas, data/plantaInterna.ts);
+  // entrando ou saindo pela porta, espera chegar
+  const pd = usePersonagem.getState().predio;
+  const dentro = !!pd && (pd.fase === "recepcao" || pd.fase === "dentro"), preso = !!pd && (pd.fase === "entrando" || pd.fase === "saindo");
+  const mundo = useMundo.getState();
+  const pl = dentro && pd ? plantaPorChave(pd.chave, mundo.terrenos) : null;
+  const publico = !!pd && !mundo.meus.includes(pd.chave);
+  const passo = (dx: number, dz: number) => (pl ? caminharDentro(pl, minhaPos.x, minhaPos.z, dx, dz, publico) : caminhar(minhaPos.x, minhaPos.z, dx, dz));
   if (mov.lengthSq() > 0.02 && !preso) {
     // o boneco anda até um ponto 2,6 m à frente, renovado várias vezes por segundo (a cena dele faz o arranque e a freada)
     mov.normalize().multiplyScalar(2.6);
     if (agora - x.ultimoPasso > 160 || !x.andando) {
-      const destino = caminhar(minhaPos.x, minhaPos.z, mov.x, mov.z);
-      usePersonagem.setState({ destino, rota: [], passeio: false, predio: null }); x.ultimoPasso = agora; x.andando = true;
+      const destino = passo(mov.x, mov.z);
+      usePersonagem.setState(dentro && pd ? { destino, rota: [], passeio: false, predio: { ...pd, fase: "dentro" } } : { destino, rota: [], passeio: false, predio: null }); x.ultimoPasso = agora; x.andando = true;
       if (agora - x.ultimaBatida > 1500) { usePersonagem.getState().avisarMovimento(); x.ultimaBatida = agora; }
     }
   } else if (x.andando) {
     // soltou: freia logo à frente
-    const destino = caminhar(minhaPos.x, minhaPos.z, Math.sin(minhaPos.rot) * 0.3, Math.cos(minhaPos.rot) * 0.3);
+    const destino = passo(Math.sin(minhaPos.rot) * 0.3, Math.cos(minhaPos.rot) * 0.3);
     usePersonagem.setState({ destino, rota: [], passeio: false }); x.andando = false; x.ultimoPasso = agora; usePersonagem.getState().avisarMovimento();
   } else if (agora - x.ultimoPasso > 7000 && !preso) {
     // parado: um "cheguei" no próprio lugar não deixa o boneco sair passeando sozinho pela calçada
@@ -298,7 +305,7 @@ export function CameraMundo({ controles, inicio }: { controles: React.RefObject<
     gl.domElement.addEventListener("dblclick", dbl); gl.domElement.addEventListener("pointerdown", toque); gl.domElement.addEventListener("wheel", toque, { passive: true });
     // foto do meu prédio (ui/FotoPredio) usa a mesma câmera e o mesmo desenho
     registrarPonte({ gl, scene, camera: camera as THREE.PerspectiveCamera, controles: x.c, pararModos: () => { if (useCamera.getState().drone) pararDrone(x); if (useCamera.getState().andar) sairAndar(x); useCamera.getState().set({ seguir: false, passeio: false }); x.c.autoRotate = false; x.anim = null; } });
-    if (MEDIR) Object.assign(window, { __minhaPos: minhaPos, __fotoPredio: tirarFotoPredio, __camInfo: cameraInfo, __livre: livre, __personagem: usePersonagem });
+    if (MEDIR) Object.assign(window, { __minhaPos: minhaPos, __fotoPredio: tirarFotoPredio, __camInfo: cameraInfo, __livre: livre, __personagem: usePersonagem, __planta: { porChave: (k: string) => plantaPorChave(k, useMundo.getState().terrenos), livreDentro, dentroDoPredio, paraMundo } });
     // ?drone=1 liga o voo quando a cidade já abriu
     const q = new URLSearchParams(window.location.search);
     const tDrone = q.get("drone") === "1" ? setTimeout(() => { if (!useCamera.getState().drone) useCamera.getState().pedir("drone"); }, 2500) : null;
