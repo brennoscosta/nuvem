@@ -12,7 +12,7 @@ import { PlacaEsquina } from "./Anuncios";
 import { nomeNicho } from "../data/mundo";
 import { Estatico } from "./Estatico";
 import { ComFallback, type NomeModelo } from "./Modelos";
-import { Mesa, Sofa, Planta, Balcao, MesaBaixa, Quadro, Cafe } from "./Moveis";
+import { Mesa, Sofa, Planta, Balcao, MesaBaixa, Quadro, Cafe, Tapete, Estante, Poltrona, LuminariaChao, MesaLateral, Bebedouro, QuadroArte, PainelLogo, Ficus, MesaAlta, Lousa, LuzDasLuminarias } from "./Moveis";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle, type Pose } from "./Boneco";
 import { BONECO } from "../data/bonecos";
 import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
@@ -23,11 +23,12 @@ import { ehKit, medidasKit, KIT_ANDARES, KIT_TOLDO, type KitId } from "../data/p
 import { LetreiroLed, VitrineJanela } from "./PredioFrente";
 import { PecaArea } from "./PecasArea";
 import { Inauguracao, LOTES_EM_OBRA_VISTOS, INAUGURAR_TESTE, easeSubida } from "./ObraFesta";
-import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, andaresDoPredio, alturaPredio, pecaEfetiva, LED_PADRAO, type Led, MAX_ANDARES, MAX_ANDARES_KIT, COBERTURAS, DIM_LAYOUT, type CoberturaId, INTERIOR_PADRAO, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote } from "../data/escritorio";
+import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, andaresDoPredio, alturaPredio, pecaEfetiva, LED_PADRAO, type Led, MAX_ANDARES, MAX_ANDARES_KIT, COBERTURAS, DIM_LAYOUT, type CoberturaId, INTERIOR_PADRAO, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote , DECORACAO_DISCRETA, type Interior, type PlantaCliente } from "../data/escritorio";
 import { useMundo, useAgora, promocaoAtiva } from "../mundoStore";
 import { abrirChatEquipe } from "../ui/ChatEquipe";
 import { useFrame } from "@react-three/fiber";
 import { useEscritorio } from "../store";
+import { usePersonagem } from "../personagemStore";
 
 const FONTE = "/fonts/inter-700.woff";
 const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = PREDIO_CLIENTE;
@@ -235,7 +236,7 @@ function ParedeComPorta({ de, ate, vao = 1.6, cor }: { de: [number, number]; ate
   );
 }
 
-export function InteriorFixo({ e, cor }: { e: Escritorio; cor: string }) {
+export function InteriorFixo({ e, cor, logo = null }: { e: Escritorio; cor: string; logo?: string | null }) {
   const planta = useMemo(() => plantaCliente(e), [e]);
   const zMeio = planta.salas[0].z1;
   // interior personalizável (12/11/2026): cor das paredes, piso único, tampo das mesas e plantas
@@ -257,7 +258,8 @@ export function InteriorFixo({ e, cor }: { e: Escritorio; cor: string }) {
       {P({ de: [X0, Z0], ate: [X0, Z1] })}
       {P({ de: [X1, Z0], ate: [X1, Z1] })}
       {/* divisórias da frente: recepção | hall | CEO (vidro na do CEO) */}
-      {P({ de: [-2.2, Z0], ate: [-2.2, zMeio] })}
+      {/* divisória recepção | hall, com uma passagem perto da frente: o visitante vem da porta da rua até o balcão */}
+      {P({ de: [-2.2, Z0 + 1.5], ate: [-2.2, zMeio] })}
       <ParedeBaixa de={[2.2, Z0]} ate={[2.2, zMeio]} cor="#CFE6EE" />
       {/* divisa frente/fundo com porta pra cada sala do fundo */}
       {planta.salas.filter((s) => s.tipo === "setor").map((s) => (
@@ -282,9 +284,82 @@ export function InteriorFixo({ e, cor }: { e: Escritorio; cor: string }) {
       {planta.salas.flatMap((s) => s.mesas.map((m, i) => <Mesa key={`${s.id}-${i}`} def={{ id: `${s.id}-${i}`, sala: s.id, pos: m.pos, rot: m.rot, tipo: m.tipo }} cor={s.setor?.cor ?? cor} tampoCor={tampo} />))}
       {/* plantinhas nos setores */}
       {it.plantas && planta.salas.filter((s) => s.tipo === "setor").map((s) => <Planta key={s.id} position={[s.x1 - 0.6, 0, s.z1 - 0.6]} pequena />)}
+      <DecoracaoCliente planta={planta} it={it} cor={cor} logo={logo} />
     </group>
   );
 }
+
+// ---------- decoração escolhida pelo dono (17/11/2026, data/escritorio.ts › ITENS_DECORACAO) ----------
+// Lugares fixos na planta (frente = -z): recepção x -8..-2,2 / z -7..-1,5 (balcão em -5,2; -4,8, visitante espera em
+// -5,2; -6), hall com a porta da rua em x 0, sala do CEO a leste e os setores atrás (z > -1,5). Nada fica no caminho da
+// porta até o balcão nem nos vãos das portas das salas.
+const clarearCli = (hex: string, k: number) => { const n = parseInt(hex.slice(1), 16); const f = (v: number) => Math.round(v + (255 - v) * k).toString(16).padStart(2, "0"); return `#${f((n >> 16) & 255)}${f((n >> 8) & 255)}${f(n & 255)}`; };
+const escurecerCli = (hex: string, k: number) => { const n = parseInt(hex.slice(1), 16); const f = (v: number) => Math.round(v * (1 - k)).toString(16).padStart(2, "0"); return `#${f((n >> 16) & 255)}${f((n >> 8) & 255)}${f(n & 255)}`; };
+const corValida = (c: string | undefined, padrao: string) => (c && /^#[0-9a-fA-F]{6}$/.test(c) ? c : padrao);
+const clara = (hex: string) => { const n = parseInt(hex.slice(1), 16); return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.72; };
+// tapete do setor: do tamanho do grupo de mesas (o piso aparece em volta); cor de setor muito clara vira um tom mais escuro
+const corTapete = (c: string) => (clara(c) ? escurecerCli(c, 0.35) : clarearCli(c, 0.38));
+function DecoracaoCliente({ planta, it, cor, logo }: { planta: PlantaCliente; it: Interior; cor: string; logo: string | null }) {
+  const tem = new Set(it.decoracao ?? DECORACAO_DISCRETA);
+  const marca = corValida(cor, "#1D4ED8");
+  const setores = planta.salas.filter((s) => s.tipo === "setor");
+  const madeira = it.moveis === "preto" ? "#2B2F36" : it.moveis === "madeira" ? "#7A5230" : "#E7E2D8";
+  const y = 0.075; // pisos do cliente em 0,06
+  return (
+    <group>
+      {tem.has("tapetes") && (
+        <>
+          <Tapete position={[-5.6, -2.6]} largura={3.6} profundidade={1.9} cor={clarearCli(marca, 0.55)} borda={marca} altura={y} />
+          <Tapete position={[0, -6.1]} largura={1.8} profundidade={1.3} cor="#2B2F36" borda={marca} altura={y} />
+          <Tapete position={[5.4, -3.9]} largura={3.2} profundidade={2.4} cor="#3B3F47" borda={escurecerCli(marca, 0.1)} altura={y} />
+          {setores.map((s) => { const c = corValida(s.cor, marca); return <Tapete key={s.id} position={[(s.x0 + s.x1) / 2, (s.z0 + s.z1) / 2 + 0.3]} largura={Math.min(s.x1 - s.x0 - 1.3, 5.4)} profundidade={Math.min(s.z1 - s.z0 - 1.1, 4.4)} cor={corTapete(c)} borda={escurecerCli(c, 0.2)} altura={y} />; })}
+        </>
+      )}
+      {tem.has("salaDeEspera") && (
+        <>
+          <Poltrona position={[-4.5, 0, -2.6]} rotation={-Math.PI / 2} cor={escurecerCli(marca, 0.25)} />
+          <MesaLateral position={[-7.45, 0, -3.85]} />
+        </>
+      )}
+      {tem.has("luminarias") && (
+        <>
+          <LuminariaChao position={[-2.65, 0, -1.95]} />
+          <LuminariaChao position={[2.7, 0, -1.95]} />
+          {setores.map((s) => <LuminariaChao key={s.id} position={[s.x1 - 0.45, 0, s.z0 + 0.5]} />)}
+        </>
+      )}
+      {tem.has("plantasGrandes") && (
+        <>
+          <Ficus position={[1.65, 0, -6.45]} escala={0.85} />
+          <Ficus position={[-1.7, 0, -5.2]} escala={0.8} />
+          <Ficus position={[X1 - 0.55, 0, -1.95]} escala={0.85} />
+          {setores.map((s) => <Ficus key={s.id} position={[s.x0 + 0.5, 0, s.z1 - 0.5]} escala={0.8} />)}
+        </>
+      )}
+      {tem.has("estantes") && (
+        <>
+          <Estante position={[5.4, 0, zMeioCliente - 0.24]} rotation={Math.PI} largura={1.6} madeira={madeira === "#E7E2D8" ? "#8E6B4A" : madeira} />
+          {setores.map((s) => <Estante key={s.id} position={[s.x1 - 0.22, 0, (s.z0 + s.z1) / 2]} rotation={-Math.PI / 2} largura={Math.min(1.4, s.z1 - s.z0 - 1.6)} madeira={madeira === "#E7E2D8" ? "#8E6B4A" : madeira} />)}
+        </>
+      )}
+      {tem.has("arte") && (
+        <>
+          <QuadroArte position={[-2.12, 0.68, -3.5]} rotation={Math.PI / 2} paleta={1} />
+          {setores.filter((s) => s.z1 >= Z1 - 0.01).map((s, i) => <QuadroArte key={s.id} position={[(s.x0 + s.x1) / 2, 0.68, Z1 - 0.08]} rotation={Math.PI} largura={1.1} paleta={i + 2} />)}
+        </>
+      )}
+      {tem.has("logoNaParede") && <PainelLogo position={[1.35, 0, -5.4]} rotation={Math.PI} largura={1.0} altura={1.35} cor={marca} logo={logo} moldura={marca} />}
+      {tem.has("cafe") && (
+        <>
+          <Bebedouro position={[1.75, 0, -2.0]} rotation={Math.PI} />
+          <MesaAlta position={[-1.2, 0, -3.4]} lugares={[[0.55, 0.1]]} />
+        </>
+      )}
+      {tem.has("lousas") && setores.map((s) => <Lousa key={s.id} position={[s.x0 + 0.4, 0, (s.z0 + s.z1) / 2]} rotation={Math.PI / 2} largura={Math.min(1.3, s.z1 - s.z0 - 1.6)} />)}
+    </group>
+  );
+}
+const zMeioCliente = -1.5; // divisa entre a faixa da frente e o fundo (data/escritorio.ts › plantaCliente)
 
 // Nome da sala flutuando (só na vista por dentro)
 function NomeSala({ s }: { s: SalaCliente }) {
@@ -308,8 +383,15 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
   // para dar tarefas ali mesmo (src/office/ui/ChatEquipe.tsx).
   const dono = useMundo((s) => !!s.usuario && s.terrenos[chave]?.usuarioId === s.usuario.id);
   const clicar = () => { if (dono) void abrirChatEquipe(chave, m.id); else useMundo.getState().selecionarLote(chave); };
+  // a atendente fala com quem chega na recepção (17/11/2026, ui/Recepcao.tsx)
+  const falaRec = usePersonagem((s) => (m.papel === "atendente" && s.falaRecepcao?.chave === chave ? s.falaRecepcao.texto : null));
   return (
     <group position={lugar.pos} rotation={[0, lugar.rot, 0]}>
+      {falaRec && !hover && (
+        <Html position={[0, 1.8, 0]} center zIndexRange={[6, 0]} style={{ pointerEvents: "none" }}>
+          <div className="w-max max-w-[230px] select-none rounded-2xl bg-white/95 px-3 py-2 text-[12.5px] leading-snug text-[#1D2128] shadow-lg"><b className="block">{m.nome}</b>{falaRec}</div>
+        </Html>
+      )}
       <BonecoProcedural ref={h} def={def} camisa={m.camisa} headset={m.papel === "atendente"} cracha={m.papel === "ceo" ? "#D4A017" : "#1D4ED8"} />
       <mesh position={[0, 0.7, 0]} onClick={(e) => { e.stopPropagation(); clicar(); }} onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = "pointer"; }} onPointerOut={() => { setHover(false); document.body.style.cursor = ""; }}>
         <cylinderGeometry args={[0.4, 0.4, 1.5, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -365,7 +447,7 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
       {(festa || INAUGURAR_TESTE === chave) && <Inauguracao cor={cor} zf={zFrente} sx={la ? DUPLO.x : 1} topo={alturaPredio(e, !!la)} />}
       {!fora && (
         <>
-          <Estatico key={"d" + assinatura}><InteriorFixo e={e} cor={cor} /></Estatico>
+          <Estatico key={"d" + assinatura}><InteriorFixo e={e} cor={cor} logo={logo} /></Estatico>
           {it?.quadros && <QuadrosLogo logo={logo} cor={cor} />}
           {planta.salas.filter((s) => s.tipo !== "hall").map((s) => <NomeSala key={s.id} s={s} />)}
           {e.equipe.map((m) => { const lugar = planta.lugares[m.id]; return lugar ? <MembroCena key={m.id} m={m} lugar={lugar} chave={chave} /> : null; })}
@@ -391,6 +473,7 @@ export function EscritoriosClientes() {
   return (
     <group>
       <RelogioPredios />
+      <LuzDasLuminarias />
       <RelogioKit />
       {Object.values(terrenos).map((t) => {
         const e = t.chave === selecionado && rascunho ? rascunho : t.escritorio;

@@ -204,19 +204,21 @@ function quadroAndar(x: Ctx, dt: number) {
   frenteV.set(t.x - camera.position.x, 0, t.z - camera.position.z).normalize(); ladoV.set(-frenteV.z, 0, frenteV.x);
   mov.set(0, 0, 0).addScaledVector(frenteV, fy).addScaledVector(ladoV, fx);
   const agora = performance.now();
-  if (mov.lengthSq() > 0.02) {
+  // dentro de um prédio (recepção) o teclado não anda: sai pelo botão "Sair do prédio" (17/11/2026)
+  const pd = usePersonagem.getState().predio, preso = !!pd && pd.fase !== "indo";
+  if (mov.lengthSq() > 0.02 && !preso) {
     // o boneco anda até um ponto 2,6 m à frente, renovado várias vezes por segundo (a cena dele faz o arranque e a freada)
     mov.normalize().multiplyScalar(2.6);
     if (agora - x.ultimoPasso > 160 || !x.andando) {
       const destino = caminhar(minhaPos.x, minhaPos.z, mov.x, mov.z);
-      usePersonagem.setState({ destino, rota: [], passeio: false }); x.ultimoPasso = agora; x.andando = true;
+      usePersonagem.setState({ destino, rota: [], passeio: false, predio: null }); x.ultimoPasso = agora; x.andando = true;
       if (agora - x.ultimaBatida > 1500) { usePersonagem.getState().avisarMovimento(); x.ultimaBatida = agora; }
     }
   } else if (x.andando) {
     // soltou: freia logo à frente
     const destino = caminhar(minhaPos.x, minhaPos.z, Math.sin(minhaPos.rot) * 0.3, Math.cos(minhaPos.rot) * 0.3);
     usePersonagem.setState({ destino, rota: [], passeio: false }); x.andando = false; x.ultimoPasso = agora; usePersonagem.getState().avisarMovimento();
-  } else if (agora - x.ultimoPasso > 7000) {
+  } else if (agora - x.ultimoPasso > 7000 && !preso) {
     // parado: um "cheguei" no próprio lugar não deixa o boneco sair passeando sozinho pela calçada
     usePersonagem.setState({ destino: [minhaPos.x, minhaPos.z], rota: [], passeio: false }); x.ultimoPasso = agora;
   }

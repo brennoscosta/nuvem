@@ -12,9 +12,33 @@ import { SombraContato } from "./SombraContato";
 import { bonecoDe, BONECOS } from "../data/bonecos";
 import { MUNDO, passeioNaCalcada, pontoNaCalcada } from "../data/mundo";
 import { usePersonagem, minhaPos, type Outro } from "../personagemStore";
-import { modoMundo } from "../mundoStore";
+import { modoMundo, useMundo } from "../mundoStore";
+import { useEscritorio } from "../store";
 
-const VEL = 2.2; // m/s (um pouco mais rápido que os pedestres)
+// entrar e sair dos prédios (17/11/2026): marcos do caminho (calçada da porta, porta e balcão), ver personagemStore.ts
+const perto = (a: readonly [number, number], b: readonly [number, number], r = 0.7) => Math.hypot(a[0] - b[0], a[1] - b[1]) < r;
+function passouPor(ponto: [number, number]) {
+  const p = usePersonagem.getState().predio; if (!p) return;
+  // chegou na calçada da porta: a vista vira "por dentro" e a câmera vai até a recepção
+  if (p.fase === "indo" && perto(ponto, p.fora)) { usePersonagem.setState({ predio: { ...p, fase: "entrando" } }); useEscritorio.getState().setVista("dentro"); useMundo.setState({ alvoCamera: [p.espera[0], 0.5, p.espera[1]] }); }
+  // saindo: passou pela porta, a vista volta para fora
+  else if (p.fase === "saindo" && perto(ponto, p.porta)) useEscritorio.getState().setVista("fora");
+}
+// chegou no balcão: o dono é reconhecido na hora; o visitante espera a vez (mais 4 s por pessoa na frente dele)
+function chegouNoBalcao() {
+  const st = usePersonagem.getState(), p = st.predio; if (!p) return;
+  const dono = useMundo.getState().meu === p.chave;
+  const fila = dono ? 0 : st.outros.filter((o) => o.online && perto([o.x, o.z], p.espera, 2.6)).length;
+  const nome = st.meu?.nome ?? "";
+  usePersonagem.setState({
+    predio: { ...p, fase: "recepcao", fila, esperaMs: dono ? 0 : 3500 + fila * 4000 },
+    falaRecepcao: { chave: p.chave, texto: dono ? `Bem-vindo de volta${nome ? `, ${nome}` : ""}! A equipe já sabe que você chegou.` : fila ? "Olá! Já vou te atender, aguarde a sua vez." : "Olá! Seja bem-vindo. Só um instante, já vou te atender." },
+  });
+}
+
+// ?correr=1 (só roteiros de teste): o navegador do servidor desenha poucos quadros por segundo e o boneco anda devagar demais
+const CORRER = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("correr") ? 8 : 1;
+const VEL = 2.2 * CORRER; // m/s (um pouco mais rápido que os pedestres)
 const VEL_PASSEIO = 1.0; // quando passeia sozinho, anda no ritmo dos outros pedestres
 const PAUSA_PASSEIO = 9; // s parado antes de sair passeando pela calçada
 const def = (id: string) => bonecoDe(id, BONECOS[1]); // catálogo ou visual personalizado (v1:…)
@@ -47,13 +71,13 @@ function Meu() {
   // posição inicial: a salva no servidor (encostada na calçada, nunca no meio da rua)
   useEffect(() => { if (g.current && meu) { const [x, z] = pontoNaCalcada(meu.x, meu.z); g.current.position.set(x, 0, z); g.current.rotation.y = meu.rot; usePersonagem.getState().setPosicao(x, z, meu.rot); } }, [meu?.usuarioId, ativo]); // eslint-disable-line react-hooks/exhaustive-deps
   useFrame((_, dt) => {
-    const o = g.current; if (!o) return; dt = Math.min(dt, 0.1);
+    const o = g.current; if (!o) return; dt = Math.min(dt, CORRER > 1 ? 0.4 : 0.1);
     const st = usePersonagem.getState();
     if (!destino) {
       vel.current = Math.max(0, vel.current - 8 * dt);
       if (!paradoDesde.current) paradoDesde.current = performance.now();
       // como um pedestre comum: depois de um tempo parado, dá uma volta pela calçada (um clique no chão interrompe)
-      if (performance.now() - paradoDesde.current > PAUSA_PASSEIO * 1000 && st.painel !== "chat") { paradoDesde.current = performance.now(); usePersonagem.setState({ destino: passeioNaCalcada(o.position.x, o.position.z), passeio: true }); st.avisarMovimento(); }
+      if (performance.now() - paradoDesde.current > PAUSA_PASSEIO * 1000 && st.painel !== "chat" && !st.predio) { paradoDesde.current = performance.now(); usePersonagem.setState({ destino: passeioNaCalcada(o.position.x, o.position.z), passeio: true }); st.avisarMovimento(); }
       minhaPos.vel = 0; return;
     }
     const dx = destino[0] - o.position.x, dz = destino[1] - o.position.z; const dist = Math.hypot(dx, dz);
@@ -63,9 +87,13 @@ function Meu() {
     const alvo = dist < 0.6 && ultimo ? Math.max(0.5, velMax * (dist / 0.6)) : velMax;
     vel.current = vel.current < alvo ? Math.min(alvo, vel.current + 6 * dt) : Math.max(alvo, vel.current - 8 * dt);
     // chegou numa esquina do caminho: segue para o próximo ponto (data/caminhos.ts) sem parar
-    if (!ultimo && dist < 0.35) { const [prox, ...resto] = st.rota; usePersonagem.setState({ destino: prox, rota: resto }); st.avisarMovimento(); return; }
+    if (!ultimo && dist < 0.35) { passouPor(destino); const [prox, ...resto] = usePersonagem.getState().rota; usePersonagem.setState({ destino: prox, rota: resto }); st.avisarMovimento(); return; }
     if (dist < 0.06) {
       o.position.set(destino[0], 0, destino[1]); vel.current = 0; minhaPos.vel = 0;
+      passouPor(destino);
+      const pd = usePersonagem.getState().predio;
+      if (pd && (pd.fase === "entrando" || pd.fase === "indo") && perto(destino, pd.espera, 0.4)) { o.rotation.y = pd.olhar; chegouNoBalcao(); }
+      else if (pd && pd.fase === "saindo" && perto(destino, pd.fora, 0.4)) usePersonagem.setState({ predio: null, falaRecepcao: null });
       paradoDesde.current = performance.now() - (st.passeio ? PAUSA_PASSEIO * 400 : 0);
       usePersonagem.setState({ destino: null, passeio: false }); st.setPosicao(o.position.x, o.position.z, o.rotation.y); st.avisarMovimento();
       return;

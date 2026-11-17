@@ -22,6 +22,7 @@ import Link from "next/link";
 import { VagasDono } from "./_vagas-dono";
 import { Rosto, RostoSede } from "./_rosto";
 import { TopoEquipe, FaixaEquipe, ComoFunciona } from "./_topo";
+import { Conectores, EnviarPara } from "./_conectores";
 
 type Regra = RegraEquipe;
 type Membro = MembroEquipe;
@@ -37,7 +38,7 @@ const Texto = ({ t }: { t: string }) => <TextoIA t={t} className="text-[15px]" /
 function Avatar({ m, tamanho = 44 }: { m: Membro; tamanho?: number }) { return <Rosto m={m} tamanho={tamanho} anel={null} />; }
 const SeloNivel = ({ m }: { m: Pick<Membro, "nivel"> }) => <span className="rounded-full px-2 py-[1px] align-middle text-[10.5px] font-semibold text-white" style={{ background: NIVEL_COR[m.nivel] }}>{NIVEL_ROTULO[m.nivel]}</span>;
 
-type AbaEquipe = "conversas" | "internas" | "visitantes" | "vagas" | "sobre";
+type AbaEquipe = "conversas" | "internas" | "visitantes" | "vagas" | "sobre" | "conectores";
 export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chaveInicial: string | null; membroInicial: string | null; abaInicial?: AbaEquipe }) {
   const [p, setP] = useState<Painel | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -83,6 +84,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
     ["visitantes", "Visitantes", "pessoa", p.visitantes.total, false],
     ["vagas", "Vagas", "maleta", null, false],
     ["sobre", "Sobre a empresa", "editar", null, false],
+    ["conectores", "Conectores", "plugue", null, false],
   ];
 
   return (
@@ -106,7 +108,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
         </span>
       </nav>
 
-      {!p.sobre && aba !== "sobre" && (
+      {!p.sobre && aba !== "sobre" && aba !== "conectores" && (
         <div className="eq-aviso">
           <span className="eq-aviso-icone"><Icone nome="editar" tamanho={17} /></span>
           <span className="min-w-0 flex-1"><b>Conte para a equipe o que a {p.lote.empresaNome} faz.</b> Sem o “Sobre a empresa”, a atendente não sabe preços, horários nem serviços.</span>
@@ -119,6 +121,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
       {aba === "visitantes" && <Visitantes q={q} />}
       {aba === "vagas" && <VagasDono empresa={p.lote.empresaNome} numero={p.lote.numero} />}
       {aba === "sobre" && <Sobre p={p} lote={p.lote.chave} salvo={carregar} />}
+      {aba === "conectores" && <Conectores p={p} />}
       {como && <ComoFunciona p={p} fechar={fecharComo} abrir={abrirPessoa} />}
     </div>
     </RostoSede.Provider>
@@ -432,6 +435,7 @@ function Bolha({ m, membro, lote, mudou }: { m: Msg; membro: Membro; lote: strin
           <button type="button" disabled={ocupado} onClick={() => treinar(1)} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${av === 1 ? "bg-[#E3F6EA] text-[#166534]" : "text-[var(--tinta-2)] hover:bg-[var(--cinza)]"}`}>{av === 1 && <Icone nome="check" tamanho={13} />}{av === 1 ? "Aprovado" : "Aprovar"}</button>
           <button type="button" disabled={ocupado} onClick={() => setCorrigindo((v) => !v)} className={`rounded-full px-2.5 py-1 font-semibold ${av === -1 ? "bg-[#FDECEC] text-[#9B1C1C]" : "text-[var(--tinta-2)] hover:bg-[var(--cinza)]"}`}>{av === -1 ? "Corrigido" : "Corrigir"}</button>
           <button type="button" onClick={() => { void navigator.clipboard?.writeText(m.conteudo); setCopiado(true); setTimeout(() => setCopiado(false), 1500); }} className="rounded-full px-2.5 py-1 font-semibold text-[var(--tinta-2)] hover:bg-[var(--cinza)]">{copiado ? "Copiado!" : "Copiar"}</button>
+          <EnviarPara m={m} membro={membro} lote={lote} />
           <span className="text-[var(--tinta-2)]">{quando(m.em)}</span>
         </div>
         {corrigindo && (

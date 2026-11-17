@@ -7,6 +7,15 @@ import type { TipoAvatar, Visual } from "./data/bonecos";
 import { pontoNaCalcada } from "./data/mundo";
 import { useChamada, type ChamadaInfo } from "./chamadaStore";
 import { rota } from "./data/caminhos";
+import type { Entrada } from "./data/entradas";
+import { useSede } from "./sedeStore";
+
+// Dentro de um prédio (17/11/2026, pedido do dono: "preciso que possa entrar, e que apareça uma porta ou se direcione para a
+// recepção onde será atendido"): o personagem vai pela rua até a calçada da porta (indo), passa pela porta e anda até o
+// balcão (entrando; a vista vira "por dentro"), fica na recepção (o dono é reconhecido; o visitante espera a vez e é
+// atendido pela atendente) e sai pelo mesmo caminho (saindo). Quem anda é scene/Personagens.tsx; o balcão é ui/Recepcao.tsx.
+export type FasePredio = "indo" | "entrando" | "recepcao" | "saindo";
+export type PredioAtual = Pick<Entrada, "chave" | "nome" | "numero" | "fora" | "porta" | "espera" | "olhar" | "centro"> & { fase: FasePredio; visita: number; fila: number; esperaMs: number };
 
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
 // perfil profissional (11/11/2026): aparece na ficha e na busca de profissionais
@@ -47,6 +56,10 @@ interface Estado {
   salvar: (d: { nome: string; tipo: string; bio: string; redes: Redes; mostrarRedes: boolean; perfil?: Perfil; visual?: Visual }) => Promise<string | null>;
   pagar: (meses?: number) => Promise<string | null>;
   abrir: (painel: Estado["painel"]) => void;
+  predio: PredioAtual | null; // em que prédio estou entrando, estou ou estou saindo
+  falaRecepcao: { chave: string; texto: string } | null; // o que a atendente está dizendo (balão na cena)
+  entrarNoPredio: (e: Entrada) => void;
+  sairDoPredio: () => void;
   fechar: () => void;
   irPara: (x: number, z: number) => void;
   setPosicao: (x: number, z: number, rot: number) => void;
@@ -72,7 +85,7 @@ export const minhaPos = { x: 0, z: 21.3, rot: 0, vel: 0 };
 let batidaPendente: ReturnType<typeof setTimeout> | null = null;
 
 export const usePersonagem = create<Estado>((set, get) => ({
-  carregado: false, meu: null, ativo: false, preco: 5.9, precoCheio: 19.9, pagamentoLigado: false, outros: [], naoLidas: 0, pedidos: 0, amigos: [], listaPedidos: [], negociacoes: [], destino: null, rota: [], passeio: false, posicao: [0, 21.3, 0], painel: null, outroSelecionado: null, mensagens: [], conversas: [], erro: null, itens: null,
+  carregado: false, meu: null, ativo: false, preco: 5.9, precoCheio: 19.9, pagamentoLigado: false, outros: [], naoLidas: 0, pedidos: 0, amigos: [], listaPedidos: [], negociacoes: [], destino: null, rota: [], predio: null, falaRecepcao: null, passeio: false, posicao: [0, 21.3, 0], painel: null, outroSelecionado: null, mensagens: [], conversas: [], erro: null, itens: null,
 
   carregarItens: async () => {
     const r = await fetch("/api/workend/itens", { cache: "no-store" }).catch(() => null);
@@ -124,7 +137,29 @@ export const usePersonagem = create<Estado>((set, get) => ({
   abrir: (painel) => set({ painel }),
   fechar: () => set({ painel: null, outroSelecionado: null }),
   // tocar no chão: caminho pelas ruas e calçadas, sem atravessar prédio (17/11/2026)
-  irPara: (x, z) => { if (!get().ativo) return; const [primeiro, ...resto] = rota([minhaPos.x, minhaPos.z], [x, z]); set({ destino: primeiro ?? null, rota: resto, passeio: false }); get().avisarMovimento(); },
+  irPara: (x, z) => {
+    const st = get(); if (!st.ativo) return;
+    // dentro do prédio não atravessa parede: sai pelo botão "Sair do prédio" (a caminho da porta, um toque cancela a entrada)
+    if (st.predio && st.predio.fase !== "indo") return;
+    const [primeiro, ...resto] = rota([minhaPos.x, minhaPos.z], [x, z]);
+    set({ destino: primeiro ?? null, rota: resto, passeio: false, predio: null }); get().avisarMovimento();
+  },
+  entrarNoPredio: (e) => {
+    const st = get(); if (!st.ativo) return;
+    if (st.predio && st.predio.fase !== "indo" && st.predio.chave !== e.chave) return; // primeiro sai do prédio em que está
+    if (st.predio?.chave === e.chave && st.predio.fase !== "indo") return;
+    const [primeiro, ...resto] = [...rota([minhaPos.x, minhaPos.z], e.fora), e.porta, e.espera];
+    set({ destino: primeiro, rota: resto, passeio: false, falaRecepcao: null,
+      predio: { chave: e.chave, nome: e.nome, numero: e.numero, fora: e.fora, porta: e.porta, espera: e.espera, olhar: e.olhar, centro: e.centro, fase: "indo", visita: (st.predio?.visita ?? 0) + 1, fila: 0, esperaMs: 0 } });
+    useMundo.setState({ loteSelecionado: null, alvoCamera: [e.fora[0], 0.5, e.fora[1]] });
+    useSede.setState({ aberto: false });
+    get().avisarMovimento();
+  },
+  sairDoPredio: () => {
+    const p = get().predio; if (!p) return;
+    if (p.fase === "indo") { set({ predio: null, destino: null, rota: [], falaRecepcao: null }); return; }
+    set({ destino: p.porta, rota: [p.fora], passeio: false, predio: { ...p, fase: "saindo" }, falaRecepcao: null }); get().avisarMovimento();
+  },
   setPosicao: (x, z, rot) => { minhaPos.x = x; minhaPos.z = z; minhaPos.rot = rot; set({ posicao: [x, z, rot] }); },
   // mudou o destino (clique, passeio ou chegada): manda a batida logo, pra quem olha de fora acompanhar sem atraso
   avisarMovimento: () => { if (batidaPendente) clearTimeout(batidaPendente); batidaPendente = setTimeout(() => { batidaPendente = null; void get().batida(); }, 120); },

@@ -69,8 +69,32 @@ export type ExtraLote = "bancos" | "mesas" | "vasos" | "totem" | "bandeiras" | "
 // Interior personalizável (12/11/2026): cor das paredes, piso, acabamento dos móveis e quadros com a logo da empresa
 export type PisoInterior = "salas" | "madeira" | "porcelanato" | "carpete" | "cimento";
 export type MovelInterior = "branco" | "madeira" | "preto";
-export interface Interior { parede: string; piso: PisoInterior; moveis: MovelInterior; quadros: boolean; plantas: boolean }
-export const INTERIOR_PADRAO: Interior = { parede: "#F4F1EB", piso: "salas", moveis: "branco", quadros: false, plantas: true };
+// Decoração por dentro (17/11/2026, pedido do dono: "essa empresa precisa ficar mais bonita, precisa de mais decoração e
+// móveis; essa opção também precisa ter para os demais que pensarem em criar uma empresa"): itens que o dono liga e
+// desliga (cada um tem lugares fixos na planta, scene/EscritorioCliente.tsx › DecoracaoCliente) e estilos prontos que
+// trocam tudo de uma vez. Quem já tinha salvo o interior antes disso (sem a lista) ganha um conjunto discreto.
+export type ItemDecoracao = "tapetes" | "estantes" | "luminarias" | "salaDeEspera" | "arte" | "logoNaParede" | "cafe" | "plantasGrandes" | "lousas";
+export type EstiloInterior = "moderno" | "aconchegante" | "executivo" | "criativo";
+export interface Interior { parede: string; piso: PisoInterior; moveis: MovelInterior; quadros: boolean; plantas: boolean; decoracao?: ItemDecoracao[]; estilo?: EstiloInterior | null }
+export const ITENS_DECORACAO: { id: ItemDecoracao; nome: string; desc: string }[] = [
+  { id: "tapetes", nome: "Tapetes", desc: "Um tapete em cada sala, na cor do setor" },
+  { id: "salaDeEspera", nome: "Sala de espera", desc: "Poltrona e mesa lateral com abajur na recepção" },
+  { id: "luminarias", nome: "Luminárias", desc: "Luminárias de chão que acendem à noite" },
+  { id: "plantasGrandes", nome: "Plantas grandes", desc: "Vasos com árvore nos cantos" },
+  { id: "estantes", nome: "Estantes", desc: "Estantes com livros na sala do CEO e nos setores" },
+  { id: "arte", nome: "Quadros de arte", desc: "Arte colorida nas paredes" },
+  { id: "logoNaParede", nome: "Logo no hall", desc: "Painel com a logo da empresa na entrada" },
+  { id: "cafe", nome: "Café e água", desc: "Bebedouro e mesa alta com banquetas" },
+  { id: "lousas", nome: "Lousas", desc: "Lousa com ideias em cada setor" },
+];
+export const DECORACAO_DISCRETA: ItemDecoracao[] = ["tapetes", "plantasGrandes"];
+export const INTERIOR_PADRAO: Interior = { parede: "#F4F1EB", piso: "salas", moveis: "branco", quadros: false, plantas: true, decoracao: ["tapetes", "salaDeEspera", "luminarias", "plantasGrandes", "arte", "cafe"], estilo: null };
+export const ESTILOS_INTERIOR: { id: EstiloInterior; nome: string; desc: string; interior: Omit<Interior, "estilo"> }[] = [
+  { id: "moderno", nome: "Moderno", desc: "Cimento queimado, branco e lousas", interior: { parede: "#F4F1EB", piso: "cimento", moveis: "branco", quadros: false, plantas: true, decoracao: ["tapetes", "luminarias", "plantasGrandes", "arte", "lousas", "cafe"] } },
+  { id: "aconchegante", nome: "Aconchegante", desc: "Madeira, tons quentes e sala de estar", interior: { parede: "#F7E3D3", piso: "madeira", moveis: "madeira", quadros: false, plantas: true, decoracao: ["tapetes", "salaDeEspera", "luminarias", "plantasGrandes", "estantes", "arte", "cafe"] } },
+  { id: "executivo", nome: "Executivo", desc: "Carpete, móveis pretos, estantes e logo", interior: { parede: "#E6EDF5", piso: "carpete", moveis: "preto", quadros: true, plantas: true, decoracao: ["tapetes", "salaDeEspera", "estantes", "luminarias", "logoNaParede", "plantasGrandes"] } },
+  { id: "criativo", nome: "Criativo", desc: "Cores por sala, arte e lousas", interior: { parede: "#EAE3F5", piso: "salas", moveis: "branco", quadros: false, plantas: true, decoracao: ["tapetes", "lousas", "arte", "plantasGrandes", "cafe", "luminarias"] } },
+];
 export const CORES_PAREDE = ["#F4F1EB", "#E6EDF5", "#F7E3D3", "#DDEFE2", "#EAE3F5", "#FFF1C9", "#3A414D"];
 export const PISOS_INTERIOR: { id: PisoInterior; nome: string; cor: string | null }[] = [
   { id: "salas", nome: "Uma cor por sala", cor: null }, { id: "madeira", nome: "Taco de madeira", cor: "#B98A5A" }, { id: "porcelanato", nome: "Porcelanato claro", cor: "#E9E5DE" },
@@ -82,7 +106,12 @@ export function limparInterior(x: unknown, base: Interior = INTERIOR_PADRAO): In
   const parede = typeof o.parede === "string" && /^#[0-9a-fA-F]{6}$/.test(o.parede) ? o.parede.toUpperCase() : base.parede;
   const piso = PISOS_INTERIOR.some((p) => p.id === o.piso) ? (o.piso as PisoInterior) : base.piso;
   const moveis = MOVEIS_INTERIOR.some((m) => m.id === o.moveis) ? (o.moveis as MovelInterior) : base.moveis;
-  return { parede, piso, moveis, quadros: typeof o.quadros === "boolean" ? o.quadros : base.quadros, plantas: typeof o.plantas === "boolean" ? o.plantas : base.plantas };
+  // decoração: só ids conhecidos, sem repetir; interior salvo antes da lista existir = conjunto discreto
+  const decoracao = Array.isArray(o.decoracao)
+    ? [...new Set(o.decoracao.filter((d): d is ItemDecoracao => ITENS_DECORACAO.some((i) => i.id === d)))]
+    : x && typeof x === "object" ? [...DECORACAO_DISCRETA] : [...(base.decoracao ?? DECORACAO_DISCRETA)];
+  const estilo = ESTILOS_INTERIOR.some((e) => e.id === o.estilo) ? (o.estilo as EstiloInterior) : null;
+  return { parede, piso, moveis, quadros: typeof o.quadros === "boolean" ? o.quadros : base.quadros, plantas: typeof o.plantas === "boolean" ? o.plantas : base.plantas, decoracao, estilo };
 }
 // ---- Prédio e fachada (12/11/2026, lote visual do dono) ----
 // andares: total de andares do prédio (0 = o do modelo). Os andares a mais sobem como um bloco recuado atrás da fachada

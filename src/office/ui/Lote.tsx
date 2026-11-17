@@ -13,6 +13,7 @@ import { CHAVE_SEDE } from "../data/onestate";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 import { abrirChatEquipe } from "./ChatEquipe";
 import { ChatLoja, Contatos, Estrelas, useLoja } from "./ChatLoja";
+import { BotaoEntrar } from "./Recepcao";
 import { AgendarLoja } from "./AgendarLoja";
 import { BotaoSeguir } from "./BotaoSeguir";
 import { PegarCupom } from "./PegarCupom";
@@ -241,7 +242,10 @@ export function CartaoLote() {
           {ehMeu && ativo && !ehAnexo && (
             // a equipe de IA do lote trabalha de verdade desde 11/11/2026; desde 16/11 a conversa abre aqui mesmo no mapa
             // (src/office/ui/ChatEquipe.tsx), com a página Minha equipe como tela cheia
-            <button type="button" onClick={() => void abrirChatEquipe(chave)} className="mt-3 block w-full rounded-xl bg-[#1D2128] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-black"><Icone nome="conversar" tamanho={17} className="mr-1 inline align-[-3px]" />Falar com a equipe e dar tarefas</button>
+            <>
+              <button type="button" onClick={() => void abrirChatEquipe(chave)} className="mt-3 block w-full rounded-xl bg-[#1D2128] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-black"><Icone nome="conversar" tamanho={17} className="mr-1 inline align-[-3px]" />Falar com a equipe e dar tarefas</button>
+              <BotaoEntrar chave={chave} className="mt-2" />
+            </>
           )}
           {ehMeu && ativo && terreno.escritorio && (
             // chão comprado: só opções de edição (prédio, setores, equipe, marca, treino, contratação)
@@ -355,6 +359,7 @@ function LojaNoMapa({ numero, ativo, chave }: { numero: number; ativo: boolean; 
   if (!loja) return <div className="mt-3 text-xs text-[#5B6472]">Abrindo a loja…</div>;
   return (
     <div className="mt-3 space-y-2">
+      <BotaoEntrar chave={chave} />
       {promo && <div className="flex items-center justify-between gap-2 rounded-xl bg-[#E11D48] px-3 py-2 text-xs font-bold text-white"><span><Icone nome="etiqueta" tamanho={14} className="mr-1 inline align-[-3px]" />{promo.texto}</span><span className="font-semibold text-white/80">{horaPromo(promo.ate, agora)}</span></div>}
       <div className="flex items-center justify-between gap-2"><span className="rounded-full bg-[#EEF3FF] px-2 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">{loja.nicho}</span><span className="flex items-center gap-2"><BotaoSeguir numero={numero} /><Estrelas media={loja.avaliacao.media} n={loja.avaliacao.n} /></span></div>
       {loja.sobre ? <p className="line-clamp-4 whitespace-pre-line text-xs text-[#1D2128]">{loja.sobre}</p> : <p className="text-xs text-[#5B6472]">A empresa ainda não contou o que faz. Pergunte à atendente.</p>}

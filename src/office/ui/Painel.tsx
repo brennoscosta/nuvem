@@ -21,6 +21,7 @@ import { CartaoPraca, AvisoEventos } from "./Praca";
 import { MiniMapa } from "./MiniMapa";
 import { CartaoOneState } from "./CartaoOneState";
 import { ChatEquipe } from "./ChatEquipe";
+import { Recepcao } from "./Recepcao";
 import { Sino } from "./Sino";
 import { VisitaGuiada } from "./VisitaGuiada";
 import { BotaoSom } from "./Som";
@@ -274,6 +275,8 @@ export function Painel() {
   useMundoServidor();
   // mapa simples em 2D (12/11/2026): ele já é o mapa; o mini-mapa e a dica de arrastar do 3D saem
   const mapa2d = useSyncExternalStore(semAssinatura, () => modoMundo() && usarMapa2D(), () => false);
+  // editor "Montar escritório" aberto: a barra da câmera some no celular para não cobrir o "Salvar escritório" (17/11/2026)
+  const editando = useMundo((s) => s.painelEscritorio);
   return (
     <>
       <BarraTopo />
@@ -285,6 +288,7 @@ export function Painel() {
       <CartaoOutdoor />
       <CartaoOneState />
       <ChatEquipe />
+      <Recepcao />
       <PainelEmpresa />
       <PainelEscritorio />
       <PainelPersonagem />
@@ -299,7 +303,7 @@ export function Painel() {
       <ModalLogin />
       <ModalContratar />
       {/* celular: girar, início, drone, andar e ajustes; no computador a barra da câmera tem tudo (ControlesCamera) */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2">
+      <div className={`pointer-events-none absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-2 ${editando ? "max-sm:hidden" : ""}`}>
         <ControlesCameraCelular />
       </div>
       <ControlesCamera />

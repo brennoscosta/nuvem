@@ -16,11 +16,12 @@ import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { caixa, cilindro, mat, plano } from "./geo";
 import { Estatico } from "./Estatico";
-import { Mesa, Balcao, Sofa, Planta, Cafe } from "./Moveis";
+import { Mesa, Balcao, Sofa, Planta, Cafe, Tapete, Estante, Poltrona, LuminariaChao, MesaLateral, Bebedouro, QuadroArte, PainelLogo, Ficus, Floreira, MesaAlta, Gaveteiro, Lousa, LuzDasLuminarias } from "./Moveis";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle, type Pose } from "./Boneco";
 import { leve } from "./qualidade";
 import { useMundo } from "../mundoStore";
 import { abrirChatEquipe } from "../ui/ChatEquipe";
+import { usePersonagem } from "../personagemStore";
 import { aparenciaAgente, hash } from "../data/aparenciaAgente";
 import { CHAVE_SEDE, OS_X, OS_Z } from "../data/onestate";
 import type { Escritorio, Membro } from "../data/escritorio";
@@ -78,7 +79,6 @@ function Fixos({ salas, lugares }: { salas: Sala[]; lugares: Record<string, Luga
       {pedacos.map((p, i) => <mesh key={`t${i}`} geometry={caixa(+p.w.toFixed(3), 0.05, +(p.d + 0.02).toFixed(3))} material={friso} position={[p.x, ALT + 0.025, p.z]} />)}
       {/* mesas de cada departamento (a do chefe é maior) e uma planta em cada sala */}
       {salas.filter((s) => s.tipo === "depto").flatMap((s) => (lugares[s.id] ?? []).map((l, k) => <Mesa key={`${s.id}${k}`} def={{ id: `${s.id}${k}`, sala: s.id, pos: l.mesa, rot: 0, tipo: l.chefe ? "gerente" : "comum" }} cor={s.cor} />))}
-      {salas.filter((s) => s.tipo === "depto").map((s) => <Planta key={`p${s.id}`} position={[s.x1 - 0.55, 0, s.norte ? s.z0 + 0.6 : s.z1 - 0.6]} pequena />)}
       {/* recepção: balcão de frente para a entrada, sofá e planta */}
       {rec && <group><Balcao position={[cx(rec), 0, rec.z1 - 4.2]} /><Sofa position={[rec.x0 + 0.8, 0, rec.z1 - 2]} rotation={Math.PI / 2} cor="#D4A63A" largura={2} /><Planta position={[rec.x1 - 0.6, 0, rec.z1 - 0.7]} /></group>}
       {/* sala de reunião: mesa comprida, cadeiras e a TV na parede do fundo */}
@@ -93,6 +93,118 @@ function Fixos({ salas, lugares }: { salas: Sala[]; lugares: Record<string, Luga
       {/* café no corredor (ponta oeste) */}
       <Cafe position={[X0 + 1.2, 0, ZC]} rotation={Math.PI / 2} />
       <Planta position={[X1 - 0.6, 0, ZC]} />
+      <DecorSede salas={salas} />
+    </group>
+  );
+}
+
+// ---------- decoração da sede (17/11/2026, pedido do dono: "essa empresa precisa ficar mais bonita, precisa de mais decoração
+// e móveis") ----------
+// Livre de propósito: a porta de cada sala (cx, largura 1,5), o caminho dos agentes (porta → [cx, zDentro] → mesas), o
+// corredor no meio (z = ZC) e, na recepção, a faixa x = cx ± 0,9 da porta da rua até o balcão (onde o visitante espera)
+// e o caminho da recepcionista para o corredor. Nas salas do sul (perto da câmera) só coisas baixas no fundo.
+const escurecer = (hex: string, k: number) => { const n = parseInt(hex.slice(1), 16); const f = (v: number) => Math.round(v * (1 - k)).toString(16).padStart(2, "0"); return `#${f((n >> 16) & 255)}${f((n >> 8) & 255)}${f(n & 255)}`; };
+function DecorSede({ salas }: { salas: Sala[] }) {
+  const deptos = salas.filter((s) => s.tipo === "depto");
+  const rec = salas.find((s) => s.tipo === "recepcao"), reuniao = salas.find((s) => s.tipo === "reuniao");
+  // vãos do corredor entre as portas (as portas ficam no meio de cada coluna)
+  const trechos = Array.from({ length: POR_FILEIRA - 1 }, (_, i) => X0 + (i + 1) * LARG);
+  return (
+    <group>
+      {deptos.map((s, i) => {
+        const x = cx(s), fundo = s.norte ? s.z0 : s.z1, dir = s.norte ? 1 : -1; // dir: do fundo para o corredor
+        const zb = (d: number) => fundo + dir * d;
+        const diretoria = s.id === "diretoria";
+        // tapete sob as mesas, na cor do departamento (diretoria: grafite com borda dourada)
+        const tapete = s.norte ? { z: s.z0 + 5.7, d: 9.2 } : { z: s.z1 - 6.6, d: 8.6 };
+        const v = i % 3;
+        return (
+          <group key={s.id}>
+            <Tapete position={[x, tapete.z]} largura={4.7} profundidade={tapete.d} cor={diretoria ? "#3B3F47" : clarear(s.cor, 0.42)} borda={diretoria ? "#D4A63A" : escurecer(s.cor, 0.12)} />
+            {s.norte ? (
+              // salas do norte: o fundo fica longe da câmera, cabem coisas altas encostadas na parede
+              diretoria ? (
+                <>
+                  <Estante position={[x - 1.5, 0, zb(0.2)]} largura={1.55} altura={1.8} />
+                  <Estante position={[x + 1.5, 0, zb(0.2)]} largura={1.55} altura={1.8} />
+                  {/* cantinho executivo perto da porta: duas poltronas e a mesa lateral */}
+                  <Poltrona position={[s.x0 + 0.6, 0, s.z0 + 10.8]} rotation={Math.PI / 2} cor="#6B4A2F" />
+                  <Poltrona position={[x - 1.0, 0, s.z0 + 10.8]} rotation={-Math.PI / 2} cor="#6B4A2F" />
+                  <MesaLateral position={[x - 1.66, 0, s.z0 + 10.8]} />
+                  <Ficus position={[s.x1 - 0.5, 0, s.z0 + 11.6]} escala={0.9} />
+                </>
+              ) : v === 0 ? (
+                <>
+                  <Estante position={[x - 1.25, 0, zb(0.2)]} largura={1.2} />
+                  <Ficus position={[s.x0 + 0.48, 0, zb(0.55)]} escala={0.85} />
+                  <LuminariaChao position={[x + 0.95, 0, zb(0.55)]} />
+                  <Gaveteiro position={[x + 1.9, 0, zb(0.28)]} largura={1.0} />
+                </>
+              ) : v === 1 ? (
+                <>
+                  <Lousa position={[x - 1.5, 0, zb(0.45)]} largura={1.2} />
+                  <Estante position={[x + 1.3, 0, zb(0.2)]} largura={1.15} />
+                  <Ficus position={[s.x1 - 0.48, 0, zb(0.55)]} escala={0.85} />
+                </>
+              ) : (
+                <>
+                  <QuadroArte position={[x - 1.45, 0.72, zb(0.08)]} paleta={i} />
+                  <LuminariaChao position={[s.x0 + 0.5, 0, zb(0.55)]} />
+                  <Ficus position={[s.x1 - 0.48, 0, zb(0.55)]} escala={0.85} />
+                  <MesaLateral position={[x + 1.2, 0, zb(0.5)]} />
+                </>
+              )
+            ) : (
+              // salas do sul: o fundo é o lado da câmera (só coisas baixas); as altas vão na parede do corredor, fora da porta
+              <>
+                <Estante position={[x - 1.55, 0, s.z0 + 0.2]} largura={1.25} />
+                <Ficus position={[s.x1 - 0.5, 0, s.z0 + 0.6]} escala={0.85} />
+                <Floreira position={[x - 0.6, 0, s.z1 - 0.3]} comprimento={2.6} />
+                {v === 1 ? <Lousa position={[s.x0 + 0.42, 0, s.z1 - 1.8]} rotation={Math.PI / 2} largura={1.1} /> : <LuminariaChao position={[s.x0 + 0.45, 0, s.z1 - 0.55]} />}
+                <MesaLateral position={[s.x1 - 0.45, 0, s.z1 - 0.55]} abajur={v !== 1} />
+              </>
+            )}
+          </group>
+        );
+      })}
+
+      {/* recepção: tapete de boas-vindas, sala de espera dos dois lados do caminho, a logo atrás do balcão */}
+      {rec && (
+        <group>
+          <Tapete position={[cx(rec), rec.z1 - 2.05]} largura={LARG - 0.5} profundidade={3.1} cor="#2B2F36" borda="#D4A63A" />
+          <MesaLateral position={[rec.x0 + 0.6, 0, rec.z1 - 3.55]} />
+          <Poltrona position={[cx(rec) + 1.75, 0, rec.z1 - 2.6]} rotation={-Math.PI / 2} cor="#1F2937" />
+          <Poltrona position={[cx(rec) + 1.75, 0, rec.z1 - 1.5]} rotation={-Math.PI / 2} cor="#1F2937" />
+          <LuminariaChao position={[rec.x1 - 0.4, 0, rec.z1 - 3.4]} />
+          <PainelLogo position={[cx(rec) - 1.65, 0, rec.z1 - 6.3]} largura={2.0} altura={1.75} cor="#D4A63A" fundo="#14110A" logo="/socialrp/icone.png" />
+          <Ficus position={[cx(rec) + 1.6, 0, rec.z1 - 6.3]} />
+          {/* placa com a logo na frente do balcão, virada para quem entra */}
+          <PainelLogo position={[cx(rec) - 0.85, 0.32, rec.z1 - 3.83]} largura={0.62} altura={0.55} cor="#D4A63A" fundo="#14110A" logo="/socialrp/icone.png" pe={false} />
+          <Ficus position={[rec.x0 + 0.5, 0, rec.z0 + 0.6]} escala={0.8} />
+        </group>
+      )}
+
+      {/* corredor: quadros na parede norte (a que a câmera vê) e floreiras na do sul, sempre entre as portas */}
+      {trechos.map((xm, i) => (
+        <group key={xm}>
+          <QuadroArte position={[xm, 0.68, ZC - CORREDOR / 2 + 0.08]} largura={1.1} altura={0.6} paleta={i + 2} />
+          <Floreira position={[xm, 0, ZC + CORREDOR / 2 - 0.26]} comprimento={2.4} flores={i % 2 === 0} />
+        </group>
+      ))}
+
+      {/* café: bebedouro, mesa alta com banquetas (os agentes param em [X0 + 2,2; ZC ± 0,5]) */}
+      <Bebedouro position={[X0 + 0.4, 0, ZC - 1.05]} rotation={Math.PI / 2} />
+      <MesaAlta position={[X0 + 2.1, 0, ZC + 1.05]} lugares={[[-0.55, 0.15]]} />
+
+      {/* sala de reunião: tapete sob a mesa, plantas nos cantos do lado do corredor e uma lousa */}
+      {reuniao && (
+        <group>
+          <Tapete position={[cx(reuniao), (reuniao.z0 + reuniao.z1) / 2 + 0.5]} largura={4.3} profundidade={7.9} cor="#1E293B" borda="#94A3B8" />
+          <Ficus position={[reuniao.x0 + 0.5, 0, reuniao.z0 + 0.6]} escala={0.85} />
+          <Ficus position={[reuniao.x1 - 0.5, 0, reuniao.z0 + 0.6]} escala={0.85} />
+          <Lousa position={[reuniao.x0 + 0.42, 0, (reuniao.z0 + reuniao.z1) / 2 - 3.6]} rotation={Math.PI / 2} largura={1.1} />
+        </group>
+      )}
     </group>
   );
 }
@@ -133,6 +245,8 @@ function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: Re
   const fase = useMemo(() => (hash(m.id) % 97) / 10, [m.id]);
   useAnimacao(h, () => plano.current.pose, fase, HIPS.procedural.base);
   const [hover, setHover] = useState(false);
+  // a recepcionista fala com quem chega na recepção (17/11/2026, ui/Recepcao.tsx)
+  const falaRec = usePersonagem((s) => (m.papel === "atendente" && s.falaRecepcao?.chave === CHAVE_SEDE ? s.falaRecepcao.texto : null));
 
   // escolhe o próximo passeio: colega (chefe ou alguém da equipe), reunião ou café; volta para a mesa depois
   const novoPasseio = (agora: number, pedido?: Aviso) => {
@@ -186,7 +300,8 @@ function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: Re
       plano.current = { pts: caminho(aqui, salaAqui, dest, sala), i: 1, ate: 0, pose: "walk", fim: "sentar" };
       return;
     }
-    if (p.fim === "sentar" && t > proxima.current) { if (leve() && Math.random() < 0.5) { proxima.current = t + 25; return; } novoPasseio(t); }
+    // a recepcionista não sai do balcão (atende quem entra pela porta, ui/Recepcao.tsx)
+    if (p.fim === "sentar" && t > proxima.current) { if (m.papel === "atendente") { proxima.current = t + 3600; return; } if (leve() && Math.random() < 0.5) { proxima.current = t + 25; return; } novoPasseio(t); }
   });
 
   const inicio = sentar.pts[0];
@@ -199,11 +314,12 @@ function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: Re
         onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = "pointer"; }} onPointerOut={() => { setHover(false); document.body.style.cursor = ""; }}>
         <cylinderGeometry args={[0.4, 0.4, 1.5, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-      {(fala || hover) && (
+      {(fala || hover || falaRec) && (
         <Html position={[0, 1.75, 0]} center zIndexRange={[6, 0]} style={{ pointerEvents: "none" }}>
           <div className="w-max max-w-[220px] select-none rounded-2xl bg-white/95 px-2.5 py-1.5 text-[12px] leading-snug text-[#1D2128] shadow-md">
             <b>{m.nome}</b><span className="ml-1 text-[#5B6472]">{hover && !fala ? m.cargo : ""}</span>
             {fala && <span className="block font-medium">{fala}</span>}
+            {!fala && falaRec && <span className="block font-medium">{falaRec}</span>}
             {dono && fala && real && <span className="mt-0.5 block text-[10.5px] text-[#5B6472]">conversa interna · {real}</span>}
             {dono && hover && <span className="mt-0.5 block text-[10.5px] font-semibold text-[#1D4ED8]">Toque para conversar</span>}
           </div>
@@ -263,6 +379,7 @@ export function InteriorSede() {
   return (
     <group>
       <Estatico><Fixos salas={ctx.salas} lugares={ctx.lugares} /></Estatico>
+      <LuzDasLuminarias />
       {ctx.salas.map((s) => <NomeSala key={s.id} s={s} />)}
       {mostrar.map((m) => <Agente key={m.id} m={m} ctx={ctx} avisos={avisos} dono={dono} />)}
     </group>

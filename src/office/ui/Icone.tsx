@@ -99,6 +99,19 @@ const ICONES = {
   tenis: <><path {...T} d="M3 16.4V9.8c0-.6.6-1 1.1-.8l3.3 1.2 2-2.8 3 3.1c2.2 2.1 4.8 2.7 7.1 3.3.8.2 1.5.9 1.5 1.7v.9z" /><path d="M3 16.4V9.8c0-.6.6-1 1.1-.8l3.3 1.2 2-2.8 3 3.1c2.2 2.1 4.8 2.7 7.1 3.3.8.2 1.5.9 1.5 1.7v.9zM3 16.4v2.1h18v-2.1M10.4 9.8l-1.3 1.4M12.6 11.8l-1.3 1.4" /></>,
   contaGotas: <><path {...T} d="M13.6 7.4l3 3-8.2 8.2-3.6.6.6-3.6z" /><path d="M13.6 7.4l3 3-8.2 8.2-3.6.6.6-3.6zM12.4 6.2l5.4 5.4M15 5.4l1.6-1.6a2.1 2.1 0 0 1 3 0l.6.6a2.1 2.1 0 0 1 0 3L18.6 9" /></>,
   dado: <><rect {...T} x="4" y="4" width="16" height="16" rx="3.4" /><rect x="4" y="4" width="16" height="16" rx="3.4" /><path d="M8.6 8.6h.01M15.4 8.6h.01M12 12h.01M8.6 15.4h.01M15.4 15.4h.01" strokeWidth="2.6" /></>,
+  // conectores (17/11/2026)
+  chave: <><circle {...T} cx="8" cy="15.5" r="4.3" /><circle cx="8" cy="15.5" r="4.3" /><path d="M11.1 12.4l8.7-8.7M16.3 7.2l2.6 2.6M14 9.5l2 2" /></>,
+  plugue: <><path {...T} d="M6.8 9h10.4v3.4a5.2 5.2 0 0 1-10.4 0z" /><path d="M6.8 9h10.4v3.4a5.2 5.2 0 0 1-10.4 0z" /><path d="M9.6 9V4.2M14.4 9V4.2M12 17.6V21" /></>,
+  enviar: <><path {...T} d="M3.5 11.3L20.5 4l-6.7 16.5-3-6.7z" /><path d="M3.5 11.3L20.5 4l-6.7 16.5-3-6.7z" /><path d="M10.8 13.8L20.5 4" /></>,
+  banco: <><ellipse {...T} cx="12" cy="6" rx="7" ry="2.8" /><ellipse cx="12" cy="6" rx="7" ry="2.8" /><path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8" /></>,
+  codigo: <><path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.4 5.5l-2.8 13" /></>,
+  // decoração por dentro (17/11/2026)
+  tapete: <><rect {...T} x="3" y="7" width="18" height="10" rx="2.5" /><rect x="3" y="7" width="18" height="10" rx="2.5" /><rect x="6.5" y="10" width="11" height="4" rx="1" /><path d="M3 9.5H1.5M3 14.5H1.5M21 9.5h1.5M21 14.5h1.5" /></>,
+  estante: <><rect {...T} x="4" y="3" width="16" height="18" rx="1.2" /><rect x="4" y="3" width="16" height="18" rx="1.2" /><path d="M4 9h16M4 15h16M7 5v3M9 5.5V8M14 11v3M16.5 10.5V14M8 17v3" /></>,
+  luminaria: <><path {...T} d="M8 3h8l2.5 6h-13z" /><path d="M8 3h8l2.5 6h-13zM12 9v11M8.5 21h7" /></>,
+  poltrona: <><path {...T} d="M6 10V7.5A2.5 2.5 0 0 1 8.5 5h7A2.5 2.5 0 0 1 18 7.5V10" /><path d="M6 10V7.5A2.5 2.5 0 0 1 8.5 5h7A2.5 2.5 0 0 1 18 7.5V10M4 11.5a2 2 0 0 1 4 0V14h8v-2.5a2 2 0 0 1 4 0V17H4zM6 17v2M18 17v2" /></>,
+  lousa: <><rect {...T} x="3" y="4" width="18" height="12" rx="1.5" /><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M7 8.5c2-1.5 3 1.5 5 0s3-1 5 .5M7 12h6M8 16l-2 5M16 16l2 5" /></>,
+  cafe: <><path {...T} d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z" /><path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5c-.8 1 .8 2 0 3M12 3.5c-.8 1 .8 2 0 3" /></>,
 } satisfies Record<string, ReactNode>;
 
 export type NomeIcone = keyof typeof ICONES;

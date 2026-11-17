@@ -19,9 +19,11 @@ import { bloqueio, contar } from "./limite";
 import { contextoAgendaIA, aplicarMarcacaoDaAtendente, temMarcacao } from "./agenda";
 import { ESPECIALISTAS_IA, ESPECIALISTA_POR_ID, type EspecialistaIA } from "@/office/data/especialistas";
 import { LOTES, LOTE_POR_CHAVE, nomeNicho } from "@/office/data/mundo";
+import { CHAVE_SEDE } from "@/office/data/onestate";
 import type { Membro, NivelMembro, Escritorio } from "@/office/data/escritorio";
 import { pedirComEquipe, trabalhando, trocasInternas, atividadeInterna } from "./delegacao";
 import type { AreaId, Nivel } from "@/office/data/org";
+import { avisar, contatosNaFala } from "./conectores";
 
 export const TETO_IA_MES = 10; // R$ de IA por lote por mês
 export const AVISO_TETO = 0.8; // a partir de 80% o painel avisa
@@ -113,7 +115,7 @@ async function sincronizarEquipe(t: Terreno, empId: string) {
     const chefeMembro = chefeDoMembro(m, e);
     const chefeAg = chefeMembro ? agenteIdDe(empId, chefeMembro) : null;
     const chefe = chefeAg && (criados.has(chefeAg) || existentes.has(chefeAg)) ? chefeAg : m.papel === "ceo" ? null : ceoId;
-    const config = { membroId: m.id, papel: m.papel, saudacao: m.treino?.saudacao || esp?.saudacao || "", especialista: esp?.id ?? null, atendeVisitantes: m.papel === "atendente" };
+    const config = { membroId: m.id, papel: m.papel, setorId: m.setorId ?? null, saudacao: m.treino?.saudacao || esp?.saudacao || "", especialista: esp?.id ?? null, atendeVisitantes: m.papel === "atendente" };
     await sql`INSERT INTO agente (id, empresa_id, nome, area, nivel, funcao, personalidade, tom_de_voz, descricao, modelo, boneco, chefe_id, teto_diario_brl, ativo, config)
       VALUES (${aid}, ${empId}, ${m.nome}, ${area}, ${nivel}, ${m.cargo}, ${esp?.personalidade ?? ""}, ${esp?.tomDeVoz ?? ""}, ${m.treino?.descricao || esp?.descricao || ""},
               ${MODELO_CLIENTE}, ${m.boneco}, ${chefe}, ${TETO_IA_MES}, true, ${sql.json(config)})
@@ -148,12 +150,15 @@ async function loteDoDono(u: Usuario, chave?: string | null): Promise<Terreno> {
   if (t.status !== "ativo") throw new ErroHttp("Pague o 1º mês do lote para ligar a equipe de IA.", 402);
   return t;
 }
-async function agenteDoMembro(empId: string, membroId: string) {
+export async function agenteDoMembro(empId: string, membroId: string) {
   const aid = agenteIdDe(empId, String(membroId ?? "").replace(/[^a-zA-Z0-9_-]/g, ""));
   const [a] = await sql<{ id: string; nome: string; ativo: boolean }[]>`SELECT id, nome, ativo FROM agente WHERE id = ${aid} AND empresa_id = ${empId}`;
   if (!a || !a.ativo) throw new ErroHttp("Essa pessoa não está mais na equipe.", 404);
   return a;
 }
+
+// empresa do lote do dono (conectores e API v1, 17/11/2026)
+export async function empresaDoDono(u: Usuario, chave?: string | null) { const t = await loteDoDono(u, chave); return { t, empId: await garantirEmpresaDoLote(t) }; }
 
 export interface Contatos { whatsapp?: string; instagram?: string; site?: string; email?: string }
 function limparContatos(x: unknown): Contatos {
@@ -265,6 +270,8 @@ export async function falarComMembro(u: Usuario, chave: string | null, membroId:
   try {
     const [ag] = await sql<AgenteDB[]>`SELECT * FROM agente WHERE id = ${a.id}`;
     const r = await pedirComEquipe({ empId, autorDono: `dono:${u.id}`, teto: async () => ({ gasto: await gastoDoMes(empId), teto: TETO_IA_MES }) }, ag, pedido);
+    // conectores: tarefa que a equipe dividiu entre si → aviso tarefa.entregue quando a entrega final sair
+    if (r.delegados.length) void r.fim.then((entrega) => { if (entrega) avisar(empId, "tarefa.entregue", { origem: "dono", tarefa: { para: { id: membroId, nome: ag.nome, cargo: ag.funcao }, texto: pedido, entrega } }); });
     return { mensagem: { id: r.mensagem.id, papel: "assistant", autor: "agente", deNome: null, conteudo: r.mensagem.conteudo, avaliacao: null, correcao: null, em: r.mensagem.criadoEm }, delegados: r.delegados, gasto: { mes: await gastoDoMes(empId), teto: TETO_IA_MES } };
   } catch (e) {
     throw new ErroHttp((e as Error).message, gasto >= TETO_IA_MES ? 402 : 502);
@@ -340,7 +347,8 @@ export async function conversaDeVisitante(u: Usuario, chave: string | null, visi
 
 // ---------- a loja, vista por quem chega ----------
 async function lojaPorNumero(numero: number) {
-  const l = LOTES.find((x) => x.numero === numero);
+  // 0 = a sede da Social RP (não tem número de loja): a recepção dela atende os visitantes que entram no prédio (17/11/2026)
+  const l = numero === 0 ? { chave: CHAVE_SEDE } : LOTES.find((x) => x.numero === numero);
   if (!l) throw new ErroHttp("Loja não encontrada.", 404);
   let t = await obterTerreno(l.chave);
   if (t?.anexoDe) t = await obterTerreno(t.anexoDe); // lote duplo: a ampliação mostra a loja principal
@@ -381,6 +389,9 @@ export async function falarNaLoja(u: Usuario, numero: number, texto: string) {
   if (bloqueio(kLoja, LIMITE_VISITANTE_LOJA_DIA) || bloqueio(kTotal, LIMITE_VISITANTE_DIA)) throw new ErroHttp("Você mandou muitas mensagens hoje. Volte amanhã ou fale direto com a loja pelos contatos dela.", 429);
   contar(kLoja, 24 * 60); contar(kTotal, 24 * 60);
   const { t, empId } = await lojaPorNumero(numero);
+  // conectores: visitante escreveu e-mail ou telefone → aviso visitante.contato
+  const contatos = contatosNaFala(fala);
+  if (contatos) avisar(empId, "visitante.contato", { loja: { numero, nome: t.empresaNome }, visitante: { id: u.id, nome: u.nome }, mensagem: fala, contatos });
   const atendente = t.escritorio?.equipe.find((m) => m.papel === "atendente");
   if (!atendente) throw new ErroHttp("Esta loja ainda não tem atendente.", 404);
   const aid = agenteIdDe(empId, atendente.id);

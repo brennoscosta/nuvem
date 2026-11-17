@@ -1,12 +1,12 @@
 "use client";
 // Painel "Montar escritório": o dono do lote escolhe o layout do prédio, os setores (nome, cor, mesas) e a equipe
 // (atendente e CEO obrigatórios; profissionais por setor). A cena desenha o rascunho ao vivo; Salvar grava no servidor.
-import { Icone } from "./Icone";
+import { Icone, type NomeIcone } from "./Icone";
 import { FLUTUANTE, LARGO } from "./estilo";
 import { useEffect, useState } from "react";
 import { PixAberto } from "./Lote";
 import { useMundo } from "../mundoStore";
-import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, vagasLivres, DECOR_PADRAO, ESTILOS_LETREIRO, PISOS, CERCAS, EXTRAS, CORES_TOLDO, INTERIOR_PADRAO, CORES_PAREDE, PISOS_INTERIOR, MOVEIS_INTERIOR, COBERTURAS, MATERIAIS, CORES_LED, LED_PADRAO, PECAS, PECA_POR_NICHO, andaresDoPredio, limitesAndares, type Led, type Escritorio, type Setor, type Membro, type Pronto, type Decoracao, type Interior } from "../data/escritorio";
+import { LAYOUTS, CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, CATALOGO_PROFISSIONAIS, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, vagasLivres, DECOR_PADRAO, ESTILOS_LETREIRO, PISOS, CERCAS, EXTRAS, CORES_TOLDO, INTERIOR_PADRAO, CORES_PAREDE, PISOS_INTERIOR, MOVEIS_INTERIOR, ITENS_DECORACAO, ESTILOS_INTERIOR, DECORACAO_DISCRETA, type ItemDecoracao, COBERTURAS, MATERIAIS, CORES_LED, LED_PADRAO, PECAS, PECA_POR_NICHO, andaresDoPredio, limitesAndares, type Led, type Escritorio, type Setor, type Membro, type Pronto, type Decoracao, type Interior } from "../data/escritorio";
 import { useEscritorio } from "../store";
 import { ehKit, KIT_TOLDO } from "../data/predios";
 import { frenteDoLote, LOTE_POR_CHAVE } from "../data/mundo";
@@ -91,6 +91,8 @@ export function PainelEscritorio() {
   const catalogo = catalogoLocal ?? abaPedida === "contratar";
   const [aVenda, setAVenda] = useState<AgenteVenda[] | null>(null);
   useEffect(() => { if (!aberto || aVenda) return; const c = new AbortController(); fetch("/api/catalogo", { signal: c.signal }).then((r) => r.json()).then((j) => setAVenda(j.agentes ?? [])).catch(() => setAVenda(CATALOGO_PROFISSIONAIS.map((p) => ({ ...p, descricao: p.treino.descricao, saudacao: p.treino.saudacao, skills: [], apis: [], preco: 0 })))); return () => c.abort(); }, [aberto, aVenda]);
+  // aberto direto na aba Interior (botão "Interior" do cartão do lote): entra no prédio, como a própria aba faz (17/11/2026)
+  useEffect(() => { if (aberto && aba === "interior") useEscritorio.getState().setVista("dentro"); }, [aberto, aba]);
   const pagar = useMundo((s) => s.pagar);
   const pix = useMundo((s) => s.pix);
   const terrenoAtual = useMundo((s) => (s.loteSelecionado ? s.terrenos[s.loteSelecionado] : undefined));
@@ -119,7 +121,7 @@ export function PainelEscritorio() {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-3">
         {aba === "visual" && <AbaVisual e={e} set={set} corMarca={terrenoAtual?.cor ?? "#1D4ED8"} nicho={terrenoAtual?.nicho ?? "negocios"} />}
-        {aba === "interior" && <AbaInterior e={e} set={set} temLogo={!!terrenoAtual?.temLogo} />}
+        {aba === "interior" && <AbaInterior e={e} set={set} temLogo={!!terrenoAtual?.temLogo} marca={terrenoAtual?.cor ?? "#1D4ED8"} />}
         {aba === "predio" && (
           <div className="space-y-2">
             {LOTE_POR_CHAVE[vista] && <PosicaoPredio k={LOTE_POR_CHAVE[vista].k} e={e} set={set} />}
@@ -245,13 +247,69 @@ function PosicaoPredio({ k, e, set }: { k: number; e: Escritorio; set: (e: Escri
 function Opcao({ ativo, onClick, children, titulo }: { ativo: boolean; onClick: () => void; children: React.ReactNode; titulo?: string }) {
   return <button type="button" title={titulo} onClick={onClick} className={`rounded-xl border-2 px-2.5 py-1.5 text-left text-[12px] font-semibold transition ${ativo ? "border-[#1D4ED8] bg-[#EEF3FF] text-[#1D2128]" : "border-black/10 bg-white text-[#5B6472] hover:border-black/25"}`}>{children}</button>;
 }
+// Decoração por dentro (17/11/2026): ícone de cada item e a miniatura de cada estilo pronto
+const ICONE_DECORACAO: Record<ItemDecoracao, NomeIcone> = { tapetes: "tapete", salaDeEspera: "poltrona", luminarias: "luminaria", plantasGrandes: "planta", estantes: "estante", arte: "quadro", logoNaParede: "placa", cafe: "cafe", lousas: "lousa" };
+// miniatura: parede, piso, tapete, mesa no tom dos móveis e os itens que o estilo liga (planta, luminária, estante, quadro)
+function MiniaturaSala({ it, marca }: { it: Interior; marca: string }) {
+  const piso = PISOS_INTERIOR.find((p) => p.id === it.piso)?.cor ?? null, tampo = MOVEIS_INTERIOR.find((m) => m.id === it.moveis)?.tampo ?? "#F7F7F5";
+  const tem = new Set(it.decoracao ?? []);
+  return (
+    <svg viewBox="0 0 80 52" className="block h-auto w-full rounded-lg" aria-hidden>
+      <rect width="80" height="22" fill={it.parede} />
+      {piso ? <rect y="22" width="80" height="30" fill={piso} /> : <><rect y="22" width="40" height="30" fill="#DFF3F6" /><rect x="40" y="22" width="40" height="30" fill="#FBE6EC" /></>}
+      <rect y="21" width="80" height="1.6" fill="rgba(0,0,0,.12)" />
+      {tem.has("tapetes") && <rect x="18" y="31" width="44" height="15" rx="3" fill={marca} opacity=".55" />}
+      {tem.has("estantes") && <g><rect x="5" y="6" width="13" height="16" rx="1" fill="#8E6B4A" />{[8, 12, 16].map((yy) => <rect key={yy} x="6.5" y={yy} width="10" height="2.4" fill={["#C0392B", "#2E86C1", "#F4D03F"][yy % 3]} />)}</g>}
+      {tem.has("arte") && <g><rect x="31" y="6" width="16" height="10" fill="#2B2F36" /><rect x="32.2" y="7.2" width="13.6" height="7.6" fill="#F6F1E7" /><circle cx="36" cy="11" r="2.6" fill="#E76F51" /><rect x="40" y="9" width="5" height="4.5" fill="#2A9D8F" /></g>}
+      {tem.has("lousas") && <g><rect x="55" y="5" width="16" height="11" fill="#FBFBF9" stroke="#C9CED6" strokeWidth="1" /><path d="M58 9c2-1.5 3 1.5 5 0s3-1 5 .5M58 12.5h6" stroke="#2E86C1" strokeWidth="1" fill="none" /></g>}
+      <rect x="28" y="33" width="24" height="7" rx="1" fill={tampo} stroke="rgba(0,0,0,.25)" strokeWidth=".6" />
+      <rect x="37" y="28" width="6" height="5" rx=".6" fill="#3A3F47" />
+      {tem.has("plantasGrandes") && <g><rect x="68" y="40" width="6" height="7" rx="1" fill="#3A3F47" /><circle cx="71" cy="35" r="5.4" fill="#2F7D46" /><circle cx="73.5" cy="32" r="3.2" fill="#58B06A" /></g>}
+      {tem.has("luminarias") && <g><rect x="9.6" y="30" width=".9" height="16" fill="#3A3F47" /><path d="M6.6 27h7l1.8 4H4.8z" fill="#FFD88A" /></g>}
+      {tem.has("salaDeEspera") && <rect x="56" y="38" width="9" height="7" rx="2" fill={marca} opacity=".85" />}
+    </svg>
+  );
+}
 // Interior (12/11/2026): paredes, piso, móveis, quadros com a logo e plantas. A cena mostra por dentro enquanto escolhe.
-function AbaInterior({ e, set, temLogo }: { e: Escritorio; set: (e: Escritorio) => void; temLogo: boolean }) {
+// 17/11/2026: estilos prontos (trocam tudo de uma vez) e itens de decoração que o dono liga e desliga.
+function AbaInterior({ e, set, temLogo, marca }: { e: Escritorio; set: (e: Escritorio) => void; temLogo: boolean; marca: string }) {
   const d = e.decor ?? DECOR_PADRAO; const i = d.interior ?? INTERIOR_PADRAO;
-  const muda = (p: Partial<Interior>) => set({ ...e, decor: { ...d, interior: { ...i, ...p } } });
+  // mexer numa peça solta tira o "estilo pronto" (vira personalizado)
+  const muda = (p: Partial<Interior>) => set({ ...e, decor: { ...d, interior: { ...i, ...p, estilo: null } } });
+  const decoracao = new Set(i.decoracao ?? DECORACAO_DISCRETA);
+  const alternar = (item: ItemDecoracao) => { const n = new Set(decoracao); if (n.has(item)) n.delete(item); else n.add(item); muda({ decoracao: ITENS_DECORACAO.map((x) => x.id).filter((x) => n.has(x)) }); };
   const titulo = (t: string) => <div className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-[#5B6472] first:mt-0">{t}</div>;
   return (
     <div>
+      {titulo("Estilo pronto")}
+      <div className="grid grid-cols-2 gap-2">
+        {ESTILOS_INTERIOR.map((es) => {
+          const ativo = i.estilo === es.id;
+          return (
+            <button key={es.id} type="button" onClick={() => set({ ...e, decor: { ...d, interior: { ...es.interior, decoracao: [...(es.interior.decoracao ?? [])], estilo: es.id } } })} aria-pressed={ativo}
+              className={`overflow-hidden rounded-xl border-2 p-1.5 text-left transition ${ativo ? "border-[#1D4ED8] bg-[#EEF3FF]" : "border-black/10 bg-white hover:border-black/25"}`}>
+              <MiniaturaSala it={es.interior} marca={marca} />
+              <span className="mt-1 block px-0.5 text-[12px] font-bold text-[#1D2128]">{es.nome}</span>
+              <span className="block px-0.5 text-[10.5px] leading-tight text-[#5B6472]">{es.desc}</span>
+            </button>
+          );
+        })}
+      </div>
+      {titulo("Decoração e móveis")}
+      <div className="space-y-1">
+        {ITENS_DECORACAO.map((item) => {
+          const ligado = decoracao.has(item.id);
+          return (
+            <button key={item.id} type="button" role="switch" aria-checked={ligado} onClick={() => alternar(item.id)}
+              className={`flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${ligado ? "border-[#1D4ED8]/40 bg-[#EEF3FF]" : "border-black/10 bg-white hover:border-black/25"}`}>
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${ligado ? "bg-[#1D4ED8] text-white" : "bg-[#F1F3F6] text-[#5B6472]"}`}><Icone nome={ICONE_DECORACAO[item.id]} tamanho={17} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-[12.5px] font-semibold text-[#1D2128]">{item.nome}</span><span className="block truncate text-[11px] text-[#5B6472]">{item.desc}</span></span>
+              <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${ligado ? "bg-[#1D4ED8]" : "bg-[#C9CED6]"}`} aria-hidden><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${ligado ? "left-[18px]" : "left-0.5"}`} /></span>
+            </button>
+          );
+        })}
+      </div>
+      {decoracao.has("logoNaParede") && !temLogo && <div className="mt-2 rounded-xl bg-[#FFF4D6] px-3 py-2 text-[11px] text-[#7A5A00]">Sem logo, o painel do hall sai com a cor da marca. Envie a logo em “Marca e logo” no cartão do lote.</div>}
       {titulo("Cor das paredes")}
       <div className="flex flex-wrap items-center gap-2">
         {CORES_PAREDE.map((c) => <button key={c} type="button" onClick={() => muda({ parede: c })} aria-label={`Parede ${c}`} className={`h-8 w-8 rounded-lg border-2 shadow-inner ${i.parede.toUpperCase() === c.toUpperCase() ? "border-[#1D2128]" : "border-black/10"}`} style={{ background: c }} />)}

@@ -4,6 +4,7 @@
 import * as THREE from "three";
 import { Personagens } from "./Personagens";
 import { EscritoriosClientes } from "./EscritorioCliente";
+import { PortasPredios } from "./Portas";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import { caixa, cilindro, mat, plano } from "./geo";
@@ -201,6 +202,7 @@ export function Mundo() {
       <Depois etapa={1}><Personagens /></Depois>
       <Perto cx={0} cz={0} raio={raio + 100}><Isolado><Lotes /></Isolado>
       <Isolado><EscritoriosClientes /></Isolado>
+      <Isolado><PortasPredios /></Isolado>
       {/* praça de eventos e feira de sábado no lote 0,1,1 (12/11/2026) */}
       <Isolado><Praca /></Isolado></Perto>
     </group>

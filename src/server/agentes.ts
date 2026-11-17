@@ -15,6 +15,7 @@ export interface ConfigAgente {
   aoConcluir?: { encaminharPara?: string | null };
   // equipe de cliente do WorkEnd (11/11/2026): de qual membro do escritório o agente nasceu
   membroId?: string; papel?: "atendente" | "ceo" | "profissional"; saudacao?: string; especialista?: string | null; atendeVisitantes?: boolean;
+  setorId?: string | null; // departamento do escritório (17/11/2026: as fontes de dados dos conectores filtram por ele)
 }
 export interface ConhecimentoDB { id: string; agenteId: string; titulo: string; conteudo: string; origem: string; ativo: boolean; criadoEm: Date }
 export interface SkillDB { id: string; agenteId: string; nome: string; quandoUsar: string; passos: string; ativo: boolean; ordem: number; criadoEm: Date }

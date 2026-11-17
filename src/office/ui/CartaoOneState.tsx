@@ -15,6 +15,7 @@ import type { Membro, Setor } from "../data/escritorio";
 import { useSede } from "../sedeStore";
 import { useEscritorio } from "../store";
 import { abrirChatEquipe } from "./ChatEquipe";
+import { BotaoEntrar } from "./Recepcao";
 import { NIVEL_COR, NIVEL_ROTULO } from "./equipeComum";
 
 export const useCartaoOneState = useSede;
@@ -118,6 +119,7 @@ export function CartaoOneState() {
         <img src="/socialrp/logo.png" alt="Social RP" className="h-11 w-auto" />
         <p className="mt-2 text-[13px] leading-snug text-white/75">A sede da Social RP na cidade. Lá dentro, cada departamento trabalha com a sua equipe de agentes de IA.</p>
         {e && <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11.5px] font-semibold"><span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5"><Icone nome="equipe" tamanho={13} className="text-[#E9C46A]" />{e.equipe.length} agentes de IA</span><span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5"><Icone nome="camadas" tamanho={13} className="text-[#E9C46A]" />{departamentos} departamentos</span></div>}
+        <BotaoEntrar chave={CHAVE_SEDE} escuro className="mt-3" />
         <div className="mt-3 flex flex-wrap gap-2">
           {souDono && <button type="button" onClick={() => conversar()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#E9C46A] px-3 py-1.5 text-[12.5px] font-bold text-[#1A1306] hover:brightness-105"><Icone nome="conversar" tamanho={15} />Falar com a equipe</button>}
           {souDono && <a href="/app/equipe?aba=internas" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-white/15"><Icone nome="equipe" tamanho={15} />Conversas internas</a>}

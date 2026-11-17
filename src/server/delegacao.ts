@@ -10,6 +10,7 @@
 import { sql, id, migrar } from "./db";
 import { conversar } from "./motor";
 import { gravarEvento, gravarMensagem, type AgenteDB, type MensagemDB } from "./agentes";
+import { avisar, dadosParaAgente } from "./conectores";
 
 export const PEDIDOS_POR_NIVEL = 4;
 export const PROFUNDIDADE_MAX = 2;
@@ -76,7 +77,9 @@ async function primeiraPassada(ctx: Contexto, chefe: AgenteDB, texto: string, au
   const subs = profundidade < PROFUNDIDADE_MAX ? await subordinadosDe(chefe.id) : [];
   const restante = PEDIDOS_POR_TAREFA - ctx.total.n;
   const comEquipe = subs.length > 0 && restante > 0;
-  const contexto = [contextoExtra, comEquipe ? instrucoes(chefe, subs, restante) : ""].filter(Boolean).join("\n\n");
+  // conectores (17/11/2026): dados reais das fontes da empresa que esta pessoa lê (erro numa fonte não para a conversa)
+  const dados = await dadosParaAgente(ctx.empId, chefe).catch(() => null);
+  const contexto = [contextoExtra, dados, comEquipe ? instrucoes(chefe, subs, restante) : ""].filter(Boolean).join("\n\n");
   const r = await conversar(chefe.id, texto, autor, { modo: "dono", contexto: contexto || undefined, tetoMes: await ctx.teto(), maxTokens: profundidade === 0 ? 1600 : 1200 });
   if (!comEquipe) return { mensagem: r.mensagem, pedidos: [] as { sub: AgenteDB; tarefa: string; cid: string }[] };
   const { limpo, pedidos } = extrair(r.mensagem.conteudo, subs, Math.min(PEDIDOS_POR_NIVEL, restante));
@@ -103,6 +106,7 @@ async function resolver(ctx: Contexto, chefe: AgenteDB, pedidoOriginal: string, 
       const final = pass.pedidos.length ? await resolver(ctx, p.sub, p.tarefa, pass.pedidos, profundidade + 1) : pass.mensagem.conteudo;
       await sql`UPDATE conversa_interna SET resposta = ${final}, status = 'respondido', respondido_em = now() WHERE id = ${p.cid}`;
       await gravarEvento(ctx.empId, p.sub.id, "respondeu", resumo(final), { de: membroDe(p.sub), para: membroDe(chefe), resumo: resumo(final) }).catch(() => {});
+      avisar(ctx.empId, "pedido_interno.respondido", { id: p.cid, de: { id: membroDe(chefe), nome: chefe.nome, cargo: chefe.funcao }, para: { id: membroDe(p.sub), nome: p.sub.nome, cargo: p.sub.funcao }, pedido: p.tarefa, resposta: final });
       return { sub: p.sub, texto: final, ok: true };
     } catch (e) {
       const msg = (e as Error).message;
@@ -114,7 +118,7 @@ async function resolver(ctx: Contexto, chefe: AgenteDB, pedidoOriginal: string, 
   try {
     const r = await conversar(chefe.id, `Respostas da sua equipe:\n\n${compilado}`, "sistema:equipe", {
       modo: "dono", tetoMes: await ctx.teto(), maxTokens: profundidade === 0 ? 2200 : 1400,
-      contexto: `A sua equipe respondeu. Junte as respostas e entregue a resposta final e completa ao pedido: "${pedidoOriginal.slice(0, 1500)}". Diga quem fez cada parte quando ajudar. Não use marcações [[PEDIR]].${profundidade === 0 ? " Esta é a entrega para o dono." : " Esta resposta vai para o seu chefe."}`,
+      contexto: `A sua equipe respondeu. Junte as respostas e entregue a resposta final e completa ao pedido: "${pedidoOriginal.slice(0, 1500)}". Diga quem fez cada parte quando ajudar. Não use marcações [[PEDIR]].${profundidade === 0 ? " Esta é a entrega para o DONO da empresa: escreva diretamente para ele (você), sem se dirigir ao seu chefe nem a colegas pelo nome no começo." : " Esta resposta vai para o seu chefe."}`,
     });
     return r.mensagem.conteudo.replace(MARCA, "").trim();
   } catch (e) {
@@ -131,14 +135,15 @@ export async function pedirComEquipe(ctx: Omit<Contexto, "origemAgente" | "orige
   const c: Contexto = { ...ctx, origemAgente: agente.id, origemMensagem: "", total: { n: 0 } };
   // a mensagem do dono é gravada pelo motor; para ligar as conversas internas a ela, guardamos o id depois
   const pass = await primeiraPassada(c, agente, pedido, ctx.autorDono, 0);
-  if (!pass.pedidos.length) return { mensagem: pass.mensagem, delegados: [] as { membroId: string; nome: string; cargo: string; tarefa: string }[] };
+  // fim: a entrega final (a própria resposta quando ninguém foi acionado); a API v1 e os avisos esperam por ela
+  if (!pass.pedidos.length) return { mensagem: pass.mensagem, delegados: [] as { membroId: string; nome: string; cargo: string; tarefa: string }[], fim: Promise.resolve<string | null>(pass.mensagem.conteudo) };
   const [dono] = await sql<{ id: string }[]>`SELECT id FROM mensagem WHERE agente_id = ${agente.id} AND papel = 'user' AND autor = ${ctx.autorDono} ORDER BY criado_em DESC LIMIT 1`;
   if (dono) { c.origemMensagem = dono.id; await sql`UPDATE conversa_interna SET origem_mensagem = ${dono.id} WHERE id = ANY(${sql.array(pass.pedidos.map((p) => p.cid))})`; }
   TRABALHOS.set(agente.id, Date.now());
-  void resolver(c, agente, pedido, pass.pedidos, 0)
-    .catch((e) => console.error("[equipe] delegação", (e as Error).message))
+  const fim: Promise<string | null> = resolver(c, agente, pedido, pass.pedidos, 0)
+    .catch((e) => { console.error("[equipe] delegação", (e as Error).message); return null; })
     .finally(() => TRABALHOS.delete(agente.id));
-  return { mensagem: pass.mensagem, delegados: pass.pedidos.map((p) => ({ membroId: membroDe(p.sub), nome: p.sub.nome, cargo: p.sub.funcao, tarefa: resumo(p.tarefa, 200) })) };
+  return { mensagem: pass.mensagem, delegados: pass.pedidos.map((p) => ({ membroId: membroDe(p.sub), nome: p.sub.nome, cargo: p.sub.funcao, tarefa: resumo(p.tarefa, 200) })), fim };
 }
 
 // ---------- leitura ----------
