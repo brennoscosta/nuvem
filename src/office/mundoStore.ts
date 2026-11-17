@@ -2,7 +2,7 @@
 // Estado do mundo WorkEnd: lotes reservados, lote selecionado, usuário do WorkEnd (sessão própria, separada do admin
 // da Nuvem) e o rascunho da empresa enquanto o usuário monta a placa dele.
 import { useSede } from "./sedeStore";
-import { CHAVE_SEDE, SEDE } from "./data/onestate";
+import { sedeDe, sedeDoParametro, centroTorre } from "./data/sedes";
 import { create } from "zustand";
 import { useSyncExternalStore } from "react";
 
@@ -47,6 +47,7 @@ export function linkCadastro(chave: string) {
 interface Estado {
   terrenos: Record<string, Terreno>;
   meu: string | null; // chave do lote do usuário logado
+  meus: string[]; // todos os lotes dele: próprios e os de que é sócio (17/11/2026, terreno.socios)
   usuario: UsuarioWorkend | null;
   admin: boolean; // admin do WorkEnd (vê tudo, libera e bane)
   pagamentoLigado: boolean; // MP_ACCESS_TOKEN configurado no servidor
@@ -111,7 +112,7 @@ export const useMundo = create<Estado>((set, get) => ({
       void get().carregarOutdoors(); return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },
-  terrenos: {}, meu: null, usuario: null, admin: false, pagamentoLigado: false, preco: 99, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
+  terrenos: {}, meu: null, meus: [], usuario: null, admin: false, pagamentoLigado: false, preco: 99, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
 
   carregar: async () => {
     void get().carregarOutdoors();
@@ -125,10 +126,11 @@ export const useMundo = create<Estado>((set, get) => ({
       ]);
       const terrenos: Record<string, Terreno> = {};
       for (const x of (t.terrenos ?? []) as Terreno[]) terrenos[x.chave] = x;
-      set({ terrenos, vagas: t.vagas ?? {}, meu: t.meu ?? null, usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? 99, fundador: t.fundador ?? null, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
+      set({ terrenos, vagas: t.vagas ?? {}, meu: t.meu ?? null, meus: Array.isArray(t.meus) ? t.meus : t.meu ? [t.meu] : [], usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? 99, fundador: t.fundador ?? null, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
       // veio do cadastro com ?lote=: já abre o lote escolhido
       const busca = primeira && typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-      if (busca?.get("sede")) get().selecionarLote(CHAVE_SEDE);
+      const sedePedida = sedeDoParametro(busca?.get("sede")); // ?sede=1 (Social RP) ou ?sede=<id da sede>
+      if (sedePedida) get().selecionarLote(sedePedida.chave);
       const pedido = busca?.get("lote") ?? null;
       if (pedido && LOTE_POR_CHAVE[pedido] && !get().loteSelecionado) { get().selecionarLote(pedido); if (u && u.id && !terrenos[pedido] && pedido !== PRACA_CHAVE && !busca?.get("pagamento")) get().abrirPainel(); }
     } catch (e) { console.warn("[mundo] sem servidor:", e); set({ carregado: true }); }
@@ -136,7 +138,8 @@ export const useMundo = create<Estado>((set, get) => ({
 
   selecionarLote: (chave) => {
     // a sede do OneState não é um lote da lista: abre o cartão dela (src/office/ui/CartaoOneState.tsx)
-    if (chave === CHAVE_SEDE) { set({ loteSelecionado: null, alvoCamera: [SEDE.x, 0.5, SEDE.z + 6] }); useSede.setState({ aberto: true }); return; }
+    const sd = sedeDe(chave);
+    if (sd) { const [x, z] = centroTorre(sd); set({ loteSelecionado: null, alvoCamera: [x, 0.5, z + 6] }); useSede.setState({ aberto: true, id: sd.id }); return; }
     const l = chave ? LOTE_POR_CHAVE[chave] : null;
     // lote duplo ativo: a câmera vai para o meio dos dois terrenos, onde fica o prédio
     let alvo: [number, number, number] | null = l ? [l.centro[0], 0.5, l.centro[1]] : null;
@@ -239,7 +242,7 @@ export const useMundo = create<Estado>((set, get) => ({
     } catch (e) { return (e as Error).message; } finally { set({ salvandoEscritorio: false }); }
   },
 
-  sairWorkend: async () => { await fetch("/api/workend/sair", { method: "POST" }); set({ usuario: null, meu: null, painelEmpresa: false, rascunho: null }); await get().carregar(); },
+  sairWorkend: async () => { await fetch("/api/workend/sair", { method: "POST" }); set({ usuario: null, meu: null, meus: [], painelEmpresa: false, rascunho: null }); await get().carregar(); },
   limparAlvo: () => set({ alvoCamera: null }),
 }));
 

@@ -9,7 +9,7 @@
 // o prédio em scene/EscritorioCliente.tsx (frente do lote, giro do dono e lote duplo). Sede: data/plantaSede.ts.
 import { LOTE_POR_CHAVE, frenteDoLote } from "./mundo";
 import { PREDIO_CLIENTE, plantaCliente, type Escritorio } from "./escritorio";
-import { CHAVE_SEDE } from "./onestate";
+import { sedeDe, deslocamento } from "./sedes";
 import { montarSalas, cx, Z1 } from "./plantaSede";
 import { pontoLivre, livre, type Ponto } from "./caminhos";
 
@@ -21,12 +21,14 @@ const paraMundo = (c: Ponto, rot: number, lx: number, lz: number): Ponto => [c[0
 
 export function entradaDoPredio(t: TerrenoEntrada, anexo: string | null): Entrada | null {
   if (t.status !== "ativo" || !t.escritorio || t.anexoDe) return null;
-  if (t.chave === CHAVE_SEDE) {
+  const sd = sedeDe(t.chave);
+  if (sd) {
+    // sedes (data/sedes.ts): a planta é a da Social RP deslocada para o quarteirão de cada uma
     const rec = montarSalas(t.escritorio.setores).find((s) => s.tipo === "recepcao");
     if (!rec) return null;
-    const x = cx(rec);
+    const [dx, dz] = deslocamento(sd), x = cx(rec) + dx, zf = Z1 + dz, zr = rec.z1 + dz;
     // a porta é o vão de 3 m no meio da parede sul da recepção; a atendente fica atrás do balcão (z1 - 4,2)
-    return { chave: t.chave, nome: t.empresaNome, numero: null, fora: pontoLivre(x, Z1 + 7), porta: [x, Z1 + 0.4], espera: [x, rec.z1 - 3.0], olhar: Math.PI, centro: [x, rec.z1 - 4], rot: 0 };
+    return { chave: t.chave, nome: t.empresaNome, numero: sd.numeroLoja, fora: pontoLivre(x, zf + 7), porta: [x, zf + 0.4], espera: [x, zr - 3.0], olhar: Math.PI, centro: [x, zr - 4], rot: 0 };
   }
   const l = LOTE_POR_CHAVE[t.chave]; if (!l) return null;
   const la = anexo ? LOTE_POR_CHAVE[anexo] : null;

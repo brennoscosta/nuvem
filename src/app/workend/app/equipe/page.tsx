@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
-import { terrenoDoUsuario, ehAdmin } from "@/server/terrenos";
+import { terrenoDoUsuario, empresasDoUsuario, ehAdmin } from "@/server/terrenos";
 import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { EquipePainel } from "./_equipe";
@@ -17,7 +17,10 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
   if (!u) redirect("/entrar?destino=/app/equipe");
   const sp = await searchParams;
   const chao = sp.lote ? null : await terrenoDoUsuario(u.id).catch(() => null);
-  const semLote = !sp.lote && (!chao || chao.status !== "ativo");
+  // empresas da pessoa (17/11/2026): as próprias e as de que é sócia (sedes divididas); com mais de uma, o topo troca entre elas
+  const empresas = await empresasDoUsuario(u.id).catch(() => []);
+  const inicial = sp.lote ?? (chao?.status === "ativo" ? chao.chave : empresas[0]?.chave) ?? null;
+  const semLote = !inicial;
   return (
     <>
       <CabecalhoApp atual="equipe" email={u.email} admin={ehAdmin(u)} />
@@ -32,7 +35,7 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
           </div>
         </section>
       ) : (
-        <EquipePainel chaveInicial={sp.lote ?? chao?.chave ?? null} membroInicial={sp.membro ?? null} abaInicial={sp.aba === "vagas" || sp.aba === "visitantes" || sp.aba === "sobre" || sp.aba === "internas" || sp.aba === "conectores" ? sp.aba : undefined} />
+        <EquipePainel chaveInicial={inicial} empresas={empresas} membroInicial={sp.membro ?? null} abaInicial={sp.aba === "vagas" || sp.aba === "visitantes" || sp.aba === "sobre" || sp.aba === "internas" || sp.aba === "conectores" ? sp.aba : undefined} />
       )}
       <div className="h-16" />
       <Rodape />

@@ -17,7 +17,8 @@ import { Entorno, GentePraia } from "./Entorno";
 import { ArvoresMistas, MISTURA_RUA, type Mistura } from "./Arvores";
 const MISTURA_PRAIA: Mistura = { coqueiro: 0.62, palmeiraImperial: 0.2, frondosa: 0.18 };
 import { Restaurante } from "./Restaurante";
-import { OneStateHQ } from "./OneStateHQ";
+import { SedeHQ } from "./OneStateHQ";
+import { SEDES } from "../data/sedes";
 import { Lotes } from "./Lotes";
 import { Horizonte } from "./Horizonte";
 import { Clima } from "./Clima";
@@ -142,8 +143,8 @@ export function Mundo() {
     }
     // cantos verdes do quarteirão do restaurante
     for (const [dx, dz] of [[-18, -18], [18, 18], [18, -18]]) add(PASSO + dx, dz, 5.5);
-    // cantos da praça da sede do OneState (o sudoeste tem o totem)
-    for (const [dx, dz] of [[-17.5, -17.5], [17.5, -17.5], [17.5, 17.5]]) add(PASSO + dx, PASSO + dz, 5.5);
+    // cantos da praça de cada sede (data/sedes.ts; o sudoeste tem o totem)
+    for (const sd of SEDES) for (const [dx, dz] of [[-17.5, -17.5], [17.5, -17.5], [17.5, 17.5]]) add(sd.x + dx, sd.z + dz, 5.5);
     // fileira na borda do mundo (depois da última rua)
     const B = N * PASSO + EIXO_RUA + 7;
     // (a fileira do norte agora fica no calçadão da beira-rio, em Rio.tsx)
@@ -197,7 +198,8 @@ export function Mundo() {
       {/* quarteirões */}
       <Perto cx={0} cz={0} raio={raio + 60}><Isolado><Entorno /></Isolado></Perto>
       <Perto cx={PASSO} cz={0} raio={raio}><Isolado><Restaurante /></Isolado></Perto>
-      <Perto cx={PASSO} cz={PASSO} raio={raio}><Isolado><OneStateHQ /></Isolado></Perto>
+      {/* sedes (data/sedes.ts): Social RP, AppZone, bday.fm e NUVCAM, cada uma no seu quarteirão */}
+      {SEDES.map((sd) => <Perto key={sd.id} cx={sd.x} cz={sd.z} raio={raio}><Isolado><SedeHQ sede={sd} /></Isolado></Perto>)}
       <Depois etapa={2}><GentePraia /></Depois>
       <Depois etapa={1}><Personagens /></Depois>
       <Perto cx={0} cz={0} raio={raio + 100}><Isolado><Lotes /></Isolado>

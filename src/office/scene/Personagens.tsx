@@ -27,7 +27,7 @@ function passouPor(ponto: [number, number]) {
 // chegou no balcão: o dono é reconhecido na hora; o visitante espera a vez (mais 4 s por pessoa na frente dele)
 function chegouNoBalcao() {
   const st = usePersonagem.getState(), p = st.predio; if (!p) return;
-  const dono = useMundo.getState().meu === p.chave;
+  const dono = useMundo.getState().meus.includes(p.chave); // dono ou sócio
   const fila = dono ? 0 : st.outros.filter((o) => o.online && perto([o.x, o.z], p.espera, 2.6)).length;
   const nome = st.meu?.nome ?? "";
   usePersonagem.setState({

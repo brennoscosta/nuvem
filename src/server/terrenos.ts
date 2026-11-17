@@ -2,7 +2,7 @@
 // os chãos pagos e as ações do admin. Regras: a reserva vale 1 hora sem pagamento; pagar (R$ 99 por lote
 // por mês) deixa o chão ativo por 30 dias, com 5 dias de tolerância depois do vencimento; um chão por conta
 // (o admin não tem essa trava); usuário banido não reserva.
-import { CHAVE_SEDE } from "@/office/data/onestate";
+import { ehSede } from "@/office/data/sedes";
 import { avisarSeguidores } from "./seguir";
 import { sql, migrar } from "./db";
 import { QUARTEIROES, nichoValido } from "@/office/data/mundo";
@@ -25,6 +25,7 @@ export interface Terreno {
   anexoDe: string | null; // lote duplo (12/11/2026): este lote é a ampliação do lote principal indicado
   promocao: Promocao | null; // promoção na fachada (12/11/2026); só vem enquanto vale
   inauguradoEm: Date | null; // 1ª vez que o lote ficou ativo (12/11/2026): a cena faz a festa de inauguração por 24 h
+  socios: string[]; // sócios (17/11/2026, migração 0037): o mesmo acesso do titular à equipe e aos conectores
 }
 export interface Promocao { texto: string; ate: string; desde: string }
 export interface TerrenoAdmin extends Terreno { email: string; usuarioNome: string; banidoEm: Date | null }
@@ -52,7 +53,7 @@ export function loteAVenda(chave: string) {
 
 // trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
 const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio, t.nicho, t.anexo_de,
-  CASE WHEN (t.promocao->>'ate')::timestamptz > now() THEN t.promocao END AS promocao, t.inaugurado_em`;
+  CASE WHEN (t.promocao->>'ate')::timestamptz > now() THEN t.promocao END AS promocao, t.inaugurado_em, t.socios`;
 
 // Limpa o que venceu: reserva sem pagamento depois de 1 h é apagada; chão pago sai do mapa depois do vencimento + tolerância,
 // mas a marca e a equipe vão pro arquivo e voltam na próxima reserva do mesmo dono
@@ -89,9 +90,22 @@ export async function listarTerrenos(): Promise<Terreno[]> {
 }
 export async function terrenoDoUsuario(usuarioId: string): Promise<Terreno | null> {
   await migrar(); await limparVencidos();
-  const [t] = await sql<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.usuario_id = ${usuarioId} AND t.anexo_de IS NULL ORDER BY t.status = 'ativo' DESC, t.reservado_em DESC LIMIT 1`;
-  return t ?? null;
+  // o lote próprio vem antes das sedes (17/11/2026): quem é titular de uma loja e de sedes continua com a loja como "meu lote"
+  const ts = await sql<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.usuario_id = ${usuarioId} AND t.anexo_de IS NULL ORDER BY t.status = 'ativo' DESC, t.reservado_em DESC`;
+  return ts.find((t) => !ehSede(t.chave)) ?? ts[0] ?? null;
 }
+// lotes de uma pessoa: os próprios (titular) e os de que é sócia (17/11/2026, terreno.socios)
+export async function chavesDoUsuario(usuarioId: string): Promise<string[]> {
+  await migrar();
+  const rows = await sql<{ chave: string }[]>`SELECT chave FROM terreno WHERE (usuario_id = ${usuarioId} OR ${usuarioId} = ANY(socios)) AND anexo_de IS NULL ORDER BY status = 'ativo' DESC, reservado_em`;
+  return rows.map((r) => r.chave);
+}
+export async function empresasDoUsuario(usuarioId: string): Promise<{ chave: string; nome: string; socio: boolean }[]> {
+  await migrar();
+  const rows = await sql<{ chave: string; empresaNome: string; usuarioId: string }[]>`SELECT chave, empresa_nome, usuario_id FROM terreno WHERE (usuario_id = ${usuarioId} OR ${usuarioId} = ANY(socios)) AND anexo_de IS NULL AND status = 'ativo' ORDER BY reservado_em`;
+  return rows.map((r) => ({ chave: r.chave, nome: r.empresaNome, socio: r.usuarioId !== usuarioId }));
+}
+export const ehDonoOuSocio = (t: Pick<Terreno, "usuarioId" | "socios">, usuarioId: string) => t.usuarioId === usuarioId || (t.socios ?? []).includes(usuarioId);
 export async function obterTerreno(chave: string): Promise<Terreno | null> {
   await migrar();
   const [t] = await sql<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${chave}`;
@@ -196,7 +210,7 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
   if (!t) throw new Error("Lote sem dono.");
   if (t.usuarioId !== u.id && !ehAdmin(u)) throw new Error("Esse chão não é seu.");
   if (t.status !== "ativo") throw new Error("Pague o 1º mês pra montar o escritório.");
-  if (chave === CHAVE_SEDE) throw new Error("A sede da Social RP tem a equipe montada por departamento e não é montada pelo editor.");
+  if (ehSede(chave)) throw new Error("A sede tem a equipe montada por departamento e não é montada pelo editor.");
   const base = t.escritorio ?? (await garantirEscritorio(chave)) ?? escritorioPadrao(t.empresaNome, t.cor);
   const e = normalizarEscritorio(dados, base);
   const detalhes: string[] = [];

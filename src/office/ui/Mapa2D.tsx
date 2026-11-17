@@ -8,7 +8,8 @@ import { useMundo, LOTES, useAgora, promocaoAtiva, type Terreno } from "../mundo
 import { QUARTEIROES, centroQuarteirao, EIXOS_RUA, RUA, MEIO_Q, BORDA_CALCADA, PASSO, N, EIXO_RUA, LOTE, nomeNicho, type LoteInfo } from "../data/mundo";
 import { PRACA_CHAVE } from "../data/praca";
 import { escolherMapa } from "../scene/qualidade";
-import { abrirOneState } from "./CartaoOneState";
+import { abrirSede } from "./CartaoOneState";
+import { SEDES } from "../data/sedes";
 
 const L = N * PASSO + EIXO_RUA + 12; // metade do lado desenhado (m)
 const ASFALTO = "#545962", FAIXA = "#F3EEDF", CALCADA = "#E4DFD4", GRAMA = "#9ACB78", GRAMA_Q = "#B2DA93";
@@ -211,12 +212,18 @@ export function Mapa2D() {
               {Array.from({ length: 4 }, (_, i) => Array.from({ length: 3 }, (_, k) => <rect key={`${i}${k}`} x={cx - 12 + i * 6.4} y={cz - 10 + k * 7} width={4.6} height={4.6} rx={0.6} fill="#5B9DFF" opacity={0.6} />))}
               <Rotulo x={cx} z={cz - 14} texto="Nuvem" sub="tecnologia" cor="#1D4ED8" />
             </g>}
-            {q.ocupante === "onestate" && <g onClick={() => abrirOneState()} style={{ cursor: "pointer" }}>
-              <rect x={cx - 11} y={cz - 11} width={22} height={16} rx={2} fill="#000" opacity={0.18} transform="translate(1.2 1.4)" />
-              <rect x={cx - 11} y={cz - 11} width={22} height={16} rx={2} fill="#14110A" stroke="#D4A63A" strokeWidth={0.8} />
-              {Array.from({ length: 4 }, (_, i) => Array.from({ length: 2 }, (_, k) => <rect key={`${i}${k}`} x={cx - 9 + i * 4.8} y={cz - 8.6 + k * 5.6} width={3.4} height={3.6} rx={0.5} fill="#E9C46A" opacity={0.55} />))}
-              <Rotulo x={cx} z={cz - 12} texto="Social RP" sub="roleplay" cor="#14110A" />
-            </g>}
+            {(q.ocupante === "onestate" || q.ocupante === "sede") && (() => {
+              // sedes (data/sedes.ts): torre escura com a cor da marca
+              const sd = SEDES.find((x) => x.i === q.i && x.j === q.j); if (!sd) return null;
+              return (
+                <g onClick={() => abrirSede(sd.id)} style={{ cursor: "pointer" }}>
+                  <rect x={cx - 11} y={cz - 11} width={22} height={16} rx={2} fill="#000" opacity={0.18} transform="translate(1.2 1.4)" />
+                  <rect x={cx - 11} y={cz - 11} width={22} height={16} rx={2} fill={sd.escura} stroke={sd.cor} strokeWidth={0.8} />
+                  {Array.from({ length: 4 }, (_, i) => Array.from({ length: 2 }, (_, k) => <rect key={`${i}${k}`} x={cx - 9 + i * 4.8} y={cz - 8.6 + k * 5.6} width={3.4} height={3.6} rx={0.5} fill={sd.cor} opacity={0.55} />))}
+                  <Rotulo x={cx} z={cz - 12} texto={sd.nome} sub={sd.tipo} cor={sd.escura} />
+                </g>
+              );
+            })()}
             {q.ocupante === "restaurante" && <g>
               <rect x={cx - 12} y={cz - 9} width={24} height={18} rx={2} fill="#000" opacity={0.18} transform="translate(1.2 1.4)" />
               <rect x={cx - 12} y={cz - 9} width={24} height={18} rx={2} fill="#D97706" />

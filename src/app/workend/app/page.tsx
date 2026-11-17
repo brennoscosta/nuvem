@@ -7,8 +7,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
-import { terrenoDoUsuario, ehAdmin, PRECO_LOTE, type Terreno } from "@/server/terrenos";
-import { CHAVE_SEDE } from "@/office/data/onestate";
+import { terrenoDoUsuario, empresasDoUsuario, ehAdmin, PRECO_LOTE, type Terreno } from "@/server/terrenos";
+import { sedeDe } from "@/office/data/sedes";
 import { painelDoDono, painelReserva, ofertaDeEntrada, saudacaoBR, type Painel, type Numero } from "@/server/painel";
 import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
 import { CabecalhoApp } from "../_cabecalho";
@@ -26,6 +26,8 @@ export default async function App() {
   const u = await usuarioAtual().catch(() => null);
   if (!u) redirect("/entrar");
   const chao = await terrenoDoUsuario(u.id).catch(() => null);
+  // as outras empresas da pessoa (17/11/2026): próprias e como sócia (sedes divididas)
+  const outras = (await empresasDoUsuario(u.id).catch(() => [])).filter((e) => e.chave !== chao?.chave);
   const nome = u.nome.split(" ")[0];
   const empresa = chao?.empresaNome || u.empresaNome || `Empresa de ${nome}`;
   const { oi, data } = saudacaoBR();
@@ -35,7 +37,7 @@ export default async function App() {
     chao && !ativo ? painelReserva(u, chao) : null,
     !chao ? ofertaDeEntrada(u) : null,
   ]);
-  const linkLote = chao ? (chao.chave === CHAVE_SEDE ? "/mundo?sede=1" : `/mundo?lote=${encodeURIComponent(chao.chave)}`) : "/mundo";
+  const linkLote = chao ? (sedeDe(chao.chave) ? `/mundo?sede=${sedeDe(chao.chave)!.id}` : `/mundo?lote=${encodeURIComponent(chao.chave)}`) : "/mundo";
 
   return (
     <div className="pn">
@@ -54,6 +56,27 @@ export default async function App() {
       {ativo && chao && p ? <LojaAberta chao={chao} p={p} empresa={empresa} linkLote={linkLote} />
         : chao && reserva ? <Reservado chao={chao} r={reserva} linkLote={linkLote} />
         : <SemLote fundador={entrada?.fundador ?? null} />}
+
+      {outras.length > 0 && (
+        <section className="faixa pn-bloco">
+          <div className="pn-titulo"><div><h2>Minhas empresas</h2><p>As outras empresas em que você é dono ou sócio. Cada uma tem a sua equipe de IA.</p></div></div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {outras.map((e) => {
+              const sd = sedeDe(e.chave);
+              return (
+                <div key={e.chave} className="rounded-2xl p-4 text-white shadow-lg" style={{ background: sd ? `linear-gradient(150deg, color-mix(in srgb, ${sd.cor} 32%, #0E1013), #0E1013)` : "var(--night)" }}>
+                  {sd ? <img src={sd.logo} alt={e.nome} className="h-8 w-auto max-w-[70%] object-contain object-left" /> : <b className="text-lg">{e.nome}</b>}
+                  <p className="mt-2 text-[13px] text-white/70">{sd ? `Sede · ${sd.tipo}` : "Loja"}{e.socio ? " · você é sócio" : " · você é o titular"}</p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-[13px] font-semibold">
+                    <Link href={`/app/equipe?lote=${encodeURIComponent(e.chave)}`} className="rounded-lg bg-white px-3 py-1.5 text-[var(--ink)]">Minha equipe</Link>
+                    <Link href={sd ? `/mundo?sede=${sd.id}` : `/mundo?lote=${encodeURIComponent(e.chave)}`} className="rounded-lg bg-white/10 px-3 py-1.5 hover:bg-white/15">Ver no mapa</Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* catálogo: um setor por vez, com quem já está na equipe marcado */}
       <section className="faixa pn-bloco">
@@ -105,7 +128,7 @@ function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; 
               {p.numero && <Link href={`/loja/${p.numero}`} className="btn pn-btn-vidro">Página da loja</Link>}
             </div>
           </div>
-          {p.sede ? <div className="pn-predio pn-predio-sede" aria-hidden="true"><img src="/socialrp/logo.png" alt="" width={809} height={240} /></div> : <div className="pn-predio" aria-hidden="true">
+          {p.sede ? <div className="pn-predio pn-predio-sede" aria-hidden="true"><img src={p.sedeLogo ?? "/socialrp/logo.png"} alt="" width={809} height={240} /></div> : <div className="pn-predio" aria-hidden="true">
             <span className="pn-balao">{p.logo ? <img src={p.logo} alt="" /> : <i>{empresa.slice(0, 1)}</i>}<b>{empresa}</b></span>
             <img src={`/workend/predios/${p.layout}.webp`} alt="" width={420} height={400} />
           </div>}

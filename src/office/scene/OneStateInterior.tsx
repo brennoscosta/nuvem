@@ -23,7 +23,8 @@ import { useMundo } from "../mundoStore";
 import { abrirChatEquipe } from "../ui/ChatEquipe";
 import { usePersonagem } from "../personagemStore";
 import { aparenciaAgente, hash } from "../data/aparenciaAgente";
-import { CHAVE_SEDE, OS_X, OS_Z } from "../data/onestate";
+import { OS_X, OS_Z } from "../data/onestate";
+import type { Sede } from "../data/sedes";
 import type { Escritorio, Membro } from "../data/escritorio";
 import { W, D, X0, Z0, X1, Z1, CORREDOR, ZC, POR_FILEIRA, LARG, cx, montarSalas, type Sala } from "../data/plantaSede";
 
@@ -53,8 +54,8 @@ const FRASES_CHEFE = ["Como está essa entrega?", "Preciso disso até o fim do d
 const FRASES_EQUIPE = ["Terminei a minha parte.", "Pode revisar pra mim?", "Tenho uma ideia pra isso.", "Já te mando os números.", "Fechado, sigo nisso."];
 
 // ---------- paredes e móveis (juntados num objeto só) ----------
-function Fixos({ salas, lugares }: { salas: Sala[]; lugares: Record<string, Lugar[]> }) {
-  const parede = mat("#F4F1EB", { rough: 0.9 }), friso = mat("#D4A63A", { rough: 0.35, metal: 0.7 });
+function Fixos({ salas, lugares, sede }: { salas: Sala[]; lugares: Record<string, Lugar[]>; sede: Sede }) {
+  const parede = mat("#F4F1EB", { rough: 0.9 }), friso = mat(sede.cor, { rough: 0.35, metal: 0.7 });
   const pedacos: { x: number; z: number; w: number; d: number }[] = [];
   const muroX = (x0: number, x1: number, z: number, vaos: [number, number][] = []) => { let a = x0; for (const [c, l] of [...vaos].sort((p, q) => p[0] - q[0])) { if (c - l / 2 > a) pedacos.push({ x: (a + c - l / 2) / 2, z, w: c - l / 2 - a, d: ESP }); a = c + l / 2; } if (x1 > a) pedacos.push({ x: (a + x1) / 2, z, w: x1 - a, d: ESP }); };
   const muroZ = (z0: number, z1: number, x: number) => pedacos.push({ x, z: (z0 + z1) / 2, w: ESP, d: z1 - z0 });
@@ -80,7 +81,7 @@ function Fixos({ salas, lugares }: { salas: Sala[]; lugares: Record<string, Luga
       {/* mesas de cada departamento (a do chefe é maior) e uma planta em cada sala */}
       {salas.filter((s) => s.tipo === "depto").flatMap((s) => (lugares[s.id] ?? []).map((l, k) => <Mesa key={`${s.id}${k}`} def={{ id: `${s.id}${k}`, sala: s.id, pos: l.mesa, rot: 0, tipo: l.chefe ? "gerente" : "comum" }} cor={s.cor} />))}
       {/* recepção: balcão de frente para a entrada, sofá e planta */}
-      {rec && <group><Balcao position={[cx(rec), 0, rec.z1 - 4.2]} /><Sofa position={[rec.x0 + 0.8, 0, rec.z1 - 2]} rotation={Math.PI / 2} cor="#D4A63A" largura={2} /><Planta position={[rec.x1 - 0.6, 0, rec.z1 - 0.7]} /></group>}
+      {rec && <group><Balcao position={[cx(rec), 0, rec.z1 - 4.2]} /><Sofa position={[rec.x0 + 0.8, 0, rec.z1 - 2]} rotation={Math.PI / 2} cor={sede.cor} largura={2} /><Planta position={[rec.x1 - 0.6, 0, rec.z1 - 0.7]} /></group>}
       {/* sala de reunião: mesa comprida, cadeiras e a TV na parede do fundo */}
       {reuniao && (
         <group>
@@ -93,7 +94,7 @@ function Fixos({ salas, lugares }: { salas: Sala[]; lugares: Record<string, Luga
       {/* café no corredor (ponta oeste) */}
       <Cafe position={[X0 + 1.2, 0, ZC]} rotation={Math.PI / 2} />
       <Planta position={[X1 - 0.6, 0, ZC]} />
-      <DecorSede salas={salas} />
+      <DecorSede salas={salas} sede={sede} />
     </group>
   );
 }
@@ -104,7 +105,7 @@ function Fixos({ salas, lugares }: { salas: Sala[]; lugares: Record<string, Luga
 // corredor no meio (z = ZC) e, na recepção, a faixa x = cx ± 0,9 da porta da rua até o balcão (onde o visitante espera)
 // e o caminho da recepcionista para o corredor. Nas salas do sul (perto da câmera) só coisas baixas no fundo.
 const escurecer = (hex: string, k: number) => { const n = parseInt(hex.slice(1), 16); const f = (v: number) => Math.round(v * (1 - k)).toString(16).padStart(2, "0"); return `#${f((n >> 16) & 255)}${f((n >> 8) & 255)}${f(n & 255)}`; };
-function DecorSede({ salas }: { salas: Sala[] }) {
+function DecorSede({ salas, sede }: { salas: Sala[]; sede: Sede }) {
   const deptos = salas.filter((s) => s.tipo === "depto");
   const rec = salas.find((s) => s.tipo === "recepcao"), reuniao = salas.find((s) => s.tipo === "reuniao");
   // vãos do corredor entre as portas (as portas ficam no meio de cada coluna)
@@ -120,7 +121,7 @@ function DecorSede({ salas }: { salas: Sala[] }) {
         const v = i % 3;
         return (
           <group key={s.id}>
-            <Tapete position={[x, tapete.z]} largura={4.7} profundidade={tapete.d} cor={diretoria ? "#3B3F47" : clarear(s.cor, 0.42)} borda={diretoria ? "#D4A63A" : escurecer(s.cor, 0.12)} />
+            <Tapete position={[x, tapete.z]} largura={4.7} profundidade={tapete.d} cor={diretoria ? "#3B3F47" : clarear(s.cor, 0.42)} borda={diretoria ? sede.cor : escurecer(s.cor, 0.12)} />
             {s.norte ? (
               // salas do norte: o fundo fica longe da câmera, cabem coisas altas encostadas na parede
               diretoria ? (
@@ -171,15 +172,15 @@ function DecorSede({ salas }: { salas: Sala[] }) {
       {/* recepção: tapete de boas-vindas, sala de espera dos dois lados do caminho, a logo atrás do balcão */}
       {rec && (
         <group>
-          <Tapete position={[cx(rec), rec.z1 - 2.05]} largura={LARG - 0.5} profundidade={3.1} cor="#2B2F36" borda="#D4A63A" />
+          <Tapete position={[cx(rec), rec.z1 - 2.05]} largura={LARG - 0.5} profundidade={3.1} cor="#2B2F36" borda={sede.cor} />
           <MesaLateral position={[rec.x0 + 0.6, 0, rec.z1 - 3.55]} />
           <Poltrona position={[cx(rec) + 1.75, 0, rec.z1 - 2.6]} rotation={-Math.PI / 2} cor="#1F2937" />
           <Poltrona position={[cx(rec) + 1.75, 0, rec.z1 - 1.5]} rotation={-Math.PI / 2} cor="#1F2937" />
           <LuminariaChao position={[rec.x1 - 0.4, 0, rec.z1 - 3.4]} />
-          <PainelLogo position={[cx(rec) - 1.65, 0, rec.z1 - 6.3]} largura={2.0} altura={1.75} cor="#D4A63A" fundo="#14110A" logo="/socialrp/icone.png" />
+          <PainelLogo position={[cx(rec) - 1.65, 0, rec.z1 - 6.3]} largura={2.0} altura={1.75} cor={sede.cor} fundo={sede.escura} logo={sede.icone} />
           <Ficus position={[cx(rec) + 1.6, 0, rec.z1 - 6.3]} />
           {/* placa com a logo na frente do balcão, virada para quem entra */}
-          <PainelLogo position={[cx(rec) - 0.85, 0.32, rec.z1 - 3.83]} largura={0.62} altura={0.55} cor="#D4A63A" fundo="#14110A" logo="/socialrp/icone.png" pe={false} />
+          <PainelLogo position={[cx(rec) - 0.85, 0.32, rec.z1 - 3.83]} largura={0.62} altura={0.55} cor={sede.cor} fundo={sede.escura} logo={sede.icone} pe={false} />
           <Ficus position={[rec.x0 + 0.5, 0, rec.z0 + 0.6]} escala={0.8} />
         </group>
       )}
@@ -222,7 +223,7 @@ type Ponto = [number, number];
 // troca interna de verdade (rota /api/workend/equipe/atividade): quem fala vai até "para" com o texto
 type Aviso = { para: string; texto: string; tipo?: "pedido" | "resposta" };
 type Plano = { pts: Ponto[]; i: number; ate: number; pose: Pose; olhar?: number; fala?: string; fim?: "sentar" | "parado" };
-interface Contexto { salas: Sala[]; salaDe: Record<string, Sala>; lugarDe: Record<string, Lugar>; ordem: Membro[]; porId: Record<string, Membro>; lugares: Record<string, Lugar[]>; posNaSala: Record<string, number> }
+interface Contexto { sede: Sede; salas: Sala[]; salaDe: Record<string, Sala>; lugarDe: Record<string, Lugar>; ordem: Membro[]; porId: Record<string, Membro>; lugares: Record<string, Lugar[]>; posNaSala: Record<string, number> }
 // caminho de um ponto numa sala até outro ponto noutra sala: sai pela porta, anda pelo corredor e entra pela outra porta
 function caminho(de: Ponto, salaA: Sala | undefined, para: Ponto, salaB: Sala | undefined): Ponto[] {
   const pts: Ponto[] = [de];
@@ -246,7 +247,7 @@ function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: Re
   useAnimacao(h, () => plano.current.pose, fase, HIPS.procedural.base);
   const [hover, setHover] = useState(false);
   // a recepcionista fala com quem chega na recepção (17/11/2026, ui/Recepcao.tsx)
-  const falaRec = usePersonagem((s) => (m.papel === "atendente" && s.falaRecepcao?.chave === CHAVE_SEDE ? s.falaRecepcao.texto : null));
+  const falaRec = usePersonagem((s) => (m.papel === "atendente" && s.falaRecepcao?.chave === ctx.sede.chave ? s.falaRecepcao.texto : null));
 
   // escolhe o próximo passeio: colega (chefe ou alguém da equipe), reunião ou café; volta para a mesa depois
   const novoPasseio = (agora: number, pedido?: Aviso) => {
@@ -306,7 +307,7 @@ function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: Re
 
   const inicio = sentar.pts[0];
   // dono: abre a conversa com esta pessoa no mapa (ChatEquipe); visitante: o cartão da sede
-  const clicar = () => { if (dono) void abrirChatEquipe(CHAVE_SEDE, m.id); else useMundo.getState().selecionarLote(CHAVE_SEDE); };
+  const clicar = () => { if (dono) void abrirChatEquipe(ctx.sede.chave, m.id); else useMundo.getState().selecionarLote(ctx.sede.chave); };
   return (
     <group ref={corpo} position={[inicio[0], 0, inicio[1]]}>
       <BonecoProcedural ref={h} def={def} camisa={camisa} headset={m.papel === "atendente"} cracha={m.nivel === "ceo" ? "#D4A017" : "#1D4ED8"} />
@@ -330,13 +331,13 @@ function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: Re
 }
 
 // conversas internas de verdade (só o dono): a cada 15 s pergunta as últimas trocas e faz quem pediu ir até quem recebeu
-function useAtividade(dono: boolean, avisos: React.RefObject<Map<string, Aviso>>) {
+function useAtividade(dono: boolean, avisos: React.RefObject<Map<string, Aviso>>, chave: string) {
   useEffect(() => {
     if (!dono) return;
     let vivo = true; let ultimo = "";
     const ler = async () => {
       try {
-        const r = await fetch(`/api/workend/equipe/atividade?chave=${encodeURIComponent(CHAVE_SEDE)}`, { cache: "no-store" });
+        const r = await fetch(`/api/workend/equipe/atividade?chave=${encodeURIComponent(chave)}`, { cache: "no-store" });
         if (!r.ok) return;
         const j = await r.json();
         // formato da rota: { trocas: [{ de, para, texto, em, tipo: "pedido" | "resposta" }] }
@@ -348,15 +349,16 @@ function useAtividade(dono: boolean, avisos: React.RefObject<Map<string, Aviso>>
     };
     void ler(); const id = setInterval(() => { if (vivo && document.visibilityState === "visible") void ler(); }, 15000);
     return () => { vivo = false; clearInterval(id); };
-  }, [dono, avisos]);
+  }, [dono, avisos, chave]);
 }
 
-export function InteriorSede() {
-  const e: Escritorio | null = useMundo((s) => s.terrenos[CHAVE_SEDE]?.escritorio ?? null);
-  const dono = useMundo((s) => s.meu === CHAVE_SEDE);
+export function InteriorSede({ sede }: { sede: Sede }) {
+  const e: Escritorio | null = useMundo((s) => s.terrenos[sede.chave]?.escritorio ?? null);
+  // dono ou sócio (17/11/2026: as sedes podem ser divididas, terreno.socios)
+  const dono = useMundo((s) => s.meus.includes(sede.chave));
   const poucos = useMemo(() => leve(), []);
   const avisos = useRef(new Map<string, Aviso>());
-  useAtividade(dono, avisos);
+  useAtividade(dono, avisos, sede.chave);
   const ctx = useMemo<Contexto | null>(() => {
     if (!e) return null;
     const salas = montarSalas(e.setores);
@@ -371,14 +373,16 @@ export function InteriorSede() {
       membros.forEach((m, k) => { if (ls[k]) { salaDe[m.id] = s; lugarDe[m.id] = ls[k]; posNaSala[m.id] = k; } });
     }
     const ordem = e.equipe.filter((m) => lugarDe[m.id]);
-    return { salas, salaDe, lugarDe, ordem, porId: Object.fromEntries(ordem.map((m) => [m.id, m])), lugares, posNaSala };
-  }, [e]);
+    return { sede, salas, salaDe, lugarDe, ordem, porId: Object.fromEntries(ordem.map((m) => [m.id, m])), lugares, posNaSala };
+  }, [e, sede]);
   if (!e || !ctx) return null;
   // gráficos leves: duas pessoas por sala (o chefe e mais uma), também andando, só que com menos frequência
   const mostrar = poucos ? ctx.ordem.filter((m) => (ctx.posNaSala[m.id] ?? 0) < 2) : ctx.ordem;
+  // desenhada em volta do centro da Social RP: quem desloca para o quarteirão de cada sede é a torre (SedeHQ), que
+  // monta este interior dentro do grupo dela
   return (
     <group>
-      <Estatico><Fixos salas={ctx.salas} lugares={ctx.lugares} /></Estatico>
+      <Estatico><Fixos salas={ctx.salas} lugares={ctx.lugares} sede={sede} /></Estatico>
       <LuzDasLuminarias />
       {ctx.salas.map((s) => <NomeSala key={s.id} s={s} />)}
       {mostrar.map((m) => <Agente key={m.id} m={m} ctx={ctx} avisos={avisos} dono={dono} />)}

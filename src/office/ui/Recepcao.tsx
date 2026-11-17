@@ -2,7 +2,7 @@
 // Recepção dos prédios (17/11/2026, pedido do dono: "preciso que possa entrar, e que apareça uma porta ou se direcione para
 // a recepção onde será atendido. Por ser o dono eles irão reconhecer, mas se for um visitante precisará ser recepcionado e
 // aguardar até ser atendido"):
-//  - perto de uma porta aparece "Entrar na …" (e o mesmo botão nos cartões da loja e da sede);
+//  - perto de uma porta aparece "Entrar em …" (e o mesmo botão nos cartões da loja e da sede);
 //  - a caminho e entrando: um aviso pequeno com "Cancelar";
 //  - no balcão: o DONO é reconhecido na hora (atalhos para a equipe); o VISITANTE espera a vez (fila com quem já está no
 //    balcão) e depois é atendido pela atendente de IA da empresa (a mesma conversa do cartão da loja, ui/ChatLoja.tsx);
@@ -39,7 +39,7 @@ export function BotaoEntrar({ chave, escuro = false, className = "" }: { chave: 
 
 const CAIXA = "pointer-events-auto absolute inset-x-2 bottom-24 z-30 mx-auto max-w-[460px]";
 
-// perto de uma porta (na calçada): "Entrar na …"
+// perto de uma porta (na calçada): "Entrar em …"
 function PertoDaPorta() {
   const entradas = useEntradas();
   const ativo = usePersonagem((s) => s.ativo);
@@ -57,7 +57,7 @@ function PertoDaPorta() {
   return (
     <div className={`${CAIXA} flex justify-center`}>
       <button type="button" onClick={() => usePersonagem.getState().entrarNoPredio(perto)} className="hud-ilha inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-bold text-white shadow-xl">
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-[#16A34A]"><Icone nome="casa" tamanho={15} /></span>Entrar na {perto.nome}
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-[#16A34A]"><Icone nome="casa" tamanho={15} /></span>Entrar em {perto.nome}
       </button>
     </div>
   );
@@ -68,7 +68,7 @@ export function Recepcao() {
   const chatAberto = useChatEquipe((s) => s.aberto);
   if (!predio) return <PertoDaPorta />;
   if (predio.fase !== "recepcao" || chatAberto) {
-    const t = predio.fase === "indo" ? `Indo até a entrada da ${predio.nome}…` : predio.fase === "entrando" ? `Entrando na ${predio.nome}…` : predio.fase === "saindo" ? `Saindo da ${predio.nome}…` : `Na recepção da ${predio.nome}`;
+    const t = predio.fase === "indo" ? `A caminho de ${predio.nome}…` : predio.fase === "entrando" ? `Entrando em ${predio.nome}…` : predio.fase === "saindo" ? `Saindo de ${predio.nome}…` : `Na recepção de ${predio.nome}`;
     return (
       <div className={`${CAIXA} flex justify-center`}>
         <div className="hud-ilha inline-flex items-center gap-3 rounded-full py-1.5 pl-4 pr-1.5 text-sm font-semibold text-white shadow-xl">
@@ -85,7 +85,7 @@ export function Recepcao() {
 function Balcao() {
   const predio = usePersonagem((s) => s.predio)!;
   const meuNome = usePersonagem((s) => s.meu?.nome ?? "");
-  const dono = useMundo((s) => s.meu === predio.chave);
+  const dono = useMundo((s) => s.meus.includes(predio.chave)); // dono ou sócio
   const usuario = useMundo((s) => s.usuario);
   const terreno = useMundo((s) => s.terrenos[predio.chave]);
   const atendente = terreno?.escritorio?.equipe.find((m) => m.papel === "atendente") ?? null;
@@ -97,18 +97,18 @@ function Balcao() {
     if (dono) return;
     const t = setTimeout(() => {
       setAtendido(true);
-      usePersonagem.setState({ falaRecepcao: { chave: predio.chave, texto: atendente?.treino?.saudacao || `Olá! Sou ${nomeAt}, da recepção da ${predio.nome}. Em que posso ajudar?` } });
+      usePersonagem.setState({ falaRecepcao: { chave: predio.chave, texto: atendente?.treino?.saudacao || `Olá! Sou ${nomeAt}, da recepção de ${predio.nome}. Em que posso ajudar?` } });
     }, predio.esperaMs);
     return () => clearTimeout(t);
   }, [dono, predio.esperaMs, predio.chave, predio.nome, atendente?.treino?.saudacao, nomeAt]);
   const sair = () => usePersonagem.getState().sairDoPredio();
   return (
-    <div className={CAIXA} role="dialog" aria-label={`Recepção da ${predio.nome}`}>
+    <div className={CAIXA} role="dialog" aria-label={`Recepção de ${predio.nome}`}>
       <div className="painel-entra overflow-hidden rounded-2xl bg-[#0E1013]/95 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur">
         <div className="flex items-center gap-3 px-4 pb-2 pt-3.5">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[15px] font-bold" style={{ background: atendente?.camisa ?? "#16A34A" }}>{nomeAt.slice(0, 1)}</span>
           <div className="min-w-0 flex-1">
-            <div className="text-[12px] font-semibold text-white/55">Recepção da {predio.nome}</div>
+            <div className="text-[12px] font-semibold text-white/55">Recepção de {predio.nome}</div>
             <div className="truncate text-[15px] font-bold">{nomeAt}{atendente?.cargo ? <span className="ml-1.5 text-[12px] font-medium text-white/55">{atendente.cargo}</span> : null}</div>
           </div>
           <button type="button" onClick={sair} className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-white/20">Sair do prédio</button>
@@ -124,7 +124,7 @@ function Balcao() {
         ) : !atendido ? (
           <div className="px-4 pb-4">
             <p className="rounded-2xl rounded-tl-md bg-white/[.07] px-3.5 py-2.5 text-[14px] leading-snug">
-              {predio.fila ? `${nomeAt} está terminando um atendimento. Você é o ${predio.fila + 1}º da fila; aguarde a sua vez.` : `Olá! Seja bem-vindo à ${predio.nome}. ${nomeAt} já vem te atender, aguarde um instante.`}
+              {predio.fila ? `${nomeAt} está terminando um atendimento. Você é o ${predio.fila + 1}º da fila; aguarde a sua vez.` : `Olá! Seja bem-vindo à recepção de ${predio.nome}. ${nomeAt} já vem te atender, aguarde um instante.`}
             </p>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden><i className="recepcao-espera block h-full rounded-full bg-[#16A34A]" style={{ animationDuration: `${predio.esperaMs}ms` }} /></div>
             <p className="mt-1.5 text-[12px] text-white/50">Aguardando atendimento…</p>

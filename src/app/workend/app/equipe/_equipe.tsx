@@ -11,7 +11,7 @@
 // 17/11/2026 (pedido do dono: "essa área precisa ser totalmente atualizada e melhorada"): topo novo com a caixa de nova
 // tarefa e o organograma vivo (_topo.tsx), a faixa "Agora na empresa", abas com contador, rostos de verdade (_rosto.tsx)
 // no lugar das bolinhas com a inicial e "Como funciona" num modal. Estilos em equipe.css (prefixo .eq-).
-import { CHAVE_SEDE } from "@/office/data/onestate";
+import { ehSede, sedeDe } from "@/office/data/sedes";
 import { Icone } from "@/office/ui/Icone";
 import {
   NIVEL_COR, NIVEL_ROTULO, agruparPorDepartamento, agruparPorTarefa, andamento, apiEquipe, brl, linhaDoTempo, quando, sugestoesTarefa, TextoIA,
@@ -39,7 +39,7 @@ function Avatar({ m, tamanho = 44 }: { m: Membro; tamanho?: number }) { return <
 const SeloNivel = ({ m }: { m: Pick<Membro, "nivel"> }) => <span className="rounded-full px-2 py-[1px] align-middle text-[10.5px] font-semibold text-white" style={{ background: NIVEL_COR[m.nivel] }}>{NIVEL_ROTULO[m.nivel]}</span>;
 
 type AbaEquipe = "conversas" | "internas" | "visitantes" | "vagas" | "sobre" | "conectores";
-export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chaveInicial: string | null; membroInicial: string | null; abaInicial?: AbaEquipe }) {
+export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas = [] }: { chaveInicial: string | null; membroInicial: string | null; abaInicial?: AbaEquipe; empresas?: { chave: string; nome: string; socio: boolean }[] }) {
   const [p, setP] = useState<Painel | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aba, setAba] = useState<AbaEquipe>(abaInicial ?? "conversas");
@@ -77,7 +77,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
   if (erro && !p) return <div className="faixa mt-6"><div className="rounded-2xl bg-[var(--cinza)] p-7"><h2 className="text-[1.4rem]">Minha equipe</h2><p className="mt-2 text-[var(--tinta-2)]">{erro}</p><Link href="/mundo" className="btn btn-azul mt-5">Ir para o mapa</Link></div></div>;
   if (!p) return <div className="faixa mt-6 text-[var(--tinta-2)]">Carregando a sua equipe…</div>;
   const membro = p.equipe.find((m) => m.membroId === sel) ?? p.equipe[0];
-  const sede = p.lote.chave === CHAVE_SEDE;
+  const sede = ehSede(p.lote.chave);
   const abas: [AbaEquipe, string, Parameters<typeof Icone>[0]["nome"], number | null, boolean][] = [
     ["conversas", "Conversar e dar tarefas", "conversar", null, false],
     ["internas", "Conversas internas", "equipe", internas?.length ?? null, abertas],
@@ -90,7 +90,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
   return (
     <RostoSede.Provider value={sede}>
     <div className="faixa mt-2">
-      <TopoEquipe p={p} internas={internas} abrir={abrirPessoa} enviado={enviado} comoFunciona={() => setComo(true)} />
+      <TopoEquipe p={p} internas={internas} abrir={abrirPessoa} enviado={enviado} comoFunciona={() => setComo(true)} empresas={empresas} />
       <FaixaEquipe p={p} internas={internas} abrir={abrirPessoa} irPara={(a) => { setAba(a); document.getElementById("eq-trabalho")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />
 
       <div id="eq-trabalho" className="scroll-mt-24" />
@@ -104,7 +104,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
           {p.lote.numero && <Link href={`/loja/${p.lote.numero}`} className="eq-link">Ver minha loja</Link>}
           {/* a sede tem a equipe montada por departamento e não passa pelo editor */}
           {!sede && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="eq-link">Montar escritório</Link>}
-          {sede && <Link href="/mundo?sede=1" className="eq-link">Ver a sede no mapa</Link>}
+          {sede && <Link href={`/mundo?sede=${sedeDe(p.lote.chave)?.id ?? "1"}`} className="eq-link">Ver a sede no mapa</Link>}
         </span>
       </nav>
 
@@ -169,7 +169,7 @@ function ListaEquipe({ p, membro, selecionar }: { p: Painel; membro: Membro; sel
             </section>
           );
         })}
-        {p.lote.chave !== CHAVE_SEDE && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="mt-2 block rounded-2xl border-2 border-dashed border-[var(--linha)] p-3 text-center text-sm font-semibold text-[var(--azul)]">+ Contratar especialista no mapa</Link>}
+        {!ehSede(p.lote.chave) && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="mt-2 block rounded-2xl border-2 border-dashed border-[var(--linha)] p-3 text-center text-sm font-semibold text-[var(--azul)]">+ Contratar especialista no mapa</Link>}
       </div>
     </aside>
   );

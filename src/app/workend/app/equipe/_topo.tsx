@@ -21,8 +21,9 @@ const chefesDe = (p: PainelEquipe, raiz: Membro | undefined) => {
 };
 
 // ---------- topo ----------
-export function TopoEquipe({ p, internas, abrir, enviado, comoFunciona }: {
+export function TopoEquipe({ p, internas, abrir, enviado, comoFunciona, empresas = [] }: {
   p: PainelEquipe; internas: TrocaInterna[] | null; abrir: (id: string) => void; enviado: (id: string) => void; comoFunciona: () => void;
+  empresas?: { chave: string; nome: string; socio: boolean }[];
 }) {
   const [semLogo, setSemLogo] = useState(false);
   const deps = new Set(p.equipe.map((m) => m.setorId).filter((s) => s && s !== "recepcao")).size;
@@ -42,6 +43,16 @@ export function TopoEquipe({ p, internas, abrir, enviado, comoFunciona }: {
           </div>
           <button type="button" onClick={comoFunciona} className="eq-ajuda"><Icone nome="ajuda" tamanho={15} />Como funciona</button>
         </div>
+        {/* mais de uma empresa (própria e como sócio, 17/11/2026): troca entre as equipes */}
+        {empresas.length > 1 && (
+          <nav className="eq-empresas" aria-label="Suas empresas">
+            {empresas.map((e) => (
+              <a key={e.chave} href={`/app/equipe?lote=${encodeURIComponent(e.chave)}`} aria-current={e.chave === p.lote.chave ? "page" : undefined} className="eq-empresa">
+                {e.nome}{e.socio && <small>sócio</small>}
+              </a>
+            ))}
+          </nav>
+        )}
         <h1><small>Equipe da</small>{p.lote.empresaNome}</h1>
         <div className="eq-numeros">
           <span className="eq-numero"><b>{p.equipe.length}</b>agentes de IA</span>

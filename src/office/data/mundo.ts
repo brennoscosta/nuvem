@@ -25,7 +25,8 @@ export type Lote =
 export interface Quarteirao {
   i: number; // coluna (x)
   j: number; // linha (z)
-  ocupante?: "nuvem" | "restaurante" | "onestate"; // quarteirão inteiro
+  ocupante?: "nuvem" | "restaurante" | "onestate" | "sede"; // quarteirão inteiro ("sede": data/sedes.ts)
+  reserva?: number; // lotes que existiam aqui antes de virar sede: os números ficam guardados (as outras lojas não mudam de número)
   lotes?: [Lote, Lote, Lote, Lote]; // ordem: noroeste, nordeste, sudoeste, sudeste
 }
 
@@ -47,10 +48,12 @@ export const QUARTEIROES: Quarteirao[] = [
   { i: 0, j: 0, ocupante: "nuvem" },
   { i: 1, j: 0, ocupante: "restaurante" },
   { i: -1, j: 0, lotes: [C("casaTerrea"), V(true), C("casaColonial", 1.05), C("casaVelha")] },
-  { i: -1, j: -1, lotes: [C("casaSobrado"), C("casaModerna"), V(), C("casaTerrea", 0.95)] },
+  // 17/11/2026: sedes da AppZone (-1,-1), do NUVCAM (1,-1) e do bday.fm (-1,1) (data/sedes.ts); nenhum desses 12 lotes
+  // estava reservado ou vendido. Os números deles ficam guardados (reserva) para a numeração das outras lojas não mudar.
+  { i: -1, j: -1, ocupante: "sede", reserva: 4 },
   { i: 0, j: -1, lotes: [V(true), C("casaVelha", 1.05), C("casaColonial"), V()] },
-  { i: 1, j: -1, lotes: [C("casaModerna", 1.05), V(), V(true), C("casaSobrado", 0.95)] },
-  { i: -1, j: 1, lotes: [V(), C("casaModerna"), C("casaVelha", 0.95), V(true)] },
+  { i: 1, j: -1, ocupante: "sede", reserva: 4 },
+  { i: -1, j: 1, ocupante: "sede", reserva: 4 },
   // o lote 0,1,1 (ao sul da Nuvem) virou a praça de eventos e da feira de sábado em 12/11/2026
   { i: 0, j: 1, lotes: [C("casaColonial", 0.95), { tipo: "praca" }, V(), C("casaTerrea", 1.05)] },
   // 16/11/2026: o quarteirão 1,1 (último na ordem, então nenhum lote mudou de número) virou a sede do OneState RP
@@ -66,7 +69,11 @@ export const COMPRIMENTO_RUA = 2 * (N * PASSO + EIXO_RUA) + RUA;
 // Lotes à venda, numerados de forma estável (Lote 1, 2, 3…) na ordem da planta
 export interface LoteInfo { chave: string; numero: number; i: number; j: number; k: number; lote: Lote; centro: [number, number] }
 export const LOTES: LoteInfo[] = [];
-for (const q of QUARTEIROES) q.lotes?.forEach((lote, k) => LOTES.push({ chave: `${q.i},${q.j},${k}`, numero: LOTES.length + 1, i: q.i, j: q.j, k, lote, centro: centroLote(q.i, q.j, k) }));
+let numeroLote = 0;
+for (const q of QUARTEIROES) {
+  if (!q.lotes) { numeroLote += q.reserva ?? 0; continue; }
+  q.lotes.forEach((lote, k) => LOTES.push({ chave: `${q.i},${q.j},${k}`, numero: ++numeroLote, i: q.i, j: q.j, k, lote, centro: centroLote(q.i, q.j, k) }));
+}
 export const LOTE_POR_CHAVE: Record<string, LoteInfo> = Object.fromEntries(LOTES.map((l) => [l.chave, l]));
 
 export const NOME_CONSTRUCAO: Record<string, string> = {
@@ -126,11 +133,8 @@ export type PisoBairro = "terracota" | "xadrezRosa" | "graficoNeon" | "folhas" |
 export type ArvoreBairro = "ipeAmarelo" | "ipeRosa" | "topiaria" | "copaVerde" | "jacaranda" | "palmeiraImperial" | "oiti";
 export interface Bairro { id: string; nome: string; curto: string; lema: string; cor: string; corLuz: string; i: number; j: number; piso: PisoBairro; arvore: ArvoreBairro; sugestao: string[] }
 export const BAIRROS: Bairro[] = [
-  { id: "moda", nome: "Rua da Moda", curto: "Moda", lema: "moda, beleza e varejo", cor: "#D6337A", corLuz: "#FF8CC6", i: -1, j: 1, piso: "xadrezRosa", arvore: "ipeRosa", sugestao: ["varejo", "beleza"] },
-  { id: "tech", nome: "Distrito Tech", curto: "Tech", lema: "tecnologia e inovação", cor: "#0E8FD6", corLuz: "#5FE3FF", i: -1, j: -1, piso: "graficoNeon", arvore: "topiaria", sugestao: ["tecnologia", "marketing", "conteudo"] },
   { id: "saude", nome: "Saúde & Bem-estar", curto: "Saúde", lema: "clínicas, academias e terapias", cor: "#18A058", corLuz: "#B8FFD2", i: -1, j: 0, piso: "folhas", arvore: "copaVerde", sugestao: ["saude", "beleza"] },
   { id: "criativos", nome: "Vila dos Criativos", curto: "Criativos", lema: "design, arte e conteúdo", cor: "#7C4DDB", corLuz: "#D2B8FF", i: 0, j: -1, piso: "granilite", arvore: "jacaranda", sugestao: ["conteudo", "marketing", "cursos", "eventos"] },
-  { id: "negocios", nome: "Centro de Negócios", curto: "Negócios", lema: "escritórios e serviços", cor: "#2B4C8C", corLuz: "#FFE3A3", i: 1, j: -1, piso: "granito", arvore: "palmeiraImperial", sugestao: ["negocios", "consultoria", "financas", "juridico", "imoveis"] },
   { id: "praca", nome: "Largo da Praça", curto: "Praça", lema: "eventos e feira de sábado", cor: "#0F8A7E", corLuz: "#9FF5E8", i: 0, j: 1, piso: "mosaico", arvore: "oiti", sugestao: ["eventos", "educacao", "servicos", "casa"] },
 ];
 export const BAIRRO_DO_QUARTEIRAO: Record<string, Bairro> = Object.fromEntries(BAIRROS.map((b) => [`${b.i},${b.j}`, b]));

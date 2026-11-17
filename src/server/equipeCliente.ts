@@ -11,7 +11,7 @@
 //    deixa recado (sem IA) e o dono vê na lista de visitantes.
 import { sql, migrar, id } from "./db";
 import type { Usuario } from "./usuarios";
-import { ehAdmin, obterTerreno, terrenoDoUsuario, type Terreno } from "./terrenos";
+import { ehAdmin, obterTerreno, terrenoDoUsuario, ehDonoOuSocio, type Terreno } from "./terrenos";
 import { avaliarMensagem, gravarMensagem, listarMensagens, salvarRegra, removerRegra, type RegraDB, type AgenteDB } from "./agentes";
 import { conversar, destilarRegra, temIA } from "./motor";
 import { versoesAtivas, skillEfetiva } from "./evolucao";
@@ -19,7 +19,7 @@ import { bloqueio, contar } from "./limite";
 import { contextoAgendaIA, aplicarMarcacaoDaAtendente, temMarcacao } from "./agenda";
 import { ESPECIALISTAS_IA, ESPECIALISTA_POR_ID, type EspecialistaIA } from "@/office/data/especialistas";
 import { LOTES, LOTE_POR_CHAVE, nomeNicho } from "@/office/data/mundo";
-import { CHAVE_SEDE } from "@/office/data/onestate";
+import { SEDE_POR_NUMERO } from "@/office/data/sedes";
 import type { Membro, NivelMembro, Escritorio } from "@/office/data/escritorio";
 import { pedirComEquipe, trabalhando, trocasInternas, atividadeInterna } from "./delegacao";
 import type { AreaId, Nivel } from "@/office/data/org";
@@ -146,7 +146,7 @@ export async function gastoDoMes(empId: string) {
 async function loteDoDono(u: Usuario, chave?: string | null): Promise<Terreno> {
   const t = chave ? await obterTerreno(chave) : await terrenoDoUsuario(u.id);
   if (!t) throw new ErroHttp("Você ainda não tem um lote. Escolha o seu no mapa para montar a equipe.", 404);
-  if (t.usuarioId !== u.id && !ehAdmin(u)) throw new ErroHttp("Esse lote não é seu.", 403);
+  if (!ehDonoOuSocio(t, u.id) && !ehAdmin(u)) throw new ErroHttp("Esse lote não é seu.", 403);
   if (t.status !== "ativo") throw new ErroHttp("Pague o 1º mês do lote para ligar a equipe de IA.", 402);
   return t;
 }
@@ -347,8 +347,9 @@ export async function conversaDeVisitante(u: Usuario, chave: string | null, visi
 
 // ---------- a loja, vista por quem chega ----------
 async function lojaPorNumero(numero: number) {
-  // 0 = a sede da Social RP (não tem número de loja): a recepção dela atende os visitantes que entram no prédio (17/11/2026)
-  const l = numero === 0 ? { chave: CHAVE_SEDE } : LOTES.find((x) => x.numero === numero);
+  // sedes (data/sedes.ts) não têm número de loja: a recepção de cada uma atende pelo número dela (Social RP 0, outras 901+)
+  const sd = SEDE_POR_NUMERO[numero];
+  const l = sd ? { chave: sd.chave } : LOTES.find((x) => x.numero === numero);
   if (!l) throw new ErroHttp("Loja não encontrada.", 404);
   let t = await obterTerreno(l.chave);
   if (t?.anexoDe) t = await obterTerreno(t.anexoDe); // lote duplo: a ampliação mostra a loja principal

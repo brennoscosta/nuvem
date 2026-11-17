@@ -9,7 +9,7 @@ import { FotoPredio } from "./FotoPredio";
 import { useEscritorio } from "../store";
 import { BotoesPersonagem } from "./BotoesPersonagem";
 import { Icone } from "./Icone";
-import { CHAVE_SEDE } from "../data/onestate";
+import { ehSede } from "../data/sedes";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 import { abrirChatEquipe } from "./ChatEquipe";
 import { ChatLoja, Contatos, Estrelas, useLoja } from "./ChatLoja";
@@ -524,7 +524,7 @@ export function ContaWorkend() {
   return (
     <div className="flex items-center gap-1 whitespace-nowrap [&>*]:shrink-0">
       <BotoesPersonagem />
-      {usuario && meu && <button onClick={() => selecionarLote(meu)} title="Ir até o meu lote" className="hud-btn hud-azul"><Icone nome="pino" tamanho={17} />{meu === CHAVE_SEDE ? <span className="hud-rotulo">Minha sede</span> : <><span className="hud-rotulo">Meu chão</span><span className="opacity-80">· {LOTE_POR_CHAVE[meu]?.numero}</span></>}</button>}
+      {usuario && meu && <button onClick={() => selecionarLote(meu)} title="Ir até o meu lote" className="hud-btn hud-azul"><Icone nome="pino" tamanho={17} />{ehSede(meu) ? <span className="hud-rotulo">Minha sede</span> : <><span className="hud-rotulo">Meu chão</span><span className="opacity-80">· {LOTE_POR_CHAVE[meu]?.numero}</span></>}</button>}
     </div>
   );
 }
@@ -554,7 +554,7 @@ export function MenuConta() {
         <div className="hud-menu" role="menu">
           <div className="hud-menu-topo"><span className="hud-avatar hud-avatar-g" aria-hidden="true">{inicial}</span><div className="min-w-0"><b>{usuario.nome.split(" ")[0]}</b><span>{usuario.email}</span></div></div>
           <a role="menuitem" href="/app" className="hud-menu-item"><Icone nome="escritorio" tamanho={18} />Meu escritório</a>
-          {meu && <button role="menuitem" type="button" onClick={() => { selecionarLote(meu); setAberto(false); }} className="hud-menu-item"><Icone nome="pino" tamanho={18} />{meu === CHAVE_SEDE ? "Minha sede" : `Meu chão · Lote ${LOTE_POR_CHAVE[meu]?.numero}`}</button>}
+          {meu && <button role="menuitem" type="button" onClick={() => { selecionarLote(meu); setAberto(false); }} className="hud-menu-item"><Icone nome="pino" tamanho={18} />{ehSede(meu) ? "Minha sede" : `Meu chão · Lote ${LOTE_POR_CHAVE[meu]?.numero}`}</button>}
           <a role="menuitem" href="/app/resultados" className="hud-menu-item"><Icone nome="resultados" tamanho={18} />Resultados da loja</a>
           <a role="menuitem" href="/app/rede" className="hud-menu-item"><Icone nome="rede" tamanho={18} />Minha rede e personagem</a>
           <button role="menuitem" type="button" onClick={sair} className="hud-menu-item hud-menu-sair"><Icone nome="sair" tamanho={18} />Sair da conta</button>

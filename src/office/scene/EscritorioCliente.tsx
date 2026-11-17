@@ -381,7 +381,7 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
   // NPC: sem balão de nome (só com o mouse em cima). Quem visita: clicar abre o cartão da loja, com a conversa com a
   // atendente de IA (desde 11/11/2026 basta a conta). O dono do lote (16/11/2026): clicar abre a conversa com ESSA pessoa,
   // para dar tarefas ali mesmo (src/office/ui/ChatEquipe.tsx).
-  const dono = useMundo((s) => !!s.usuario && s.terrenos[chave]?.usuarioId === s.usuario.id);
+  const dono = useMundo((s) => !!s.usuario && (s.terrenos[chave]?.usuarioId === s.usuario.id || s.meus.includes(chave)));
   const clicar = () => { if (dono) void abrirChatEquipe(chave, m.id); else useMundo.getState().selecionarLote(chave); };
   // a atendente fala com quem chega na recepção (17/11/2026, ui/Recepcao.tsx)
   const falaRec = usePersonagem((s) => (m.papel === "atendente" && s.falaRecepcao?.chave === chave ? s.falaRecepcao.texto : null));

@@ -13,7 +13,7 @@ import { meuCodigo, minhasIndicacoes, vagasFundador, primeiraVez, cotacaoLote, F
 import { empresaIdDe, gastoDoMes, especialistaDe, fotoDoEspecialista, TETO_IA_MES, type Contatos } from "./equipeCliente";
 import { diaDe, horaDe, rotuloDia } from "./agenda";
 import { LOTE_POR_CHAVE, bairroDoLote, nomeNicho } from "@/office/data/mundo";
-import { CHAVE_SEDE } from "@/office/data/onestate";
+import { sedeDe } from "@/office/data/sedes";
 
 const TZ = "America/Sao_Paulo";
 const seguro = <T,>(p: Promise<T>, padrao: T, onde: string): Promise<T> => p.catch((e) => { console.error("[painel]", onde, (e as Error).message); return padrao; });
@@ -68,7 +68,7 @@ export async function painelDoDono(u: Usuario, t: Terreno) {
   const bairro = bairroDoLote(t.chave);
   const agora = Date.now();
   const pagoAte = t.pagoAte ? new Date(t.pagoAte) : null;
-  const sede = t.chave === CHAVE_SEDE; // a sede do OneState (src/office/data/onestate.ts): sem número de loja nem mensalidade
+  const sd = sedeDe(t.chave), sede = !!sd; // sedes (src/office/data/sedes.ts): sem número de loja nem mensalidade
   const diasRestam = pagoAte && !sede ? Math.ceil((pagoAte.getTime() - agora) / 86400_000) : null;
 
   const equipe = (t.escritorio?.equipe ?? []).map((m) => {
@@ -83,7 +83,7 @@ export async function painelDoDono(u: Usuario, t: Terreno) {
   const fmtAte = (iso: string) => { const d = new Date(iso); return diaDe(d) === diaDe(new Date()) ? `hoje, até ${horaDe(d)}` : `até ${fmtDiaMes.format(d)}`; };
 
   // o que falta para a loja ficar completa (cada item leva direto para onde se faz)
-  const lote = sede ? "/mundo?sede=1" : `/mundo?lote=${encodeURIComponent(t.chave)}`;
+  const lote = sd ? `/mundo?sede=${sd.id}` : `/mundo?lote=${encodeURIComponent(t.chave)}`;
   const passos = [
     { id: "logo", feito: t.temLogo, titulo: "Logomarca na placa", texto: "Aparece na fachada, no balão do mapa e na página da loja.", link: lote, acao: "Pôr a logo" },
     { id: "contatos", feito: !!(contatos.whatsapp || contatos.instagram || contatos.site), titulo: "WhatsApp e redes da loja", texto: "Os botões que levam o cliente até você.", link: "/app/equipe?aba=sobre", acao: "Preencher" },
@@ -95,7 +95,7 @@ export async function painelDoDono(u: Usuario, t: Terreno) {
 
   const ind = indicacoes.lista;
   return {
-    sede, numero: info?.numero ?? null, bairro: bairro ? { nome: bairro.nome, cor: bairro.cor } : null, nicho: nomeNicho(t.nicho),
+    sede, sedeLogo: sd?.logo ?? null, numero: info?.numero ?? null, bairro: bairro ? { nome: bairro.nome, cor: bairro.cor } : null, nicho: nomeNicho(t.nicho),
     layout: t.escritorio?.layout ?? "moderno", logo: t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null,
     pagoAte: pagoAte ? (sede ? pagoAte.toLocaleDateString("pt-BR", { timeZone: TZ }) : fmtDiaMes.format(pagoAte)) : null, diasRestam,
     inaugurouHoje: !!t.inauguradoEm && agora - new Date(t.inauguradoEm).getTime() < 86400_000,
