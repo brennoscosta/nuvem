@@ -441,10 +441,11 @@ export async function buscarEmpresas(f: { q?: string | null; nicho?: string | nu
     const nota = notas.find((n) => n.paraId === l.usuarioId);
     const atendente = l.escritorio?.equipe.find((m) => m.papel === "atendente");
     return {
-      numero: LOTE_POR_CHAVE[l.chave]?.numero ?? 0, chave: l.chave, nome: l.empresaNome, cor: l.cor, nicho: l.nicho, nichoNome: nomeNicho(l.nicho),
+      // sedes também aparecem na busca (17/11/2026): número delas vem de data/numeroLoja.ts (Social RP 0, 901–903)
+      numero: numeroDaLoja(l) ?? -1, chave: l.chave, nome: l.empresaNome, cor: l.cor, nicho: l.nicho, nichoNome: nomeNicho(l.nicho),
       logo: l.temLogo ? `/api/terrenos/${encodeURIComponent(l.chave)}/logo` : null, sobre: (e?.sobre ?? "").slice(0, 400), contatos: e?.contatos ?? {},
       equipe: l.escritorio?.equipe.length ?? 0, atendente: atendente?.nome ?? null, reputacao: { media: nota?.media ?? null, n: nota?.n ?? 0 },
     };
-  }).filter((l) => l.numero && (!q || `${l.nome} ${l.sobre} ${l.nichoNome}`.toLowerCase().includes(q)))
+  }).filter((l) => l.numero >= 0 && (!q || `${l.nome} ${l.sobre} ${l.nichoNome}`.toLowerCase().includes(q)))
     .sort((a, b) => Number(!!b.sobre) - Number(!!a.sobre) || b.reputacao.n - a.reputacao.n || a.numero - b.numero);
 }

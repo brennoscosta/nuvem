@@ -7,6 +7,7 @@ import { NICHOS } from "@/office/data/mundo";
 import { MiniAvatar } from "@/office/ui/MiniAvatar";
 import type { Perfil, Redes } from "@/office/personagemStore";
 import { EstrelaMedia } from "@/office/ui/NotaEstrelas";
+import { rotuloLoja } from "@/office/data/numeroLoja";
 
 type Prof = { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; redes?: Redes; online: boolean; perfil: Perfil; nichoNome: string | null; reputacao: { media: number | null; n: number } };
 type Emp = { numero: number; chave: string; nome: string; cor: string; nicho: string; nichoNome: string; logo: string | null; sobre: string; contatos: { whatsapp?: string; instagram?: string; site?: string; email?: string }; equipe: number; atendente: string | null; reputacao: { media: number | null; n: number } };
@@ -115,7 +116,7 @@ export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string
           <li key={e.chave} className="busca-cartao flex flex-col overflow-hidden rounded-2xl border border-[var(--linha)] bg-[var(--surface)]" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
             <div className="flex items-center gap-3 p-4 text-white" style={{ background: `linear-gradient(135deg, ${e.cor}, #161C25 140%)` }}>
               {e.logo ? <img src={e.logo} alt="" className="h-12 w-12 rounded-xl bg-white object-contain p-1" /> : <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/15 font-black">{e.nome.slice(0, 2).toUpperCase()}</span>}
-              <div className="min-w-0"><b className="block truncate text-[17px]">{e.nome}</b><span className="text-[13px] text-white/80">Lote {e.numero} · {e.nichoNome}</span></div>
+              <div className="min-w-0"><b className="block truncate text-[17px]">{e.nome}</b><span className="text-[13px] text-white/80">{rotuloLoja(e.numero)} · {e.nichoNome}</span></div>
             </div>
             <div className="flex flex-1 flex-col p-4">
               <div className="flex items-center justify-between gap-2"><Nota r={e.reputacao} />{e.atendente && <span className="text-[12px] font-semibold text-[#16A34A]">● {e.atendente} atende agora</span>}</div>
