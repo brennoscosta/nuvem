@@ -195,7 +195,7 @@ export default async function Inicio() {
             <a href={`/loja/${destaque.numero}`} className="group flex flex-wrap items-center gap-5 overflow-hidden rounded-[22px] p-6 text-white shadow-xl sm:flex-nowrap sm:p-7" style={{ background: `linear-gradient(120deg, #111827, ${destaque.cor})` }}>
               <span className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white p-1.5 shadow-lg">{destaque.logo ? <img src={destaque.logo} alt={`Logo da ${destaque.empresa}`} className="h-full w-full object-contain" /> : <span className="text-2xl font-black" style={{ color: destaque.cor }}>{destaque.empresa.slice(0, 2).toUpperCase()}</span>}</span>
               <span className="min-w-0 flex-1">
-                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#FACC15] px-3 py-1 text-[12px] font-black uppercase tracking-wide text-[#3B2A00]">⭐ Loja destaque da semana</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#FACC15] px-3 py-1 text-[12px] font-black uppercase tracking-wide text-[#3B2A00]">Loja destaque da semana</span>
                 <span className="mt-2 block truncate text-[1.7rem] font-black leading-tight sm:text-[2rem]" style={{ color: "#FFFFFF" }}>{destaque.empresa}</span>
                 <span className="block text-[15px]" style={{ color: "rgba(255,255,255,.82)" }}>{destaque.nicho} · {destaque.visitas} visitante{destaque.visitas === 1 ? "" : "s"} na semana passada</span>
               </span>

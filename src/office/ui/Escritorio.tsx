@@ -296,7 +296,7 @@ function AlturaFachada({ e, set, corMarca }: { e: Escritorio; set: (e: Escritori
       <div className="mt-1 text-[11px] text-[#5B6472]">{!kit ? "Os andares a mais sobem atrás da fachada, com o mesmo revestimento; à noite as janelas acendem." : e.layout === "logistico" || e.layout === "industrial" ? "No galpão, os andares são do escritório da frente; o galpão continua com o pé-direito alto." : "Os andares são de verdade: o prédio inteiro sobe, com janelas dos quatro lados; à noite elas acendem."}</div>
       {titulo("No topo")}
       <div className="grid grid-cols-2 gap-1.5">
-        {COBERTURAS.map((c) => <Opcao key={c.id} ativo={cobertura === c.id} onClick={() => muda({ cobertura: c.id })}><span className="mr-1">{c.icone}</span>{c.nome}</Opcao>)}
+        {COBERTURAS.map((c) => <Opcao key={c.id} ativo={cobertura === c.id} onClick={() => muda({ cobertura: c.id })}>{c.nome}</Opcao>)}
       </div>
       {titulo("Revestimento da fachada")}
       <div className="grid grid-cols-2 gap-1.5">
@@ -354,8 +354,8 @@ function AbaVisual({ e, set, corMarca, nicho }: { e: Escritorio; set: (e: Escrit
       </div>
       {titulo("Peça da área na frente da loja")}
       <select value={d.peca ?? "auto"} onChange={(ev) => muda({ peca: ev.target.value as Decoracao["peca"] })} aria-label="Peça da área" className="w-full rounded-xl border border-black/10 bg-white px-2 py-2 text-base sm:text-xs">
-        <option value="auto">Automática pela área: {pecaAuto.icone} {pecaAuto.nome}</option>
-        {PECAS.map((p) => <option key={p.id} value={p.id}>{p.icone} {p.nome}</option>)}
+        <option value="auto">Automática pela área: {pecaAuto.nome}</option>
+        {PECAS.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
         <option value="nenhuma">Nenhuma</option>
       </select>
       {titulo("Vitrine na janela")}
@@ -393,7 +393,7 @@ function AbaVisual({ e, set, corMarca, nicho }: { e: Escritorio; set: (e: Escrit
       </div>
       {titulo("Na frente da loja")}
       <div className="grid grid-cols-2 gap-1.5">
-        {EXTRAS.filter((x) => x.id !== "natal" || natalAtivo()).map((x) => { const on = d.extras.includes(x.id); return <Opcao key={x.id} ativo={on} onClick={() => muda({ extras: on ? d.extras.filter((y) => y !== x.id) : [...d.extras, x.id] })}><span className="mr-1">{x.icone}</span>{x.nome}</Opcao>; })}
+        {EXTRAS.filter((x) => x.id !== "natal" || natalAtivo()).map((x) => { const on = d.extras.includes(x.id); return <Opcao key={x.id} ativo={on} onClick={() => muda({ extras: on ? d.extras.filter((y) => y !== x.id) : [...d.extras, x.id] })}>{x.nome}</Opcao>; })}
       </div>
       <div className="mt-3 rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">Tudo aparece no mapa enquanto você escolhe. Mudar a fachada e o lote é grátis e não conta como troca de prédio.</div>
     </div>

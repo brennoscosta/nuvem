@@ -1,6 +1,7 @@
 "use client";
 // Lotes à venda: casinhas (modelos do Higgsfield, instanciados por modelo) e terrenos vazios, todos com a placa
 // "À VENDA" na frente. As placas são juntadas num <Estatico> (uma textura compartilhada → um draw call).
+import { Icone } from "../ui/Icone";
 import * as THREE from "three";
 import { useLotesComEscritorio } from "./EscritorioCliente";
 import { useEffect, useMemo } from "react";
@@ -234,9 +235,9 @@ export function Balao({ position, nome, cor, logo, subtitulo, onClick, apagado =
       <div className={`flex w-max select-none flex-col items-center transition-[opacity,transform] duration-500 ${apagado ? "scale-75 opacity-25" : ""} ${destaque ? "balao-destaque" : ""}`}>
         {/* selo em cima do balão (ex.: "Estamos contratando", 12/11/2026) */}
         {/* loja destaque da semana (13/11/2026) */}
-        {semana && <div className={`${promo || selo ? "mb-1" : "-mb-1.5"} flex items-center gap-1 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#FACC15] px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#3B2A00] shadow-md ring-2 ring-white`}><span aria-hidden>⭐</span>Destaque da semana</div>}
+        {semana && <div className={`${promo || selo ? "mb-1" : "-mb-1.5"} flex items-center gap-1 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#FACC15] px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-[#3B2A00] shadow-md ring-2 ring-white`}><Icone nome="estrela" tamanho={13} traco={2.2} />Destaque da semana</div>}
         {/* promoção na fachada (12/11/2026) */}
-        {promo && <div className={`balao-promo ${selo ? "mb-1" : "-mb-1.5"} flex items-center gap-1 rounded-full bg-[#E11D48] px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-white shadow-md ring-2 ring-white`}><span aria-hidden>🏷️</span>{promo}</div>}
+        {promo && <div className={`balao-promo ${selo ? "mb-1" : "-mb-1.5"} flex items-center gap-1 rounded-full bg-[#E11D48] px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-white shadow-md ring-2 ring-white`}><Icone nome="etiqueta" tamanho={13} traco={2.2} />{promo}</div>}
         {selo && <div className="-mb-1.5 rounded-full bg-[#FACC15] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#1D2128] shadow-md ring-2 ring-white">{selo}</div>}
         <div className={`pointer-events-auto flex items-center gap-2.5 rounded-2xl px-4 py-2 shadow-xl ${onClick ? "cursor-pointer" : ""}`} style={{ background: cor }} onClick={(e) => { e.stopPropagation(); onClick?.(); }}>
           {logo && <img src={logo} alt="" className="h-9 w-9 rounded-lg bg-white/95 object-contain p-0.5" />}

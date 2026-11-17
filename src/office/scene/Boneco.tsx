@@ -116,13 +116,15 @@ const caixa = (x: number, y: number, z: number) => g(`b${x}-${y}-${z}`, () => ne
 const cilindro = (rt: number, rb: number, h: number, seg: number) => g(`y${rt}-${rb}-${h}-${seg}`, () => new THREE.CylinderGeometry(rt, rb, h, seg));
 const arco = () => g("arco", () => new THREE.TorusGeometry(0.235, 0.012, 6, 20, Math.PI));
 
+const escurecer = (hex: string, k: number) => { const n = parseInt(hex.slice(1), 16); const f = (v: number) => Math.round(v * (1 - k)).toString(16).padStart(2, "0"); return `#${f((n >> 16) & 255)}${f((n >> 8) & 255)}${f(n & 255)}`; };
 type Peca = { osso: Osso; geo: THREE.BufferGeometry; cor: string; pos?: [number, number, number]; rot?: [number, number, number]; esc?: [number, number, number] };
 function pecas(def: BonecoDef, camisa: string, cracha: string, headset: boolean, semChapeu = false): Peca[] {
   const { pele, cabelo: cab, calca } = def; const tenis = "#F4F4F4", preto = "#2A2D33";
   const traje = def.traje ?? "camisa";
-  const praia = traje !== "camisa"; // gente de praia: perna de fora, chinelo, sem crachá
-  const corTronco = traje === "camisa" || traje === "saida" ? camisa : pele;
-  const corManga = traje === "camisa" ? camisa : pele;
+  const blazer = traje === "blazer";
+  const praia = traje !== "camisa" && !blazer; // gente de praia: perna de fora, chinelo, sem crachá
+  const corTronco = traje === "camisa" || traje === "saida" || blazer ? camisa : pele;
+  const corManga = traje === "camisa" || blazer ? camisa : pele;
   const p: Peca[] = [{ osso: "hips", geo: caixa(0.3, 0.14, 0.22), cor: calca, pos: [0, 0.02, 0] }];
   for (const lado of ["L", "R"] as const) {
     p.push(
@@ -131,7 +133,7 @@ function pecas(def: BonecoDef, camisa: string, cracha: string, headset: boolean,
       { osso: `foot${lado}`, geo: caixa(0.14, praia ? 0.04 : 0.09, 0.22), cor: praia ? "#3B2A22" : tenis, pos: [0, praia ? -0.025 : 0, 0.02] },
       { osso: `upperArm${lado}`, geo: capsula(S.bracoR, S.bracoL * 0.55), cor: corManga, pos: [0, 0.01, 0] },
       { osso: `upperArm${lado}`, geo: capsula(S.bracoR * 0.85, S.bracoL), cor: pele },
-      { osso: `lowerArm${lado}`, geo: capsula(S.bracoR * 0.8, S.antebracoL), cor: pele },
+      { osso: `lowerArm${lado}`, geo: capsula(S.bracoR * 0.8, S.antebracoL), cor: blazer ? camisa : pele }, // blazer: manga comprida
       { osso: `hand${lado}`, geo: esfera(0.06), cor: pele },
     );
   }
@@ -139,6 +141,21 @@ function pecas(def: BonecoDef, camisa: string, cracha: string, headset: boolean,
   if (traje === "camisa") p.push(
     { osso: "chest", geo: caixa(0.05, 0.065, 0.006), cor: cracha, pos: [-0.09, 0.07, 0.135] }, // crachá
     { osso: "chest", geo: caixa(0.14, 0.03, 0.12), cor: camisa, pos: [0, 0.2, 0.02] }, // gola
+  );
+  if (blazer) {
+    // blazer aberto: camiseta clara aparecendo no peito, lapelas um pouco mais escuras, botão e a barra do blazer no quadril
+    const lapela = escurecer(camisa, 0.28);
+    p.push(
+      { osso: "chest", geo: caixa(0.1, 0.25, 0.012), cor: "#F4F4F0", pos: [0, 0.2, 0.134] },
+      { osso: "chest", geo: caixa(0.05, 0.22, 0.014), cor: lapela, pos: [0.065, 0.22, 0.135], rot: [0, 0, 0.32] },
+      { osso: "chest", geo: caixa(0.05, 0.22, 0.014), cor: lapela, pos: [-0.065, 0.22, 0.135], rot: [0, 0, -0.32] },
+      { osso: "chest", geo: esfera(0.014), cor: "#1F2227", pos: [0.06, 0.07, 0.14] },
+      { osso: "hips", geo: caixa(0.34, 0.11, 0.27), cor: camisa, pos: [0, 0.07, 0] },
+    );
+  }
+  if (def.tenis && !praia) for (const lado of ["L", "R"] as const) p.push(
+    { osso: `foot${lado}`, geo: caixa(0.15, 0.025, 0.23), cor: "#1F2227", pos: [0, -0.05, 0.02] }, // sola
+    { osso: `foot${lado}`, geo: caixa(0.152, 0.022, 0.09), cor: def.tenis, pos: [0, 0.005, -0.01] }, // listra
   );
   if (traje === "biquini") p.push({ osso: "chest", geo: caixa(0.36, 0.09, 0.3), cor: camisa, pos: [0, 0.2, 0], esc: [1, 1, 0.78] }); // top
   if (traje === "saida") p.push({ osso: "hips", geo: cilindro(0.17, 0.3, 0.3, 14), cor: camisa, pos: [0, -0.1, 0] }); // saída de praia (saia)
@@ -172,7 +189,7 @@ function pecas(def: BonecoDef, camisa: string, cracha: string, headset: boolean,
 // Geometria do boneco (pose de descanso) com cor e osso de cada vértice. Uma por aparência, compartilhada.
 const bonecoCache = new Map<string, THREE.BufferGeometry>();
 function geometriaBoneco(def: BonecoDef, camisa: string, cracha: string, headset: boolean, semChapeu = false) {
-  const k = `${def.id}|${def.pele}|${def.cabelo}|${def.calca}|${def.estiloCabelo}|${def.traje ?? ""}|${def.prancha ?? ""}|${def.chapeu ?? ""}|${camisa}|${cracha}|${headset}|${semChapeu}`;
+  const k = `${def.id}|${def.pele}|${def.cabelo}|${def.calca}|${def.estiloCabelo}|${def.traje ?? ""}|${def.tenis ?? ""}|${def.prancha ?? ""}|${def.chapeu ?? ""}|${camisa}|${cracha}|${headset}|${semChapeu}`;
   const pronta = bonecoCache.get(k); if (pronta) return pronta;
   const repouso = {} as Record<Osso, THREE.Matrix4>;
   for (const nome of OSSOS) { const [pai, p] = OSSO_PAI[nome]; const local = new THREE.Matrix4().makeTranslation(p[0], p[1], p[2]); repouso[nome] = pai ? new THREE.Matrix4().multiplyMatrices(repouso[pai], local) : local; }

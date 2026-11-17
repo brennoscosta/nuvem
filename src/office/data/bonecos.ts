@@ -4,7 +4,7 @@
 
 export type Cabelo = "curto" | "coque" | "longo" | "careca";
 
-export type Traje = "camisa" | "semCamisa" | "biquini" | "saida";
+export type Traje = "camisa" | "semCamisa" | "biquini" | "saida" | "blazer";
 export interface Boneco {
   id: string;
   nome: string;
@@ -17,6 +17,7 @@ export interface Boneco {
   traje?: Traje; // padrão: camisa (cor vem de fora). semCamisa/biquini/saida = gente de praia
   prancha?: string; // cor da prancha de surf debaixo do braço
   chapeu?: string; // chapéu de praia
+  tenis?: string; // cor de destaque do tênis (sola escura e listra nessa cor); sem isso, tênis branco liso
 }
 
 export const BONECOS: Boneco[] = [
@@ -42,7 +43,14 @@ export const BONECOS_PRAIA: Boneco[] = [
   { id: "praia-3", nome: "California · biquíni verde", arquivo: null, pele: "#F5D6BC", cabelo: "#B5532D", estiloCabelo: "coque", calca: "#1F2937", traje: "biquini", oculos: true },
   { id: "praia-4", nome: "Surfista com prancha", arquivo: null, pele: "#D9A882", cabelo: "#2A1E19", estiloCabelo: "longo", calca: "#DB2777", traje: "biquini", prancha: "#8B6CF0" },
 ];
-export const TODOS_BONECOS: Record<string, Boneco> = Object.fromEntries([...BONECOS, ...BONECOS_PRAIA].map((b) => [b.id, b]));
+// Blazer moderno (16/11/2026, pedido do dono): blazer aberto com camiseta por baixo, calça escura e tênis com listra.
+// A cor do blazer é a roupa do tipo de avatar.
+export const BONECOS_ESTILO: Boneco[] = [
+  { id: "blazer-1", nome: "Blazer moderno", arquivo: null, pele: "#C98E68", cabelo: "#1E1A18", estiloCabelo: "curto", calca: "#1F2329", traje: "blazer", tenis: "#E11D48" },
+  { id: "blazer-2", nome: "Blazer moderno · coque", arquivo: null, pele: "#F1C9A5", cabelo: "#3B2A22", estiloCabelo: "coque", calca: "#22252B", traje: "blazer", tenis: "#0A6CFF" },
+  { id: "blazer-3", nome: "Blazer moderno · cabelo longo", arquivo: null, pele: "#8D5A3B", cabelo: "#1E1A18", estiloCabelo: "longo", calca: "#1F2329", traje: "blazer", tenis: "#D4A63A" },
+];
+export const TODOS_BONECOS: Record<string, Boneco> = Object.fromEntries([...BONECOS, ...BONECOS_PRAIA, ...BONECOS_ESTILO].map((b) => [b.id, b]));
 
 // Tipos de avatar oferecidos a quem compra um personagem (R$ 5,99/mês): gênero + estilo. Cada tipo aponta pra um
 // boneco e uma cor de roupa; a lista cresce com os modelos do Higgsfield.
@@ -51,6 +59,9 @@ export interface TipoAvatar { id: string; nome: string; genero: Genero; estilo: 
 export const TIPOS_AVATAR: TipoAvatar[] = [
   { id: "exec-f", nome: "Executiva", genero: "feminino", estilo: "executivo", boneco: "coque", roupa: "#1F2937" },
   { id: "exec-m", nome: "Executivo", genero: "masculino", estilo: "executivo", boneco: "classico", roupa: "#1F2937" },
+  { id: "blazer-1", nome: "Blazer moderno", genero: "masculino", estilo: "executivo", boneco: "blazer-1", roupa: "#1E3A5F" },
+  { id: "blazer-2", nome: "Blazer moderno", genero: "feminino", estilo: "executivo", boneco: "blazer-2", roupa: "#2B2F36" },
+  { id: "blazer-3", nome: "Blazer vinho", genero: "feminino", estilo: "executivo", boneco: "blazer-3", roupa: "#6B2737" },
   { id: "casual-f", nome: "Casual", genero: "feminino", estilo: "casual", boneco: "longo", roupa: "#DB2777" },
   { id: "casual-m", nome: "Casual", genero: "masculino", estilo: "casual", boneco: "ruivo", roupa: "#0EA5A4" },
   { id: "criativo-f", nome: "Criativa", genero: "feminino", estilo: "criativo", boneco: "praia-3", roupa: "#7C3AED" },

@@ -49,7 +49,7 @@ export async function tirarFotoPredio(chave: string, hora: HoraFoto = "agora"): 
   // guarda tudo para devolver do jeito que estava
   const antes = { pos: camera.position.clone(), alvo: controles.target.clone(), fov: camera.fov, aspect: camera.aspect, hora: useHora.getState().modo, sel: useMundo.getState().loteSelecionado, dpr: gl.getPixelRatio(), tam: gl.getSize(new THREE.Vector2()) };
   const aviso = document.createElement("div");
-  aviso.textContent = "📸 Preparando a foto do prédio…";
+  aviso.textContent = "Preparando a foto do prédio…";
   Object.assign(aviso.style, { position: "fixed", top: "16px", left: "50%", transform: "translateX(-50%)", zIndex: "2147483000", background: "rgba(17,20,24,.92)", color: "#fff", font: "600 13px Inter, system-ui, sans-serif", padding: "8px 14px", borderRadius: "999px", pointerEvents: "none" });
   document.body.appendChild(aviso);
   try {

@@ -109,8 +109,10 @@ function texturaBarraca(b: BarracaFeira) {
   g.textAlign = "center"; g.textBaseline = "middle";
   if (livre) { g.fillStyle = "#7A7366"; g.font = "800 44px Inter, Arial, sans-serif"; g.fillText(b.status === "reservada" ? "RESERVADA" : "BARRACA LIVRE", 256, 70); g.font = "600 28px Inter, Arial, sans-serif"; g.fillText(b.status === "reservada" ? "aguardando o Pix" : "alugue por R$ 9,90 · clique", 256, 118); }
   else {
-    const icone = TIPOS_BARRACA.find((x) => x.id === b.tipo)?.icone ?? "🛍️";
-    g.font = "64px sans-serif"; g.fillText(icone, 66, 82);
+    // selo redondo na cor da barraca com a inicial do tipo (sem emoji, 16/11/2026)
+    const tipo = TIPOS_BARRACA.find((x) => x.id === b.tipo)?.nome ?? "Barraca";
+    g.fillStyle = b.cor; g.beginPath(); g.arc(66, 82, 40, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#FFFFFF"; g.font = "900 44px Inter, Arial, sans-serif"; g.fillText(tipo.slice(0, 1).toUpperCase(), 66, 84);
     g.fillStyle = "#1D2128"; let tam = 58; g.font = `900 ${tam}px Inter, Arial, sans-serif`;
     while (g.measureText(b.nome).width > 360 && tam > 26) { tam -= 4; g.font = `900 ${tam}px Inter, Arial, sans-serif`; }
     g.textAlign = "left"; g.fillText(b.nome, 120, 82, 370);

@@ -67,12 +67,12 @@ export function LetreiroLed({ led, numero, promo, nome, y, z, largura }: { led: 
   }, [led.modo, numero]);
   const h = agenda?.n === numero ? agenda.h : null;
   let texto: string;
-  if (led.modo === "promocao") texto = promo ? `🏷 ${promo}` : led.texto || nome;
+  if (led.modo === "promocao") texto = promo ? `PROMOÇÃO · ${promo}` : led.texto || nome;
   else if (led.modo === "horario") {
     const faixas = h ? (d: number) => faixasDoDia(h[String(d)]) : (d: number) => (led.dias.includes(d) ? faixasDoDia({ aberto: true, ini: led.abre, fim: led.fecha }) : []);
     texto = agora ? textoHorario(faixas, agora) : "";
   } else texto = led.texto || nome;
-  texto = texto.replace(/🏷\s?/, "").toUpperCase();
+  texto = texto.toUpperCase();
   const cor = CORES_LED[led.cor]?.hex ?? CORES_LED.ambar.hex;
   const dados = useMemo(() => (texto ? texturaLed(`   ${texto}   ·`, cor) : null), [texto, cor]);
   const alt = 0.46, ref = useRef<THREE.MeshBasicMaterial>(null);

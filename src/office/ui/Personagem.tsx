@@ -11,7 +11,7 @@ import { PixAberto } from "./Lote";
 import { ACESSORIOS, ACESSORIO_POR_ID, type LugarAcessorio } from "../data/acessorios";
 import { MISSAO_POR_ID, type Missao } from "../data/missoes";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
-import { Icone } from "./Icone";
+import { Icone, ICONE_ACESSORIO } from "./Icone";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR");
@@ -30,7 +30,7 @@ export function MiniAvatar({ boneco, roupa, tamanho = 40, acessorios }: { boneco
   return (
     <span className="relative inline-block shrink-0" style={{ width: tamanho, height: tamanho }}>
       {avatar}
-      {usados.map((a) => <span key={a.id} aria-hidden className="pointer-events-none absolute select-none leading-none" style={POS_ICONE[a.lugar](tamanho)}>{a.icone}</span>)}
+      {usados.map((a) => { const st = POS_ICONE[a.lugar](tamanho), t = Number(st.fontSize) || tamanho * 0.3; return <span key={a.id} aria-hidden className="pointer-events-none absolute grid select-none place-items-center leading-none" style={{ ...st, fontSize: undefined, color: a.cor === "#FFFFFF" ? "#8C97A6" : a.cor, filter: "drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff)" }}><Icone nome={ICONE_ACESSORIO[a.id] ?? "mais"} tamanho={Math.round(t * 1.15)} traco={2.2} /></span>; })}
     </span>
   );
 }
@@ -44,6 +44,7 @@ function AvatarCss({ boneco, roupa, tamanho }: { boneco: string; roupa: string; 
       {b.estiloCabelo === "longo" && <span className="absolute left-1/2 -translate-x-1/2 rounded-b-lg" style={{ top: tamanho * 0.22, width: tamanho * 0.58, height: tamanho * 0.3, background: b.cabelo, zIndex: 0 }} />}
       {b.oculos && <span className="absolute left-1/2 -translate-x-1/2 rounded bg-black/70" style={{ top: tamanho * 0.3, width: tamanho * 0.42, height: tamanho * 0.1 }} />}
       {b.chapeu && <span className="absolute left-1/2 -translate-x-1/2 rounded-full" style={{ top: tamanho * 0.02, width: tamanho * 0.7, height: tamanho * 0.12, background: b.chapeu }} />}
+      {b.traje === "blazer" && <span className="absolute left-1/2 -translate-x-1/2" style={{ top: tamanho * 0.6, width: tamanho * 0.2, height: tamanho * 0.4, background: "#F4F4F0", clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />}
       {b.traje === "biquini" && <span className="absolute left-1/2 -translate-x-1/2 rounded" style={{ top: tamanho * 0.64, width: tamanho * 0.5, height: tamanho * 0.12, background: roupa }} />}
     </span>
   );
@@ -300,7 +301,7 @@ function LojaAcessorios({ boneco, roupa }: { boneco: string; roupa: string }) {
                   return (
                     <Fragment key={a.id}>
                     <div className={`flex items-center gap-2 rounded-xl border-2 p-1.5 ${uso ? "border-[#7C3AED] bg-white" : "border-transparent bg-white/70"}`}>
-                      <span className="text-2xl leading-none">{a.icone}</span>
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white" style={{ color: a.cor === "#FFFFFF" ? "#8C97A6" : a.cor }}><Icone nome={ICONE_ACESSORIO[a.id] ?? "mais"} tamanho={20} /></span>
                       <div className="min-w-0 flex-1"><div className="truncate text-[11px] font-bold">{a.nome}</div><div className="text-[10px] text-[#5B6472]">{uso ? "usando ✓" : tem ? "na sua conta" : brl(a.preco)}</div></div>
                       <button type="button" onClick={() => agir(a.id)} disabled={ocupado === a.id || (pixItem === chave && pix?.status === "pendente")} className={`rounded-lg px-2 py-1 text-[10px] font-bold disabled:opacity-50 ${tem ? (uso ? "bg-[#F1F3F6] text-[#5B6472]" : "bg-[#7C3AED] text-white") : "bg-[#16A34A] text-white"}`}>{ocupado === a.id ? "…" : tem ? (uso ? "Tirar" : "Usar") : "Comprar"}</button>
                     </div>
