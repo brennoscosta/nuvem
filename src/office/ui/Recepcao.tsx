@@ -15,6 +15,7 @@ import { entradasDaCidade, type Entrada } from "../data/entradas";
 import { abrirChatEquipe, useChatEquipe } from "./ChatEquipe";
 import { ChatLoja, useLoja } from "./ChatLoja";
 import { Icone } from "./Icone";
+import { sedeDoParametro } from "../data/sedes";
 
 function useEntradas() {
   const terrenos = useMundo((s) => s.terrenos);
@@ -63,7 +64,30 @@ function PertoDaPorta() {
   );
 }
 
+// link "Entrar no prédio" das páginas públicas (/mundo?lote=…&entrar=1 ou ?sede=…&entrar=1, 17/11/2026): quando o mapa e o
+// personagem carregam, entra sozinho naquele prédio; sem personagem, abre a criação dele
+function useEntrarPeloLink() {
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    if (q.get("entrar") !== "1") return;
+    let n = 0;
+    const t = setInterval(() => {
+      const m = useMundo.getState(), st = usePersonagem.getState();
+      if (++n > 120) { clearInterval(t); return; } // 1 minuto esperando o mapa
+      if (!m.carregado || !st.carregado) return;
+      clearInterval(t);
+      const chave = q.get("lote") ?? sedeDoParametro(q.get("sede"))?.chave ?? null;
+      const e = chave ? entradasDaCidade(m.terrenos).find((x) => x.chave === chave) : null;
+      if (!e) return;
+      if (!st.ativo) { st.abrir("montar"); return; }
+      st.entrarNoPredio(e);
+    }, 500);
+    return () => clearInterval(t);
+  }, []);
+}
+
 export function Recepcao() {
+  useEntrarPeloLink();
   const predio = usePersonagem((s) => s.predio);
   const chatAberto = useChatEquipe((s) => s.aberto);
   if (!predio) return <PertoDaPorta />;

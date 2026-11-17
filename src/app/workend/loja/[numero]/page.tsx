@@ -1,10 +1,15 @@
 // Página pública da loja (11/11/2026): o endereço da empresa no WorkEnd para divulgar (workend.online/loja/N). Mostra o
 // que a empresa faz, contatos, equipe, avaliações de quem já negociou e a conversa com a atendente de IA.
 // Desde 12/11/2026 mostra também as vagas abertas ("Estamos contratando", com candidatura).
+// 17/11/2026 (frente acabamento): visual novo (topo escuro na cor da marca, cartões brancos, celular primeiro, conversa logo
+// depois do topo) e uma versão própria para as SEDES (números 0, 901, 902, 903 — data/sedes.ts): site oficial em destaque,
+// áreas do site e os departamentos da equipe (contagem e chefe de cada um, sem o treino). Estilos em ../loja.css (.lj-).
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { LOTES } from "@/office/data/mundo";
+import { SEDE_POR_NUMERO, type Sede } from "@/office/data/sedes";
+import { rotuloLoja } from "@/office/data/numeroLoja";
 import { NaoEncontrada } from "../../_nao-encontrada";
 import { usuarioAtual } from "@/server/usuarios";
 import { lojaPublica } from "@/server/equipeCliente";
@@ -24,21 +29,29 @@ import { PegarCupom } from "@/office/ui/PegarCupom";
 import { VitrineLoja } from "@/office/ui/VitrineLoja";
 import { Icone } from "@/office/ui/Icone";
 import { NotaEstrelas, EstrelaMedia } from "@/office/ui/NotaEstrelas";
+import type { Escritorio } from "@/office/data/escritorio";
+import "../loja.css";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ numero: string }> };
+type Loja = NonNullable<Awaited<ReturnType<typeof carregar>>>;
 
 async function carregar(numero: string) { return lojaPublica(Number(numero) | 0).catch(() => null); }
+const primeiraLetra = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+// a primeira frase do "Sobre" (para o topo e o compartilhamento)
+const resumoDe = (t: string, max = 200) => { const s = t.replace(/\s+/g, " ").trim(); const p = s.match(/^.{20,}?[.!?](\s|$)/)?.[0] ?? s; return p.length > max ? `${p.slice(0, max - 1).trimEnd()}…` : p.trim(); };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { numero } = await params;
   const l = await carregar(numero);
   if (!l) return meta({ titulo: "Loja fechada — WorkEnd", caminho: `/loja/${numero}`, indexar: false });
-  const resumo = (l.sobre || `${l.nome} tem endereço no WorkEnd, a cidade 3D das empresas. Converse com a equipe e peça seu orçamento.`).replace(/\s+/g, " ").slice(0, 155);
-  return meta({ titulo: `${l.nome} · ${l.nicho} — WorkEnd`, descricao: resumo, caminho: `/loja/${numero}` });
+  const sede = SEDE_POR_NUMERO[l.numero];
+  if (sede) return meta({ titulo: `${l.nome} — sede no WorkEnd`, descricao: resumoDe(l.sobre || sede.resumo, 155), caminho: `/loja/${numero}`, imagem: { url: sede.icone, width: 256, height: 256, alt: `Logo da ${l.nome}` } });
+  const resumo = resumoDe(l.sobre || `${l.nome} tem endereço no WorkEnd, a cidade 3D das empresas. Converse com a equipe e peça seu orçamento.`, 155);
+  return meta({ titulo: `${l.nome} · ${l.nicho} — WorkEnd`, descricao: resumo, caminho: `/loja/${numero}`, ...(l.logo ? { imagem: { url: l.logo, alt: `Logo da ${l.nome}` } } : {}) });
 }
 
-export default async function Loja({ params }: Props) {
+export default async function Pagina({ params }: Props) {
   const { numero } = await params;
   const n = Number(numero) | 0;
   const lote = LOTES.find((x) => x.numero === n) ?? null;
@@ -58,83 +71,117 @@ export default async function Loja({ params }: Props) {
   const u = await usuarioAtual().catch(() => null);
   // painel de resultados do dono: uma visita por pessoa por dia (o próprio dono não conta)
   void registrarVisitaDia(await headers(), { chave: l.chave, donoId: l.donoId }, u?.id ?? null, "pagina");
-  const [avals, vagasBrutas] = await Promise.all([avaliacoesRecebidas(l.donoId, 6).catch(() => []), vagasAbertas({ donoId: l.donoId }).catch(() => [])]);
-  const vagas: VagaLista[] = vagasBrutas.map((v) => ({ ...v, criadoEm: new Date(v.criadoEm).toISOString() }));
-  const ehDono = u?.id === l.donoId;
-  const promo = (await obterTerreno(l.chave).catch(() => null))?.promocao ?? null; // promoção na fachada (12/11/2026)
+  const sede = SEDE_POR_NUMERO[l.numero] ?? null;
+  const [avals, vagasBrutas, terreno] = await Promise.all([
+    avaliacoesRecebidas(l.donoId, 6).catch(() => []),
+    vagasAbertas({ donoId: l.donoId }).catch(() => []),
+    obterTerreno(l.chave).catch(() => null),
+  ]);
+  // as vagas de quem é dono de várias empresas (sedes) não se misturam: só as desta
+  const vagas: VagaLista[] = vagasBrutas.filter((v) => !("chave" in v) || (v as { chave?: string }).chave === l.chave).map((v) => ({ ...v, criadoEm: new Date(v.criadoEm).toISOString() }));
+  const ehDono = u?.id === l.donoId || (!!u && (terreno?.socios ?? []).includes(u.id));
+  const promo = terreno?.promocao ?? null; // promoção na fachada (12/11/2026)
+  const cor = sede?.cor ?? l.cor;
+  const linkMapa = sede ? `/mundo?sede=${sede.id}` : `/mundo?lote=${encodeURIComponent(l.chave)}`;
+
   return (
     <>
       <Topo logado={!!u} nome={u?.nome} />
       <main className="faixa mt-4">
-        <section className="relative overflow-hidden rounded-[22px] p-7 text-white sm:p-10" style={{ background: `linear-gradient(135deg, ${l.cor}, #161C25 115%)` }}>
-          <div className="loja-brilho" aria-hidden="true" />
-          <div className="relative flex flex-wrap items-center gap-5">
-            {l.logo ? <img src={l.logo} alt={`Logo da ${l.nome}`} className="h-20 w-20 rounded-2xl bg-white object-contain p-1.5 shadow-xl" /> : <span className="grid h-20 w-20 place-items-center rounded-2xl bg-white/15 text-3xl font-black">{l.nome.slice(0, 2).toUpperCase()}</span>}
-            <div className="min-w-0">
-              <span className="text-[13px] font-semibold text-white/75">Lote {l.numero} · {l.nicho}</span>
-              <h1 className="mt-1 text-[2.2rem] sm:text-[3rem]" style={{ color: "#fff" }}>{l.nome}</h1>
-              <span className="mt-1 inline-block rounded-full bg-white/90 px-3 py-1"><EstrelasTexto media={l.avaliacao.media} n={l.avaliacao.n} /></span>
+        <section className="pg-topo lj-topo" style={{ "--marca": cor, background: sede ? `linear-gradient(160deg, ${sede.escura}, #0E1013 75%)` : undefined } as React.CSSProperties} aria-label={l.nome}>
+          <div className="min-w-0">
+            {sede
+              ? <img src={sede.logo} alt={l.nome} className="lj-logo-sede" />
+              : l.logo ? <img src={l.logo} alt={`Logo da ${l.nome}`} className="lj-logo" /> : <span className="lj-logo lj-logo-letra" aria-hidden>{l.nome.slice(0, 2).toUpperCase()}</span>}
+            <div className="pg-rotulo mt-4">{sede ? `Sede · ${primeiraLetra(sede.tipo)}` : `${rotuloLoja(l.numero)} · ${l.nicho}`}</div>
+            <h1>{l.nome}</h1>
+            <p className="lj-resumo">{resumoDe(l.sobre || (sede ? sede.resumo : "A empresa ainda não escreveu a apresentação. A atendente responde as suas dúvidas na hora."))}</p>
+            <div className="lj-selos">
+              <span className="lj-selo"><Avaliacao media={l.avaliacao.media} n={l.avaliacao.n} /></span>
+              {l.atendente && <span className="lj-selo lj-selo-vivo"><i />{l.atendente.nome} atende agora</span>}
+              {sede && <span className="lj-selo"><Icone nome="equipe" tamanho={14} />{l.equipe.length} agentes de IA</span>}
+              {promo && <span className="lj-selo lj-promo"><Icone nome="etiqueta" tamanho={14} />{promo.texto} · até {new Date(promo.ate).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>}
+            </div>
+            <div className="pg-acoes mt-5">
+              {sede && <a href={sede.site} target="_blank" rel="noopener" className="btn lj-btn-marca"><Icone nome="globo" tamanho={17} />Abrir {sede.dominio}</a>}
+              <Link prefetch={false} href={`${linkMapa}&entrar=1`} className={sede ? "btn btn-linha" : "btn lj-btn-marca"}><Icone nome="casa" tamanho={17} />{sede ? "Entrar na sede" : "Entrar no prédio"}</Link>
+              <Link prefetch={false} href={linkMapa} className="btn btn-linha"><Icone nome="mapa" tamanho={17} />Ver no mapa 3D</Link>
+              <BotaoSeguir numero={l.numero} claro />
+              {vagas.length > 0 && <a href="#vagas" className="btn btn-linha"><Icone nome="candidato" tamanho={17} />Contratando · {vagas.length} {vagas.length === 1 ? "vaga" : "vagas"}</a>}
+              {ehDono && <Link href={`/app/equipe?lote=${encodeURIComponent(l.chave)}`} className="btn btn-linha"><Icone nome="equipe" tamanho={17} />{sede ? "Esta sede é sua · equipe" : "Esta é a sua loja · equipe"}</Link>}
             </div>
           </div>
-          {promo && <p className="relative mt-5 inline-flex flex-wrap items-center gap-2 rounded-full bg-[#E11D48] px-4 py-1.5 text-[15px] font-bold shadow-lg"><Icone nome="etiqueta" tamanho={17} />{promo.texto}<span className="font-semibold text-white/80">· até {new Date(promo.ate).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span></p>}
-          <div className="relative mt-6 flex flex-wrap gap-2">
-            <BotaoSeguir numero={l.numero} claro />
-            <Link prefetch={false} href={`/mundo?lote=${encodeURIComponent(l.chave)}`} className="btn" style={{ background: "#fff", color: "var(--ink)" }}>Ver no mapa 3D</Link>
-            {vagas.length > 0 && <a href="#vagas" className="btn border-white/40 bg-white/10" style={{ color: "#fff" }}><span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-[#FFD24A]" aria-hidden="true" />Estamos contratando · {vagas.length} {vagas.length === 1 ? "vaga" : "vagas"}</a>}
-            {ehDono && <Link href="/app/equipe" className="btn border-white/40 bg-white/10" style={{ color: "#fff" }}>Esta é a sua loja · Minha equipe</Link>}
-          </div>
+          {l.atendente && (
+            <aside className="lj-recepcao hidden lg:block" aria-label="Recepção">
+              <div className="text-[12.5px] font-semibold text-white/60">Recepção</div>
+              <div className="lj-recepcao-pessoa mt-2">
+                <span className="lj-avatar" style={{ background: l.atendente.camisa }}>{l.atendente.nome.slice(0, 1)}</span>
+                <span className="min-w-0"><b className="block truncate text-[16px] text-white">{l.atendente.nome}</b><span className="block truncate text-[13px] text-white/65">{l.atendente.cargo} · responde na hora</span></span>
+              </div>
+              <p className="mt-3 text-[13.5px] leading-snug text-white/75">{l.atendente.saudacao}</p>
+              <a href="#conversa" className="btn lj-btn-marca mt-3 w-full !py-2.5 text-[14.5px]"><Icone nome="conversar" tamanho={16} />Conversar agora</a>
+            </aside>
+          )}
         </section>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[1.2fr_1fr]">
-          <div className="space-y-8">
-            <section>
-              <h2 className="text-[1.5rem]">O que a {l.nome} faz</h2>
-              {l.sobre ? <p className="mt-3 max-w-[62ch] whitespace-pre-line text-[17px] leading-relaxed">{l.sobre}</p> : <p className="mt-3 text-[var(--tinta-2)]">A empresa ainda não escreveu a apresentação. Pergunte à atendente ao lado.</p>}
+        <div className="lj-grade">
+          <div className="lj-lado">
+            <div className="lj-o1"><ConversaDaLoja loja={l} logado={!!u} /></div>
+            {!sede && <div className="lj-o3"><PegarCupom numero={l.numero} /></div>}
+            {!sede && <div className="lj-o3"><AgendarLoja numero={l.numero} cor={l.cor} /></div>}
+            <div className="lj-o4"><Contatos c={l.contatos} numero={l.numero} site={sede?.site} /></div>
+          </div>
+
+          <div className="lj-principal lj-o2">
+            <section className="pg-cartao lj-bloco">
+              <h2>{sede ? `Sobre ${l.nome}` : `O que a ${l.nome} faz`}</h2>
+              {l.sobre ? <p className="lj-sobre">{l.sobre}</p> : <p className="lj-nota-txt">A empresa ainda não escreveu a apresentação. Pergunte à atendente: ela responde na hora.</p>}
             </section>
-            <VitrineLoja numero={l.numero} />
+
+            {sede && <AreasDoSite sede={sede} />}
+            {sede && terreno?.escritorio && <Departamentos e={terreno.escritorio} total={l.equipe.length} />}
+            {!sede && <VitrineLoja numero={l.numero} />}
+
             {vagas.length > 0 && (
-              <section id="vagas" className="scroll-mt-6">
+              <section id="vagas" className="pg-cartao lj-bloco scroll-mt-6">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 className="text-[1.5rem]">Estamos contratando</h2>
+                  <h2>Estamos contratando</h2>
                   <span className="text-sm text-[var(--tinta-2)]">{vagas.length} {vagas.length === 1 ? "vaga aberta" : "vagas abertas"} · <a href="/encontrar?tipo=vagas" className="font-semibold text-[var(--azul)] hover:underline">ver vagas de outras empresas</a></span>
                 </div>
                 <ListaVagas vagas={vagas} logado={!!u} destino={`/loja/${l.numero}#vagas`} mostrarEmpresa={false} ehDono={ehDono} />
               </section>
             )}
-            {l.equipe.length > 0 && (
-              <section>
-                <h2 className="text-[1.3rem]">Quem trabalha aqui</h2>
-                <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+
+            {!sede && l.equipe.length > 0 && (
+              <section className="pg-cartao lj-bloco">
+                <h2>Quem trabalha aqui</h2>
+                <p className="lj-nota-txt">Equipe de agentes de IA da {l.nome}: atende, orça e passa o seu contato para quem decide.</p>
+                <ul className="lj-equipe">
                   {l.equipe.map((m) => (
-                    <li key={`${m.nome}-${m.cargo}`} className="flex items-center gap-3 rounded-2xl bg-[var(--cinza)] p-3">
-                      {m.foto ? <img src={m.foto} alt="" width={44} height={44} className="h-11 w-11 rounded-full object-cover" /> : <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-dim)] font-bold">{m.nome.slice(0, 1)}</span>}
-                      <span className="min-w-0"><b className="block truncate">{m.nome}</b><small className="block truncate text-[var(--tinta-2)]">{m.cargo} · IA</small></span>
+                    <li key={`${m.nome}-${m.cargo}`} className="lj-pessoa">
+                      {m.foto ? <img src={m.foto} alt="" width={34} height={34} /> : <span aria-hidden>{m.nome.slice(0, 1)}</span>}
+                      <span className="min-w-0"><b className="truncate">{m.nome}</b><small className="truncate">{m.cargo}</small></span>
                     </li>
                   ))}
                 </ul>
               </section>
             )}
-            <section>
-              <h2 className="text-[1.3rem]">Avaliações</h2>
+
+            <section className="pg-cartao lj-bloco">
+              <h2>Avaliações</h2>
               {avals.length ? (
-                <ul className="mt-4 space-y-3">
+                <ul className="mt-2">
                   {avals.map((a) => (
-                    <li key={a.id} className="rounded-2xl border border-[var(--linha)] p-4">
-                      <div className="flex items-baseline justify-between gap-2"><b>{a.deNome}</b><NotaEstrelas nota={a.nota} /></div>
+                    <li key={a.id} className="lj-aval">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2"><b>{a.deNome}</b><NotaEstrelas nota={a.nota} /></div>
                       {a.texto && <p className="mt-1 text-[15px]">{a.texto}</p>}
                       <small className="text-[var(--tinta-2)]">{a.titulo} · {new Date(a.criadoEm).toLocaleDateString("pt-BR")}</small>
                     </li>
                   ))}
                 </ul>
-              ) : <p className="mt-2 text-[var(--tinta-2)]">Ainda não há avaliações. Elas aparecem quando um negócio fechado pelo WorkEnd é concluído.</p>}
+              ) : <p className="lj-nota-txt">Ainda não há avaliações. Elas aparecem quando um negócio fechado pelo WorkEnd é concluído.</p>}
             </section>
           </div>
-          <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <PegarCupom numero={l.numero} />
-            <AgendarLoja numero={l.numero} cor={l.cor} />
-            <ConversaDaLoja loja={l} logado={!!u} />
-            <ContatosBloco c={l.contatos} numero={l.numero} />
-          </aside>
         </div>
       </main>
       <div className="h-16" />
@@ -143,17 +190,66 @@ export default async function Loja({ params }: Props) {
   );
 }
 
-function EstrelasTexto({ media, n }: { media: number | null; n: number }) {
-  if (!n || media == null) return <span className="text-[13px] font-semibold text-[var(--tinta-2)]">Sem avaliações ainda</span>;
-  return <span className="text-[13px] font-bold text-[#7A5A00]"><EstrelaMedia />{media.toFixed(1).replace(".", ",")} <span className="font-normal text-[var(--tinta-2)]">· {n} {n === 1 ? "avaliação" : "avaliações"}</span></span>;
+function Avaliacao({ media, n }: { media: number | null; n: number }) {
+  if (!n || media == null) return <>Sem avaliações ainda</>;
+  return <><EstrelaMedia />{media.toFixed(1).replace(".", ",")} · {n} {n === 1 ? "avaliação" : "avaliações"}</>;
 }
-function ContatosBloco({ c, numero }: { c: { whatsapp?: string; instagram?: string; site?: string; email?: string }; numero: number }) {
-  const itens = [c.whatsapp && ["WhatsApp", `https://wa.me/${c.whatsapp.length <= 11 ? `55${c.whatsapp}` : c.whatsapp}`, c.whatsapp, "whatsapp"], c.instagram && ["Instagram", `https://instagram.com/${c.instagram}`, `@${c.instagram}`, "instagram"], c.site && ["Site", c.site, c.site.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""), "site"], c.email && ["E-mail", `mailto:${c.email}`, c.email, "email"]].filter(Boolean) as string[][];
+
+// sedes: as áreas do site oficial, cada uma levando à página dela
+function AreasDoSite({ sede }: { sede: Sede }) {
+  return (
+    <section className="pg-cartao lj-bloco" style={{ "--marca": sede.cor } as React.CSSProperties}>
+      <h2>Áreas do site {sede.dominio}</h2>
+      <p className="lj-nota-txt">As áreas que aparecem iluminadas na fachada da sede, no mapa.</p>
+      <div className="lj-areas">
+        {sede.areas.map((a) => (
+          <a key={a.id} href={`${sede.site}${a.href}`} target="_blank" rel="noopener" className="lj-area"><span className="lj-ponto" style={{ background: a.cor }} aria-hidden />{a.nome}</a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// sedes: os departamentos (tamanho de cada um e quem comanda), sem o treino de ninguém
+function Departamentos({ e, total }: { e: Escritorio; total: number }) {
+  const deps = e.setores.filter((s) => s.id !== "recepcao").map((s) => {
+    const pessoas = e.equipe.filter((m) => (m.setorId ?? (m.papel === "ceo" ? "diretoria" : "")) === s.id);
+    const chefe = pessoas.find((m) => m.nivel === "ceo") ?? pessoas.find((m) => m.nivel === "gerente") ?? pessoas.find((m) => m.nivel === "diretor") ?? null;
+    return { s, n: pessoas.length, chefe };
+  }).filter((d) => d.n > 0);
+  if (!deps.length) return null;
+  return (
+    <section className="pg-cartao lj-bloco">
+      <h2>Como a empresa se organiza</h2>
+      <p className="lj-nota-txt">{total} agentes de IA em {deps.length} departamentos, cada um com um chefe que divide o trabalho com a equipe.</p>
+      <div className="lj-barra" role="img" aria-label={deps.map((d) => `${d.s.nome}: ${d.n}`).join(", ")}>
+        {deps.map((d, i) => <i key={d.s.id} title={`${d.s.nome}: ${d.n}`} style={{ flex: d.n, background: d.s.cor, animationDelay: `${0.1 + i * 0.05}s` }} />)}
+      </div>
+      <ul className="lj-deps">
+        {deps.map((d) => (
+          <li key={d.s.id} className="lj-dep">
+            <span className="lj-ponto" style={{ background: d.s.cor }} aria-hidden />
+            <span className="min-w-0"><b className="block truncate">{d.s.nome}</b>{d.chefe && <small className="truncate">{d.chefe.nome}, {d.chefe.nivel === "ceo" ? "CEO" : d.chefe.cargo.toLowerCase()}</small>}</span>
+            <em>{d.n}</em>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function Contatos({ c, numero, site }: { c: Loja["contatos"]; numero: number; site?: string }) {
+  const itens = [
+    c.whatsapp && ["WhatsApp", `https://wa.me/${c.whatsapp.length <= 11 ? `55${c.whatsapp}` : c.whatsapp}`, c.whatsapp, "whatsapp"],
+    c.instagram && ["Instagram", `https://instagram.com/${c.instagram}`, `@${c.instagram}`, "instagram"],
+    (c.site || site) && ["Site", (c.site || site) as string, ((c.site || site) as string).replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""), "site"],
+    c.email && ["E-mail", `mailto:${c.email}`, c.email, "email"],
+  ].filter(Boolean) as string[][];
   if (!itens.length) return null;
   return (
-    <div className="rounded-2xl border border-[var(--linha)] p-5">
-      <b>Contatos</b>
-      <ul className="mt-2 space-y-1.5">{itens.map(([t, href, rot, tipo]) => <li key={t} className="flex justify-between gap-3 text-[15px]"><span className="text-[var(--tinta-2)]">{t}</span><LinkRastreado numero={numero} tipo={tipo as TipoClique} href={href} target="_blank" rel="noreferrer nofollow" className="truncate font-semibold text-[var(--azul)] hover:underline">{rot}</LinkRastreado></li>)}</ul>
-    </div>
+    <section className="pg-cartao lj-bloco">
+      <h2 className="!text-[1.15rem]">Contatos</h2>
+      <ul className="mt-2">{itens.map(([t, href, rot, tipo]) => <li key={t} className="lj-contato"><span className="text-[var(--tinta-2)]">{t}</span><LinkRastreado numero={numero} tipo={tipo as TipoClique} href={href} target="_blank" rel="noreferrer nofollow" className="truncate font-semibold text-[var(--azul)] hover:underline">{rot}</LinkRastreado></li>)}</ul>
+    </section>
   );
 }

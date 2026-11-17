@@ -8,7 +8,8 @@ export const DESCRICAO = "Escolha um lote no mapa 3D, coloque a marca da sua emp
 export const OG = { url: "/workend/marca/og-workend.jpg", width: 1200, height: 630, alt: "WorkEnd — o mapa 3D onde a sua empresa tem endereço" };
 
 // Metadados-base (herdados por todas as páginas do site). Cada página passa título/descrição/canonical próprios.
-export function meta(d: { titulo?: string; descricao?: string; caminho: string; indexar?: boolean }): Metadata {
+// imagem: a de compartilhamento da página (logo da loja ou da sede); sem ela, a imagem do WorkEnd
+export function meta(d: { titulo?: string; descricao?: string; caminho: string; indexar?: boolean; imagem?: { url: string; width?: number; height?: number; alt?: string } }): Metadata {
   const title = d.titulo ?? TITULO;
   const description = d.descricao ?? DESCRICAO;
   const url = `${SITE}${d.caminho}`;
@@ -27,8 +28,8 @@ export function meta(d: { titulo?: string; descricao?: string; caminho: string; 
     robots: indexar
       ? { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } }
       : { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
-    openGraph: { type: "website", url, siteName: NOME, locale: "pt_BR", title, description, images: [OG] },
-    twitter: { card: "summary_large_image", title, description, images: [OG.url] },
+    openGraph: { type: "website", url, siteName: NOME, locale: "pt_BR", title, description, images: [d.imagem ?? OG] },
+    twitter: { card: d.imagem ? "summary" : "summary_large_image", title, description, images: [(d.imagem ?? OG).url] },
     icons: { icon: [{ url: "/workend/marca/workend-favicon.svg", type: "image/svg+xml" }, { url: "/workend/marca/workend-icone-32.png", sizes: "32x32", type: "image/png" }], apple: [{ url: "/workend/marca/workend-icone-180.png", sizes: "180x180" }], shortcut: "/workend/marca/workend-icone-32.png" },
     manifest: "/workend/manifest.webmanifest",
     formatDetection: { telephone: false, email: false, address: false },

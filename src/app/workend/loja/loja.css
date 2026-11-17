@@ -1,0 +1,73 @@
+/* Página pública da loja e da sede (17/11/2026, frente acabamento). Prefixo .lj-. Usa o topo escuro do visual novo
+   (.pg-topo em workend.css, com o brilho na cor da marca via --marca) e cartões brancos (.pg-cartao). Celular primeiro:
+   a conversa com a atendente vem logo depois do topo; no computador ela fica fixa à direita. */
+@layer components {
+  .we .lj-topo { display: grid; gap: 1.4rem; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 1024px) { .we .lj-topo { grid-template-columns: minmax(0, 1.35fr) minmax(0, .65fr); align-items: end; } }
+  .we .lj-logo { width: 72px; height: 72px; border-radius: 18px; object-fit: contain; background: #fff; padding: 6px; box-shadow: 0 12px 30px -12px rgba(0,0,0,.6); }
+  .we .lj-logo-letra { display: grid; place-items: center; background: var(--marca, var(--blue)); color: #fff; font-weight: 800; font-size: 1.6rem; padding: 0; }
+  .we .lj-logo-sede { display: block; height: clamp(46px, 7vw, 64px); width: auto; max-width: 100%; object-fit: contain; object-position: left; filter: drop-shadow(0 8px 18px rgba(0,0,0,.45)); }
+  .we .lj-resumo { margin-top: .7rem; max-width: 60ch; color: rgba(255,255,255,.78); font-size: 16.5px; line-height: 1.5; }
+  .we .lj-selos { margin-top: .9rem; display: flex; flex-wrap: wrap; gap: .45rem; }
+  .we .lj-selo { display: inline-flex; align-items: center; gap: .4rem; border-radius: 999px; padding: .32rem .7rem; font-size: 13px; font-weight: 600; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.14); color: rgba(255,255,255,.9); }
+  .we .lj-selo-vivo i { width: 7px; height: 7px; border-radius: 50%; background: #3DDC84; animation: lj-pulso 2s ease-out infinite; }
+  .we .lj-promo { background: #E11D48; border-color: #E11D48; color: #fff; }
+  .we .lj-btn-marca { background: #fff; color: var(--ink); }
+  .we .lj-btn-marca:hover { background: #F2F5F8; }
+
+  /* cartão da recepção dentro do topo (computador): quem atende e o atalho para a conversa */
+  .we .lj-recepcao { border-radius: 20px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); padding: 1rem; backdrop-filter: blur(6px); }
+  .we .lj-recepcao-pessoa { display: flex; align-items: center; gap: .7rem; }
+  .we .lj-avatar { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; color: #fff; font-weight: 800; font-size: 1.1rem; box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
+
+  .we .lj-grade { margin-top: 1.4rem; display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 1024px) {
+    .we .lj-grade { grid-template-columns: minmax(0, 1.25fr) minmax(0, .9fr); align-items: start; }
+    .we .lj-lado { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 1.5rem; }
+    .we .lj-principal { grid-column: 1; grid-row: 1; }
+  }
+  .we .lj-lado, .we .lj-principal { display: grid; gap: 1.25rem; min-width: 0; }
+  /* celular: a conversa logo depois do topo, depois o que a empresa faz e, no fim, cupom, agenda e contatos */
+  @media (max-width: 1023px) {
+    .we .lj-lado { display: contents; }
+    .we .lj-o1 { order: 1; } .we .lj-o2 { order: 2; } .we .lj-o3 { order: 3; } .we .lj-o4 { order: 4; }
+  }
+  .we .lj-o1, .we .lj-o3, .we .lj-o4 { min-width: 0; }
+  .we .lj-bloco { padding: clamp(1.1rem, 2.6vw, 1.6rem); }
+  .we .lj-bloco h2 { font-size: clamp(1.25rem, 2.4vw, 1.5rem); line-height: 1.2; letter-spacing: -0.02em; }
+  .we .lj-nota-txt { margin-top: .35rem; color: var(--muted); font-size: 15px; }
+  .we .lj-sobre { margin-top: .75rem; max-width: 64ch; white-space: pre-line; font-size: 16.5px; line-height: 1.6; color: var(--ink); }
+
+  /* departamentos da sede: uma barra com o tamanho de cada um e a lista com o chefe */
+  .we .lj-barra { margin-top: 1rem; display: flex; height: 14px; border-radius: 999px; overflow: hidden; gap: 2px; background: var(--surface-dim); }
+  .we .lj-barra i { display: block; height: 100%; transform-origin: left; animation: lj-cresce .9s cubic-bezier(.2,.8,.2,1) both; }
+  .we .lj-deps { margin-top: 1rem; display: grid; gap: .1rem .9rem; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 640px) { .we .lj-deps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .we .lj-dep { display: flex; align-items: center; gap: .65rem; padding: .55rem 0; border-top: 1px solid var(--line); min-width: 0; }
+  .we .lj-dep b { font-size: 15px; }
+  .we .lj-dep small { display: block; color: var(--muted); font-size: 13px; }
+  .we .lj-dep em { margin-left: auto; flex: none; font-style: normal; font-size: 13px; font-weight: 700; color: var(--ink); background: var(--surface); border-radius: 999px; padding: .2rem .6rem; }
+  .we .lj-ponto { flex: none; width: 10px; height: 10px; border-radius: 3px; }
+
+  /* áreas do site (sedes): links em pílula com a cor da área */
+  .we .lj-areas { margin-top: .9rem; display: flex; flex-wrap: wrap; gap: .45rem; }
+  .we .lj-area { display: inline-flex; align-items: center; gap: .5rem; min-height: 40px; border-radius: 999px; padding: .35rem .85rem; font-size: 14.5px; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--line); transition: border-color .2s, transform .2s; }
+  .we .lj-area:hover { border-color: var(--marca, var(--blue)); transform: translateY(-1px); }
+
+  /* equipe da loja (lojas comuns): fila de pessoas */
+  .we .lj-equipe { margin-top: .9rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+  .we .lj-pessoa { display: flex; align-items: center; gap: .55rem; border-radius: 999px; padding: .3rem .85rem .3rem .3rem; background: var(--surface); border: 1px solid var(--line); min-width: 0; max-width: 100%; }
+  .we .lj-pessoa img, .we .lj-pessoa > span:first-child { flex: none; width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+  .we .lj-pessoa > span:first-child { display: grid; place-items: center; background: var(--surface-dim); font-weight: 700; }
+  .we .lj-pessoa b { display: block; font-size: 14px; line-height: 1.15; }
+  .we .lj-pessoa small { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.15; }
+
+  .we .lj-contato { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .6rem 0; border-top: 1px solid var(--line); font-size: 15px; min-width: 0; }
+  .we .lj-contato:first-of-type { border-top: 0; }
+  .we .lj-aval { padding: .85rem 0; border-top: 1px solid var(--line); }
+  .we .lj-aval:first-of-type { border-top: 0; }
+
+  @keyframes lj-pulso { 0% { box-shadow: 0 0 0 0 rgba(61,220,132,.6); } 100% { box-shadow: 0 0 0 8px transparent; } }
+  @keyframes lj-cresce { from { transform: scaleX(0); } }
+  @media (prefers-reduced-motion: reduce) { .we .lj-selo-vivo i, .we .lj-barra i { animation: none; } }
+}

@@ -12,7 +12,7 @@ import { PASSO } from "../data/mundo";
 
 const CHAVE = "workend-visita-guiada";
 // quem chega por um link direto (lote, sede, conversa com a equipe…) não recebe a visita guiada por cima do que veio ver
-const PARAMS_DIRETOS = ["lote", "sede", "equipe", "membro", "cam", "vista", "feira", "hora", "medir", "natal", "qualidade", "praca", "nicho", "pagamento", "outdoor"];
+const PARAMS_DIRETOS = ["lote", "sede", "entrar", "equipe", "membro", "cam", "vista", "feira", "hora", "medir", "natal", "qualidade", "praca", "nicho", "pagamento", "outdoor"];
 const DURACAO = 4500; // ms por passo
 const ESPERA_ALVO = 1600; // se a peça não aparecer nesse tempo, o passo é pulado
 const PAD = 8; // folga do holofote em volta da peça

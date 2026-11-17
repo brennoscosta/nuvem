@@ -19,7 +19,7 @@ import { bloqueio, contar } from "./limite";
 import { contextoAgendaIA, aplicarMarcacaoDaAtendente, temMarcacao } from "./agenda";
 import { ESPECIALISTAS_IA, ESPECIALISTA_POR_ID, type EspecialistaIA } from "@/office/data/especialistas";
 import { LOTES, LOTE_POR_CHAVE, nomeNicho } from "@/office/data/mundo";
-import { SEDE_POR_NUMERO } from "@/office/data/sedes";
+import { SEDE_POR_NUMERO, SEDE_SOCIALRP, ehSede } from "@/office/data/sedes";
 import type { Membro, NivelMembro, Escritorio } from "@/office/data/escritorio";
 import { pedirComEquipe, trabalhando, trocasInternas, atividadeInterna } from "./delegacao";
 import type { AreaId, Nivel } from "@/office/data/org";
@@ -38,7 +38,9 @@ export const statusDe = (e: unknown) => (e instanceof ErroHttp ? e.status : 500)
 
 // ---------- identidades ----------
 const sanChave = (chave: string) => chave.replace(/-/g, "m").replace(/[^a-zA-Z0-9]/g, "_");
-export function empresaIdDe(usuarioId: string, chave: string, admin: boolean) { return admin ? `emp_${usuarioId}_${sanChave(chave)}` : `emp_${usuarioId}`; }
+// empresa por lote para admin e para as sedes novas (17/11/2026): um dono comum com várias sedes não junta as equipes numa
+// empresa só. A sede da Social RP fica de fora porque a empresa dela já existe com o id antigo (emp_<usuário>).
+export function empresaIdDe(usuarioId: string, chave: string, admin: boolean) { return admin || (ehSede(chave) && chave !== SEDE_SOCIALRP.chave) ? `emp_${usuarioId}_${sanChave(chave)}` : `emp_${usuarioId}`; }
 export const agenteIdDe = (empresaId: string, membroId: string) => `ag_${empresaId.slice(4)}_${membroId}`;
 export const fotoDoEspecialista = (e: EspecialistaIA | null | undefined) => (e ? `/workend/agentes/${e.id}.webp` : null);
 

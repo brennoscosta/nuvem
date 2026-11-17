@@ -1,6 +1,8 @@
 "use client";
 // A busca de /encontrar: profissionais (personagens com perfil profissional), empresas (lojas abertas no mapa) e,
 // desde 12/11/2026, as vagas abertas das empresas (a placa "Estamos contratando" do mapa leva para cá).
+// 17/11/2026 (frente acabamento): topo escuro do visual novo (.pg-topo) e, em Empresas, a faixa "Sedes na cidade" com a marca
+// de cada sede (data/sedes.ts) antes das lojas.
 import { useEffect, useMemo, useState } from "react";
 import { ListaVagas, type VagaLista } from "../_vagas";
 import { NICHOS } from "@/office/data/mundo";
@@ -8,6 +10,8 @@ import { MiniAvatar } from "@/office/ui/MiniAvatar";
 import type { Perfil, Redes } from "@/office/personagemStore";
 import { EstrelaMedia } from "@/office/ui/NotaEstrelas";
 import { rotuloLoja } from "@/office/data/numeroLoja";
+import { SEDE_POR_NUMERO, type Sede } from "@/office/data/sedes";
+import { Icone } from "@/office/ui/Icone";
 
 type Prof = { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; redes?: Redes; online: boolean; perfil: Perfil; nichoNome: string | null; reputacao: { media: number | null; n: number } };
 type Emp = { numero: number; chave: string; nome: string; cor: string; nicho: string; nichoNome: string; logo: string | null; sobre: string; contatos: { whatsapp?: string; instagram?: string; site?: string; email?: string }; equipe: number; atendente: string | null; reputacao: { media: number | null; n: number } };
@@ -42,14 +46,18 @@ export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string
   }, [busca, tipo, termo, nicho]);
   const entrar = (destino: string) => (logado ? destino : `/entrar?destino=${encodeURIComponent(destino)}`);
   const nomeNicho = useMemo(() => NICHOS.find((n) => n.id === nicho)?.nome, [nicho]);
+  const { sedes, lojas } = useMemo(() => {
+    const emps = tipo === "empresas" ? ((res as Emp[] | null) ?? []) : [];
+    return { sedes: emps.flatMap((e) => (SEDE_POR_NUMERO[e.numero] ? [{ e, sede: SEDE_POR_NUMERO[e.numero] }] : [])), lojas: emps.filter((e) => !SEDE_POR_NUMERO[e.numero]) };
+  }, [tipo, res]);
 
   return (
     <main className="faixa mt-2">
-      <section className="busca-topo relative overflow-hidden rounded-[22px] bg-[var(--night)] p-7 text-white sm:p-10">
-        <div className="busca-grade" aria-hidden="true" />
+      <section className="pg-topo">
         <div className="relative">
-          <h1 className="text-[2.1rem] sm:text-[3rem]" style={{ color: "#fff" }}>Encontre quem resolve.</h1>
-          <p className="mt-2 max-w-[56ch] text-white/75">{tipo === "vagas" ? "Empresas do mapa 3D que estão contratando agora. Candidate-se em um minuto: a empresa recebe sua mensagem e responde pelo seu contato." : "Profissionais que atendem pelo WorkEnd e empresas com endereço no mapa 3D. Converse, peça orçamento e feche negócio com avaliação dos dois lados."}</p>
+          <span className="pg-rotulo"><Icone nome="encontrar" tamanho={15} />Encontrar</span>
+          <h1>Encontre quem resolve.</h1>
+          <p className="pg-sub">{tipo === "vagas" ? "Empresas do mapa 3D que estão contratando agora. Candidate-se em um minuto: a empresa recebe sua mensagem e responde pelo seu contato." : "Profissionais que atendem pelo WorkEnd e empresas com endereço no mapa 3D. Converse, peça orçamento e feche negócio com avaliação dos dois lados."}</p>
           <div className="mt-6 inline-flex rounded-xl bg-white/10 p-1 text-sm font-semibold">
             {(["profissionais", "empresas", "vagas"] as Tipo[]).map((t) => <button key={t} type="button" onClick={() => setTipo(t)} className={`rounded-lg px-4 py-2 transition ${tipo === t ? "bg-white text-[var(--tinta)]" : "text-white/80 hover:text-white"}`}>{ROTULO[t]}</button>)}
           </div>
@@ -86,6 +94,19 @@ export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string
 
       {tipo === "vagas" && res && res.length > 0 && <ListaVagas vagas={res as VagaLista[]} logado={logado} destino="/encontrar?tipo=vagas" />}
 
+      {tipo === "empresas" && sedes.length > 0 && (
+        <section className="mt-5" aria-label="Sedes na cidade">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-[1.35rem]">Sedes na cidade</h2>
+            <span className="text-sm text-[var(--tinta-2)]">Prédios inteiros, com equipe de IA por departamento e recepção</span>
+          </div>
+          <ul className="mt-3 grid gap-3 md:grid-cols-2">
+            {sedes.map(({ e, sede }, i) => <SedeCartao key={e.chave} e={e} sede={sede} i={i} />)}
+          </ul>
+        </section>
+      )}
+      {tipo === "empresas" && sedes.length > 0 && lojas.length > 0 && <h2 className="mt-7 text-[1.35rem]">Lojas</h2>}
+
       <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {tipo === "profissionais" && (res as Prof[] | null)?.map((p, i) => (
           <li key={p.usuarioId} className="busca-cartao flex flex-col rounded-2xl border border-[var(--linha)] bg-[var(--surface)] p-5" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
@@ -112,14 +133,14 @@ export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string
             )}
           </li>
         ))}
-        {tipo === "empresas" && (res as Emp[] | null)?.map((e, i) => (
+        {tipo === "empresas" && lojas.map((e, i) => (
           <li key={e.chave} className="busca-cartao flex flex-col overflow-hidden rounded-2xl border border-[var(--linha)] bg-[var(--surface)]" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
             <div className="flex items-center gap-3 p-4 text-white" style={{ background: `linear-gradient(135deg, ${e.cor}, #161C25 140%)` }}>
               {e.logo ? <img src={e.logo} alt="" className="h-12 w-12 rounded-xl bg-white object-contain p-1" /> : <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/15 font-black">{e.nome.slice(0, 2).toUpperCase()}</span>}
               <div className="min-w-0"><b className="block truncate text-[17px]">{e.nome}</b><span className="text-[13px] text-white/80">{rotuloLoja(e.numero)} · {e.nichoNome}</span></div>
             </div>
             <div className="flex flex-1 flex-col p-4">
-              <div className="flex items-center justify-between gap-2"><Nota r={e.reputacao} />{e.atendente && <span className="text-[12px] font-semibold text-[#16A34A]">● {e.atendente} atende agora</span>}</div>
+              <div className="flex items-center justify-between gap-2"><Nota r={e.reputacao} />{e.atendente && <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#15803D]"><span className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" aria-hidden />{e.atendente} atende agora</span>}</div>
               <p className="mt-2 line-clamp-3 text-[14px] text-[var(--tinta-2)]">{e.sobre || "A empresa ainda não escreveu a apresentação. A atendente responde suas dúvidas."}</p>
               <div className="mt-auto flex gap-2 pt-4">
                 <a href={`/loja/${e.numero}`} className="btn btn-azul flex-1 !py-2.5 text-sm">Abrir a loja</a>
@@ -130,5 +151,25 @@ export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string
         ))}
       </ul>
     </main>
+  );
+}
+
+const primeiraFrase = (t: string) => (t.replace(/\s+/g, " ").trim().match(/^.{12,}?[.!?](\s|$)/)?.[0] ?? t).trim();
+// sede: faixa larga com a marca (logo clara sobre o escuro da sede), o resumo e os caminhos
+function SedeCartao({ e, sede, i }: { e: Emp; sede: Sede; i: number }) {
+  return (
+    <li className="busca-cartao relative flex flex-col overflow-hidden rounded-[20px] p-5 text-white" style={{ background: `linear-gradient(150deg, ${sede.escura} 35%, color-mix(in srgb, ${sede.cor} 55%, ${sede.escura}))`, animationDelay: `${Math.min(i, 6) * 50}ms` }}>
+      <img src={sede.logo} alt={e.nome} className="h-10 w-auto max-w-[70%] object-contain object-left" />
+      <p className="mt-3 line-clamp-2 text-[14.5px] leading-snug text-white/80">{primeiraFrase(e.sobre || sede.resumo)}</p>
+      <div className="mt-3 flex flex-wrap gap-1.5 text-[12.5px] font-semibold">
+        <span className="rounded-full bg-white/10 px-2.5 py-1">{e.equipe} agentes de IA</span>
+        {e.atendente && <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1"><span className="h-1.5 w-1.5 rounded-full bg-[#3DDC84]" aria-hidden />{e.atendente} na recepção</span>}
+        <span className="rounded-full bg-white/10 px-2.5 py-1">{sede.dominio}</span>
+      </div>
+      <div className="mt-auto flex flex-wrap gap-2 pt-4">
+        <a href={`/loja/${e.numero}`} className="btn !py-2.5 text-sm" style={{ background: "#fff", color: "var(--ink)" }}>Conhecer a sede</a>
+        <a href={`/mundo?sede=${sede.id}`} className="btn !py-2.5 text-sm" style={{ background: "rgba(255,255,255,.1)", color: "#fff", borderColor: "rgba(255,255,255,.24)" }}>Ver no mapa</a>
+      </div>
+    </li>
   );
 }
