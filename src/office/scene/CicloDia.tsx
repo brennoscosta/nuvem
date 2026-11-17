@@ -13,9 +13,15 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useHora } from "../cameraStore";
 import { clima, iniciarClima, passoClima } from "../clima";
 import { leve } from "./qualidade";
+import { useEscritorio } from "../store";
 import type { ItemInstancia } from "./Modelos";
 
 export const ceu = { noite: 0, crep: 0, nublado: 0 };
+// luz por dentro (17/11/2026, pedido do dono: "preciso de uma luz dentro da empresa, está tudo escuro, não dá para
+// enxergar"): k vai de 0 a 1 quando a vista é por dentro e a luz está acesa (botão Luz na barra). Só muda intensidade e
+// cor das luzes que já existem: não acrescenta luz nem recompila nada.
+export const luzInterna = { k: 0 };
+const LUZ_QUENTE = new THREE.Color("#FFF2DE"), LUZ_CHAO = new THREE.Color("#E9DDCB");
 const HORA_FIXA = (() => { if (typeof window === "undefined") return null; const h = new URLSearchParams(window.location.search).get("hora"); return h != null && h !== "" && Number.isFinite(Number(h)) ? Number(h) : null; })();
 
 function horaBrasilia() {
@@ -125,6 +131,15 @@ function atualizar(scene: THREE.Scene, l: Luzes, dt: number, t: number) {
   if (h) { mistura(C.hemiCeu, n, crep, h.color); mistura(C.hemiChao, n, crep, h.groundColor); h.intensity = THREE.MathUtils.lerp(0.9, 0.42, n) * (1 - fechado * 0.12); }
   if (s) { mistura(C.sol, n, crep, s.color); s.intensity = THREE.MathUtils.lerp(2.2, 0.5, n) * (1 - crep * 0.25) * (1 - fechado * 0.55) * (1 - neb * 0.3); }
   if (p) p.intensity = THREE.MathUtils.lerp(0.5, 0.15, n) * (1 + fechado * 0.3);
+  const vista = useEscritorio.getState();
+  luzInterna.k += ((vista.vista === "dentro" && vista.luz ? 1 : 0) - luzInterna.k) * Math.min(1, dt * 4);
+  const k = luzInterna.k;
+  if (k > 0.001) {
+    if (h) { h.intensity = THREE.MathUtils.lerp(h.intensity, 1.3, k); h.color.lerp(LUZ_QUENTE, k * 0.8); h.groundColor.lerp(LUZ_CHAO, k * 0.8); }
+    if (p) p.intensity = THREE.MathUtils.lerp(p.intensity, 0.75, k);
+    // à noite a luz de cima (a lua) vira luz de lâmpada sobre a planta
+    if (s) { s.intensity = THREE.MathUtils.lerp(s.intensity, Math.max(s.intensity, 1.4), k * n); s.color.lerp(LUZ_QUENTE, k * n * 0.7); }
+  }
   mistura(C.horizonte, n, crep, tmp).lerp(doisTons(FECHADO.horizonte, n, tmp2), fechado * 0.7);
   for (const m of horizonte) m.color.copy(tmp);
 }

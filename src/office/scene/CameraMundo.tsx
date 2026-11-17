@@ -15,6 +15,7 @@ import { minhaPos, usePersonagem } from "../personagemStore";
 import { useMundo } from "../mundoStore";
 import { LOTE_POR_CHAVE, PASSO, MEIO_Q, MUNDO, N } from "../data/mundo";
 import { PRACA_CHAVE } from "../data/praca";
+import { caminhar, livre } from "../data/caminhos";
 import { registrarPonte, tirarFotoPredio } from "./fotoPredio";
 
 const MIN_RAIO = 6, MAX_RAIO = 119;
@@ -81,23 +82,7 @@ const SEM_UI = typeof window !== "undefined" && new URLSearchParams(window.locat
 const MEDIR = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("medir");
 
 // ---------- andar pela rua ----------
-// calçadas, ruas e a grama das bordas são livres; dentro dos quarteirões só a praça é aberta
-const PRACA = LOTE_POR_CHAVE[PRACA_CHAVE]?.centro ?? null;
-function livre(x: number, z: number) {
-  if (Math.abs(x) > MUNDO.x - 2 || Math.abs(z) > MUNDO.z - 2) return false;
-  const i = Math.round(x / PASSO), j = Math.round(z / PASSO);
-  if (Math.abs(i) > N || Math.abs(j) > N) return true;
-  const B = MEIO_Q + 0.35;
-  if (Math.abs(x - i * PASSO) >= B || Math.abs(z - j * PASSO) >= B) return true;
-  return !!PRACA && Math.abs(x - PRACA[0]) < 10.4 && Math.abs(z - PRACA[1]) < 10.4;
-}
-// anda o que der: se bater num quarteirão, escorrega ao longo da calçada
-function caminhar(x: number, z: number, dx: number, dz: number): [number, number] {
-  if (livre(x + dx, z + dz)) return [x + dx, z + dz];
-  if (livre(x + dx, z)) return [x + dx, z];
-  if (livre(x, z + dz)) return [x, z + dz];
-  return [x, z];
-}
+// livre() e caminhar() moram em data/caminhos.ts (o toque no chão usa o mesmo mapa do que é livre, com caminho)
 function entrarAndar(x: Ctx) {
   const st = useCamera.getState(), c = x.c, e = extra(c);
   x.antesAndar = { minDistance: e.minDistance, maxDistance: e.maxDistance, minPolarAngle: e.minPolarAngle, maxPolarAngle: c.maxPolarAngle, enablePan: e.enablePan, mouseButtons: { ...e.mouseButtons }, touches: { ...e.touches } };
@@ -115,7 +100,7 @@ function sairAndar(x: Ctx) {
   useCamera.getState().set({ andar: false });
   if (a) { e.minDistance = a.minDistance ?? 4; e.maxDistance = a.maxDistance ?? MAX_RAIO; e.minPolarAngle = a.minPolarAngle ?? 0.35; c.maxPolarAngle = a.maxPolarAngle ?? 1.25; e.enablePan = a.enablePan ?? true; if (a.mouseButtons) e.mouseButtons = a.mouseButtons; if (a.touches) e.touches = a.touches; }
   x.antesAndar = null; joystick.x = 0; joystick.y = 0;
-  if (x.andando) usePersonagem.setState({ destino: null });
+  if (x.andando) usePersonagem.setState({ destino: null, rota: [] });
   x.andando = false;
   animar(x, (s) => { s.radius = 40; s.phi = POLAR_PADRAO; }, 1.0, new THREE.Vector3(x.c.target.x, 0.5, x.c.target.z));
 }
@@ -224,16 +209,16 @@ function quadroAndar(x: Ctx, dt: number) {
     mov.normalize().multiplyScalar(2.6);
     if (agora - x.ultimoPasso > 160 || !x.andando) {
       const destino = caminhar(minhaPos.x, minhaPos.z, mov.x, mov.z);
-      usePersonagem.setState({ destino, passeio: false }); x.ultimoPasso = agora; x.andando = true;
+      usePersonagem.setState({ destino, rota: [], passeio: false }); x.ultimoPasso = agora; x.andando = true;
       if (agora - x.ultimaBatida > 1500) { usePersonagem.getState().avisarMovimento(); x.ultimaBatida = agora; }
     }
   } else if (x.andando) {
     // soltou: freia logo à frente
     const destino = caminhar(minhaPos.x, minhaPos.z, Math.sin(minhaPos.rot) * 0.3, Math.cos(minhaPos.rot) * 0.3);
-    usePersonagem.setState({ destino, passeio: false }); x.andando = false; x.ultimoPasso = agora; usePersonagem.getState().avisarMovimento();
+    usePersonagem.setState({ destino, rota: [], passeio: false }); x.andando = false; x.ultimoPasso = agora; usePersonagem.getState().avisarMovimento();
   } else if (agora - x.ultimoPasso > 7000) {
     // parado: um "cheguei" no próprio lugar não deixa o boneco sair passeando sozinho pela calçada
-    usePersonagem.setState({ destino: [minhaPos.x, minhaPos.z], passeio: false }); x.ultimoPasso = agora;
+    usePersonagem.setState({ destino: [minhaPos.x, minhaPos.z], rota: [], passeio: false }); x.ultimoPasso = agora;
   }
   // a câmera acompanha o boneco (o alvo é a altura do peito dele) e mantém o ângulo que a pessoa escolheu
   mov.set(minhaPos.x - t.x, 1.3 - t.y, minhaPos.z - t.z).multiplyScalar(Math.min(1, dt * 6));
@@ -311,7 +296,7 @@ export function CameraMundo({ controles, inicio }: { controles: React.RefObject<
     gl.domElement.addEventListener("dblclick", dbl); gl.domElement.addEventListener("pointerdown", toque); gl.domElement.addEventListener("wheel", toque, { passive: true });
     // foto do meu prédio (ui/FotoPredio) usa a mesma câmera e o mesmo desenho
     registrarPonte({ gl, scene, camera: camera as THREE.PerspectiveCamera, controles: x.c, pararModos: () => { if (useCamera.getState().drone) pararDrone(x); if (useCamera.getState().andar) sairAndar(x); useCamera.getState().set({ seguir: false, passeio: false }); x.c.autoRotate = false; x.anim = null; } });
-    if (MEDIR) Object.assign(window, { __minhaPos: minhaPos, __fotoPredio: tirarFotoPredio, __camInfo: cameraInfo, __livre: livre });
+    if (MEDIR) Object.assign(window, { __minhaPos: minhaPos, __fotoPredio: tirarFotoPredio, __camInfo: cameraInfo, __livre: livre, __personagem: usePersonagem });
     // ?drone=1 liga o voo quando a cidade já abriu
     const q = new URLSearchParams(window.location.search);
     const tDrone = q.get("drone") === "1" ? setTimeout(() => { if (!useCamera.getState().drone) useCamera.getState().pedir("drone"); }, 2500) : null;

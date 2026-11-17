@@ -8,15 +8,20 @@
 // quem, os pedidos internos dentro da conversa ("Helena pediu a Ricardo: …" e a resposta), a aba Conversas internas e um
 // passo a passo de como dar uma tarefa. A delegação roda em src/server/delegacao.ts; os tipos e o texto da IA são os mesmos
 // do painel do mapa (src/office/ui/equipeComum.tsx).
+// 17/11/2026 (pedido do dono: "essa área precisa ser totalmente atualizada e melhorada"): topo novo com a caixa de nova
+// tarefa e o organograma vivo (_topo.tsx), a faixa "Agora na empresa", abas com contador, rostos de verdade (_rosto.tsx)
+// no lugar das bolinhas com a inicial e "Como funciona" num modal. Estilos em equipe.css (prefixo .eq-).
 import { CHAVE_SEDE } from "@/office/data/onestate";
 import { Icone } from "@/office/ui/Icone";
 import {
-  NIVEL_COR, NIVEL_ROTULO, agruparPorDepartamento, agruparPorTarefa, andamento, apiEquipe, brl, linhaDoTempo, quando, resumoNiveis, sugestoesTarefa, TextoIA,
+  NIVEL_COR, NIVEL_ROTULO, agruparPorDepartamento, agruparPorTarefa, andamento, apiEquipe, brl, linhaDoTempo, quando, sugestoesTarefa, TextoIA,
   type ContatosEquipe, type ConversaEquipe, type GrupoTarefa, type MembroEquipe, type MsgEquipe, type PainelEquipe, type RegraEquipe, type RespostaEnvio, type TrocaInterna,
 } from "@/office/ui/equipeComum";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { VagasDono } from "./_vagas-dono";
+import { Rosto, RostoSede } from "./_rosto";
+import { TopoEquipe, FaixaEquipe, ComoFunciona } from "./_topo";
 
 type Regra = RegraEquipe;
 type Membro = MembroEquipe;
@@ -26,20 +31,11 @@ type Msg = MsgEquipe;
 type Visitante = { visitanteId: string; nome: string | null; n: number; ultimaEm: string; ultimaFala: string | null };
 type FalaVisita = { id: string; papel: string; conteudo: string; quem: string; criadoEm: string };
 
-const MES = () => new Date().toLocaleDateString("pt-BR", { month: "long" });
 const api = apiEquipe;
 const Texto = ({ t }: { t: string }) => <TextoIA t={t} className="text-[15px]" />;
 
-function Avatar({ m, tamanho = 44 }: { m: Pick<Membro, "nome" | "camisa" | "foto" | "nivel">; tamanho?: number }) {
-  if (m.foto) return <img src={m.foto} alt="" width={tamanho} height={tamanho} className="shrink-0 rounded-full object-cover shadow-[0_0_0_2px_#fff]" style={{ width: tamanho, height: tamanho }} />;
-  return (
-    <span className="relative grid shrink-0 place-items-center rounded-full font-bold text-white shadow-[0_0_0_2px_#fff]" style={{ width: tamanho, height: tamanho, background: m.camisa, fontSize: tamanho * 0.4 }}>
-      {m.nome.slice(0, 1).toUpperCase()}
-      {(m.nivel === "ceo" || m.nivel === "diretor" || m.nivel === "gerente") && tamanho >= 32 && <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white" style={{ background: NIVEL_COR[m.nivel] }} />}
-    </span>
-  );
-}
-const SeloNivel = ({ m }: { m: Pick<Membro, "nivel"> }) => <span className="rounded-full px-2 py-[1px] align-middle text-[10px] font-black uppercase tracking-wide text-white" style={{ background: NIVEL_COR[m.nivel] }}>{NIVEL_ROTULO[m.nivel]}</span>;
+function Avatar({ m, tamanho = 44 }: { m: Membro; tamanho?: number }) { return <Rosto m={m} tamanho={tamanho} anel={null} />; }
+const SeloNivel = ({ m }: { m: Pick<Membro, "nivel"> }) => <span className="rounded-full px-2 py-[1px] align-middle text-[10.5px] font-semibold text-white" style={{ background: NIVEL_COR[m.nivel] }}>{NIVEL_ROTULO[m.nivel]}</span>;
 
 type AbaEquipe = "conversas" | "internas" | "visitantes" | "vagas" | "sobre";
 export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chaveInicial: string | null; membroInicial: string | null; abaInicial?: AbaEquipe }) {
@@ -60,94 +56,72 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial }: { chav
       .catch((e) => vivo && setErro((e as Error).message));
     return () => { vivo = false; };
   }, [q, versao]);
-  const abrirPessoa = useCallback((id: string) => { setSel(id); setAba("conversas"); }, []);
+  const abrirPessoa = useCallback((id: string) => { setSel(id); setAba("conversas"); document.getElementById("eq-trabalho")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, []);
+  const [como, setComo] = useState(false);
+  const fecharComo = useCallback(() => setComo(false), []);
+  const [envios, setEnvios] = useState(0);
+  // conversas internas para o topo e a faixa "Agora na empresa": a cada 15 s, a cada 4 s enquanto há pedido aberto
+  const [internas, setInternas] = useState<TrocaInterna[] | null>(null);
+  const [versaoInt, setVersaoInt] = useState(0);
+  useEffect(() => {
+    if (!q) return;
+    let vivo = true;
+    api<{ internas: TrocaInterna[] }>(`/api/workend/equipe/internas?${q}`).then((r) => { if (vivo) setInternas(r.internas); }).catch(() => { if (vivo) setInternas((x) => x ?? []); });
+    return () => { vivo = false; };
+  }, [q, versaoInt]);
+  const abertas = !!internas?.some((t) => t.status === "pedido");
+  useEffect(() => { const t = setInterval(() => { if (document.visibilityState === "visible") setVersaoInt((v) => v + 1); }, abertas || envios ? 4000 : 15000); return () => clearInterval(t); }, [abertas, envios]);
+  const enviado = useCallback((id: string) => { setEnvios((n) => n + 1); setVersao((v) => v + 1); setVersaoInt((v) => v + 1); setSel(id); setAba("conversas"); setTimeout(() => document.getElementById("eq-trabalho")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80); }, []);
 
   if (erro && !p) return <div className="faixa mt-6"><div className="rounded-2xl bg-[var(--cinza)] p-7"><h2 className="text-[1.4rem]">Minha equipe</h2><p className="mt-2 text-[var(--tinta-2)]">{erro}</p><Link href="/mundo" className="btn btn-azul mt-5">Ir para o mapa</Link></div></div>;
   if (!p) return <div className="faixa mt-6 text-[var(--tinta-2)]">Carregando a sua equipe…</div>;
   const membro = p.equipe.find((m) => m.membroId === sel) ?? p.equipe[0];
-  const pct = Math.min(100, (p.gasto.mes / p.gasto.teto) * 100);
-  const comEquipe = p.equipe.filter((m) => m.temEquipe).length;
+  const sede = p.lote.chave === CHAVE_SEDE;
+  const abas: [AbaEquipe, string, Parameters<typeof Icone>[0]["nome"], number | null, boolean][] = [
+    ["conversas", "Conversar e dar tarefas", "conversar", null, false],
+    ["internas", "Conversas internas", "equipe", internas?.length ?? null, abertas],
+    ["visitantes", "Visitantes", "pessoa", p.visitantes.total, false],
+    ["vagas", "Vagas", "maleta", null, false],
+    ["sobre", "Sobre a empresa", "editar", null, false],
+  ];
 
   return (
+    <RostoSede.Provider value={sede}>
     <div className="faixa mt-2">
-      <section className="flex flex-wrap items-end justify-between gap-5">
-        <div>
-          <span className="text-[13px] font-semibold uppercase tracking-wide text-[var(--azul)]">{p.lote.numero ? `Lote ${p.lote.numero} · ` : ""}{p.lote.nicho}</span>
-          <h1 className="mt-1 text-[2rem] lg:text-[2.6rem]">Equipe da {p.lote.empresaNome}</h1>
-          <p className="mt-1 text-[15px] font-semibold text-[var(--tinta)]">{p.equipe.length} pessoas em {p.departamentos.length} áreas · {resumoNiveis(p.equipe)}</p>
-          <p className="mt-2 max-w-[66ch] text-[var(--tinta-2)]">
-            {comEquipe > 0
-              ? "Dê tarefas como daria a um funcionário. Quem comanda uma área divide o trabalho com a própria equipe, acompanha cada parte e entrega tudo junto para você."
-              : "Converse com cada pessoa, aprove ou corrija o que ela entrega e peça o relatório da semana ao CEO. A atendente já responde quem entra na sua loja pelo mapa."}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {p.lote.numero && <Link href={`/loja/${p.lote.numero}`} className="btn btn-linha">Ver minha loja</Link>}
-          {/* a sede tem a equipe montada por departamento e não passa pelo editor */}
-          {p.lote.chave !== CHAVE_SEDE && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="btn btn-claro">Montar escritório</Link>}
-        </div>
-      </section>
+      <TopoEquipe p={p} internas={internas} abrir={abrirPessoa} enviado={enviado} comoFunciona={() => setComo(true)} />
+      <FaixaEquipe p={p} internas={internas} abrir={abrirPessoa} irPara={(a) => { setAba(a); document.getElementById("eq-trabalho")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />
 
-      {comEquipe > 0 && <ComoDarTarefa p={p} abrir={abrirPessoa} />}
-
-      <section className="mt-5 grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl bg-[var(--cinza)] p-5 md:col-span-2">
-          <div className="flex items-baseline justify-between gap-3"><b>IA usada em {MES()}</b><span className="text-sm text-[var(--tinta-2)]">{brl(p.gasto.mes)} de {brl(p.gasto.teto)}</span></div>
-          <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[var(--surface-dim)]"><div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.max(2, pct)}%`, background: p.gasto.esgotado ? "#E2575B" : p.gasto.aviso ? "#E8A317" : "var(--azul)" }} /></div>
-          <p className="mt-2 text-[13px] text-[var(--tinta-2)]">{p.gasto.esgotado ? `Os ${brl(p.gasto.teto)} do mês acabaram: a equipe volta a responder no dia 1º. Os visitantes continuam deixando recado.` : p.gasto.aviso ? "Perto do limite do mês. Prefira pedidos completos numa mensagem só." : `Cada lote tem ${brl(p.gasto.teto)} de IA por mês, incluídos no aluguel. Uma conversa comum gasta poucos centavos; uma tarefa dividida com a equipe gasta um pouco mais.`}</p>
-        </div>
-        <button type="button" onClick={() => setAba("visitantes")} className="rounded-2xl border border-[var(--linha)] bg-[var(--surface)] p-5 text-left transition hover:-translate-y-0.5 hover:shadow-lg">
-          <b className="text-[2rem] leading-none">{p.visitantes.total}</b>
-          <span className="mt-1 block font-semibold">{p.visitantes.total === 1 ? "visitante conversou" : "visitantes conversaram"} com a loja</span>
-          <span className="text-[13px] text-[var(--tinta-2)]">{p.visitantes.ultimas24h ? `${p.visitantes.ultimas24h} nas últimas 24 horas · ver conversas` : "ver conversas"}</span>
-        </button>
-      </section>
-
-      <nav className="sem-barra mt-7 flex gap-1 overflow-x-auto rounded-xl bg-[var(--surface-dim)] p-1 text-sm font-semibold sm:w-max" aria-label="Seções da equipe">
-        {([["conversas", "Conversar e dar tarefas"], ["internas", "Conversas internas"], ["visitantes", `Visitantes (${p.visitantes.total})`], ["vagas", "Vagas"], ["sobre", "Sobre a empresa"]] as const).map(([k, t]) => (
-          <button key={k} type="button" onClick={() => setAba(k)} className={`flex-1 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 transition sm:flex-none ${aba === k ? "bg-[var(--surface)] shadow" : "text-[var(--tinta-2)] hover:text-[var(--tinta)]"}`}>{t}</button>
+      <div id="eq-trabalho" className="scroll-mt-24" />
+      <nav className="eq-abas" role="tablist" aria-label="Seções da equipe">
+        {abas.map(([k, t, ic, n, vivo]) => (
+          <button key={k} type="button" role="tab" aria-selected={aba === k} onClick={() => setAba(k)} className="eq-aba">
+            <Icone nome={ic} tamanho={17} />{t}{n !== null && n > 0 && <span className={`eq-aba-num ${vivo ? "eq-aba-num-vivo" : ""}`}>{n}</span>}
+          </button>
         ))}
+        <span className="ml-auto flex shrink-0 items-center gap-2 pb-1.5 pl-3">
+          {p.lote.numero && <Link href={`/loja/${p.lote.numero}`} className="eq-link">Ver minha loja</Link>}
+          {/* a sede tem a equipe montada por departamento e não passa pelo editor */}
+          {!sede && <Link href={`/mundo?lote=${encodeURIComponent(p.lote.chave)}`} className="eq-link">Montar escritório</Link>}
+          {sede && <Link href="/mundo?sede=1" className="eq-link">Ver a sede no mapa</Link>}
+        </span>
       </nav>
 
       {!p.sobre && aba !== "sobre" && (
-        <button type="button" onClick={() => setAba("sobre")} className="mt-4 w-full rounded-xl bg-[#FFF4DB] px-4 py-3 text-left text-sm text-[#6B4A00]">
-          <b>Conte para a equipe o que a {p.lote.empresaNome} faz.</b> Sem o “Sobre a empresa”, a atendente não sabe preços, horários nem serviços. Escrever leva 2 minutos →
-        </button>
+        <div className="eq-aviso">
+          <span className="eq-aviso-icone"><Icone nome="editar" tamanho={17} /></span>
+          <span className="min-w-0 flex-1"><b>Conte para a equipe o que a {p.lote.empresaNome} faz.</b> Sem o “Sobre a empresa”, a atendente não sabe preços, horários nem serviços.</span>
+          <button type="button" onClick={() => setAba("sobre")} className="btn btn-tinta !py-2 text-sm">Escrever agora</button>
+        </div>
       )}
 
-      {aba === "conversas" && membro && <Conversas p={p} membro={membro} q={q} selecionar={setSel} recarregar={carregar} />}
+      {aba === "conversas" && membro && <Conversas key={`${membro.membroId}-${envios}`} p={p} membro={membro} q={q} selecionar={setSel} recarregar={carregar} />}
       {aba === "internas" && <Internas p={p} q={q} abrir={abrirPessoa} />}
       {aba === "visitantes" && <Visitantes q={q} />}
       {aba === "vagas" && <VagasDono empresa={p.lote.empresaNome} numero={p.lote.numero} />}
       {aba === "sobre" && <Sobre p={p} lote={p.lote.chave} salvo={carregar} />}
+      {como && <ComoFunciona p={p} fechar={fecharComo} abrir={abrirPessoa} />}
     </div>
-  );
-}
-
-// passo a passo curto: para quem pedir, como pedir e onde acompanhar
-function ComoDarTarefa({ p, abrir }: { p: Painel; abrir: (id: string) => void }) {
-  const ceo = p.equipe.find((m) => m.nivel === "ceo");
-  const gerentes = p.equipe.filter((m) => m.temEquipe && (m.nivel === "gerente" || m.nivel === "diretor")).sort((a, b) => (a.nivel === "gerente" ? 0 : 1) - (b.nivel === "gerente" ? 0 : 1)).slice(0, 3);
-  const g1 = gerentes[0], g1equipe = g1 ? p.equipe.find((m) => m.chefeId === g1.membroId) : null;
-  const exemplo = ceo && g1 ? `${ceo.nome} pediu a ${g1.nome}…` : "o CEO pediu ao gerente…";
-  return (
-    <section className="mt-5 grid gap-3 rounded-2xl border border-[var(--linha)] bg-[var(--surface)] p-4 md:grid-cols-3" aria-label="Como dar uma tarefa">
-      <div className="flex gap-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--azul)] text-sm font-black text-white">1</span>
-        <div className="text-[14px]">
-          <b className="block">Escolha para quem pedir</b>
-          <span className="text-[var(--tinta-2)]">Pedidos grandes vão para {ceo ? <button type="button" onClick={() => abrir(ceo.membroId)} className="font-semibold text-[var(--azul)] hover:underline">{ceo.nome} (CEO)</button> : "o CEO"}. Algo de uma área só vai direto para quem comanda a área{gerentes.length ? <>: {gerentes.map((g, i) => <span key={g.membroId}>{i ? ", " : ""}<button type="button" onClick={() => abrir(g.membroId)} className="font-semibold text-[var(--azul)] hover:underline">{g.nome}</button></span>)}…</> : "."}</span>
-        </div>
-      </div>
-      <div className="flex gap-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--azul)] text-sm font-black text-white">2</span>
-        <div className="text-[14px]"><b className="block">Escreva como falaria com um funcionário</b><span className="text-[var(--tinta-2)]">Diga o que precisa, para quando e os detalhes que importam. Ex.: “Monte o plano da semana com o que cada departamento vai fazer”.</span></div>
-      </div>
-      <div className="flex gap-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--azul)] text-sm font-black text-white">3</span>
-        <div className="text-[14px]"><b className="block">Acompanhe a equipe trabalhando</b><span className="text-[var(--tinta-2)]">Você vê cada pedido interno (“{exemplo}”{g1 && g1equipe ? `, “${g1.nome} pediu a ${g1equipe.nome}…”` : ""}) e a resposta de cada um. A entrega final chega na mesma conversa, em 1 a 3 minutos.</span></div>
-      </div>
-    </section>
+    </RostoSede.Provider>
   );
 }
 
@@ -168,18 +142,18 @@ function ListaEquipe({ p, membro, selecionar }: { p: Painel; membro: Membro; sel
           const fechado = !busca && fechados.includes(dep.id);
           return (
             <section key={dep.id} className="mb-1">
-              <button type="button" onClick={() => alternar(dep.id)} aria-expanded={!fechado} className="sticky top-0 z-[1] flex w-full items-center gap-2 rounded-lg bg-[var(--surface)] px-2 py-1.5 text-left text-[11.5px] font-black uppercase tracking-wide text-[var(--tinta-2)] hover:text-[var(--tinta)]">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: dep.cor }} />
-                <span className="flex-1">{dep.nome}</span>
-                <span className="font-semibold">{pessoas.length}</span>
-                <Icone nome="baixo" tamanho={14} className={`transition ${fechado ? "-rotate-90" : ""}`} />
+              <button type="button" onClick={() => alternar(dep.id)} aria-expanded={!fechado} className="eq-dep">
+                <i style={{ background: dep.cor }} />
+                <span>{dep.nome}</span>
+                <em>{pessoas.length}</em>
+                <Icone nome="baixo" tamanho={14} className={`text-[var(--muted)] transition ${fechado ? "-rotate-90" : ""}`} />
               </button>
               {!fechado && pessoas.map((m) => {
                 const lider = m.temEquipe || m.nivel === "ceo";
                 return (
                   <button key={m.membroId} type="button" data-membro={m.membroId} onClick={() => selecionar(m.membroId)}
-                    className={`flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition ${m.membroId === membro.membroId ? "bg-[#EEF3FF] shadow-[inset_0_0_0_1.5px_var(--azul)]" : "hover:bg-[var(--cinza)]"} ${lider ? "" : "pl-5"}`}>
-                    <Avatar m={m} tamanho={lider ? 38 : 32} />
+                    aria-current={m.membroId === membro.membroId} className={`eq-pessoa ${lider ? "" : "pl-4"}`}>
+                    <Rosto m={m} tamanho={lider ? 40 : 34} anel={lider ? m.setorCor : null} />
                     <span className="min-w-0 flex-1 leading-tight">
                       <span className="flex items-center gap-1.5 truncate font-semibold">{m.nome}{lider && <SeloNivel m={m} />}</span>
                       <span className="block truncate text-[12.5px] text-[var(--tinta-2)]">{m.cargo}</span>
@@ -258,8 +232,8 @@ function Conversas({ p, membro, q, selecionar, recarregar }: { p: Painel; membro
       <ListaEquipe p={p} membro={membro} selecionar={(id) => { setErro(null); selecionar(id); }} />
 
       <div className="flex min-h-[600px] flex-col overflow-hidden rounded-2xl border border-[var(--linha)] bg-[var(--surface)] lg:h-[760px]">
-        <header className="flex flex-wrap items-start gap-3 border-b border-[var(--linha)] p-4">
-          <Avatar m={membro} tamanho={52} />
+        <header className="eq-conversa-cab flex flex-wrap items-start gap-3 border-b border-[var(--linha)] p-4 pt-5" style={{ "--setor": membro.setorCor } as React.CSSProperties}>
+          <Rosto m={membro} tamanho={56} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2"><b className="text-lg">{membro.nome}</b><SeloNivel m={membro} /></div>
             <div className="text-[14px] text-[var(--tinta-2)]">{membro.cargo} · <b style={{ color: membro.setorCor }}>{membro.setor}</b></div>
@@ -285,7 +259,7 @@ function Conversas({ p, membro, q, selecionar, recarregar }: { p: Painel; membro
           {c === null && !erro && <p className="text-sm text-[var(--tinta-2)]">Carregando a conversa…</p>}
           {c && itens.length === 0 && (
             <div className="mx-auto max-w-[48ch] py-8 text-center">
-              <div className="mx-auto w-max"><Avatar m={membro} tamanho={72} /></div>
+              <div className="mx-auto w-max"><Rosto m={membro} tamanho={88} /></div>
               <p className="mt-3 font-semibold">{membro.saudacao || `Oi! Sou ${membro.nome}. Em que posso ajudar a ${p.lote.empresaNome}?`}</p>
               <p className="mt-1 text-sm text-[var(--tinta-2)]">{subs.length ? `Peça uma tarefa como pediria a um funcionário. ${membro.nome} divide o trabalho com a própria equipe (${subs.length} ${subs.length === 1 ? "pessoa" : "pessoas"}) e entrega tudo junto aqui.` : "Peça uma tarefa como pediria a um funcionário. A resposta vem com o material pronto."}</p>
             </div>
@@ -403,7 +377,7 @@ function Internas({ p, q, abrir }: { p: Painel; q: string; abrir: (id: string) =
         {agruparPorTarefa(visiveis).map((g) => (
           <article key={g.chave} className="rounded-2xl bg-[var(--cinza)] p-4">
             <header className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="text-[12px] font-black uppercase tracking-wide text-[var(--azul)]">Tarefa que você deu a {g.quem.nome}</span>
+              <span className="text-[13px] font-bold text-[var(--azul)]">Tarefa que você deu a {g.quem.nome}</span>
               <span className="text-[12.5px] text-[var(--tinta-2)]">{quando(g.em)} · {g.prontos} de {g.total} {g.total === 1 ? "pedido respondido" : "pedidos respondidos"}</span>
               <button type="button" onClick={() => abrir(g.quem.id)} className="ml-auto text-[13px] font-semibold text-[var(--azul)] hover:underline">Ver a entrega na conversa</button>
               {g.tarefa && <p className="w-full text-[15px] font-semibold text-[var(--tinta)]">“{g.tarefa}”</p>}
@@ -430,7 +404,7 @@ function Bolha({ m, membro, lote, mudou }: { m: Msg; membro: Membro; lote: strin
   if (m.autor === "dono") return <div className="equipe-entra ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-[var(--azul)] px-4 py-2.5 text-[15px] text-white"><p className="whitespace-pre-wrap">{m.conteudo}</p></div>;
   if (m.autor === "chefe") return (
     <div className="equipe-entra max-w-[88%] rounded-2xl border border-[#F2D58A] bg-[#FFF8E6] px-4 py-3 text-[#4A3A10]">
-      <div className="mb-1 text-[11.5px] font-black uppercase tracking-wide text-[#8A6A12]">Pedido interno de {m.deNome ?? "um chefe"}</div>
+      <div className="mb-1 text-[12.5px] font-bold text-[#8A6A12]">Pedido interno de {m.deNome ?? "um chefe"}</div>
       <TextoIA t={m.conteudo.replace(/^Pedido de [^\n]*:\n\n/, "")} className="text-[14.5px]" />
     </div>
   );

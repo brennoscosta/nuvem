@@ -18,10 +18,10 @@ import { caixa, cilindro, mat, plano } from "./geo";
 import { Estatico } from "./Estatico";
 import { Mesa, Balcao, Sofa, Planta, Cafe } from "./Moveis";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle, type Pose } from "./Boneco";
-import type { Boneco as BonecoDef } from "../data/bonecos";
 import { leve } from "./qualidade";
 import { useMundo } from "../mundoStore";
 import { abrirChatEquipe } from "../ui/ChatEquipe";
+import { aparenciaAgente, hash } from "../data/aparenciaAgente";
 import { CHAVE_SEDE, OS_X, OS_Z } from "../data/onestate";
 import type { Escritorio, Membro } from "../data/escritorio";
 import { W, D, X0, Z0, X1, Z1, CORREDOR, ZC, POR_FILEIRA, LARG, cx, montarSalas, type Sala } from "../data/plantaSede";
@@ -45,35 +45,6 @@ function lugaresDaSala(s: Sala, n: number): Lugar[] {
     out.push({ mesa: [v.x, 0, v.z], pos: [v.x, 0, v.z - 0.62], chefe: v.chefe });
   }
   return out;
-}
-
-// ---------- aparência de cada agente (tirada do id: estável e variada) ----------
-const PELES = ["#F3D2B3", "#F1C9A5", "#D9A882", "#C98E68", "#A8714F", "#8D5A3B", "#6B4029"];
-const CABELOS = ["#1E1A18", "#2A1E19", "#3B2A22", "#5A3B22", "#8A5A2B", "#B5532D", "#D9B26F", "#9CA3AF"];
-// penteados, barbas, roupas e tênis do boneco novo (frente "personagem", 16/11/2026): cada pessoa sai diferente
-const ESTILOS: BonecoDef["estiloCabelo"][] = ["curto", "longo", "coque", "cacheado", "rabo", "topete", "careca", "curto", "longo", "cacheado", "moicano"];
-const CALCAS = ["#1F2329", "#22252B", "#2F3542", "#3E4450", "#4B3B2E", "#1E3A5F", "#5A6472", "#C8B79A"];
-const TENIS = ["#E11D48", "#0A6CFF", "#16A34A", "#D4A63A", "#7C3AED", "#F97316", ""];
-const CALCADOS = ["#F4F4F4", "#F4F4F4", "#1F2329", "#E7E2D6", "#9CA3AF"];
-const BLAZERS = ["#1E3A5F", "#2B2F36", "#3F3F46", "#6B2737", "#1F2937", "#0F4C5C"];
-// equipe: camisa na maioria, mas também moletom, jaqueta e vestido (todos na cor do departamento)
-const TRAJES_EQUIPE: NonNullable<BonecoDef["traje"]>[] = ["camisa", "camisa", "moletom", "camisa", "jaqueta", "vestido", "camisa", "moletom"];
-const BARBAS: NonNullable<BonecoDef["barba"]>[] = ["nenhuma", "nenhuma", "rala", "nenhuma", "bigode", "rala", "cheia"]; // barba cheia fica pesada: mais rara
-const hash = (s: string) => Math.abs([...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7));
-function aparencia(m: Membro): { def: BonecoDef; camisa: string } {
-  const h = hash(m.id + m.nome), h2 = hash(m.nome + m.cargo);
-  const chefe = m.nivel === "ceo" || m.nivel === "diretor" || m.nivel === "gerente";
-  const estilo = ESTILOS[(h >> 6) % ESTILOS.length];
-  const curto = estilo === "curto" || estilo === "careca" || estilo === "topete" || estilo === "moicano";
-  const traje = chefe ? "blazer" : TRAJES_EQUIPE[h2 % TRAJES_EQUIPE.length];
-  const def: BonecoDef = {
-    id: `ag-${m.id}`, nome: m.nome, arquivo: null,
-    pele: PELES[h % PELES.length], cabelo: CABELOS[(h >> 3) % CABELOS.length], estiloCabelo: estilo,
-    calca: CALCAS[(h >> 9) % CALCAS.length], traje: traje === "vestido" && curto ? "camisa" : traje,
-    tenis: TENIS[(h >> 12) % TENIS.length] || undefined, calcado: CALCADOS[(h2 >> 3) % CALCADOS.length],
-    barba: curto ? BARBAS[(h2 >> 6) % BARBAS.length] : "nenhuma", oculos: (h2 >> 9) % 5 === 0,
-  };
-  return { def, camisa: chefe ? (m.nivel === "ceo" ? "#14110A" : BLAZERS[(h >> 4) % BLAZERS.length]) : m.camisa };
 }
 
 // frases da rotina (genéricas: os visitantes não veem nada da empresa); o dono vê as conversas de verdade
@@ -152,7 +123,7 @@ function caminho(de: Ponto, salaA: Sala | undefined, para: Ponto, salaB: Sala | 
 function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: React.RefObject<Map<string, Aviso>>; dono: boolean }) {
   const corpo = useRef<THREE.Group>(null);
   const h = useRef<BonecoHandle>(null);
-  const { def, camisa } = useMemo(() => aparencia(m), [m]);
+  const { def, camisa } = useMemo(() => aparenciaAgente(m), [m]);
   const lugar = ctx.lugarDe[m.id];
   const sala = ctx.salaDe[m.id];
   const sentar: Plano = useMemo(() => ({ pts: lugar ? [[lugar.pos[0], lugar.pos[2]]] : [[OS_X, ZC]], i: 0, ate: 0, pose: m.nivel === "ceo" ? "think" : "type", fim: "sentar" }), [lugar, m.nivel]);

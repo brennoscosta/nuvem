@@ -7,6 +7,7 @@ import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { EquipePainel } from "./_equipe";
 import { meta } from "../../seo";
+import "./equipe.css";
 
 export const metadata = meta({ titulo: "Minha equipe — WorkEnd", caminho: "/app/equipe", indexar: false });
 export const dynamic = "force-dynamic";

@@ -48,6 +48,8 @@ interface Estado {
   abaPedida: string | null; // aba que o painel deve abrir ao selecionar (ex.: "tarefas" ao clicar no balão de concluído)
   vista: "dentro" | "fora"; // por dentro (planta) ou por fora (prédio de vidro + mural)
   setVista: (v: "dentro" | "fora") => void;
+  luz: boolean; // luz por dentro acesa (17/11/2026): clareia a cena na vista por dentro (scene/CicloDia.tsx)
+  setLuz: (v: boolean) => void;
   andar: 0 | 1; // andar que está sendo visto (por dentro)
   setAndar: (a: 0 | 1) => void;
   statusServidor: { banco: string; ia: string; detalhe?: string } | null;
@@ -108,6 +110,7 @@ export const useEscritorio = create<Estado>((set, get) => ({
   modalLogin: false,
   abaPedida: null,
   vista: "dentro",
+  luz: true,
   andar: 0,
   statusServidor: null,
 
@@ -144,6 +147,7 @@ export const useEscritorio = create<Estado>((set, get) => ({
   setModalLogin: (v) => set({ modalLogin: v }),
   setAbaPedida: (v) => set({ abaPedida: v }),
   setVista: (v) => set({ vista: v, selecionado: null, hover: null }),
+  setLuz: (v) => set({ luz: v }),
   setAndar: (a) => set({ andar: a, selecionado: null, hover: null }),
 
   contratar: async (dados) => {

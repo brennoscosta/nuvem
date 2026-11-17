@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Environment, Lightformer } from "@react-three/drei";
-import { ceu } from "./CicloDia";
+import { ceu, luzInterna } from "./CicloDia";
 import { clima } from "../clima";
 
 const CAMPOS_TEXTURA = ["map", "roughnessMap", "metalnessMap", "normalMap", "emissiveMap", "aoMap"] as const;
@@ -25,7 +25,7 @@ export function Acabamento({ hemi, preench }: { hemi: React.RefObject<THREE.Hemi
   const scene = useThree((s) => s.scene), gl = useThree((s) => s.gl);
   useFrame((estado) => {
     const chuva = Math.min(1, Math.max(0, clima.chuva));
-    estado.scene.environmentIntensity = 0.55 * (1 - 0.85 * ceu.noite) * (1 - 0.35 * chuva);
+    estado.scene.environmentIntensity = 0.55 * (1 - 0.85 * ceu.noite * (1 - luzInterna.k)) * (1 - 0.35 * chuva);
     compensarLuzes(hemi.current, preench.current);
   });
   useEffect(() => {

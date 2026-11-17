@@ -58,9 +58,12 @@ function Meu() {
     }
     const dx = destino[0] - o.position.x, dz = destino[1] - o.position.z; const dist = Math.hypot(dx, dz);
     const velMax = st.passeio ? VEL_PASSEIO : VEL;
-    // freia nos últimos 60 cm, acelera no resto
-    const alvo = dist < 0.6 ? Math.max(0.5, velMax * (dist / 0.6)) : velMax;
+    // freia nos últimos 60 cm do caminho (nas esquinas do meio do caminho segue sem frear), acelera no resto
+    const ultimo = st.rota.length === 0;
+    const alvo = dist < 0.6 && ultimo ? Math.max(0.5, velMax * (dist / 0.6)) : velMax;
     vel.current = vel.current < alvo ? Math.min(alvo, vel.current + 6 * dt) : Math.max(alvo, vel.current - 8 * dt);
+    // chegou numa esquina do caminho: segue para o próximo ponto (data/caminhos.ts) sem parar
+    if (!ultimo && dist < 0.35) { const [prox, ...resto] = st.rota; usePersonagem.setState({ destino: prox, rota: resto }); st.avisarMovimento(); return; }
     if (dist < 0.06) {
       o.position.set(destino[0], 0, destino[1]); vel.current = 0; minhaPos.vel = 0;
       paradoDesde.current = performance.now() - (st.passeio ? PAUSA_PASSEIO * 400 : 0);

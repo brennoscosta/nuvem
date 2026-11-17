@@ -95,6 +95,7 @@ export function CartaoOneState() {
   const sede = useMundo((s) => s.terrenos[CHAVE_SEDE]);
   const souDono = useMundo((s) => s.meu === CHAVE_SEDE);
   const dentro = useEscritorio((s) => s.vista === "dentro");
+  const luz = useEscritorio((s) => s.luz);
   const [depto, setDepto] = useState<string | null>("diretoria");
   if (!aberto || loteAberto) return null;
   const alternarVista = () => { useEscritorio.getState().setVista(dentro ? "fora" : "dentro"); useMundo.setState({ alvoCamera: [SEDE.x, 0.5, SEDE.z + 3] }); };
@@ -121,6 +122,7 @@ export function CartaoOneState() {
           {souDono && <button type="button" onClick={() => conversar()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#E9C46A] px-3 py-1.5 text-[12.5px] font-bold text-[#1A1306] hover:brightness-105"><Icone nome="conversar" tamanho={15} />Falar com a equipe</button>}
           {souDono && <a href="/app/equipe?aba=internas" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-white/15"><Icone nome="equipe" tamanho={15} />Conversas internas</a>}
           <button type="button" onClick={alternarVista} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold ring-1 ring-[#D4A63A]/50 hover:bg-white/15"><Icone nome={dentro ? "predios" : "escritorio"} tamanho={15} className="text-[#E9C46A]" />{dentro ? "Ver por fora" : "Ver por dentro"}</button>
+          {dentro && <button type="button" onClick={() => useEscritorio.getState().setLuz(!luz)} aria-pressed={luz} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-white/15"><Icone nome={luz ? "sol" : "lua"} tamanho={15} className="text-[#E9C46A]" />{luz ? "Apagar a luz" : "Acender a luz"}</button>}
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">

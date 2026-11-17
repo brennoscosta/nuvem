@@ -6,6 +6,7 @@ import { useMundo } from "./mundoStore";
 import type { TipoAvatar, Visual } from "./data/bonecos";
 import { pontoNaCalcada } from "./data/mundo";
 import { useChamada, type ChamadaInfo } from "./chamadaStore";
+import { rota } from "./data/caminhos";
 
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
 // perfil profissional (11/11/2026): aparece na ficha e na busca de profissionais
@@ -28,7 +29,8 @@ interface Estado {
   naoLidas: number;
   pedidos: number; // pedidos de amizade recebidos
   amigos: Amigo[]; listaPedidos: Pedido[]; negociacoes: Negociacao[];
-  destino: [number, number] | null; // pra onde meu boneco está andando
+  destino: [number, number] | null; // pra onde meu boneco está andando (o próximo ponto do caminho)
+  rota: [number, number][]; // os pontos do caminho depois do destino (data/caminhos.ts): contorna os quarteirões
   passeio: boolean; // o destino atual é um passeio automático pela calçada (não um clique)
   posicao: [number, number, number]; // x, z, rot atuais (atualizados pela cena)
   painel: "montar" | "ficha" | "chat" | "caixa" | null;
@@ -70,7 +72,7 @@ export const minhaPos = { x: 0, z: 21.3, rot: 0, vel: 0 };
 let batidaPendente: ReturnType<typeof setTimeout> | null = null;
 
 export const usePersonagem = create<Estado>((set, get) => ({
-  carregado: false, meu: null, ativo: false, preco: 5.9, precoCheio: 19.9, pagamentoLigado: false, outros: [], naoLidas: 0, pedidos: 0, amigos: [], listaPedidos: [], negociacoes: [], destino: null, passeio: false, posicao: [0, 21.3, 0], painel: null, outroSelecionado: null, mensagens: [], conversas: [], erro: null, itens: null,
+  carregado: false, meu: null, ativo: false, preco: 5.9, precoCheio: 19.9, pagamentoLigado: false, outros: [], naoLidas: 0, pedidos: 0, amigos: [], listaPedidos: [], negociacoes: [], destino: null, rota: [], passeio: false, posicao: [0, 21.3, 0], painel: null, outroSelecionado: null, mensagens: [], conversas: [], erro: null, itens: null,
 
   carregarItens: async () => {
     const r = await fetch("/api/workend/itens", { cache: "no-store" }).catch(() => null);
@@ -121,7 +123,8 @@ export const usePersonagem = create<Estado>((set, get) => ({
   },
   abrir: (painel) => set({ painel }),
   fechar: () => set({ painel: null, outroSelecionado: null }),
-  irPara: (x, z) => { if (!get().ativo) return; set({ destino: [x, z], passeio: false }); get().avisarMovimento(); },
+  // tocar no chão: caminho pelas ruas e calçadas, sem atravessar prédio (17/11/2026)
+  irPara: (x, z) => { if (!get().ativo) return; const [primeiro, ...resto] = rota([minhaPos.x, minhaPos.z], [x, z]); set({ destino: primeiro ?? null, rota: resto, passeio: false }); get().avisarMovimento(); },
   setPosicao: (x, z, rot) => { minhaPos.x = x; minhaPos.z = z; minhaPos.rot = rot; set({ posicao: [x, z, rot] }); },
   // mudou o destino (clique, passeio ou chegada): manda a batida logo, pra quem olha de fora acompanhar sem atraso
   avisarMovimento: () => { if (batidaPendente) clearTimeout(batidaPendente); batidaPendente = setTimeout(() => { batidaPendente = null; void get().batida(); }, 120); },

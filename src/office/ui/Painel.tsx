@@ -49,6 +49,8 @@ export function BarraTopo() {
   const statusServidor = useEscritorio((s) => s.statusServidor);
   const vista = useEscritorio((s) => s.vista);
   const setVista = useEscritorio((s) => s.setVista);
+  const luz = useEscritorio((s) => s.luz);
+  const setLuz = useEscritorio((s) => s.setLuz);
   const mundo = useModoMundo();
   const temSimulados = ordem.some((id) => agentes[id] && !agentes[id].real);
   const total = ordem.length;
@@ -69,6 +71,12 @@ export function BarraTopo() {
           <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório da Nuvem" : "Ver o prédio por fora"} className="hud-btn hud-so-pc">
             <Icone nome={vista === "fora" ? "escritorio" : "predios"} tamanho={18} /><span className="hud-rotulo">{vista === "fora" ? "Ver por dentro" : "Ver por fora"}</span>
           </button>
+          {/* luz por dentro (17/11/2026): acesa ao entrar; o botão apaga e acende */}
+          {vista === "dentro" && (
+            <button onClick={() => setLuz(!luz)} aria-pressed={luz} title={luz ? "Apagar a luz de dentro" : "Acender a luz de dentro"} className="hud-btn">
+              <Icone nome={luz ? "sol" : "lua"} tamanho={18} /><span className="hud-rotulo">{luz ? "Luz acesa" : "Acender a luz"}</span>
+            </button>
+          )}
           <BotaoSom />
           <span className="hud-sep hud-so-pc" aria-hidden="true" />
           <ContaWorkend />
