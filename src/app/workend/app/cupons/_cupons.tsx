@@ -1,8 +1,12 @@
 "use client";
 // Tela dos cupons (13/11/2026): validar código, criar e encerrar cupons da loja e a lista "Meus cupons".
+// 17/11/2026: desconto em número (% ou R$, com pedido mínimo) para a atendente aplicar nos pedidos feitos na conversa.
 import { useEffect, useState } from "react";
 
-type CupomDono = { id: string; titulo: string; regra: string; validade: string; limite: number | null; ativo: boolean; pegos: number; usados: number; vencido: boolean };
+type CupomDono = { id: string; titulo: string; regra: string; validade: string; limite: number | null; ativo: boolean; pegos: number; usados: number; vencido: boolean; descontoPct: number | null; descontoCentavos: number | null; minimoCentavos: number | null };
+const reais = (c: number) => (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const noPedido = (c: CupomDono) => { const b = c.descontoPct ? `${c.descontoPct}%` : c.descontoCentavos ? reais(c.descontoCentavos) : null; return b ? `No pedido pela atendente: ${b} de desconto${c.minimoCentavos ? ` a partir de ${reais(c.minimoCentavos)}` : ""}` : "Só de balcão"; };
+const FORM_VAZIO = { titulo: "", regra: "", validade: "", limite: "", descontoTipo: "" as "" | "pct" | "valor", descontoValor: "", minimo: "" };
 type Meu = { codigo: string; titulo: string; regra: string; validade: string; usado: boolean; vencido: boolean; empresa: string; numero: number | null };
 type Dados = { temLoja: boolean; daLoja: CupomDono[]; meus: Meu[] };
 const dataBR = (d: string) => d.split("-").reverse().join("/");
@@ -21,7 +25,7 @@ export function PainelCupons() {
   const [versao, setVersao] = useState(0);
   const [codigo, setCodigo] = useState("");
   const [resultado, setResultado] = useState<{ ok: boolean; t: string } | null>(null);
-  const [form, setForm] = useState({ titulo: "", regra: "", validade: "", limite: "" });
+  const [form, setForm] = useState(FORM_VAZIO);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   useEffect(() => {
@@ -37,7 +41,7 @@ export function PainelCupons() {
   };
   const criar = async () => {
     setErro(null); setOcupado(true);
-    try { await api("/api/workend/cupons", { method: "POST", body: JSON.stringify(form) }); setForm({ titulo: "", regra: "", validade: "", limite: "" }); setVersao((v) => v + 1); }
+    try { await api("/api/workend/cupons", { method: "POST", body: JSON.stringify(form) }); setForm(FORM_VAZIO); setVersao((v) => v + 1); }
     catch (e) { setErro((e as Error).message); }
     finally { setOcupado(false); }
   };
@@ -65,6 +69,20 @@ export function PainelCupons() {
               <label className="block sm:col-span-2 text-[13px] font-semibold">Regra curta (opcional)<input value={form.regra} onChange={(e) => setForm({ ...form, regra: e.target.value.slice(0, 120) })} placeholder="Ex.: compras acima de R$ 30" className={campo} /></label>
               <label className="block text-[13px] font-semibold">Vale até<input type="date" value={form.validade} min={hojeBR()} onChange={(e) => setForm({ ...form, validade: e.target.value })} className={campo} /></label>
               <label className="block text-[13px] font-semibold">Limite de cupons (opcional)<input inputMode="numeric" value={form.limite} onChange={(e) => setForm({ ...form, limite: e.target.value.replace(/\D/g, "").slice(0, 5) })} placeholder="Sem limite" className={campo} /></label>
+              <fieldset className="sm:col-span-2 rounded-xl bg-[var(--cinza)] p-3">
+                <legend className="sr-only">Desconto nos pedidos pela atendente</legend>
+                <span className="block text-[13px] font-semibold">Desconto nos pedidos pela atendente</span>
+                <span className="block text-[12.5px] text-[var(--tinta-2)]">Com um número aqui, a atendente aplica o cupom no total do pedido e no Pix. Sem número, o cupom é só de balcão.</span>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {([["", "Só de balcão"], ["pct", "Em %"], ["valor", "Em R$"]] as const).map(([v, n]) => <button key={v} type="button" aria-pressed={form.descontoTipo === v} onClick={() => setForm({ ...form, descontoTipo: v, descontoValor: "" })} className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ring-1 ${form.descontoTipo === v ? "bg-[#9F1239] text-white ring-[#9F1239]" : "bg-white text-[var(--tinta-2)] ring-[var(--linha)]"}`}>{n}</button>)}
+                </div>
+                {form.descontoTipo && (
+                  <div className="mt-2 grid grid-cols-2 gap-2 [&>*]:min-w-0">
+                    <label className="block text-[13px] font-semibold">{form.descontoTipo === "pct" ? "Porcentagem (1 a 90)" : "Valor do desconto (R$)"}<input inputMode="decimal" value={form.descontoValor} onChange={(e) => setForm({ ...form, descontoValor: e.target.value.replace(/[^\d,.]/g, "").slice(0, 9) })} placeholder={form.descontoTipo === "pct" ? "10" : "5,00"} className={campo} /></label>
+                    <label className="block text-[13px] font-semibold">Pedido mínimo (opcional)<input inputMode="decimal" value={form.minimo} onChange={(e) => setForm({ ...form, minimo: e.target.value.replace(/[^\d,.]/g, "").slice(0, 9) })} placeholder="Ex.: 30,00" className={campo} /></label>
+                  </div>
+                )}
+              </fieldset>
             </div>
             {erro && <p className="mt-2 text-[14px] font-semibold text-[#B42318]">{erro}</p>}
             <button type="button" onClick={criar} disabled={ocupado || ativos.length >= 3} className="btn btn-azul mt-3 !py-2">Criar cupom</button>
@@ -79,6 +97,7 @@ export function PainelCupons() {
               <li key={c.id} className={`rounded-2xl border border-dashed p-4 ${c.ativo && !c.vencido ? "border-[#E11D48]/50 bg-[#FFF5F7]" : "border-[var(--linha)] bg-[var(--cinza)] opacity-70"}`}>
                 <b className="text-[17px] text-[#9F1239]">{c.titulo}</b>
                 <p className="text-[13px] text-[var(--tinta-2)]">{c.regra ? `${c.regra} · ` : ""}até {dataBR(c.validade)}{c.limite != null ? ` · limite ${c.limite}` : ""}</p>
+                <p className="mt-1 text-[12.5px] font-semibold text-[#9F1239]">{noPedido(c)}</p>
                 <p className="mt-2 text-[14px]"><b>{c.pegos}</b> pego{c.pegos === 1 ? "" : "s"} · <b>{c.usados}</b> usado{c.usados === 1 ? "" : "s"}</p>
                 <p className="mt-1 text-[12px] font-semibold text-[var(--tinta-2)]">{!c.ativo ? "Encerrado" : c.vencido ? "Vencido" : "Ativo"}</p>
                 {c.ativo && !c.vencido && <button type="button" onClick={() => encerrar(c.id)} className="mt-2 text-[13px] font-semibold text-[#B42318] hover:underline">Encerrar cupom</button>}

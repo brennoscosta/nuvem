@@ -123,9 +123,10 @@ export function VitrinePainel() {
             <div className="min-w-0">
               <span className="pg-rotulo"><Icone nome="sacola" tamanho={15} />{numero != null ? `${rotuloLoja(numero)} · ` : ""}{lote?.empresa}</span>
               <h1>Vitrine da loja</h1>
-              <p className="pg-sub">Até {max} produtos com foto e preço. Eles aparecem no cartão da sua loja no mapa e na página da loja, com o botão <b>Pedir no WhatsApp</b>. O pagamento você combina direto com o cliente: o WorkEnd não passa dinheiro adiante.</p>
+              <p className="pg-sub">Até {max} produtos com foto e preço. Eles aparecem no cartão da sua loja no mapa e na página da loja, com o botão <b>Pedir no WhatsApp</b>, e a atendente de IA monta o pedido com o cliente e passa o <b>Pix com a sua chave</b>. O dinheiro vai direto para você: o WorkEnd não passa dinheiro adiante.</p>
             </div>
             <div className="pg-acoes">
+              <Link href="/app/vendas" className="btn btn-tinta">Vendas e Pix</Link>
               {numero != null && <a href={`/loja/${numero}#vitrine`} target="_blank" rel="noreferrer" className="btn btn-linha">Ver a página da loja</a>}
               {lote && <Link prefetch={false} href={`/mundo?lote=${encodeURIComponent(lote.chave)}`} className="btn btn-claro">Ver no mapa</Link>}
             </div>

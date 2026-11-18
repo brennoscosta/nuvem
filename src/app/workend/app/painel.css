@@ -196,6 +196,19 @@
 .we .pn-qr { width: 36px; height: 36px; border: 3px solid #fff; border-radius: 3px; background: conic-gradient(#161C25 25%, #fff 0 50%, #161C25 0 75%, #fff 0) 0 0 / 7px 7px; }
 .we .pn-scan { position: absolute; left: 10%; right: 10%; height: 2px; top: 30%; background: #6CFFB8; box-shadow: 0 0 10px #6CFFB8; animation: pn-scan 2.2s ease-in-out infinite alternate; }
 
+/* Vendas (17/11/2026): um recibo com o valor esperando pagamento */
+.we .pn-vendas { display: flex; align-items: center; gap: 1rem; }
+.we .pn-recibo { flex: none; width: 54px; height: 66px; border-radius: 6px; background-color: #fff; border: 1px solid var(--line); box-shadow: 0 10px 22px -14px rgba(22,28,37,.45);
+  background-image: linear-gradient(var(--line), var(--line)), linear-gradient(var(--line), var(--line)), linear-gradient(var(--line), var(--line)), linear-gradient(#16A34A, #16A34A);
+  background-size: 30px 3px, 24px 3px, 30px 3px, 22px 6px; background-position: 11px 13px, 11px 22px, 11px 31px, 11px 46px; background-repeat: no-repeat; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+.we .pn-f:hover .pn-recibo { transform: rotate(-6deg) translateY(-3px); }
+.we .pn-vendas-valor { display: block; font-size: 1.55rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.we .pn-vendas-alerta { color: #8A5A00; font-weight: 600; }
+.we .pn-vendas-lista { flex: 1; min-width: 0; display: grid; gap: .35rem; margin-left: auto; max-width: 260px; }
+.we .pn-vendas-lista li { display: flex; justify-content: space-between; gap: .6rem; min-width: 0; border-radius: 10px; background: #fff; padding: .45rem .7rem; font-size: 13.5px; box-shadow: 0 1px 0 rgba(16,24,40,.04); }
+.we .pn-vendas-lista li > span:last-child { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; }
+@media (max-width: 560px) { .we .pn-vendas { flex-wrap: wrap; } .we .pn-vendas-lista { flex-basis: 100%; max-width: none; margin-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .we .pn-recibo { transition: none; } }
 .we .pn-vagas { display: flex; align-items: center; gap: 1rem; }
 .we .pn-folhas { position: relative; flex: none; width: 54px; height: 66px; }
 .we .pn-folhas i { position: absolute; inset: 0; border-radius: 6px; background: #fff; border: 1px solid var(--line); transition: transform .3s cubic-bezier(.2,.8,.2,1);
@@ -354,3 +367,15 @@
 .we .pn-predio.pn-predio-sede { align-items: center; padding-top: 0; }
 .we .pn-predio-sede img { width: min(100%, 440px); max-height: none; filter: drop-shadow(0 18px 30px rgba(0,0,0,.6)); }
 .we .pn-predio-sede::before { display: none; }
+
+/* vendas do mês (17/11/2026, "Quanto a sua equipe trouxe"): uma linha logo abaixo da loja que leva aos Resultados */
+@layer components {
+  .we .pn-mes { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem;
+    border-radius: 16px; background: var(--surface); border: 1px solid transparent; padding: .8rem 1.1rem; color: var(--ink); text-decoration: none; transition: border-color .15s ease; }
+  .we .pn-mes:hover { border-color: var(--line-strong); }
+  .we .pn-mes:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+  .we .pn-mes-txt { display: inline-flex; align-items: center; gap: .7rem; min-width: 0; font-size: 15.5px; line-height: 1.35; }
+  .we .pn-mes-txt b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .we .pn-mes-txt small { font-size: 14px; color: var(--muted); white-space: nowrap; }
+  .we .pn-mes-ico { flex: none; display: grid; place-items: center; width: 2.1rem; height: 2.1rem; border-radius: 10px; background: #fff; color: var(--ink); }
+}

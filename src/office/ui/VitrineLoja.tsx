@@ -8,7 +8,7 @@ import { avisarClique } from "./LinkRastreado";
 import { useEffect, useState } from "react";
 
 export type ProdutoVitrine = { id: string; nome: string; preco: number | null; descricao: string; foto: string | null };
-export type DadosVitrine = { numero: number; empresa: string; cor: string; whatsapp: string | null; atendente: string | null; produtos: ProdutoVitrine[] };
+export type DadosVitrine = { numero: number; empresa: string; cor: string; whatsapp: string | null; atendente: string | null; recebePix?: boolean; produtos: ProdutoVitrine[] };
 
 export const precoBR = (centavos: number | null) => (centavos == null ? "Sob consulta" : (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 const numeroZap = (n: string) => (n.length <= 11 ? `55${n}` : n);
@@ -23,6 +23,11 @@ export function textoPedido(d: DadosVitrine, pedido: Pedido) {
   const linhas = itens.map((p) => { const q = pedido[p.id]; return `• ${q}× ${p.nome} — ${p.preco == null ? "sob consulta" : precoBR(p.preco * q).replace(/\s/g, " ")}`; });
   const total = itens.reduce((a, p) => a + (p.preco ?? 0) * pedido[p.id], 0), consulta = itens.some((p) => p.preco == null);
   return `Olá! Quero fazer um pedido pela sua loja do WorkEnd:\n${linhas.join("\n")}\nTotal: ${total ? precoBR(total).replace(/\s/g, " ") : "a combinar"}${consulta && total ? " (+ itens sob consulta)" : ""}`;
+}
+// pedido para a atendente (17/11/2026): só itens e quantidades; o preço quem põe é o servidor, com a tabela da loja
+export function textoPedidoAtendente(d: DadosVitrine, pedido: Pedido) {
+  const itens = d.produtos.filter((p) => (pedido[p.id] ?? 0) > 0).map((p) => `${pedido[p.id]}× ${p.nome}`);
+  return `Quero fazer um pedido: ${itens.length > 1 ? `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}` : itens[0]}.`;
 }
 function contarClique(numero: number, produtoId: string) {
   avisarClique(numero, "produto", produtoId); // conta no painel e faz sair o motoboy da loja na cena
@@ -93,9 +98,9 @@ function BarraPedido({ d, pedido, limpar, pequeno }: { d: DadosVitrine; pedido: 
       <span className={pequeno ? "text-[11px]" : "text-sm"}><Icone nome="sacola" tamanho={14} className="mr-1 inline align-[-3px]" /><b>{n} {n === 1 ? "item" : "itens"}</b> · {total ? precoBR(total) : "a combinar"}{consulta && total ? " + sob consulta" : ""}</span>
       <span className="flex items-center gap-1.5">
         <button type="button" onClick={limpar} className={`${pequeno ? "text-[11px]" : "text-sm"} rounded-lg px-2 py-1 text-white/70 hover:text-white`}>Limpar</button>
-        {d.whatsapp
-          ? <a href={`https://wa.me/${numeroZap(d.whatsapp)}?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer nofollow" onClick={enviar} className={`${cls} bg-[#16A34A] hover:bg-[#15803d]`}>Enviar pedido no WhatsApp</a>
-          : d.atendente ? <button type="button" onClick={() => { enviar(); perguntarAtendente(texto.replace(/\n/g, " ")); }} className={`${cls} bg-[#1D4ED8] hover:bg-[#1a44c2]`}>Mandar à atendente</button> : null}
+        {/* a atendente fecha o pedido (com o Pix da loja, quando ela tem); o WhatsApp continua como alternativa */}
+        {d.atendente && <button type="button" onClick={() => { enviar(); perguntarAtendente(textoPedidoAtendente(d, pedido)); }} className={`${cls} bg-[#1D4ED8] hover:bg-[#1a44c2]`}>{d.recebePix ? "Pedir e pagar no Pix" : "Pedir à atendente"}</button>}
+        {d.whatsapp && <a href={`https://wa.me/${numeroZap(d.whatsapp)}?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer nofollow" onClick={enviar} className={`${cls} bg-[#16A34A] hover:bg-[#15803d]`}>{d.atendente ? "WhatsApp" : "Enviar pedido no WhatsApp"}</a>}
       </span>
     </div>
   );
@@ -161,7 +166,7 @@ export function VitrineLoja({ numero, compacto }: { numero: number; compacto?: b
     <section id="vitrine" className="scroll-mt-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[1.5rem]">Vitrine</h2>
-        <span className="text-sm text-[var(--tinta-2,#5B6472)]">{d.whatsapp ? `Peça direto no WhatsApp da ${d.empresa}. O pagamento é combinado com a loja.` : "Pergunte à atendente sobre prazo e entrega."}</span>
+        <span className="text-sm text-[var(--tinta-2,#5B6472)]">{d.atendente && d.recebePix ? `Monte o pedido e mande à atendente: ela confirma e passa o Pix da ${d.empresa}, direto para a loja.` : d.whatsapp ? `Peça direto no WhatsApp da ${d.empresa}. O pagamento é combinado com a loja.` : "Pergunte à atendente sobre prazo e entrega."}</span>
       </div>
       <VitrineVisual d={d} />
     </section>

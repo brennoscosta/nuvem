@@ -10,9 +10,11 @@ import { usuarioAtual } from "@/server/usuarios";
 import { terrenoDoUsuario, empresasDoUsuario, ehAdmin, PRECO_LOTE, type Terreno } from "@/server/terrenos";
 import { sedeDe } from "@/office/data/sedes";
 import { painelDoDono, painelReserva, ofertaDeEntrada, saudacaoBR, type Painel, type Numero } from "@/server/painel";
+import { resumoVendas } from "@/server/pedidos";
 import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
 import { CabecalhoApp } from "../_cabecalho";
 import { Contador, ContagemReserva, CopiarLink, Catalogo } from "./_painel";
+import { Icone } from "@/office/ui/Icone";
 import { meta } from "../seo";
 import "./painel.css";
 
@@ -32,10 +34,11 @@ export default async function App() {
   const empresa = chao?.empresaNome || u.empresaNome || `Empresa de ${nome}`;
   const { oi, data } = saudacaoBR();
   const ativo = chao?.status === "ativo";
-  const [p, reserva, entrada] = await Promise.all([
+  const [p, reserva, entrada, vendas] = await Promise.all([
     ativo && chao ? painelDoDono(u, chao).catch((e) => { console.error("[painel]", (e as Error).message); return null; }) : null,
     chao && !ativo ? painelReserva(u, chao) : null,
     !chao ? ofertaDeEntrada(u) : null,
+    ativo ? resumoVendas(u.id).catch(() => null) : null, // pedidos pela atendente (17/11/2026)
   ]);
   const linkLote = chao ? (sedeDe(chao.chave) ? `/mundo?sede=${sedeDe(chao.chave)!.id}` : `/mundo?lote=${encodeURIComponent(chao.chave)}`) : "/mundo";
 
@@ -53,7 +56,7 @@ export default async function App() {
         </p>
       </section>
 
-      {ativo && chao && p ? <LojaAberta chao={chao} p={p} empresa={empresa} linkLote={linkLote} />
+      {ativo && chao && p ? <LojaAberta chao={chao} p={p} empresa={empresa} linkLote={linkLote} vendas={vendas} />
         : chao && reserva ? <Reservado chao={chao} r={reserva} linkLote={linkLote} />
         : <SemLote fundador={entrada?.fundador ?? null} />}
 
@@ -98,7 +101,8 @@ export default async function App() {
 }
 
 // ======================= loja aberta =======================
-function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; empresa: string; linkLote: string }) {
+type ResumoVendas = Awaited<ReturnType<typeof resumoVendas>>;
+function LojaAberta({ chao, p, empresa, linkLote, vendas }: { chao: Terreno; p: Painel; empresa: string; linkLote: string; vendas: ResumoVendas | null }) {
   const dias = p.diasRestam ?? 0;
   const vencendo = p.diasRestam !== null && dias <= 5;
   const feitos = p.passos.filter((x) => x.feito).length;
@@ -134,6 +138,9 @@ function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; 
           </div>}
         </div>
       </section>
+
+      {/* vendas do mês (17/11/2026): a linha que leva ao "Quanto a sua equipe trouxe", em Resultados */}
+      {p.vendasMes && <VendasDoMes v={p.vendasMes} />}
 
       {/* a semana em números */}
       {p.semana && (
@@ -172,6 +179,13 @@ function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; 
               <span className="min-w-0"><b className="block">{p.visitantes24h ? plural(p.visitantes24h, "visitante falou", "visitantes falaram") + " com a atendente" : "Ninguém falou com a atendente hoje"}</b><small>{p.visitantes24h ? "Nas últimas 24 horas." : "Quem entra na loja pelo mapa é atendido por ela."}</small></span>
               {p.visitantes24h > 0 && <Link href="/app/equipe?aba=visitantes" className="pn-link">Ler</Link>}
             </li>
+            {(vendas?.aguardando ?? 0) > 0 && (
+              <li>
+                <span className="pn-hoje-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21z M9 8h6 M9 12h6" /></svg></span>
+                <span className="min-w-0"><b className="block">{plural(vendas!.aguardando, "pedido esperando", "pedidos esperando")} pagamento</b><small>{reais(vendas!.valorAguardando / 100)} · confira no app do banco e confirme.</small></span>
+                <Link href="/app/vendas?status=aguardando" className="pn-link">Ver</Link>
+              </li>
+            )}
             {(p.semana?.candidaturas ?? 0) > 0 && (
               <li>
                 <span className="pn-hoje-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z M14 3v4h4" /></svg></span>
@@ -227,6 +241,17 @@ function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; 
             <p className="pn-f-rodape">{p.vitrine.ativos ? "Pedido pelo WhatsApp com vários produtos de uma vez." : "Mostre até 12 produtos com foto e preço."}</p>
           </Link>
 
+          {/* vendas pela atendente (17/11/2026): pedido com o Pix do dono */}
+          <Link href="/app/vendas" className="pn-f pn-f-largo">
+            <div className="pn-f-topo"><b>Vendas</b><span>{vendas?.aguardando ? plural(vendas.aguardando, "pedido esperando", "pedidos esperando") : vendas?.semana ? `${plural(vendas.semana, "pedido", "pedidos")} em 7 dias` : "pela atendente de IA"}</span></div>
+            <div className="pn-vendas">
+              <span className="pn-recibo" aria-hidden="true" />
+              <div className="min-w-0"><b className="pn-vendas-valor">{reais((vendas?.valorAguardando ?? 0) / 100)}</b><small className="block">esperando pagamento</small></div>
+              {!!vendas?.ultimos.length && <ul className="pn-vendas-lista">{vendas.ultimos.map((o) => <li key={o.numero}><span className="truncate"><b>#{o.numero}</b> {o.nome}</span><span>{reais(o.total / 100)}</span></li>)}</ul>}
+            </div>
+            <p className={`pn-f-rodape ${vendas && !vendas.temPix ? "pn-vendas-alerta" : ""}`}>{vendas && !vendas.temPix ? "Cadastre a sua chave Pix para receber os pedidos." : "A atendente monta o pedido e passa o Pix com a sua chave."}</p>
+          </Link>
+
           <Link href="/app/agenda" className="pn-f">
             <div className="pn-f-topo"><b>Agenda</b><span>{p.semana?.agendaLigada ? "ligada" : "desligada"}</span></div>
             <div className={`pn-cal ${p.semana?.agendaLigada ? "" : "pn-cal-off"}`}>
@@ -254,7 +279,7 @@ function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; 
             <p className="pn-f-rodape">{p.promo ? "Quem segue a loja recebe o aviso no celular." : "Liga no cartão do lote, no mapa. Quem segue a loja é avisado."}</p>
           </Link>
 
-          <Link href="/app/divulgar" className="pn-f">
+          <Link href="/app/divulgar" className="pn-f pn-f-largo">
             <div className="pn-f-topo"><b>Divulgar</b><span>Stories e adesivo</span></div>
             <div className="pn-story" style={{ ["--marca" as string]: chao.cor || "#0A6CFF" }}>
               <span className="pn-story-tela"><span className="pn-qr" /><i className="pn-scan" /></span>
@@ -262,7 +287,7 @@ function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; 
             </div>
           </Link>
 
-          <Link href="/app/equipe?aba=vagas" className="pn-f">
+          <Link href="/app/equipe?aba=vagas" className="pn-f pn-f-largo">
             <div className="pn-f-topo"><b>Vagas</b><span>{plural(p.semana?.vagasAbertas ?? 0, "aberta", "abertas")}</span></div>
             <div className="pn-vagas">
               <span className="pn-folhas" aria-hidden="true"><i /><i /><i /></span>
@@ -315,6 +340,24 @@ function LojaAberta({ chao, p, empresa, linkLote }: { chao: Terreno; p: Painel; 
 
       <Rede />
     </>
+  );
+}
+
+function VendasDoMes({ v }: { v: { centavos: number; pedidos: number; aguardando: number } }) {
+  return (
+    <section className="faixa">
+      <Link href="/app/resultados" className="pn-mes">
+        <span className="pn-mes-txt">
+          <span className="pn-mes-ico" aria-hidden="true"><Icone nome="sacola" tamanho={18} /></span>
+          <span className="min-w-0">
+            {v.pedidos ? <>Este mês: <b>{reais(v.centavos / 100)}</b> em vendas · <b>{plural(v.pedidos, "pedido", "pedidos")}</b>{v.aguardando > 0 && <small> · {v.aguardando} esperando o Pix</small>}</>
+              : v.aguardando ? <>Este mês: <b>{plural(v.aguardando, "pedido", "pedidos")}</b> esperando o Pix</>
+              : <>Este mês: nenhuma venda pela atendente ainda</>}
+          </span>
+        </span>
+        <span className="pn-link">{v.pedidos || v.aguardando ? "Ver resultados" : "Como vender pela atendente"}</span>
+      </Link>
+    </section>
   );
 }
 

@@ -17,7 +17,8 @@ const MAX_PRECO = 99_999_999; // R$ 999.999,99
 
 export interface ProdutoPublico { id: string; nome: string; preco: number | null; descricao: string; foto: string | null }
 export interface ProdutoDono extends ProdutoPublico { ativo: boolean; ordem: number }
-export interface VitrinePublica { numero: number; empresa: string; cor: string; whatsapp: string | null; atendente: string | null; produtos: ProdutoPublico[] }
+// recebePix (17/11/2026): a loja cadastrou a chave Pix em /app/vendas e a atendente fecha o pedido com o Pix dela
+export interface VitrinePublica { numero: number; empresa: string; cor: string; whatsapp: string | null; atendente: string | null; recebePix: boolean; produtos: ProdutoPublico[] }
 
 const texto = (t: unknown, max: number) => (typeof t === "string" ? t : "").replace(/[<>{}\[\]\\]/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim().slice(0, max);
 
@@ -150,7 +151,8 @@ export async function vitrinePublica(numero: number): Promise<VitrinePublica> {
   const t = await obterTerreno(loja.chave);
   const produtos = await sql<Linha[]>`SELECT ${CAMPOS()} FROM produto WHERE usuario_id = ${loja.donoId} AND ativo ORDER BY ordem, criado_em LIMIT ${MAX_PRODUTOS}`;
   const atendente = t?.escritorio?.equipe.find((m) => m.papel === "atendente")?.nome ?? null;
-  return { numero, empresa: t?.empresaNome ?? "", cor: t?.cor ?? "#1D4ED8", whatsapp: produtos.length ? await whatsappDe(loja.donoId, loja.chave) : null, atendente, produtos: produtos.map(paraPublico) };
+  const [pix] = produtos.length ? await sql`SELECT 1 FROM recebimento_pix WHERE usuario_id = ${loja.donoId}`.catch(() => []) : [];
+  return { numero, empresa: t?.empresaNome ?? "", cor: t?.cor ?? "#1D4ED8", whatsapp: produtos.length ? await whatsappDe(loja.donoId, loja.chave) : null, atendente, recebePix: !!pix, produtos: produtos.map(paraPublico) };
 }
 
 // foto: pública quando o produto está à mostra; escondido, só o dono vê (na prévia)

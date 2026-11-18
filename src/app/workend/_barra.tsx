@@ -93,6 +93,7 @@ export function BarraApp({ atual, email, admin }: { atual: AtualApp; email?: str
                 <div className="cab-pop" role="menu">
                   <div className="cab-pop-topo"><span className="cab-avatar cab-avatar-g" aria-hidden="true">{inicial}</span><div className="min-w-0"><b>Minha conta</b><span>{email}</span></div></div>
                   <Link role="menuitem" href="/app" className="cab-pop-item"><Icone nome="escritorio" tamanho={18} />Meu escritório</Link>
+                  <Link role="menuitem" href="/app/vendas" className="cab-pop-item"><Icone nome="recibo" tamanho={18} />Vendas e pedidos</Link>
                   <Link role="menuitem" href="/app/rede" className="cab-pop-item"><Icone nome="rede" tamanho={18} />Minha rede e personagem</Link>
                   {admin && <Link role="menuitem" href="/app/admin" className="cab-pop-item"><Icone nome="admin" tamanho={18} />Administração</Link>}
                   <button role="menuitem" type="button" onClick={() => void sairDaConta()} className="cab-pop-item cab-pop-sair"><Icone nome="sair" tamanho={18} />Sair da conta</button>
@@ -126,6 +127,7 @@ export function BarraApp({ atual, email, admin }: { atual: AtualApp; email?: str
             <div className="cab-folha-conta">
               <span className="cab-avatar" aria-hidden="true">{inicial}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-[var(--muted)]">{email}</span>
+              <Link href="/app/vendas" className="cab-folha-mini" onClick={() => setMenu(false)}><Icone nome="recibo" tamanho={16} />Vendas</Link>
               {admin && <Link href="/app/admin" className="cab-folha-mini" onClick={() => setMenu(false)}><Icone nome="admin" tamanho={16} />Admin</Link>}
               <button type="button" onClick={() => void sairDaConta()} className="cab-folha-mini"><Icone nome="sair" tamanho={16} />Sair</button>
             </div>

@@ -17,6 +17,7 @@ import { conversar, destilarRegra, temIA } from "./motor";
 import { versoesAtivas, skillEfetiva } from "./evolucao";
 import { bloqueio, contar } from "./limite";
 import { contextoAgendaIA, aplicarMarcacaoDaAtendente, temMarcacao } from "./agenda";
+import { contextoPedidosIA, aplicarPedidoDaAtendente, temMarcacaoPedido, pedidosDasMensagens } from "./pedidos";
 import { ESPECIALISTAS_IA, ESPECIALISTA_POR_ID, type EspecialistaIA } from "@/office/data/especialistas";
 import { LOTES, LOTE_POR_CHAVE, nomeNicho } from "@/office/data/mundo";
 import { SEDE_POR_NUMERO, SEDE_SOCIALRP, ehSede } from "@/office/data/sedes";
@@ -381,12 +382,14 @@ export async function conversaNaLoja(u: Usuario, numero: number) {
   const atendente = t.escritorio?.equipe.find((m) => m.papel === "atendente");
   if (!atendente) return [];
   const msgs = await listarMensagens(agenteIdDe(empId, atendente.id), 60, u.id);
-  return msgs.map((m) => ({ id: m.id, papel: m.papel, conteudo: m.conteudo, em: m.criadoEm }));
+  // pedidos feitos pela atendente (17/11/2026): o cartão volta para a mensagem em que o pedido nasceu
+  const pedidos = await pedidosDasMensagens(u.id, msgs.filter((m) => m.papel === "assistant").map((m) => m.id)).catch(() => new Map());
+  return msgs.map((m) => ({ id: m.id, papel: m.papel, conteudo: m.conteudo, em: m.criadoEm, pedido: pedidos.get(m.id) ?? null }));
 }
 
 const RECADO_SEM_IA = "Obrigado pela mensagem! A equipe não consegue responder agora, mas o seu recado ficou anotado para o dono. Se quiser retorno, deixe o seu nome e um WhatsApp ou e-mail.";
 
-export async function falarNaLoja(u: Usuario, numero: number, texto: string) {
+export async function falarNaLoja(u: Usuario, numero: number, texto: string, ip?: string | null) {
   const fala = String(texto ?? "").trim().slice(0, 800);
   if (!fala) throw new ErroHttp("Escreva a sua mensagem.");
   const kLoja = `loja:${numero}:${u.id}`, kTotal = `lojas:${u.id}`;
@@ -409,14 +412,18 @@ export async function falarNaLoja(u: Usuario, numero: number, texto: string) {
   try {
     // agenda ligada (12/11/2026): a atendente recebe os serviços e as faixas livres e pode marcar pela conversa
     const ctxAgenda = await contextoAgendaIA(numero, u).catch((e) => { console.error("[loja] agenda:", (e as Error).message); return null; });
-    const r = await conversar(aid, fala, `visitante:${u.id}`, { modo: "visitante", visitanteId: u.id, tetoMes: { gasto, teto: TETO_IA_MES }, contexto: ctxAgenda ?? undefined, maxTokens: ctxAgenda ? 500 : undefined });
+    // vitrine e pedidos (17/11/2026): a atendente monta o pedido e o servidor cria (src/server/pedidos.ts)
+    const ctxPedidos = await contextoPedidosIA(numero, u).catch((e) => { console.error("[loja] pedidos:", (e as Error).message); return null; });
+    const contexto = [ctxAgenda, ctxPedidos].filter(Boolean).join("\n\n");
+    const r = await conversar(aid, fala, `visitante:${u.id}`, { modo: "visitante", visitanteId: u.id, tetoMes: { gasto, teto: TETO_IA_MES }, contexto: contexto || undefined, maxTokens: ctxAgenda && ctxPedidos ? 650 : contexto ? 500 : undefined });
     let conteudo = r.mensagem.conteudo;
-    // a marcação [[AGENDAR ...]] nunca fica na conversa: o servidor valida, marca e escreve o resultado no lugar
-    if (temMarcacao(conteudo)) {
-      conteudo = await aplicarMarcacaoDaAtendente(conteudo, u, numero);
-      await sql`UPDATE mensagem SET conteudo = ${conteudo} WHERE id = ${r.mensagem.id}`;
-    }
-    return { id: r.mensagem.id, papel: "assistant", conteudo, em: r.mensagem.criadoEm };
+    const original = conteudo;
+    // as marcações [[AGENDAR ...]] e [[PEDIDO ...]] nunca ficam na conversa: o servidor valida, faz e escreve o resultado no lugar
+    if (temMarcacao(conteudo)) conteudo = await aplicarMarcacaoDaAtendente(conteudo, u, numero);
+    let pedido = null;
+    if (temMarcacaoPedido(conteudo)) ({ texto: conteudo, pedido } = await aplicarPedidoDaAtendente(conteudo, u, numero, r.mensagem.id, ip));
+    if (conteudo !== original) await sql`UPDATE mensagem SET conteudo = ${conteudo} WHERE id = ${r.mensagem.id}`;
+    return { id: r.mensagem.id, papel: "assistant", conteudo, em: r.mensagem.criadoEm, pedido };
   } catch (e) {
     // a mensagem do visitante já ficou gravada; responde com o recado fixo para ele não ficar sem retorno
     console.error("[loja] atendente falhou:", (e as Error).message);

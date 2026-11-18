@@ -1,5 +1,5 @@
 // Central de avisos (sino, 12/11/2026): candidatura recebida, evento da praça daqui a 10 minutos, mensagem nova,
-// conversa na loja, pagamento confirmado, indicação paga, agendamento. Cada aviso tem um `ref`: o mesmo ref não
+// conversa na loja, pagamento confirmado, indicação paga, agendamento, pedido pela atendente (venda, 17/11/2026). Cada aviso tem um `ref`: o mesmo ref não
 // duplica; com `renovar`, um aviso que já existe volta a ficar não lido e sobe para o topo (uma conversa = um aviso).
 // avisar() nunca lança: aviso não pode derrubar o fluxo principal.
 // Desde 13/11/2026: todo aviso novo (ou que voltou ao topo) também vai para o celular de quem ligou os avisos (src/server/push.ts),
@@ -10,7 +10,7 @@ import { resultadosDoDono } from "./resultados";
 import type { Usuario } from "./usuarios";
 import type { Terreno } from "./terrenos";
 
-export type TipoAviso = "candidatura" | "evento" | "mensagem" | "loja" | "pagamento" | "indicacao" | "agendamento" | "amizade" | "negociacao" | "seguindo" | "resumo" | "sistema";
+export type TipoAviso = "candidatura" | "evento" | "mensagem" | "loja" | "pagamento" | "indicacao" | "agendamento" | "amizade" | "negociacao" | "seguindo" | "resumo" | "sistema" | "venda";
 export interface Aviso { id: string; tipo: TipoAviso; titulo: string; texto: string; link: string; lidoEm: Date | null; criadoEm: Date }
 
 const limpa = (t: unknown, max: number) => (typeof t === "string" ? t : "").replace(/\s+/g, " ").trim().slice(0, max);

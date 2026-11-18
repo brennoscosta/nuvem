@@ -10,7 +10,7 @@ import { Icone, type NomeIcone } from "./Icone";
 
 interface Aviso { id: string; tipo: string; titulo: string; texto: string; link: string; lidoEm: string | null; criadoEm: string }
 // ícones próprios por tipo (16/11/2026: nada de emoji), cada um com a sua cor
-const ICONE: Record<string, [NomeIcone, string]> = { candidatura: ["candidato", "#7C3AED"], evento: ["microfone", "#D9661F"], mensagem: ["conversar", "#0A6CFF"], loja: ["escritorio", "#0E8F7E"], pagamento: ["check", "#16A34A"], indicacao: ["amizade", "#DB2777"], agendamento: ["agenda", "#0A6CFF"], amizade: ["amizade", "#DB2777"], negociacao: ["negociar", "#B7791F"], seguindo: ["estrela", "#E8A317"], resumo: ["resultados", "#0A6CFF"], sistema: ["ajuda", "#5B6472"] };
+const ICONE: Record<string, [NomeIcone, string]> = { candidatura: ["candidato", "#7C3AED"], evento: ["microfone", "#D9661F"], mensagem: ["conversar", "#0A6CFF"], loja: ["escritorio", "#0E8F7E"], pagamento: ["check", "#16A34A"], indicacao: ["amizade", "#DB2777"], agendamento: ["agenda", "#0A6CFF"], amizade: ["amizade", "#DB2777"], negociacao: ["negociar", "#B7791F"], seguindo: ["estrela", "#E8A317"], resumo: ["resultados", "#0A6CFF"], sistema: ["ajuda", "#5B6472"], venda: ["recibo", "#16A34A"] };
 
 // ---------- avisos no celular (web push, 13/11/2026) ----------
 // O push chega sem conteúdo e o service worker (public/sw.js) busca o aviso mais recente. A permissão só é pedida no toque.

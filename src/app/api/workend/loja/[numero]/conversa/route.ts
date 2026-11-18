@@ -5,6 +5,7 @@ import { lojaDoNumero } from "@/server/resultados";
 import { avisar } from "@/server/avisos";
 import { sql } from "@/server/db";
 import { ok, erro, corpo } from "@/server/http";
+import { ipDe } from "@/server/limite";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 type Ctx = { params: Promise<{ numero: string }> };
@@ -17,7 +18,7 @@ export async function POST(req: Request, { params }: Ctx) {
     const u = await usuarioAtual(); if (!u) return erro("Entre na sua conta do WorkEnd para conversar com a loja.", 401);
     if (u.banidoEm) return erro("Conta suspensa.", 403);
     const { numero } = await params; const d = await corpo<{ texto?: string }>(req);
-    const r = await falarNaLoja(u, Number(numero) | 0, d.texto ?? "");
+    const r = await falarNaLoja(u, Number(numero) | 0, d.texto ?? "", ipDe(req)); // IP: limite de pedidos por hora
     void avisarDono(Number(numero) | 0, u.id, u.nome, d.texto ?? "");
     return ok(r);
   } catch (e) { return erro(e, statusDe(e)); }

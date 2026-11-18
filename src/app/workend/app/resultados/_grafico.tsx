@@ -15,7 +15,7 @@ function Variacao({ total, anterior }: { total: number; anterior: number }) {
   return <span className={`text-[12px] font-semibold ${p > 0 ? "text-[#166534]" : "text-[#B42318]"}`}>{p > 0 ? "▲" : "▼"} {Math.abs(p)}% <span className="font-normal text-[var(--tinta-2)]">vs. período anterior</span></span>;
 }
 
-export function GraficoResultados({ metricas, dias }: { metricas: Metrica[]; dias: number }) {
+export function GraficoResultados({ metricas, dias, quando }: { metricas: Metrica[]; dias: number; quando?: string }) {
   const [sel, setSel] = useState(metricas[0]?.id ?? "");
   const [tabela, setTabela] = useState(false);
   const [foco, setFoco] = useState<number | null>(null);
@@ -58,7 +58,7 @@ export function GraficoResultados({ metricas, dias }: { metricas: Metrica[]; dia
           <Variacao total={m.total} anterior={m.anterior} />
         </div>
         <div ref={caixa} className="relative mt-3">
-          <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block h-auto w-full" role="img" aria-label={`${m.nome} por dia nos últimos ${dias} dias: total ${m.total}`} onMouseLeave={() => setFoco(null)}>
+          <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block h-auto w-full" role="img" aria-label={`${m.nome} por dia ${quando ?? `nos últimos ${dias} dias`}: total ${m.total}`} onMouseLeave={() => setFoco(null)}>
             {marcas.map((v) => { const y = base - (v / topo) * alto; return (
               <g key={v}><line x1={esq} x2={W} y1={y} y2={y} stroke="#E6E8EC" strokeWidth={1} /><text x={esq - 6} y={y + 4} textAnchor="end" fontSize={11} fill="#6B7380">{v}</text></g>
             ); })}

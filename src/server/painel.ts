@@ -5,7 +5,7 @@
 import { sql, migrar } from "./db";
 import type { Usuario } from "./usuarios";
 import { ehAdmin, type Terreno } from "./terrenos";
-import { resultadosDoDono, type Serie } from "./resultados";
+import { resultadosDoDono, vendasDoMes, type Serie } from "./resultados";
 import { vitrineResumo } from "./vitrine";
 import { cuponsDoDono } from "./cupons";
 import { seguidoresDe } from "./seguir";
@@ -49,7 +49,7 @@ export async function painelDoDono(u: Usuario, t: Terreno) {
   await migrar();
   const uid = u.id;
   const empId = empresaIdDe(uid, t.chave, ehAdmin(u));
-  const [res, proximos, vitrine, cupons, seguidores, codigo, indicacoes, avisos, gasto, empresa, visitantes] = await Promise.all([
+  const [res, proximos, vitrine, cupons, seguidores, codigo, indicacoes, avisos, gasto, empresa, visitantes, vendasMes] = await Promise.all([
     seguro(resultadosDoDono(u, t, 7), null, "resultados"),
     seguro(sql<{ id: string; servico: string; inicio: Date; fim: Date; nome: string }[]>`SELECT id, servico, inicio, fim, nome FROM agendamento WHERE dono_id = ${uid} AND status = 'marcado' AND fim > now() ORDER BY inicio LIMIT 3`.then((r) => [...r]), [], "agenda"),
     seguro(vitrineResumo(uid, 4), { ativos: 0, max: 12, primeiros: [] }, "vitrine"),
@@ -62,6 +62,8 @@ export async function painelDoDono(u: Usuario, t: Terreno) {
     seguro(sql<{ sobre: string; contatos: Contatos }[]>`SELECT sobre, contatos FROM empresa WHERE id = ${empId}`.then((r) => [...r]), [], "empresa"),
     seguro(sql<{ n: number }[]>`SELECT count(DISTINCT m.visitante_id)::int AS n FROM mensagem m JOIN agente a ON a.id = m.agente_id
       WHERE a.empresa_id = ${empId} AND m.visitante_id IS NOT NULL AND m.papel = 'user' AND m.criado_em >= now() - interval '24 hours'`, [{ n: 0 }], "visitantes"),
+    // vendas do mês (17/11/2026): o cartão "Este mês: R$ X em vendas" que leva aos Resultados
+    seguro(vendasDoMes(uid), null, "vendas"),
   ]);
 
   const info = LOTE_POR_CHAVE[t.chave];
@@ -112,6 +114,7 @@ export async function painelDoDono(u: Usuario, t: Terreno) {
     indicacao: { codigo, link: codigo && info?.numero ? `workend.online/loja/${info.numero}?ind=${codigo}` : codigo ? `workend.online/?ind=${codigo}` : null, credito: indicacoes.credito, pagas: ind.filter((x) => x.status === "liberada").length, esperando: ind.filter((x) => x.status === "pendente").length, porEmpresa: CREDITO_INDICACAO, descontoIndicado: Math.round(INDICADO.desconto * 100) },
     avisosNaoLidos: avisos[0]?.n ?? 0,
     ia: { gasto, teto: TETO_IA_MES },
+    vendasMes,
     visitantes24h: visitantes[0]?.n ?? 0,
     equipe, especialistas, contratados: equipe.map((m) => m.catalogoId).filter((x): x is string => !!x),
     passos,
