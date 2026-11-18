@@ -14,7 +14,7 @@ import { ComFallback } from "./Modelos";
 import { ceu } from "./CicloDia";
 import { leve } from "./qualidade";
 import { SEDE, OS_X, OS_Z } from "../data/onestate";
-import { SEDE_SOCIALRP, deslocamento, areasDoAndarDe, andaresComAreas, alturaSede, type Sede, type AreaSede } from "../data/sedes";
+import { SEDE_SOCIALRP, deslocamento, areasDoAndarDe, andaresComAreas, FRENTE_SEDE, LADO_SEDE, alturaSede, type Sede, type AreaSede } from "../data/sedes";
 import { abrirSede } from "../ui/CartaoOneState";
 import { InteriorSede } from "./OneStateInterior";
 import { useEscritorio } from "../store";
@@ -141,7 +141,7 @@ function brilho(t: number) { if (t === ultimoBrilho) return; ultimoBrilho = t; b
 // cada andar de cada face é um plano com a sua pintura; andares e faces sem nome de área (fundo, leste, andares de cima)
 // dividem a mesma pintura (uma textura por tamanho), e o Estatico junta os planos iguais numa malha só
 const PX_M = 1024 / SEDE.w; // px por metro na largura (a altura do andar tem 192 px)
-const VAZIO3 = [null, null, null], VAZIO2 = [null, null];
+const VAZIO3 = Array<null>(FRENTE_SEDE).fill(null), VAZIO2 = Array<null>(LADO_SEDE).fill(null); // andares sem área: o mesmo ritmo de janelas
 function Fachadas({ sede }: { sede: Sede }) {
   const H = SEDE.andar, nAreas = andaresComAreas(sede);
   return (
@@ -153,7 +153,7 @@ function Fachadas({ sede }: { sede: Sede }) {
         const tipoL: Tipo = f === 0 ? "saguao" : temAreas && lado.some(Boolean) ? "areas" : "comum";
         const ws = p.x1 - p.x0 - 2 * p.canto, wl = p.z1 - p.z0 - 2 * p.canto, pxS = Math.round(ws * PX_M), pxL = Math.round(wl * PX_M);
         const cx = (p.x0 + p.x1) / 2, cz = (p.z0 + p.z1) / 2, y = f * H + H / 2;
-        const comumS = fachada(sede, `comum3:${pxS}`, pxS, 192, VAZIO3, "comum"), comumL = fachada(sede, `comum2:${pxL}`, pxL, 192, VAZIO2, "comum");
+        const comumS = fachada(sede, `comum${FRENTE_SEDE}:${pxS}`, pxS, 192, VAZIO3, "comum"), comumL = fachada(sede, `comum${LADO_SEDE}:${pxL}`, pxL, 192, VAZIO2, "comum");
         return (
           <group key={f}>
             <mesh geometry={plano(ws, H)} material={tipoF === "comum" ? comumS : fachada(sede, `s${f}`, pxS, 192, frente, tipoF)} position={[cx, y, p.z1 + 0.02]} />

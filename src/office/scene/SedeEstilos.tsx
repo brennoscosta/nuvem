@@ -18,7 +18,7 @@ import { caixa, cilindro, circulo, esfera, mat, plano } from "./geo";
 import { leve } from "./qualidade";
 import { ceu } from "./CicloDia";
 import { SEDE, OS_X, OS_Z } from "../data/onestate";
-import { alturaSede, type Sede, type EstiloSede } from "../data/sedes";
+import { alturaSede, andaresComAreas, type Sede, type EstiloSede } from "../data/sedes";
 
 type V3 = [number, number, number];
 const PI = Math.PI;
@@ -43,11 +43,15 @@ export const PALETAS: Record<EstiloSede, Paleta> = {
 // ---------- andares: retângulo de cada um (o NUVCAM tem recuos em cima) e o raio das quinas (bday.fm) ----------
 export interface Piso { f: number; x0: number; x1: number; z0: number; z1: number; canto: number }
 const CANTO_FESTA = 3;
-// NUVCAM: do 6º andar (índice 5) para cima o prédio recua 2 m dos lados e 3 m na frente, a cada degrau
-const recuoEstudio = (f: number) => (f >= 6 ? 2 : f >= 5 ? 1 : 0);
+// NUVCAM: os andares de cima recuam 2 m dos lados e 3 m na frente a cada degrau (dois degraus a partir de 7 andares, um
+// abaixo disso; 18/11/2026: o prédio passou a 5 andares)
+export const degrausEstudio = (n: number) => (n >= 7 ? 2 : 1);
+const recuoEstudio = (f: number, n: number) => { const D = degrausEstudio(n); return Math.min(D, Math.max(0, f - (n - D) + 1)); };
+// telão de LED: entre o último andar com nome de área e o topo do bloco cheio (8 m de altura no prédio de 7 andares)
+export function telaoDe(sede: Sede) { const F = sede.andares - degrausEstudio(sede.andares), y0 = (andaresComAreas(sede) + 1) * AND; return { y0, s: Math.max(3, F * AND - y0) / 8 }; }
 export function pisosDe(sede: Sede): Piso[] {
   return Array.from({ length: sede.andares }, (_, f) => {
-    if (sede.estilo === "estudio") { const k = recuoEstudio(f); return { f, x0: O + 2 * k, x1: L - 2 * k, z0: N, z1: S - 3 * k, canto: 0 }; }
+    if (sede.estilo === "estudio") { const k = recuoEstudio(f, sede.andares); return { f, x0: O + 2 * k, x1: L - 2 * k, z0: N, z1: S - 3 * k, canto: 0 }; }
     return { f, x0: O, x1: L, z0: N, z1: S, canto: sede.estilo === "festa" ? CANTO_FESTA : 0 };
   });
 }
@@ -56,7 +60,12 @@ export function pisosDe(sede: Sede): Piso[] {
 // chao = altura onde os postes da placa nascem (ficam 0,8 m enterrados na coroa, como na torre original)
 export interface LogoAlto { x: number; z: number; rotY: number; w: number; chao: number; verso: boolean; postes: number[] }
 export interface LogosEstilo { alto: LogoAlto[]; portico: { pos: V3; w: number } }
+// 18/11/2026: com as torres mais baixas, as logos do alto ficaram 20% menores
 export function logosDe(sede: Sede): LogosEstilo {
+  const l = logosBase(sede);
+  return { ...l, alto: l.alto.map((a) => ({ ...a, w: a.w * 0.8, postes: a.postes.map((p) => p * 0.8) })) };
+}
+function logosBase(sede: Sede): LogosEstilo {
   const H = alturaSede(sede);
   switch (sede.estilo) {
     case "tech": return {
@@ -70,7 +79,7 @@ export function logosDe(sede: Sede): LogosEstilo {
       portico: { pos: [SEDE.x, 4.6, S + 4.62], w: 6 },
     };
     case "estudio": {
-      const zt = S - 6, xt = O + 4; // o último degrau
+      const D = degrausEstudio(sede.andares), zt = S - 3 * D, xt = O + 2 * D; // o último degrau
       return {
         alto: [{ x: SEDE.x, z: zt - 0.9, rotY: 0, w: 11, chao: H - 0.2, verso: true, postes: [-4, 0, 4] },
           { x: xt + 0.9, z: (N + zt) / 2, rotY: -PI / 2, w: 7, chao: H - 0.2, verso: false, postes: [-2.6, 2.6] }],
@@ -381,7 +390,8 @@ function Estudio({ sede }: { sede: Sede }) {
   const mAviso = luz(`${sede.id}:aviso`, "#FF2B2B", { dia: 0.3, noite: 3, modo: "aviso" });
   const mPrato = duplo("#E5E7EB");
   // degraus: 5 andares cheios, depois recuo de 2 m nos lados e 3 m na frente, duas vezes
-  const degraus = [0, 1, 2].map((k) => ({ x0: O + 2 * k, x1: L - 2 * k, z0: N, z1: S - 3 * k, y0: k === 0 ? 0 : (4 + k) * AND, y1: (5 + k) * AND }));
+  const D = degrausEstudio(sede.andares), F = sede.andares - D, tl = telaoDe(sede);
+  const degraus = Array.from({ length: D + 1 }, (_, k) => ({ x0: O + 2 * k, x1: L - 2 * k, z0: N, z1: S - 3 * k, y0: k === 0 ? 0 : (F - 1 + k) * AND, y1: (F + k) * AND }));
   const laje = (d: (typeof degraus)[number], y: number, h: number, k: string) => {
     const cx = (d.x0 + d.x1) / 2, cz = (d.z0 + d.z1) / 2, w = d.x1 - d.x0, p = d.z1 - d.z0;
     return (
@@ -412,29 +422,27 @@ function Estudio({ sede }: { sede: Sede }) {
       {/* núcleos dos três degraus */}
       {degraus.map((d, k) => <mesh key={`n${k}`} geometry={caixa(d.x1 - d.x0 - 0.1, d.y1 - d.y0, d.z1 - d.z0 - 0.1)} material={mPreto} position={[(d.x0 + d.x1) / 2, (d.y0 + d.y1) / 2, (d.z0 + d.z1) / 2]} castShadow receiveShadow />)}
       {/* lajes pretas com friso vermelho aceso */}
-      {[1, 2, 3, 4].map((f) => laje(degraus[0], f * AND, 0.3, `l${f}`))}
-      {laje(degraus[0], 5 * AND + 0.25, 0.5, "t1")}
-      {laje(degraus[1], 6 * AND + 0.2, 0.4, "t2")}
-      {laje(degraus[2], H + 0.3, 0.6, "t3")}
-      {terraco(degraus[0], 5 * AND + 0.5, "g1")}
-      {terraco(degraus[1], 6 * AND + 0.4, "g2")}
+      {Array.from({ length: F - 1 }, (_, i) => i + 1).map((f) => laje(degraus[0], f * AND, 0.3, `l${f}`))}
+      {degraus.slice(0, D).map((d, k) => laje(d, (F + k) * AND + (k ? 0.2 : 0.25), k ? 0.4 : 0.5, `t${k + 1}`))}
+      {laje(degraus[D], H + 0.3, 0.6, "tt")}
+      {degraus.slice(0, D).map((d, k) => terraco(d, (F + k) * AND + (k ? 0.4 : 0.5), `g${k + 1}`))}
       {/* pilares de canto com neon vermelho */}
-      {[[O, S], [L, S], [O, N], [L, N]].map(([x, z], i) => <mesh key={`p${i}`} geometry={caixa(0.7, 5 * AND + 0.3, 0.7)} material={mPreto} position={[x, (5 * AND + 0.3) / 2, z]} castShadow />)}
-      {[O, L].map((x) => <mesh key={`ns${x}`} geometry={caixa(0.12, 5 * AND - 0.6, 0.05)} material={mFriso} position={[x, 5 * AND / 2, S + 0.37]} />)}
-      {[S, N].map((z) => <mesh key={`no${z}`} geometry={caixa(0.05, 5 * AND - 0.6, 0.12)} material={mFriso} position={[O - 0.37, 5 * AND / 2, z]} />)}
-      {[S, N].map((z) => <mesh key={`nl${z}`} geometry={caixa(0.05, 5 * AND - 0.6, 0.12)} material={mFriso} position={[L + 0.37, 5 * AND / 2, z]} />)}
+      {[[O, S], [L, S], [O, N], [L, N]].map(([x, z], i) => <mesh key={`p${i}`} geometry={caixa(0.7, F * AND + 0.3, 0.7)} material={mPreto} position={[x, (F * AND + 0.3) / 2, z]} castShadow />)}
+      {[O, L].map((x) => <mesh key={`ns${x}`} geometry={caixa(0.12, F * AND - 0.6, 0.05)} material={mFriso} position={[x, F * AND / 2, S + 0.37]} />)}
+      {[S, N].map((z) => <mesh key={`no${z}`} geometry={caixa(0.05, F * AND - 0.6, 0.12)} material={mFriso} position={[O - 0.37, F * AND / 2, z]} />)}
+      {[S, N].map((z) => <mesh key={`nl${z}`} geometry={caixa(0.05, F * AND - 0.6, 0.12)} material={mFriso} position={[L + 0.37, F * AND / 2, z]} />)}
       {/* moldura do telão de LED (a tela, o letreiro corrido e o selo ficam em TelaoEstudio) */}
-      <mesh geometry={caixa(18.8, 8, 0.5)} material={mPreto} position={[SEDE.x, 16, S + 0.3]} castShadow />
-      {[19.96, 12.04].map((y) => <mesh key={`mt${y}`} geometry={caixa(18.9, 0.08, 0.06)} material={mFriso} position={[SEDE.x, y, S + 0.57]} />)}
-      {[-9.42, 9.42].map((dx) => <mesh key={`ml${dx}`} geometry={caixa(0.08, 8, 0.06)} material={mFriso} position={[SEDE.x + dx, 16, S + 0.57]} />)}
+      <mesh geometry={caixa(18.8 * tl.s, 8 * tl.s, 0.5)} material={mPreto} position={[SEDE.x, tl.y0 + 4 * tl.s, S + 0.3]} castShadow />
+      {[7.96, 0.04].map((dy) => <mesh key={`mt${dy}`} geometry={caixa(18.9 * tl.s, 0.08, 0.06)} material={mFriso} position={[SEDE.x, tl.y0 + dy * tl.s, S + 0.57]} />)}
+      {[-9.42, 9.42].map((dx) => <mesh key={`ml${dx}`} geometry={caixa(0.08, 8 * tl.s, 0.06)} material={mFriso} position={[SEDE.x + dx * tl.s, tl.y0 + 4 * tl.s, S + 0.57]} />)}
       {/* mastro de antena listrado com a luz de balizamento */}
       <mesh geometry={caixa(1.4, 0.6, 1.4)} material={mLaje} position={[mastro[0], mastro[1] + 0.3, mastro[2]]} />
       {[0, 1, 2, 3, 4, 5].map((k) => { const rb = 0.42 - k * 0.05; return <mesh key={`m${k}`} geometry={cilindro(rb - 0.05, rb, 2.2, 10)} material={k % 2 ? mVerm : mBranco} position={[mastro[0], mastro[1] + 0.6 + k * 2.2 + 1.1, mastro[2]]} castShadow />; })}
       {[9.6, 11.2].map((dy) => <group key={`d${dy}`}><mesh geometry={caixa(2.4, 0.08, 0.08)} material={mPe} position={[mastro[0], mastro[1] + dy, mastro[2]]} /><mesh geometry={caixa(0.08, 0.08, 2.4)} material={mPe} position={[mastro[0], mastro[1] + dy, mastro[2]]} /></group>)}
       <mesh geometry={esfera(0.24, 10)} material={mAviso} position={[mastro[0], mastro[1] + 14.1, mastro[2]]} />
       {/* parabólicas nos terraços e no topo */}
-      <Parabolica pos={[O + 2.2, 5 * AND + 0.5, S - 1.6]} r={1.6} yaw={-PI / 4} tilt={0.8} prato={mPrato} pe={mPe} />
-      <Parabolica pos={[L - 3.6, 6 * AND + 0.4, S - 4.6]} r={1.9} yaw={PI / 5} tilt={0.75} prato={mPrato} pe={mPe} />
+      <Parabolica pos={[O + 2.2, F * AND + 0.5, S - 1.6]} r={1.6} yaw={-PI / 4} tilt={0.8} prato={mPrato} pe={mPe} />
+      <Parabolica pos={[L - 3.6, D > 1 ? (F + 1) * AND + 0.4 : H + 0.6, S - 4.6]} r={1.9} yaw={PI / 5} tilt={0.75} prato={mPrato} pe={mPe} />
       <Parabolica pos={[SEDE.x - 1.5, H + 0.6, N + 3.2]} r={2.4} yaw={0.15} tilt={0.7} prato={mPrato} pe={mPe} />
       {/* entrada de estúdio: cobertura preta com friso aceso, painel da logo e a luz "AO VIVO" em cima */}
       <mesh geometry={caixa(10, 0.45, 4.2)} material={mPreto} position={[SEDE.x, 4.4, S + 2.1]} castShadow />
@@ -539,13 +547,15 @@ function animarTelao(t: Telas, s: number, dt: number) {
 }
 export function TelaoEstudio({ sede }: { sede: Sede }) {
   const logo = useLoader(THREE.TextureLoader, sede.logo);
-  const t = telasDe(sede, logo.image as unknown as HTMLImageElement);
+  const t = telasDe(sede, logo.image as unknown as HTMLImageElement), tl = telaoDe(sede);
   useFrame(({ clock }, dt) => animarTelao(t, clock.elapsedTime, dt));
   return (
     <group>
-      <mesh geometry={plano(18, 6)} material={t.mTela} position={[SEDE.x, 16.75, S + 0.56]} />
-      <mesh geometry={plano(18, 1)} material={t.mCorrido} position={[SEDE.x, 13.05, S + 0.56]} />
-      <mesh geometry={circulo(0.18, 16)} material={t.mPonto} position={[SEDE.x - 9 + (18 * PONTO[0]) / TW, 16.75 + 3 - (6 * PONTO[1]) / TH, S + 0.57]} />
+      <group position={[SEDE.x, tl.y0, S]} scale={[tl.s, tl.s, 1]}>
+        <mesh geometry={plano(18, 6)} material={t.mTela} position={[0, 4.75, 0.56]} />
+        <mesh geometry={plano(18, 1)} material={t.mCorrido} position={[0, 1.05, 0.56]} />
+        <mesh geometry={circulo(0.18, 16)} material={t.mPonto} position={[-9 + (18 * PONTO[0]) / TW, 4.75 + 3 - (6 * PONTO[1]) / TH, 0.57]} />
+      </group>
       <mesh geometry={plano(2.4, 0.52)} material={t.mSelo} position={[SEDE.x, 6.585, S + 4.16]} />
     </group>
   );
