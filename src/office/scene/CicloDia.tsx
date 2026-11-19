@@ -41,10 +41,12 @@ export function noiteDaHora(h: number) {
 }
 
 // paletas: dia, crepúsculo (pico no meio da rampa) e noite
+// 18/11/2026 (acabamento): o sol ficou um pouco mais quente e o "chão" da luz de hemisfério, que antes era um cinza quase
+// branco, virou o rebatimento de grama e asfalto (mais escuro e quente): paredes e baixos ganham volume, o alto continua claro
 const C = {
-  hemiCeu: [new THREE.Color("#FFFFFF"), new THREE.Color("#FFD7B0"), new THREE.Color("#6F82BE")],
-  hemiChao: [new THREE.Color("#CDD3DB"), new THREE.Color("#B48C7A"), new THREE.Color("#1A2030")],
-  sol: [new THREE.Color("#FFF6E8"), new THREE.Color("#FF9F5A"), new THREE.Color("#A9BCFF")],
+  hemiCeu: [new THREE.Color("#EEF4FF"), new THREE.Color("#FFD7B0"), new THREE.Color("#6F82BE")],
+  hemiChao: [new THREE.Color("#9C9886"), new THREE.Color("#8E7064"), new THREE.Color("#1A2030")],
+  sol: [new THREE.Color("#FFF0DA"), new THREE.Color("#FF9F5A"), new THREE.Color("#A9BCFF")],
   horizonte: [new THREE.Color("#FFFFFF"), new THREE.Color("#F4B48C"), new THREE.Color("#28324A")],
   ceuBaixo: [new THREE.Color("#CFE3F5"), new THREE.Color("#FFB16C"), new THREE.Color("#18284A")],
   ceuAlto: [new THREE.Color("#5E9BD8"), new THREE.Color("#3D4B8E"), new THREE.Color("#050B18")],
@@ -59,6 +61,18 @@ function mistura(lista: THREE.Color[], n: number, crep: number, alvo: THREE.Colo
   return alvo.lerp(lista[1], crep * forcaCrep); // puxa para o laranja no meio do caminho
 }
 const doisTons = (par: THREE.Color[], n: number, alvo: THREE.Color) => alvo.copy(par[0]).lerp(par[1], n);
+
+// direção de onde vem a luz principal (sol de dia, lua à noite), já normalizada. 18/11/2026: no fim da tarde o sol desce
+// (de ~54° para ~21° de altura, mesma direção no chão): sombras compridas e luz rasante dourada. As sombras (Cena3D) e o
+// reflexo do céu (Acabamento) leem este vetor; quem só ilumina (modo leve) recebe a direção pela posição da luz.
+const AZIMUTE_SOL = Math.atan2(10, 12), ALTURA_DIA = Math.asin(22 / Math.hypot(12, 22, 10)), ALTURA_TARDE = THREE.MathUtils.degToRad(21);
+export const DIR_SOL = new THREE.Vector3(12, 22, 10).normalize();
+function apontarSol(crep: number) {
+  const a = THREE.MathUtils.lerp(ALTURA_DIA, ALTURA_TARDE, crep);
+  DIR_SOL.set(Math.cos(AZIMUTE_SOL) * Math.cos(a), Math.sin(a), Math.sin(AZIMUTE_SOL) * Math.cos(a));
+}
+// exposição da curva de tom (Acabamento): um pouco mais aberta à noite, para a cidade continuar legível
+const EXPOSICAO_DIA = 1.15, EXPOSICAO_NOITE = 1.35;
 
 // uniformes do céu: a cúpula e os painéis do horizonte leem os mesmos valores
 const SOL_DIR = new THREE.Vector3(12, 2.4, 10).normalize(); // brilho do sol baixo, do lado de onde vem a luz da cena
@@ -100,7 +114,8 @@ export function registrarHorizonte(m: THREE.MeshBasicMaterial) {
 
 interface Luzes { hemi: React.RefObject<THREE.HemisphereLight | null>; sol: React.RefObject<THREE.DirectionalLight | null>; preench: React.RefObject<THREE.DirectionalLight | null> }
 
-function atualizar(scene: THREE.Scene, l: Luzes, dt: number, t: number) {
+const DIST_LUZ = new THREE.Vector3();
+function atualizar(scene: THREE.Scene, gl: THREE.WebGLRenderer, l: Luzes, dt: number, t: number) {
   const modo = useHora.getState().modo;
   const hora = HORA_FIXA != null ? HORA_FIXA : modo === "auto" ? horaAgora(t) : null; // "sempre dia/noite": sem hora (nada de neblina da manhã)
   const alvo = hora != null ? noiteDaHora(hora) : modo === "noite" ? 1 : 0;
@@ -116,6 +131,7 @@ function atualizar(scene: THREE.Scene, l: Luzes, dt: number, t: number) {
   mistura(C.nuvem, n, crep, U.uNuvemCor.value, 0.9).lerp(doisTons(FECHADO.nuvem, n, tmp), fechado * 0.8);
   U.uTroca.value = Math.max(crep * 0.95, n, fechado * 0.85);
   U.uSolForca.value = crep * (1 - fechado) * 1.3;
+  U_BRUMA.value = (1 - n * 0.75) * (1 - fechado * 0.6);
   // fundo e neblina: o horizonte some na cor do céu baixo; na neblina, num branco acinzentado
   const corNevoa = tmp2.copy(U.uCeuBaixo.value).lerp(doisTons(NEVOA, n, tmp), Math.min(1, neb * 1.3));
   U.uNevoaCor.value.copy(corNevoa); U.uNevoa.value = Math.min(0.97, neb * 1.6);
@@ -123,13 +139,22 @@ function atualizar(scene: THREE.Scene, l: Luzes, dt: number, t: number) {
   const fog = scene.fog as THREE.Fog | null;
   if (fog) {
     fog.color.copy(corNevoa);
-    // neblina: o alcance cai depressa (0,55 da manhã ≈ 115 m; 0,9 ≈ 55 m) e começa bem perto da câmera
+    // neblina: o alcance cai depressa (0,55 da manhã ≈ 115 m; 0,9 ≈ 55 m) e começa bem perto da câmera.
+    // 18/11/2026: com tempo limpo ela começa a 115 m (antes 140): um véu leve no meio da distância dá profundidade
     const far = 360 * Math.pow(45 / 360, neb) * (1 - clima.chuva * 0.3);
-    fog.far = far; fog.near = THREE.MathUtils.lerp(140 * (1 - clima.chuva * 0.25), far * 0.06, Math.min(1, neb * 2.2));
+    fog.far = far; fog.near = THREE.MathUtils.lerp(115 * (1 - clima.chuva * 0.25), far * 0.06, Math.min(1, neb * 2.2));
   }
+  // curva de tom: exposição pela hora (só um número; não recompila)
+  gl.toneMappingExposure = THREE.MathUtils.lerp(EXPOSICAO_DIA, EXPOSICAO_NOITE, n);
   const h = l.hemi.current, s = l.sol.current, p = l.preench.current;
-  if (h) { mistura(C.hemiCeu, n, crep, h.color); mistura(C.hemiChao, n, crep, h.groundColor); h.intensity = THREE.MathUtils.lerp(0.9, 0.42, n) * (1 - fechado * 0.12); }
-  if (s) { mistura(C.sol, n, crep, s.color); s.intensity = THREE.MathUtils.lerp(2.2, 0.5, n) * (1 - crep * 0.25) * (1 - fechado * 0.55) * (1 - neb * 0.3); }
+  if (h) { mistura(C.hemiCeu, n, crep, h.color); mistura(C.hemiChao, n, crep, h.groundColor); h.intensity = THREE.MathUtils.lerp(0.85, 0.42, n) * (1 - fechado * 0.12); }
+  if (s) {
+    mistura(C.sol, n, crep, s.color); s.intensity = THREE.MathUtils.lerp(2.4, 0.5, n) * (1 - crep * 0.2) * (1 - fechado * 0.6) * (1 - neb * 0.3);
+    // a direção muda só no fim da tarde; a distância da luz até o alvo fica a mesma (o Cena3D escolhe o alvo da sombra)
+    apontarSol(crep);
+    const d = DIST_LUZ.copy(s.position).sub(s.target.position).length() || 30;
+    s.position.copy(s.target.position).addScaledVector(DIR_SOL, d);
+  }
   if (p) p.intensity = THREE.MathUtils.lerp(0.5, 0.15, n) * (1 + fechado * 0.3);
   const vista = useEscritorio.getState();
   luzInterna.k += ((vista.vista === "dentro" && vista.luz ? 1 : 0) - luzInterna.k) * Math.min(1, dt * 4);
@@ -145,28 +170,35 @@ function atualizar(scene: THREE.Scene, l: Luzes, dt: number, t: number) {
 }
 
 export function CicloDia({ luzes }: { luzes: Luzes }) {
-  const scene = useThree((s) => s.scene);
+  const scene = useThree((s) => s.scene), gl = useThree((s) => s.gl);
   useEffect(() => { iniciarClima(); }, []);
-  useFrame(({ clock }, dt) => atualizar(scene, luzes, Math.min(dt, 0.1), clock.elapsedTime));
+  useFrame(({ clock }, dt) => atualizar(scene, gl, luzes, Math.min(dt, 0.1), clock.elapsedTime));
   return <><Cupula /><Estrelas /><Lua /></>;
 }
 
 // ---------- cúpula do céu ----------
 // Esfera grande que acompanha a câmera, desenhada antes de tudo (sem profundidade): degradê do horizonte ao alto e o
 // brilho do sol baixo no entardecer e no amanhecer. Acima dos painéis do horizonte é o que se vê do céu.
+// 18/11/2026: o azul sobe mais depressa a partir do horizonte (como um céu de verdade, não uma rampa reta), uma faixa
+// de bruma clara fica rente ao horizonte e um pontilhado imperceptível (dithering) tira as faixas do degradê.
+const U_BRUMA = { value: 1 };
 const MAT_CUPULA = new THREE.ShaderMaterial({
-  uniforms: { uCeuBaixo: U.uCeuBaixo, uCeuAlto: U.uCeuAlto, uSolDir: U.uSolDir, uSolCor: U.uSolCor, uSolForca: U.uSolForca },
+  uniforms: { uCeuBaixo: U.uCeuBaixo, uCeuAlto: U.uCeuAlto, uSolDir: U.uSolDir, uSolCor: U.uSolCor, uSolForca: U.uSolForca, uBruma: U_BRUMA },
   vertexShader: "varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
-  fragmentShader: `uniform vec3 uCeuBaixo; uniform vec3 uCeuAlto; uniform vec3 uSolDir; uniform vec3 uSolCor; uniform float uSolForca; varying vec3 vDir;
+  fragmentShader: `#include <common>
+#include <dithering_pars_fragment>
+uniform vec3 uCeuBaixo; uniform vec3 uCeuAlto; uniform vec3 uSolDir; uniform vec3 uSolCor; uniform float uSolForca; uniform float uBruma; varying vec3 vDir;
 void main() {
   vec3 d = normalize(vDir);
-  vec3 c = mix(uCeuBaixo, uCeuAlto, smoothstep(-0.02, 0.55, d.y));
+  vec3 c = mix(uCeuBaixo, uCeuAlto, pow(smoothstep(-0.02, 0.62, d.y), 0.72));
+  c = mix(c, uCeuBaixo * 1.05 + vec3(0.012), (1.0 - smoothstep(0.0, 0.1, abs(d.y))) * 0.5 * uBruma);
   float s = max(0.0, dot(d, uSolDir));
   c += uSolCor * (pow(s, 48.0) * 1.6 + pow(s, 6.0) * 0.35) * uSolForca;
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
+  #include <dithering_fragment>
 }`,
-  side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
+  side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false, dithering: true,
 });
 function Cupula() {
   const ref = useRef<THREE.Mesh>(null);

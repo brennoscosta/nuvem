@@ -1,16 +1,19 @@
 // Sede da Social RP (antes OneState RP; o nome mudou em 16/11/2026) na cidade (16/11/2026, pedido do dono: "coloque um prédio desse para o OneState, com logo e todas
 // as áreas do site"). Ocupa o quarteirão 1,1 (sudeste) inteiro, como a Nuvem e a lanchonete: o último na ordem da planta,
-// então nenhum lote mudou de número. Térreo = saguão; do 1º ao 5º andar, cada sala é uma área do site, com o nome
-// iluminado na fachada (3 na frente sul e 2 no lado oeste, os lados que a câmera vê). Tocar no prédio abre o cartão com
-// todas as áreas (src/office/ui/CartaoOneState.tsx), cada uma levando à página no onestatebr.com.br.
+// então nenhum lote mudou de número. Térreo = saguão; do 1º andar para cima, cada sala é uma área do site, com o nome
+// iluminado na fachada (a divisão por andar e por face fica em data/sedes.ts › areasDoAndarDe). Tocar no prédio abre o
+// cartão com todas as áreas (src/office/ui/CartaoOneState.tsx), cada uma levando à página no onestatebr.com.br.
 import { centroQuarteirao } from "./mundo";
 
 export const SITE_ONESTATE = "https://onestatebr.com.br";
 // a sede é o "lote" de uma conta (o dono): chave fora da lista de lotes à venda, sem número de loja (equipe em scripts/sede-socialrp.mjs: departamentos com chefes)
 export const CHAVE_SEDE = "1,1,0";
 export const [OS_X, OS_Z] = centroQuarteirao(1, 1);
-// torre: 22 m de frente (x) por 16 m de fundo (z), recuada para o norte (a praça de entrada fica na frente, ao sul)
-export const SEDE = { x: OS_X, z: OS_Z - 3, w: 22, d: 16, andar: 4, andares: 6 };
+// torre: 19 m de frente (x) por 14 m de fundo (z), recuada para o norte (a praça de entrada fica na frente, ao sul).
+// 18/11/2026, pedido do dono ("os prédios podem ser menores ainda"): antes 22 x 16 m com andares de 4 m; agora pé-direito
+// de 3,4 m. O interior (data/plantaSede.ts, 34 x 30 m) não depende destas medidas: na vista por dentro a torre some.
+// `andares` é só o padrão antigo; cada sede tem o seu número de andares (data/sedes.ts).
+export const SEDE = { x: OS_X, z: OS_Z - 3, w: 19, d: 14, andar: 3.4, andares: 4 };
 export const ALTURA_SEDE = SEDE.andar * SEDE.andares;
 export const POR_ANDAR = 5; // salas com nome por andar: 3 na frente (sul) e 2 no lado (oeste)
 

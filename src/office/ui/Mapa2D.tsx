@@ -114,8 +114,9 @@ function Lote2D({ l, t, principal, anexoMeio, sel, vagas, promo, vivo }: { l: Lo
       <rect x={x - s / 2} y={z - s / 2} width={s} height={s} rx={2} fill={GRAMA_Q} />
       {l.lote.tipo === "casa" ? <Casa x={x} z={z - 1} cor={({ casaVelha: "#9C6B4E", casaTerrea: "#C0623A", casaSobrado: "#8A8F98", casaColonial: "#B5552F", casaModerna: "#6B7280" } as Record<string, string>)[l.lote.modelo] ?? "#C0623A"} /> : l.lote.tipo === "vazio" && l.lote.arvore ? <Arvore x={x + 3} z={z - 2} r={2.6} /> : null}
       <g style={{ pointerEvents: "none" }}>
-        <rect x={x - (10 + String(l.numero).length * 1.3) / 2} y={z + 4.4} width={10 + String(l.numero).length * 1.3} height={3.4} rx={0.6} fill="#FFFFFF" stroke="#1D4ED8" strokeWidth={0.3} />
-        <text x={x} y={z + 6.75} textAnchor="middle" fontSize={1.9} fontWeight={800} fill="#1D4ED8">À venda · {l.numero}</text>
+        <rect x={x - (13 + String(l.numero).length * 1.3) / 2} y={z + 4.4} width={13 + String(l.numero).length * 1.3} height={3.4} rx={0.6} fill="#FFFFFF" stroke="#1D4ED8" strokeWidth={0.3} />
+        {/* 18/11/2026: o lote livre é um "ponto disponível" (mesmo nome da placa no mapa 3D) */}
+        <text x={x} y={z + 6.75} textAnchor="middle" fontSize={1.9} fontWeight={800} fill="#1D4ED8">Disponível · {l.numero}</text>
       </g>
       {borda}
     </g>

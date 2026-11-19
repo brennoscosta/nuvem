@@ -15,7 +15,7 @@ import { MUNDO, LIMITE_CAMERA } from "../data/mundo";
 import { Fachada } from "./Fachada";
 import { CameraMundo } from "./CameraMundo";
 import { CicloDia } from "./CicloDia";
-import { Acabamento } from "./Acabamento";
+import { Acabamento, TOM_PROPRIO } from "./Acabamento";
 import { MiniMapaRender } from "./MiniMapaRender";
 import { precarregarCidade } from "./Modelos";
 import { Agente, handlers } from "./Agente";
@@ -111,26 +111,50 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
 }
 
 // Sombras "assadas": o mapa de sombras é recalculado só de vez em quando (quem anda não projeta sombra; usa a
-// mancha de contato). Economiza um passe inteiro de desenho por quadro. O mundo é grande, então a câmera de sombra
-// (±26 m) acompanha o ponto que o usuário está olhando: quando ele arrasta pra longe, a luz muda de lugar e refaz.
-const SOL = new THREE.Vector3(12, 22, 10);
+// mancha de contato). Economiza um passe inteiro de desenho por quadro. O mundo é grande, então a área com sombra
+// acompanha o ponto que o usuário está olhando: quando ele arrasta pra longe, a luz muda de lugar e refaz.
+// 18/11/2026 (acabamento): a área também acompanha o zoom (de perto ±20 m, bem nítida; de longe até ±85 m, cobrindo o que
+// aparece na tela, com o texel do mapa do tamanho de um pixel no chão), anda um pouco para o fundo da tela (a parte de cima
+// mostra mais chão), fica presa à grade de texels (a borda não "anda" entre um refazer e outro) e some aos poucos na borda
+// (Acabamento). A luz fica longe (180 m): as torres altas das sedes não são mais cortadas pelo plano de perto da câmera de
+// sombra. O viés acompanha o tamanho do texel (sem "acne" no chão e sem sombra descolada do pé dos prédios).
+const MAPA_SOMBRA = 2048;
+const S = { centro: new THREE.Vector3(), frente: new THREE.Vector3(), dir: new THREE.Vector3(), dirFeita: new THREE.Vector3(), dx: new THREE.Vector3(), dy: new THREE.Vector3(), centroFeito: new THREE.Vector3(1e9, 0, 0), meiaFeita: 0 };
+const CIMA = new THREE.Vector3(0, 1, 0);
+// fora do componente: a luz e a câmera são objetos do three.js, não estado do React. Diz se a área de sombra mudou.
+function encaixarSombra(l: THREE.DirectionalLight, camera: THREE.Camera, alvo: THREE.Vector3, forcar: boolean) {
+  const meia = THREE.MathUtils.clamp(camera.position.distanceTo(alvo) * 0.62, 20, 85);
+  S.frente.set(alvo.x - camera.position.x, 0, alvo.z - camera.position.z);
+  const fl = S.frente.length(); if (fl > 1e-3) S.frente.multiplyScalar((meia * 0.3) / fl);
+  S.centro.set(alvo.x, 0, alvo.z).add(S.frente);
+  // direção do sol (o CicloDia ajusta pela hora): a posição da luz menos o alvo
+  S.dir.copy(l.position).sub(l.target.position).normalize();
+  const mudou = Math.abs(meia - S.meiaFeita) > S.meiaFeita * 0.18 || S.centro.distanceTo(S.centroFeito) > Math.max(6, meia * 0.2) || S.dir.angleTo(S.dirFeita) > 0.012;
+  if (!mudou && !forcar) return false;
+  S.meiaFeita = meia; S.centroFeito.copy(S.centro); S.dirFeita.copy(S.dir);
+  const texel = (2 * meia) / MAPA_SOMBRA;
+  // prende o centro à grade de texels no plano da luz
+  S.dx.crossVectors(CIMA, S.dir).normalize(); S.dy.crossVectors(S.dir, S.dx);
+  const u = Math.round(S.centro.dot(S.dx) / texel) * texel, v = Math.round(S.centro.dot(S.dy) / texel) * texel, w = S.centro.dot(S.dir);
+  S.centro.copy(S.dx).multiplyScalar(u).addScaledVector(S.dy, v).addScaledVector(S.dir, w);
+  const c = l.shadow.camera;
+  c.left = -meia; c.right = meia; c.top = meia; c.bottom = -meia; c.near = 1; c.far = 420; c.updateProjectionMatrix();
+  l.position.copy(S.centro).addScaledVector(S.dir, 180); l.target.position.copy(S.centro); l.target.updateMatrixWorld();
+  l.shadow.normalBias = texel * 1.6; l.shadow.bias = -0.00004;
+  return true;
+}
 function SombrasFixas({ luz, controles }: { luz: React.RefObject<THREE.DirectionalLight | null>; controles: React.RefObject<any> }) {
   const vista = useEscritorio((s) => s.vista);
   const prox = useRef(0);
   const vistaFeita = useRef<string | null>(null);
-  const centro = useRef(new THREE.Vector3(1e9, 0, 0));
   // modelos e fontes chegam aos poucos: refaz a sombra a cada 1 s nos primeiros 12 s, depois a cada 5 s e quando a vista muda
-  useFrame(({ gl, clock }) => {
+  useFrame(({ gl, clock, camera }) => {
     gl.shadowMap.autoUpdate = false;
     const t = clock.elapsedTime;
     // qualidade baixada durante o uso: a sombra só é refeita quando a câmera anda ou a vista muda (sem o refazer periódico)
     let refaz = (!sombraEconomica && t >= prox.current) || vistaFeita.current !== vista;
     const l = luz.current, alvo = controles.current?.target as THREE.Vector3 | undefined;
-    if (l && alvo && alvo.distanceTo(centro.current) > 6) {
-      centro.current.copy(alvo);
-      l.position.copy(alvo).add(SOL); l.target.position.copy(alvo); l.target.updateMatrixWorld();
-      refaz = true;
-    }
+    if (l && alvo && encaixarSombra(l, camera, alvo, refaz)) refaz = true;
     if (refaz) { gl.shadowMap.needsUpdate = true; prox.current = t + (t < 12 ? 1 : 5); vistaFeita.current = vista; }
   });
   return null;
@@ -242,9 +266,10 @@ function Luzes({ sombras, luz, hemi, preench }: { sombras: boolean; luz: React.R
       <directionalLight
         ref={luz}
         position={[12, 22, 10]} intensity={2.2} color="#FFF6E8" castShadow={sombras}
-        // modo completo (12/11/2026): sombra em 2048 cobrindo ±32 m (antes 1024 em ±26 m): mais nítida e mais longe
-        shadow-mapSize={sombras ? [2048, 2048] : [1024, 1024]} shadow-bias={-0.0004} shadow-normalBias={0.02} shadow-radius={sombras ? 3 : 4}
-        shadow-camera-left={-32} shadow-camera-right={32} shadow-camera-top={32} shadow-camera-bottom={-32} shadow-camera-near={1} shadow-camera-far={90}
+        // modo completo (12/11/2026): sombra em 2048 cobrindo ±32 m (antes 1024 em ±26 m): mais nítida e mais longe.
+        // 18/11/2026: área, viés e distância da luz passam a ser ajustados pelo SombrasFixas conforme o zoom; raio 2,5 texels
+        shadow-mapSize={sombras ? [MAPA_SOMBRA, MAPA_SOMBRA] : [1024, 1024]} shadow-bias={-0.00004} shadow-normalBias={0.05} shadow-radius={sombras ? 2.5 : 4}
+        shadow-camera-left={-32} shadow-camera-right={32} shadow-camera-top={32} shadow-camera-bottom={-32} shadow-camera-near={1} shadow-camera-far={420}
       />
       <directionalLight ref={preench} position={[-14, 10, -8]} intensity={0.5} color="#DCE8FF" />
     </>
@@ -279,7 +304,8 @@ export function Cena3D() {
       frameloop={leve ? "never" : "always"}
       shadows={leveInicial ? false : { enabled: true, type: THREE.PCFShadowMap }}
       camera={{ position: cam.pos, fov: FOV, near: 0.5, far: 420 }}
-      gl={{ antialias: true, powerPreference: "high-performance" }}
+      // curva de tom própria no mapa da cidade (Acabamento; a exposição o CicloDia ajusta pela hora)
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: TOM_PROPRIO && modoMundo() ? THREE.CustomToneMapping : THREE.ACESFilmicToneMapping }}
       onPointerMissed={() => { useEscritorio.getState().selecionar(null); if (!useMundo.getState().painelEmpresa) useMundo.getState().selecionarLote(null); }}>
       <color attach="background" args={["#CFE3F5"]} />
       <fog attach="fog" args={["#CFE3F5", 140, 360]} />
@@ -287,7 +313,8 @@ export function Cena3D() {
       <AplicarNivel nivel={nivel} luz={luz} />
       {leve ? <Limite30 /> : (
         <>
-          {nivel === 0 && <SombrasFixas luz={luz} controles={controles} />}
+          {/* no 1º degrau da queda a sombra continua acompanhando a câmera (só perde o refazer periódico); antes ela parava onde estava */}
+          <SombrasFixas luz={luz} controles={controles} />
           {/* só reage a queda sustentada (abaixo de 35 fps): os tropeços do carregamento não contam */}
           <PerformanceMonitor bounds={() => [35, 55]} flipflops={4} onDecline={() => setDpr(1)} onIncline={() => setDpr(maxDpr)} onFallback={() => setDpr(1)} />
         </>

@@ -41,17 +41,20 @@ export const centroLote = (i: number, j: number, k: number): [number, number] =>
 export const frenteDoLote = (k: number) => (k >= 2 ? 0 : Math.PI);
 
 // Casas distribuídas pra nunca repetir o mesmo modelo lado a lado; terrenos vazios no meio.
+// 18/11/2026 (pedido do dono: "as casas velhas, melhore o visual"): a casinha caindo aos pedaços (casaVelha) saiu dos
+// lotes 4 e 10; no lugar entraram a casa moderna (lote 4) e a casinha térrea com varanda (lote 10), bem acabadas. O sobrado
+// moderno foi testado e saiu: por trás e dos lados ele é um cubo branco liso. O modelo antigo continua no código.
 const V = (arvore = false): Lote => ({ tipo: "vazio", arvore });
 const C = (modelo: ModeloCasa, escala = 1): Lote => ({ tipo: "casa", modelo, escala });
 
 export const QUARTEIROES: Quarteirao[] = [
   { i: 0, j: 0, ocupante: "nuvem" },
   { i: 1, j: 0, ocupante: "restaurante" },
-  { i: -1, j: 0, lotes: [C("casaTerrea"), V(true), C("casaColonial", 1.05), C("casaVelha")] },
+  { i: -1, j: 0, lotes: [C("casaTerrea"), V(true), C("casaColonial", 1.05), C("casaModerna")] },
   // 17/11/2026: sedes da AppZone (-1,-1), do NUVCAM (1,-1) e do bday.fm (-1,1) (data/sedes.ts); nenhum desses 12 lotes
   // estava reservado ou vendido. Os números deles ficam guardados (reserva) para a numeração das outras lojas não mudar.
   { i: -1, j: -1, ocupante: "sede", reserva: 4 },
-  { i: 0, j: -1, lotes: [V(true), C("casaVelha", 1.05), C("casaColonial"), V()] },
+  { i: 0, j: -1, lotes: [V(true), C("casaTerrea", 1.05), C("casaColonial"), V()] },
   { i: 1, j: -1, ocupante: "sede", reserva: 4 },
   { i: -1, j: 1, ocupante: "sede", reserva: 4 },
   // o lote 0,1,1 (ao sul da Nuvem) virou a praça de eventos e da feira de sábado em 12/11/2026

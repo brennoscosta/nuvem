@@ -1,5 +1,5 @@
 "use client";
-// Sede da Social RP, antes OneState RP (16/11/2026; dados em src/office/data/onestate.ts). Torre de 6 andares de vidro escuro com estrutura
+// Sede da Social RP, antes OneState RP (16/11/2026; dados em src/office/data/onestate.ts). Torre de vidro escuro com estrutura
 // grafite e frisos dourados (as cores da marca: ouro e prata sobre preto), logo grande no alto (sul, oeste e norte),
 // pórtico dourado com a logo na entrada, praça com totem e o balão. Cada andar de cada fachada é UMA imagem desenhada na
 // hora (salas acesas na cor da área, mesas e a placa com o nome): poucos objetos para o mapa desenhar. A fachada acende
@@ -14,12 +14,12 @@ import { ComFallback } from "./Modelos";
 import { ceu } from "./CicloDia";
 import { leve } from "./qualidade";
 import { SEDE, OS_X, OS_Z } from "../data/onestate";
-import { SEDE_SOCIALRP, deslocamento, areasDoAndarDe, andaresComAreas, FRENTE_SEDE, LADO_SEDE, alturaSede, type Sede, type AreaSede } from "../data/sedes";
+import { SEDE_SOCIALRP, deslocamento, areasDoAndarDe, andaresComAreas, SALAS_NA_FACE, alturaSede, type Sede, type AreaSede, type FaceSede, type SalasDoAndar } from "../data/sedes";
 import { abrirSede } from "../ui/CartaoOneState";
 import { InteriorSede } from "./OneStateInterior";
 import { useEscritorio } from "../store";
 import { cameraInfo } from "./CameraMundo";
-import { PALETAS, pisosDe, logosDe, brilhoEstilos, comAlfa, CascaEstilo, TelaoEstudio, type Paleta } from "./SedeEstilos";
+import { PALETAS, PORTICO, SX, SZ, pisosDe, logosDe, brilhoEstilos, comAlfa, CascaEstilo, TelaoEstudio, type Paleta } from "./SedeEstilos";
 
 // 17/11/2026: a mesma torre serve a todas as sedes do cadastro (data/sedes.ts): cor de destaque, logo, áreas e balão de
 // cada uma; é desenhada em volta do centro da Social RP e deslocada para o quarteirão da sede (deslocamento()).
@@ -32,9 +32,17 @@ const S = SEDE.z + SEDE.d / 2, N = SEDE.z - SEDE.d / 2, O = SEDE.x - SEDE.w / 2,
 const PELES = ["#F1C9A5", "#C98E68", "#8D5A3B", "#F3D2B3", "#6B4029"];
 type Tipo = "areas" | "comum" | "saguao";
 const caixaRedonda = (g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); };
+// nome da área: numa sala estreita a letra diminui (até 70%) antes de ser apertada na largura, para continuar legível
+function escrever(g: CanvasRenderingContext2D, texto: string, x: number, y: number, max: number, px: number) {
+  const fonte = (p: number) => `800 ${Math.round(p)}px "Arial Black", Inter, Arial, sans-serif`;
+  g.font = fonte(px);
+  const w = g.measureText(texto).width;
+  if (w > max) g.font = fonte(Math.max(px * 0.7, (px * max) / w));
+  g.fillText(texto, x, y, max);
+}
 // a placa com o nome da área no alto da sala, no jeito de cada estilo (a clássica é a original, com moldura dourada)
 function placa(g: CanvasRenderingContext2D, P: Paleta, x0: number, sw: number, H: number, topo: number, a: AreaSede | null, OURO: string, CLARA: string, ESCURA: string) {
-  const fonte = `800 ${Math.round(H * 0.125)}px "Arial Black", Inter, Arial, sans-serif`, cy = 7 + (topo - 10) / 2;
+  const px = H * 0.125, cy = 7 + (topo - 10) / 2;
   g.textBaseline = "middle";
   if (P.placa === "app") {
     // AppZone: faixa escura com sublinhado na cor da marca e um ícone de aplicativo na cor da área
@@ -42,7 +50,7 @@ function placa(g: CanvasRenderingContext2D, P: Paleta, x0: number, sw: number, H
     g.fillStyle = OURO; g.fillRect(x0 + 6, topo - 7, sw - 12, 3);
     if (a) {
       const s = H * 0.1; g.fillStyle = a.cor; caixaRedonda(g, x0 + 16, cy - s / 2, s, s, 5); g.fill();
-      g.fillStyle = P.texto ?? CLARA; g.font = fonte; g.fillText(a.nome.toUpperCase(), x0 + 26 + s, cy, sw - 44 - s);
+      g.fillStyle = P.texto ?? CLARA; escrever(g, a.nome.toUpperCase(), x0 + 26 + s, cy, sw - 44 - s, px);
     }
     return;
   }
@@ -52,7 +60,7 @@ function placa(g: CanvasRenderingContext2D, P: Paleta, x0: number, sw: number, H
     if (!a) return;
     g.fillStyle = "#FFFFFF"; caixaRedonda(g, x0 + 10, 9, sw - 20, topo - 17, (topo - 17) / 2); g.fill();
     g.fillStyle = a.cor; g.beginPath(); g.arc(x0 + 34, cy, H * 0.035, 0, Math.PI * 2); g.fill();
-    g.fillStyle = ESCURA; g.font = fonte; g.fillText(a.nome.toUpperCase(), x0 + 50, cy, sw - 74);
+    g.fillStyle = ESCURA; escrever(g, a.nome.toUpperCase(), x0 + 50, cy, sw - 74, px);
     return;
   }
   if (P.placa === "estudio") {
@@ -62,7 +70,7 @@ function placa(g: CanvasRenderingContext2D, P: Paleta, x0: number, sw: number, H
     if (a) {
       g.strokeStyle = a.cor; g.lineWidth = 3; g.beginPath(); g.arc(x0 + 36, cy, H * 0.042, 0, Math.PI * 2); g.stroke();
       g.fillStyle = a.cor; g.beginPath(); g.arc(x0 + 36, cy, H * 0.024, 0, Math.PI * 2); g.fill();
-      g.fillStyle = P.texto ?? CLARA; g.font = fonte; g.fillText(a.nome.toUpperCase(), x0 + 54, cy, sw - 72);
+      g.fillStyle = P.texto ?? CLARA; escrever(g, a.nome.toUpperCase(), x0 + 54, cy, sw - 72, px);
     }
     return;
   }
@@ -71,8 +79,7 @@ function placa(g: CanvasRenderingContext2D, P: Paleta, x0: number, sw: number, H
   g.strokeStyle = OURO; g.lineWidth = 3; g.strokeRect(x0 + 7.5, 7.5, sw - 15, topo - 13);
   if (a) {
     g.fillStyle = a.cor; g.beginPath(); g.arc(x0 + 30, cy - 1, H * 0.035, 0, Math.PI * 2); g.fill();
-    g.fillStyle = CLARA; g.font = fonte;
-    g.fillText(a.nome.toUpperCase(), x0 + 48, cy, sw - 66);
+    g.fillStyle = CLARA; escrever(g, a.nome.toUpperCase(), x0 + 48, cy, sw - 66, px);
   }
 }
 function pintar(W: number, H: number, salas: (AreaSede | null)[], tipo: Tipo, OURO: string, CLARA: string, ESCURA: string, P: Paleta) {
@@ -108,7 +115,7 @@ function pintar(W: number, H: number, salas: (AreaSede | null)[], tipo: Tipo, OU
     // montantes do caixilho
     g.fillStyle = P.montante; for (let m = 0; m <= P.montantes; m++) g.fillRect(x0 + (sw * m) / P.montantes - P.largMontante / 2, topo, P.largMontante, H - topo);
     // placa com o nome da área
-    if (tipo === "areas") placa(g, P, x0, sw, H, topo, a, OURO, CLARA, ESCURA);
+    if (tipo === "areas") { g.save(); g.translate(0, H * (P.placaY ?? 0)); placa(g, P, x0, sw, H, topo, a, OURO, CLARA, ESCURA); g.restore(); }
     else { g.fillStyle = P.faixa; g.fillRect(0, 0, W, topo - 2); g.fillStyle = comAlfa(OURO, 0.75); g.fillRect(0, topo - 4, W, 2); }
   }
   g.fillStyle = P.laje; g.fillRect(0, H - 8, W, 8); // laje
@@ -138,28 +145,32 @@ function brilhoSede(noite: number) {
 let ultimoBrilho = -1;
 function brilho(t: number) { if (t === ultimoBrilho) return; ultimoBrilho = t; brilhoSede(ceu.noite); brilhoEstilos(ceu.noite, t); }
 
-// cada andar de cada face é um plano com a sua pintura; andares e faces sem nome de área (fundo, leste, andares de cima)
-// dividem a mesma pintura (uma textura por tamanho), e o Estatico junta os planos iguais numa malha só
-const PX_M = 1024 / SEDE.w; // px por metro na largura (a altura do andar tem 192 px)
-const VAZIO3 = Array<null>(FRENTE_SEDE).fill(null), VAZIO2 = Array<null>(LADO_SEDE).fill(null); // andares sem área: o mesmo ritmo de janelas
+// cada andar de cada face é um plano com a sua pintura; andares e faces sem nome de área (andares de cima, fundo e leste
+// quando não precisam) dividem a mesma pintura (uma textura por tamanho), e o Estatico junta os planos iguais numa malha só
+const PX_M = 1024 / SEDE.w; // px por metro, na largura e na altura (o andar tem SEDE.andar × PX_M px de altura)
+const PX_ANDAR = Math.round(SEDE.andar * PX_M);
+const vazio = (face: FaceSede) => Array<null>(SALAS_NA_FACE[face]).fill(null); // andares sem área: o mesmo ritmo de janelas
+const VAZIO: SalasDoAndar = { sul: vazio("sul"), oeste: vazio("oeste"), leste: vazio("leste"), norte: vazio("norte") };
 function Fachadas({ sede }: { sede: Sede }) {
   const H = SEDE.andar, nAreas = andaresComAreas(sede);
   return (
     <group>
       {pisosDe(sede).map((p) => {
-        const f = p.f, temAreas = f >= 1 && f <= nAreas;
-        const { frente, lado } = temAreas ? areasDoAndarDe(sede, f) : { frente: VAZIO3, lado: VAZIO2 };
-        const tipoF: Tipo = f === 0 ? "saguao" : temAreas ? "areas" : "comum";
-        const tipoL: Tipo = f === 0 ? "saguao" : temAreas && lado.some(Boolean) ? "areas" : "comum";
+        const f = p.f, salas = f >= 1 && f <= nAreas ? areasDoAndarDe(sede, f) : VAZIO;
         const ws = p.x1 - p.x0 - 2 * p.canto, wl = p.z1 - p.z0 - 2 * p.canto, pxS = Math.round(ws * PX_M), pxL = Math.round(wl * PX_M);
         const cx = (p.x0 + p.x1) / 2, cz = (p.z0 + p.z1) / 2, y = f * H + H / 2;
-        const comumS = fachada(sede, `comum${FRENTE_SEDE}:${pxS}`, pxS, 192, VAZIO3, "comum"), comumL = fachada(sede, `comum${LADO_SEDE}:${pxL}`, pxL, 192, VAZIO2, "comum");
+        const comumS = fachada(sede, `comum${SALAS_NA_FACE.sul}:${pxS}`, pxS, PX_ANDAR, VAZIO.sul, "comum"), comumL = fachada(sede, `comum${SALAS_NA_FACE.oeste}:${pxL}`, pxL, PX_ANDAR, VAZIO.oeste, "comum");
+        // o saguão (térreo) aparece na frente e no oeste; uma face com pelo menos uma área tem a pintura própria
+        const pintura = (face: FaceSede, px: number, comum: THREE.Material) => {
+          const tipo: Tipo = f === 0 ? (face === "sul" || face === "oeste" ? "saguao" : "comum") : salas[face].some(Boolean) ? "areas" : "comum";
+          return tipo === "comum" ? comum : fachada(sede, `${face}${f}`, px, PX_ANDAR, salas[face], tipo);
+        };
         return (
           <group key={f}>
-            <mesh geometry={plano(ws, H)} material={tipoF === "comum" ? comumS : fachada(sede, `s${f}`, pxS, 192, frente, tipoF)} position={[cx, y, p.z1 + 0.02]} />
-            <mesh geometry={plano(wl, H)} material={tipoL === "comum" ? comumL : fachada(sede, `o${f}`, pxL, 192, lado, tipoL)} position={[p.x0 - 0.02, y, cz]} rotation={[0, -Math.PI / 2, 0]} />
-            <mesh geometry={plano(ws, H)} material={comumS} position={[cx, y, p.z0 - 0.02]} rotation={[0, Math.PI, 0]} />
-            <mesh geometry={plano(wl, H)} material={comumL} position={[p.x1 + 0.02, y, cz]} rotation={[0, Math.PI / 2, 0]} />
+            <mesh geometry={plano(ws, H)} material={pintura("sul", pxS, comumS)} position={[cx, y, p.z1 + 0.02]} />
+            <mesh geometry={plano(wl, H)} material={pintura("oeste", pxL, comumL)} position={[p.x0 - 0.02, y, cz]} rotation={[0, -Math.PI / 2, 0]} />
+            <mesh geometry={plano(ws, H)} material={pintura("norte", pxS, comumS)} position={[cx, y, p.z0 - 0.02]} rotation={[0, Math.PI, 0]} />
+            <mesh geometry={plano(wl, H)} material={pintura("leste", pxL, comumL)} position={[p.x1 + 0.02, y, cz]} rotation={[0, Math.PI / 2, 0]} />
           </group>
         );
       })}
@@ -213,15 +224,15 @@ function Estrutura({ parte, sede }: { parte: "sempre" | "fora"; sede: Sede }) {
       {/* coroa: platibanda, faixa dourada acesa e máquinas no telhado */}
       <mesh geometry={caixa(SEDE.w + 0.7, 1.3, SEDE.d + 0.7)} material={mG} position={[SEDE.x, H + 0.65, SEDE.z]} castShadow />
       <mesh geometry={caixa(SEDE.w + 0.74, 0.14, SEDE.d + 0.74)} material={mat(OURO, { rough: 0.3, metal: 0.6, emissive: OURO, ei: 0.9 })} position={[SEDE.x, H + 0.2, SEDE.z]} />
-      <mesh geometry={caixa(5, 1.8, 3.4)} material={mat("#3A3F47", { rough: 0.7 })} position={[SEDE.x + 6, H + 1.5, SEDE.z - 3.5]} castShadow />
-      <mesh geometry={caixa(3.2, 1.2, 2.6)} material={mat("#4A4F57", { rough: 0.7 })} position={[SEDE.x - 6.5, H + 1.2, SEDE.z - 4]} castShadow />
+      <mesh geometry={caixa(5, 1.8, 3.4)} material={mat("#3A3F47", { rough: 0.7 })} position={[SEDE.x + 6 * SX, H + 1.5, SEDE.z - 3.5 * SZ]} castShadow />
+      <mesh geometry={caixa(3.2, 1.2, 2.6)} material={mat("#4A4F57", { rough: 0.7 })} position={[SEDE.x - 6.5 * SX, H + 1.2, SEDE.z - 4 * SZ]} castShadow />
       <mesh geometry={cilindro(0.09, 0.14, 7, 8)} material={mG} position={[L - 1.8, H + 4.6, N + 1.8]} />
       <mesh geometry={esfera(0.22, 10)} material={mat("#FF3B3B", { emissive: "#FF3B3B", ei: 2 })} position={[L - 1.8, H + 8.2, N + 1.8]} />
-      {/* pórtico dourado da entrada (frente sul) e degraus */}
+      {/* pórtico dourado da entrada (frente sul) e degraus: a altura acompanha o pé-direito (PORTICO, SedeEstilos) */}
       <mesh geometry={caixa(9, 0.18, 2.4)} material={mCaminho} position={[SEDE.x, 0.09, S + 1.2]} receiveShadow />
-      {[-3.5, 3.5].map((dx) => <mesh key={dx} geometry={caixa(0.6, 4.8, 0.6)} material={mOuro} position={[SEDE.x + dx, 2.4, S + 2.1]} castShadow />)}
-      <mesh geometry={caixa(7.8, 0.6, 2.6)} material={mOuro} position={[SEDE.x, 4.8, S + 1.25]} castShadow />
-      <mesh geometry={caixa(7.4, 2.5, 0.2)} material={mat("#07090C", { rough: 0.5 })} position={[SEDE.x, 6.35, S + 2.45]} castShadow />
+      {[-3.5, 3.5].map((dx) => <mesh key={dx} geometry={caixa(0.6, PORTICO.vao, 0.6)} material={mOuro} position={[SEDE.x + dx, PORTICO.vao / 2, S + 2.1]} castShadow />)}
+      <mesh geometry={caixa(7.8, 0.6, 2.6)} material={mOuro} position={[SEDE.x, PORTICO.vao, S + 1.25]} castShadow />
+      <mesh geometry={caixa(7.4, 2.5, 0.2)} material={mat("#07090C", { rough: 0.5 })} position={[SEDE.x, PORTICO.placa, S + 2.45]} castShadow />
     </group>
   );
 }

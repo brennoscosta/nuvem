@@ -2,6 +2,7 @@
 // Câmera do mapa (11/11/2026): girar de 90 em 90 graus, aproximar e afastar, ver de cima, ver da rua, voltar ao início,
 // seguir o meu personagem, girar devagar em volta do ponto, teclado (WASD/setas, Q/E, +/−) e duplo clique para ir até
 // um ponto. Tudo com animação suave em cima dos controles de mapa que já existiam.
+// 18/11/2026: o personagem atrás de um prédio não some mais (desvio da câmera, mais abaixo).
 // 12/11/2026: voo de drone pela cidade (?drone=1 liga; &semui=1 esconde a interface para gravar vídeo; qualquer toque
 // ou tecla devolve o controle) e andar pela rua (câmera atrás do meu personagem; W A S D ou o joystick da tela andam,
 // arrastar gira a vista; não entra nos quarteirões, só a praça é aberta).
@@ -13,10 +14,12 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useCamera, joystick, type ComandoCamera } from "../cameraStore";
 import { minhaPos, usePersonagem } from "../personagemStore";
 import { useMundo } from "../mundoStore";
+import { useEscritorio } from "../store";
 import { LOTE_POR_CHAVE, PASSO, MEIO_Q, MUNDO, N } from "../data/mundo";
 import { PRACA_CHAVE } from "../data/praca";
 import { caminhar, livre } from "../data/caminhos";
 import { plantaPorChave, caminharDentro, livreDentro, dentroDoPredio, paraMundo } from "../data/plantaInterna";
+import { caixasDaCidade, primeiraBatida, type Caixa } from "../data/obstaculos";
 import { registrarPonte, tirarFotoPredio } from "./fotoPredio";
 
 const MIN_RAIO = 6, MAX_RAIO = 119;
@@ -32,6 +35,7 @@ interface Rota { pos: THREE.CatmullRomCurve3; alvo: THREE.CatmullRomCurve3; comp
 interface Ctx {
   camera: THREE.Camera; c: Controles; inicio: { pos: THREE.Vector3; alvo: THREE.Vector3 }; anim: Anim | null; teclas: Set<string>; interagindo: boolean;
   rota: Rota | null; antesAndar: Partial<ControlesExtra> & { maxPolarAngle?: number } | null; andando: boolean; ultimoPasso: number; ultimaBatida: number;
+  desvio: Desvio;
 }
 const suave = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 const segundos = () => performance.now() / 1000;
@@ -281,6 +285,78 @@ function atualizarInfo(x: Ctx) {
   cameraInfo.x = t.x; cameraInfo.z = t.z; cameraInfo.ang = Math.atan2(t.x - p.x, t.z - p.z); cameraInfo.pronto = true;
 }
 
+// ---------- o personagem atrás de um prédio (18/11/2026) ----------
+// Pedido do dono: "a câmera de seguir o personagem fica bugada quando se aproxima de um prédio, fica escondendo o boneco".
+// Seguindo o personagem (botão Seguir ou andar pela rua), a cada quadro sai um raio do peito do boneco até a câmera, testado
+// contra as caixas dos prédios (data/obstaculos.ts: umas 50 caixas, nada de raio contra as malhas da cena). Se bater, a
+// câmera procura a posição livre mais parecida com a que a pessoa escolheu: sobe (olha mais de cima) e/ou chega mais perto.
+// Seguindo de longe ela prefere subir; andando pela rua (câmera baixa, logo atrás) prefere chegar perto. Vai depressa para
+// a posição livre e volta devagar quando o caminho abre, sem pular. O desvio é só no desenho: a posição escolhida fica
+// guardada e volta no começo do quadro seguinte, antes de os controles do mapa lerem a câmera (girar, aproximar e afastar
+// continuam como antes). Por dentro dos prédios (vista "dentro", entrando, na recepção ou saindo) nada muda.
+interface Desvio { sobe: number; razao: number; aplicado: boolean; desejada: THREE.Vector3; aplicada: THREE.Vector3 }
+const novoDesvio = (): Desvio => ({ sobe: 0, razao: 1, aplicado: false, desejada: new THREE.Vector3(), aplicada: new THREE.Vector3() });
+const PEITO = 0.95; // altura do peito do boneco (m): o raio sai daqui
+const FOLGA_CAIXA = 0.3; // o raio passa a pelo menos 30 cm da parede
+const PHI_MIN = 0.12; // a câmera sobe no máximo até quase em cima do boneco
+let caixasCache: { de: unknown; caixas: Caixa[] } = { de: null, caixas: [] };
+function caixasAgora() {
+  const t = useMundo.getState().terrenos;
+  if (caixasCache.de !== t) caixasCache = { de: t, caixas: caixasDaCidade(t) };
+  return caixasCache.caixas;
+}
+const esfera = new THREE.Spherical(), ponto = new THREE.Vector3();
+// para cada subida (0; 0,08; 0,16… rad) a distância livre do raio; fica a de menor custo (subir + chegar perto), com um
+// empurrãozinho para ficar perto do desvio atual (sem tremer entre duas posições parecidas)
+function melhorDesvio(x: Ctx, andar: boolean): { sobe: number; razao: number } {
+  const t = x.c.target, d = x.desvio;
+  esfera.setFromVector3(ponto.copy(x.camera.position).sub(t));
+  const caixas = caixasAgora(), bx = minhaPos.x, bz = minhaPos.z;
+  const rMin = andar ? 1.7 : 5, pesoSobe = andar ? 1.1 : 0.45, pesoPerto = andar ? 1 : 2.2;
+  let melhor = { sobe: 0, razao: 1 }, custo = Infinity, ultimo = { sobe: 0, razao: 1 };
+  for (let k = 0; k <= 14; k++) {
+    const sobe = k * 0.08, phi = esfera.phi - sobe;
+    if (phi < PHI_MIN && k > 0) break;
+    ponto.setFromSphericalCoords(esfera.radius, phi, esfera.theta).add(t);
+    const dist = Math.hypot(ponto.x - bx, ponto.y - PEITO, ponto.z - bz);
+    const f = primeiraBatida(caixas, bx, PEITO, bz, ponto.x, ponto.y, ponto.z, FOLGA_CAIXA);
+    if (f >= 1 && k === 0) return melhor; // caminho livre: sem desvio
+    const r = f >= 1 ? esfera.radius : Math.min(esfera.radius, f * dist - 0.4);
+    ultimo = { sobe, razao: Math.max(rMin, r) / esfera.radius };
+    if (r < rMin) continue;
+    const razao = r / esfera.radius;
+    const c = pesoSobe * sobe + pesoPerto * (1 - razao) + 0.15 * (Math.abs(sobe - d.sobe) + Math.abs(razao - d.razao));
+    if (c < custo) { custo = c; melhor = { sobe, razao }; }
+    if (f >= 1) break; // subir mais só custaria mais
+  }
+  return custo < Infinity ? melhor : ultimo; // nada livre: o mais alto e o mais perto que dá
+}
+function desviar(x: Ctx, dt: number) {
+  const st = useCamera.getState(), p = usePersonagem.getState(), d = x.desvio;
+  const fase = p.predio?.fase;
+  const seguindo = (st.seguir || st.andar) && !st.drone && p.ativo && useEscritorio.getState().vista === "fora" && (!fase || fase === "indo");
+  const alvo = seguindo ? melhorDesvio(x, st.andar) : { sobe: 0, razao: 1 };
+  // vai depressa para onde o boneco aparece e volta devagar
+  const ir = 1 - Math.exp(-dt * 10), voltar = 1 - Math.exp(-dt * 2.2);
+  d.sobe += (alvo.sobe - d.sobe) * (alvo.sobe > d.sobe ? ir : voltar);
+  d.razao += (alvo.razao - d.razao) * (alvo.razao < d.razao ? ir : voltar);
+  if (d.sobe < 0.002 && d.razao > 0.998) { d.sobe = 0; d.razao = 1; return; }
+  const { camera } = x, t = x.c.target;
+  d.desejada.copy(camera.position);
+  esfera.setFromVector3(ponto.copy(camera.position).sub(t));
+  esfera.phi = Math.max(PHI_MIN, esfera.phi - d.sobe); esfera.radius *= d.razao;
+  camera.position.setFromSpherical(esfera).add(t); camera.lookAt(t);
+  d.aplicada.copy(camera.position); d.aplicado = true;
+}
+// começo do quadro: devolve a posição escolhida pela pessoa. Se alguém mexeu na câmera entre um quadro e outro (foto do
+// prédio, roteiro de teste, troca de vista), vale a posição nova e o desvio recomeça do zero.
+function desfazerDesvio(x: Ctx) {
+  const d = x.desvio; if (!d.aplicado) return;
+  d.aplicado = false;
+  if (x.camera.position.distanceToSquared(d.aplicada) < 1e-8) x.camera.position.copy(d.desejada);
+  else { d.sobe = 0; d.razao = 1; }
+}
+
 export function CameraMundo({ controles, inicio }: { controles: React.RefObject<Controles | null>; inicio: { pos: THREE.Vector3; alvo: THREE.Vector3 } }) {
   const { camera, gl, scene } = useThree();
   const ctx = useRef<Ctx | null>(null);
@@ -288,7 +364,7 @@ export function CameraMundo({ controles, inicio }: { controles: React.RefObject<
   const drone = useCamera((s) => s.drone);
   const pegar = () => {
     const c = controles.current; if (!c) return null;
-    if (!ctx.current) ctx.current = { camera, c, inicio, anim: null, teclas: new Set(), interagindo: false, rota: null, antesAndar: null, andando: false, ultimoPasso: 0, ultimaBatida: 0 };
+    if (!ctx.current) ctx.current = { camera, c, inicio, anim: null, teclas: new Set(), interagindo: false, rota: null, antesAndar: null, andando: false, ultimoPasso: 0, ultimaBatida: 0, desvio: novoDesvio() };
     return ctx.current;
   };
 
@@ -305,7 +381,7 @@ export function CameraMundo({ controles, inicio }: { controles: React.RefObject<
     gl.domElement.addEventListener("dblclick", dbl); gl.domElement.addEventListener("pointerdown", toque); gl.domElement.addEventListener("wheel", toque, { passive: true });
     // foto do meu prédio (ui/FotoPredio) usa a mesma câmera e o mesmo desenho
     registrarPonte({ gl, scene, camera: camera as THREE.PerspectiveCamera, controles: x.c, pararModos: () => { if (useCamera.getState().drone) pararDrone(x); if (useCamera.getState().andar) sairAndar(x); useCamera.getState().set({ seguir: false, passeio: false }); x.c.autoRotate = false; x.anim = null; } });
-    if (MEDIR) Object.assign(window, { __minhaPos: minhaPos, __fotoPredio: tirarFotoPredio, __camInfo: cameraInfo, __livre: livre, __personagem: usePersonagem, __planta: { porChave: (k: string) => plantaPorChave(k, useMundo.getState().terrenos), livreDentro, dentroDoPredio, paraMundo } });
+    if (MEDIR) Object.assign(window, { __minhaPos: minhaPos, __fotoPredio: tirarFotoPredio, __camInfo: cameraInfo, __livre: livre, __personagem: usePersonagem, __planta: { porChave: (k: string) => plantaPorChave(k, useMundo.getState().terrenos), livreDentro, dentroDoPredio, paraMundo }, __camera: useCamera, __desvio: x.desvio, __obstaculos: { caixas: caixasAgora, primeiraBatida } });
     // ?drone=1 liga o voo quando a cidade já abriu
     const q = new URLSearchParams(window.location.search);
     const tDrone = q.get("drone") === "1" ? setTimeout(() => { if (!useCamera.getState().drone) useCamera.getState().pedir("drone"); }, 2500) : null;
@@ -324,6 +400,8 @@ export function CameraMundo({ controles, inicio }: { controles: React.RefObject<
     const t = setInterval(() => esconderInterface(gl.domElement, true), 700); // cartões e avisos que aparecem depois
     return () => clearInterval(t);
   }, [drone, gl]);
-  useFrame((_, dt) => { const x = pegar(); if (x) quadro(x, Math.min(dt, 0.1)); });
+  // antes dos controles do mapa (prioridade -1): a câmera volta para a posição escolhida pela pessoa
+  useFrame(() => { const x = pegar(); if (x) desfazerDesvio(x); }, -2);
+  useFrame((_, dt) => { const x = pegar(); if (x) { quadro(x, Math.min(dt, 0.1)); desviar(x, Math.min(dt, 0.1)); } });
   return null;
 }

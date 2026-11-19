@@ -29,7 +29,9 @@ import { LuzesPostes } from "./CicloDia";
 import { natalAtivo, ArvoreNatal, LuzesNatalPostes } from "./Natal";
 import { Outdoors } from "./Anuncios";
 import { Praca } from "./Praca";
-import { CalcadaBairro, ArvoresDeRua, Galhardetes, PlacasBairro, HalosPostes } from "./Bairros";
+import { CalcadaBairro, ArvoresDeRua, Galhardetes, PlacasBairro, HalosPostes, planoMetros } from "./Bairros";
+import { materialGrama, METROS_GRAMA } from "./Gramado";
+import { ARVORE_TERRENO, noLote } from "./PontoDisponivel";
 import { PlacasDeRua } from "./RuasPlacas";
 import { Rio } from "./Rio";
 import { Parque, ParqueChao, LAGO } from "./Parque";
@@ -66,7 +68,8 @@ function Ruas() {
     <group>
       {/* chão geral (grama) até a borda do mundo */}
       {/* do calçadão da beira-rio até a borda sul; ao norte, o rio e o parque têm chão próprio (12/11/2026) */}
-      <mesh geometry={plano(MUNDO.x * 2, MUNDO.z - NORTE.calcadao.z0)} material={mat("#79B968", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, (MUNDO.z + NORTE.calcadao.z0) / 2]} receiveShadow />
+      {/* 18/11/2026: grama com textura (manchas, folhinhas e trevos, scene/Gramado.tsx) no lugar do verde chapado */}
+      <mesh geometry={planoMetros(MUNDO.x * 2, MUNDO.z - NORTE.calcadao.z0, METROS_GRAMA)} material={materialGrama() ?? mat("#79B968", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, (MUNDO.z + NORTE.calcadao.z0) / 2]} receiveShadow />
       {EIXOS_RUA.map((e) => <mesh key={"h" + e} geometry={plano(L, RUA)} material={mat(ASFALTO, { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, e]} receiveShadow />)}
       {EIXOS_RUA.map((e) => <mesh key={"v" + e} geometry={plano(RUA, L)} material={mat(ASFALTO, { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[e, -0.004, 0]} receiveShadow />)}
       {tracos}
@@ -137,7 +140,8 @@ export function Mundo() {
       if (!q.lotes) continue;
       q.lotes.forEach((l, k) => {
         const [x, z] = centroLote(q.i, q.j, k); const fundo = k >= 2 ? -1 : 1, kit = comKit.has(`${q.i},${q.j},${k}`);
-        if (l.tipo === "vazio" && l.arvore) add(x + 1.5, z - fundo * 1, kit ? 0 : 6.5);
+        // a árvore do terreno vazio fica no canto do fundo (18/11/2026): o meio fica livre para o prédio (PontoDisponivel.tsx)
+        if (l.tipo === "vazio" && l.arvore) { const [ax, az] = noLote({ centro: [x, z], k }, ...ARVORE_TERRENO(k)); add(ax, az, kit ? 0 : 6.5); }
         else if (l.tipo === "casa") { add(x - 7, z + fundo * 7, kit ? 0 : 4.8); if (!poucos) add(x + 7.5, z + fundo * 6, kit ? 0 : 4.2); }
       });
     }

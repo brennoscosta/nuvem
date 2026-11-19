@@ -110,6 +110,8 @@ export function CalcadaBairro({ cx, cz, b }: { cx: number; cz: number; b: Bairro
 
 // ---------- árvores de rua ----------
 // Duas por lado do quarteirão, no canteiro junto ao meio-fio (longe dos semáforos, que ficam perto das esquinas).
+// 18/11/2026: na frente dos lotes (lados norte e sul) elas ficam a 17 m do meio, na frente do canto do lote: antes
+// (a 11 m) caíam bem na frente do portão e do caminho até a porta (scene/PontoDisponivel.tsx).
 // Desde a v63 (12/11/2026) cada bairro tem a sua espécie desenhada em código (scene/Arvores.tsx): ipê amarelo, ipê rosa,
 // ipê roxo (o "jacarandá" do bairro), oiti, frondosa, topiária aparada e palmeira imperial. A grade de ferro continua.
 const ESPECIE_DO_BAIRRO: Record<string, Especie> = { ipeAmarelo: "ipeAmarelo", ipeRosa: "ipeRosa", jacaranda: "ipeRoxo", copaVerde: "frondosa", oiti: "oiti", topiaria: "topiaria", palmeiraImperial: "palmeiraImperial" };
@@ -119,7 +121,7 @@ function posicoesArvores(): PosArvore[] {
   const out: PosArvore[] = []; const off = BORDA_CALCADA - 0.6; let n = 0;
   for (const b of BAIRROS) {
     const cx = b.i * PASSO, cz = b.j * PASSO;
-    for (const s of [-11, 11]) { out.push({ x: cx + s, z: cz - off, b, n: n++ }, { x: cx + s, z: cz + off, b, n: n++ }, { x: cx - off, z: cz + s, b, n: n++ }, { x: cx + off, z: cz + s, b, n: n++ }); }
+    for (const s of [-11, 11]) { const f = Math.sign(s) * 17; out.push({ x: cx + f, z: cz - off, b, n: n++ }, { x: cx + f, z: cz + off, b, n: n++ }, { x: cx - off, z: cz + s, b, n: n++ }, { x: cx + off, z: cz + s, b, n: n++ }); }
   }
   return out;
 }

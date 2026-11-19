@@ -1,6 +1,7 @@
 "use client";
-// Lotes à venda: casinhas (modelos do Higgsfield, instanciados por modelo) e terrenos vazios, todos com a placa
-// "À VENDA" na frente. As placas são juntadas num <Estatico> (uma textura compartilhada → um draw call).
+// Lotes à venda: casas (modelos do Higgsfield, instanciados por modelo) e terrenos vazios. Desde 18/11/2026 cada lote
+// livre é um "ponto disponível" (scene/PontoDisponivel.tsx): divisa com mureta ou meio-fio, quintal bem acabado, número
+// do lote e a placa "Ponto disponível · Lote N", acesa à noite. As peças fixas são juntadas num <Estatico>.
 import { Icone } from "../ui/Icone";
 import * as THREE from "three";
 import { useLotesComEscritorio } from "./EscritorioCliente";
@@ -9,119 +10,43 @@ import { Obra, LOTES_EM_OBRA_VISTOS } from "./ObraFesta";
 import { alturaPredio } from "../data/escritorio";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
-import { caixa, cilindro, esfera, mat, plano } from "./geo";
+import { caixa, cilindro, mat, plano } from "./geo";
 import { ComFallback, type ItemInstancia } from "./Modelos";
 import { ModeloInstanciadoNoite } from "./PredioMaterial";
 import { ArvoresInstanciadas } from "./Arvores";
 import { Estatico } from "./Estatico";
-import { QUARTEIROES, centroLote, frenteDoLote, LOTE, nomeNicho, type ModeloCasa } from "../data/mundo";
+import { CASA, CASA_RECUO, QuintaisEstaticos, LuzesQuintais, detalhesDosQuintais, noLote, type Quintal } from "./PontoDisponivel";
+import { GramadoLotes, TufosFlores } from "./Gramado";
+import { frenteDoLote, LOTE, nomeNicho, type ModeloCasa } from "../data/mundo";
 import { useMundo, LOTES, LOTE_POR_CHAVE, useAgora, promocaoAtiva, type Rascunho } from "../mundoStore";
 import { useDestaque } from "../destaque";
 import { usePersonagem } from "../personagemStore";
 
-// Altura real (m) e pra onde o modelo olha (rotação que leva a frente do GLB pro +z)
-const CASA: Record<ModeloCasa, { altura: number; frente: number }> = {
-  casaVelha: { altura: 5.2, frente: -Math.PI / 2 },
-  casaTerrea: { altura: 5.0, frente: -Math.PI / 2 },
-  casaSobrado: { altura: 7.6, frente: -Math.PI / 2 },
-  casaColonial: { altura: 7.8, frente: -Math.PI / 2 },
-  casaModerna: { altura: 4.6, frente: -Math.PI / 2 },
-};
-
-type Casa = { modelo: ModeloCasa; pos: [number, number, number]; rot: number; escala: number };
-type Terreno = { pos: [number, number, number]; rot: number; arvore: boolean };
-
 // emObra: lotes reservados (sem pagar): a casa sai e entra a obra (12/11/2026)
 function listar(comEscritorio: Set<string>, emObra: Set<string>) {
-  const casas: Casa[] = [], terrenos: Terreno[] = [], placas: { chave: string; pos: [number, number, number]; rot: number }[] = [];
-  for (const q of QUARTEIROES) {
-    if (!q.lotes) continue;
-    q.lotes.forEach((l, k) => {
-      const [x, z] = centroLote(q.i, q.j, k);
-      const rot = frenteDoLote(k);
-      const frente = k >= 2 ? 1 : -1; // lado da rua
-      const chave = `${q.i},${q.j},${k}`;
-      // placa perto da calçada, num canto do lote
-      if (l.tipo === "praca") return; // a praça tem a cena dela (scene/Praca.tsx), sem placa de venda
-      placas.push({ chave, pos: [x + (k % 2 ? 6.5 : -6.5), 0, z + frente * (LOTE / 2 - 1.6)], rot });
-      if (comEscritorio.has(chave) || emObra.has(chave)) return; // o escritório do cliente (ou a obra) ocupa o lote: a casa/terreno original some
-      if (l.tipo === "casa") casas.push({ modelo: l.modelo, pos: [x, 0, z - frente * 1.2], rot, escala: l.escala ?? 1 });
-      else terrenos.push({ pos: [x, 0, z], rot, arvore: !!l.arvore });
-    });
+  const quintais: Quintal[] = [];
+  for (const l of LOTES) {
+    if (l.lote.tipo === "praca") continue; // a praça tem a cena dela (scene/Praca.tsx)
+    if (comEscritorio.has(l.chave) || emObra.has(l.chave)) continue; // o escritório do cliente (ou a obra) ocupa o lote: a casa/terreno original some
+    quintais.push({ l, casa: l.lote.tipo === "casa" ? { modelo: l.lote.modelo, escala: l.lote.escala ?? 1 } : null, arvore: l.lote.tipo === "vazio" && !!l.lote.arvore });
   }
-  return { casas, terrenos, placas };
-}
-
-// Placa "À VENDA": textura desenhada uma vez (canvas) e compartilhada por todas
-let texPlaca: THREE.CanvasTexture | null = null;
-function texturaPlaca() {
-  if (texPlaca) return texPlaca;
-  const c = document.createElement("canvas"); c.width = 512; c.height = 256;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, 512, 256);
-  g.fillStyle = "#1D4ED8"; g.fillRect(0, 0, 512, 54);
-  g.fillStyle = "#FFFFFF"; g.font = "bold 30px Inter, Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
-  g.fillText("WORKEND", 256, 28);
-  g.fillStyle = "#0F172A"; g.font = "bold 96px Inter, Arial, sans-serif"; g.fillText("À VENDA", 256, 140);
-  g.fillStyle = "#475569"; g.font = "28px Inter, Arial, sans-serif"; g.fillText("compre seu chão e monte sua empresa", 256, 218);
-  texPlaca = new THREE.CanvasTexture(c); texPlaca.colorSpace = THREE.SRGBColorSpace; texPlaca.anisotropy = 4;
-  return texPlaca;
-}
-let matPlaca: THREE.MeshBasicMaterial | null = null;
-const materialPlaca = () => matPlaca ?? (matPlaca = new THREE.MeshBasicMaterial({ map: texturaPlaca(), toneMapped: false }));
-
-function Placa({ pos, rot }: { pos: [number, number, number]; rot: number }) {
-  return (
-    <group position={pos} rotation={[0, rot, 0]}>
-      {[-0.7, 0.7].map((x) => <mesh key={x} geometry={caixa(0.08, 1.9, 0.08)} material={mat("#6B4F2A", { rough: 0.9 })} position={[x, 0.95, 0]} castShadow />)}
-      <mesh geometry={caixa(1.9, 1.0, 0.06)} material={mat("#F7F7F5")} position={[0, 1.5, 0]} castShadow />
-      <mesh geometry={plano(1.8, 0.9)} material={materialPlaca()} position={[0, 1.5, 0.035]} />
-    </group>
-  );
-}
-
-// Terreno vazio: grama mais clara com mato baixo; às vezes uma árvore grande (instanciada em Mundo)
-function Terreno({ pos }: { pos: [number, number, number] }) {
-  return (
-    <group position={pos}>
-      <mesh geometry={plano(LOTE - 1.5, LOTE - 1.5)} material={mat("#8CC978", { rough: 1 })} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.015, 0]} receiveShadow />
-      {[[-5, -4], [4, -6], [6, 3], [-3, 6], [1, 1]].map(([x, z], i) => (
-        <mesh key={i} geometry={esfera(0.5 + (i % 3) * 0.15, 7)} material={mat(i % 2 ? "#6FB15F" : "#9ACD6B")} position={[x, 0.2, z]} scale={[1, 0.5, 1]} />
-      ))}
-    </group>
-  );
-}
-
-// Azaleias floridas nos canteiros das casas (v63): instanciadas, na mesma posição do canteiro do Jardim (-5,5 ; 6,5 no lote)
-function AzaleiasDosJardins({ casas }: { casas: { pos: [number, number, number]; rot: number }[] }) {
-  const itens: ItemInstancia[] = useMemo(() => casas.map((c) => { const lx = -5.5, lz = 6.5, cs = Math.cos(c.rot), sn = Math.sin(c.rot); return { pos: [c.pos[0] + lx * cs + lz * sn, 0.22, c.pos[2] - lx * sn + lz * cs] as [number, number, number], rot: c.rot, altura: 1.15 }; }), [casas]);
-  return <ArvoresInstanciadas especie="azaleia" itens={itens} />;
-}
-
-// Caminho da calçada até a porta da casa e um canteiro na frente
-function Jardim({ pos, rot }: { pos: [number, number, number]; rot: number }) {
-  return (
-    <group position={pos} rotation={[0, rot, 0]}>
-      <mesh geometry={plano(1.4, 6)} material={mat("#D9D5CC", { rough: 0.95 })} rotation={[-Math.PI / 2, 0, 0]} position={[1.2, -0.01, 6.5]} receiveShadow />
-      <mesh geometry={cilindro(0.9, 1.1, 0.25, 12)} material={mat("#5C4634", { rough: 1 })} position={[-5.5, 0.12, 6.5]} />
-      {/* a azaleia florida do canteiro fica fora do Estatico (ela balança com o vento): ver AzaleiasDosJardins */}
-    </group>
-  );
+  return quintais;
 }
 
 export function Lotes() {
   const comEscritorio = useLotesComEscritorio();
   const terrenosMundo = useMundo((s) => s.terrenos);
   const chavesObra = Object.values(terrenosMundo).filter((t) => t.status === "reservado").map((t) => t.chave).sort().join("|");
-  const { casas, terrenos, placas, porModelo } = useMemo(() => {
-    const r = listar(comEscritorio, new Set(chavesObra ? chavesObra.split("|") : []));
+  const { quintais, detalhes, porModelo } = useMemo(() => {
+    const quintais = listar(comEscritorio, new Set(chavesObra ? chavesObra.split("|") : []));
     const m = new Map<ModeloCasa, ItemInstancia[]>();
-    for (const c of r.casas) {
-      const info = CASA[c.modelo];
-      const lista = m.get(c.modelo) ?? []; m.set(c.modelo, lista);
-      lista.push({ pos: c.pos, rot: c.rot + info.frente, altura: info.altura * c.escala });
+    for (const q of quintais) {
+      if (!q.casa) continue;
+      const info = CASA[q.casa.modelo], [x, z] = noLote(q.l, 0, -CASA_RECUO);
+      const lista = m.get(q.casa.modelo) ?? []; m.set(q.casa.modelo, lista);
+      lista.push({ pos: [x, 0, z], rot: frenteDoLote(q.l.k) + info.frente, altura: info.altura * q.casa.escala });
     }
-    return { ...r, porModelo: [...m.entries()] };
+    return { quintais, detalhes: detalhesDosQuintais(quintais), porModelo: [...m.entries()] };
   }, [comEscritorio, chavesObra]);
   const reservados = useMundo((s) => s.terrenos);
   const selecionado = useMundo((s) => s.loteSelecionado);
@@ -134,17 +59,19 @@ export function Lotes() {
   const destaqueSemana = useDestaque(); // loja destaque da semana (13/11/2026): selo dourado no balão
   // lote duplo: o balão do principal vai para o meio dos dois terrenos; a ampliação em obras mostra o tapume com a marca do principal
   const anexoAtivo = useMemo(() => { const m: Record<string, string> = {}; for (const t of Object.values(reservados)) if (t.anexoDe && t.status === "ativo") m[t.anexoDe] = t.chave; return m; }, [reservados]);
-  // placas "À venda" só nos lotes livres (o lote reservado ganha a placa da empresa). O lote em rascunho também perde a placa.
+  // placa "Ponto disponível" só nos lotes livres (o lote reservado ganha a placa da empresa). O lote em rascunho também perde a placa.
   const emRascunho = rascunho && selecionado ? selecionado : null;
-  const livres = placas.filter((p) => !reservados[p.chave] && p.chave !== emRascunho);
+  const comPlaca = useMemo(() => { const res = new Set(chavesReservadas ? chavesReservadas.split("|") : []); return new Set(LOTES.filter((l) => !res.has(l.chave) && l.chave !== emRascunho).map((l) => l.chave)); }, [chavesReservadas, emRascunho]);
   return (
     <group>
       <Estatico key={chavesReservadas + "|" + (emRascunho ?? "") + "|" + [...comEscritorio].join(",")}>
-        {terrenos.map((t, i) => <Terreno key={i} pos={t.pos} />)}
-        {casas.map((c, i) => <Jardim key={i} pos={c.pos} rot={c.rot} />)}
-        {livres.map((p) => <Placa key={p.chave} pos={p.pos} rot={p.rot} />)}
+        <QuintaisEstaticos quintais={quintais} comPlaca={comPlaca} />
       </Estatico>
-      <AzaleiasDosJardins casas={casas} />
+      {/* grama aparada, capim, flores e azaleias dos quintais (instanciados) e as luzes da noite */}
+      <GramadoLotes areas={detalhes.areas} />
+      <TufosFlores tufos={detalhes.tufos} flores={detalhes.flores} />
+      <ArvoresInstanciadas especie="azaleia" itens={detalhes.azaleias} />
+      <LuzesQuintais varandas={detalhes.varandas} lampioes={detalhes.lampioes} pocas={detalhes.pocas} />
       {porModelo.map(([modelo, itens]) => (
         <ComFallback key={modelo} fallback={<Estatico>{itens.map((it, i) => <CasaProcedural key={i} pos={it.pos} rot={it.rot ?? 0} altura={it.altura ?? 5} />)}</Estatico>}>
           <ModeloInstanciadoNoite nome={modelo} itens={itens} />

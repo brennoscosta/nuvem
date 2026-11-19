@@ -1,14 +1,14 @@
 "use client";
-// Cartão do lote (o que tem ali, status, "Quero esse chão") e o painel "Montar minha empresa" (nome, logo, cor),
+// Cartão do lote (o que tem ali, status, "Transformar em minha empresa") e o painel "Montar minha empresa" (nome, logo, cor),
 // que reflete ao vivo na placa e no tapume do lote. Reservar precisa da conta do WorkEnd.
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES_EMPRESA, useAgora, promocaoAtiva } from "../mundoStore";
 import { NICHOS, bairroDoLote, nomeNicho } from "../data/mundo";
 import { NomearRua } from "./NomearRua";
 import { FotoPredio } from "./FotoPredio";
 import { useEscritorio } from "../store";
 import { BotoesPersonagem } from "./BotoesPersonagem";
-import { Icone } from "./Icone";
+import { Icone, type NomeIcone } from "./Icone";
 import { ehSede } from "../data/sedes";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 import { abrirChatEquipe } from "./ChatEquipe";
@@ -132,6 +132,32 @@ export function PixAberto({ chave }: { chave: string }) {
   );
 }
 
+// "Este ponto pode virar a sua empresa": de hoje (casa ou terreno) ao prédio com loja, atendente de IA e equipe
+function PontoDisponivel({ casa }: { casa: boolean }) {
+  const passos: { icone: NomeIcone; texto: string }[] = [
+    { icone: casa ? "casa" : "placa", texto: casa ? "A casa de hoje" : "O terreno de hoje" },
+    { icone: "predios", texto: "Seu prédio com loja" },
+    { icone: "equipe", texto: "Atendente de IA e equipe" },
+  ];
+  return (
+    <div className="mt-3 rounded-2xl border border-[#1D4ED8]/15 bg-gradient-to-br from-[#EEF3FF] to-[#F7F9FF] p-3">
+      <div className="text-sm font-bold leading-snug text-[#1D2128]">Este ponto pode virar a sua empresa</div>
+      <div className="mt-0.5 text-xs leading-snug text-[#4B5563]">{casa ? "A casa vira o seu prédio" : "O terreno vira o seu prédio"}, com loja, atendente de IA e equipe.</div>
+      <div className="mt-2.5 flex items-start">
+        {passos.map((p, i) => (
+          <Fragment key={p.icone}>
+            <div className="flex min-w-0 flex-1 flex-col items-center text-center">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-[#1D4ED8] shadow-sm ring-1 ring-[#1D4ED8]/10"><Icone nome={p.icone} tamanho={19} /></span>
+              <span className="mt-1 text-[10.5px] font-semibold leading-tight text-[#334155]">{p.texto}</span>
+            </div>
+            {i < passos.length - 1 && <Icone nome="seta" tamanho={14} className="mt-2.5 shrink-0 text-[#94A3B8]" />}
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function CartaoLote() {
   const chave = useMundo((s) => s.loteSelecionado);
   const terreno = useMundo((s) => (chave ? s.terrenos[chave] : undefined));
@@ -185,7 +211,7 @@ export function CartaoLote() {
         <div>
           {/* um número só por loja: a ampliação do lote duplo mostra o número da loja principal (17/11/2026) */}
           <div className="text-[12px] font-semibold text-[#1D4ED8]">Lote {numeroPrincipal}</div>
-          <div className="text-lg font-bold">{livre ? "À venda" : ehAnexo ? (ehMeu ? "Ampliação do seu prédio" : principal?.empresaNome ?? terreno.empresaNome) : ehMeu ? "Seu chão" : terreno.empresaNome}</div>
+          <div className="text-lg font-bold">{livre ? "Ponto disponível" : ehAnexo ? (ehMeu ? "Ampliação do seu prédio" : principal?.empresaNome ?? terreno.empresaNome) : ehMeu ? "Seu chão" : terreno.empresaNome}</div>
           {/* loja aberta não mostra a descrição do terreno antigo ("terreno vazio com uma árvore") */}
           <div className="text-xs text-[#5B6472]">{livre ? `20 × 20 m · ${descricaoLote(l)}` : terreno?.status === "ativo" ? `${nomeNicho((principal ?? terreno)?.nicho)} · loja aberta` : "Reservado · em obras"}</div>
           {/* bairro do quarteirão (12/11/2026): só identidade visual, qualquer área compra em qualquer bairro */}
@@ -196,6 +222,9 @@ export function CartaoLote() {
 
       {livre && (
         <>
+          {/* ponto disponível (18/11/2026, pedido do dono: "transforme em pontos que podem ser transformados"): o cartão
+              vende a ideia antes do preço; o botão é o mesmo fluxo de reserva de sempre */}
+          <PontoDisponivel casa={l.lote.tipo === "casa"} />
           <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm">
             <div className="flex items-center justify-between"><span className="text-[#5B6472]">Mensalidade</span><span className="font-semibold">{brl(preco)}/mês</span></div>
             {!!fundador && fundador.restam > 0 && <div className="mt-1.5 rounded-xl bg-[#EAF7EE] px-2 py-1.5 text-xs font-semibold text-[#166534]"><Icone nome="brilho" tamanho={14} className="mr-1 inline align-[-3px]" />Preço de fundador: 1º mês por {brl(fundador.valor)} · restam {fundador.restam} de {fundador.vagas} vagas</div>}
@@ -204,9 +233,9 @@ export function CartaoLote() {
           {usuario?.banidoEm ? (
             <div className="mt-3 rounded-xl bg-[#FDE8E8] px-3 py-2 text-xs text-[#8A2A2A]">Sua conta está suspensa por descumprir as políticas de uso. Fale com contato@workend.online.</div>
           ) : usuario ? (
-            <button onClick={abrirPainel} className="mt-3 w-full rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#1a44c2]">{meu && !admin ? "Trocar meu chão por este" : "Quero esse chão"}</button>
+            <button onClick={abrirPainel} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#1a44c2]">{meu && !admin ? "Trocar meu chão por este" : <>Transformar em minha empresa<Icone nome="seta" tamanho={16} traco={2.2} /></>}</button>
           ) : (
-            <a href={linkCadastro(chave)} className="mt-3 block w-full rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-[#1a44c2]">Quero esse chão</a>
+            <a href={linkCadastro(chave)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-[#1a44c2]">Transformar em minha empresa<Icone nome="seta" tamanho={16} traco={2.2} /></a>
           )}
           {!usuario && <div className="mt-2 text-center text-[11px] text-[#5B6472]">Você cria sua conta no WorkEnd e volta direto pra este lote.{!modoMundo() && " Abre em workend.online."}</div>}
           {usuario && meu && !admin && <div className="mt-2 text-center text-[11px] text-[#5B6472]">Nesta fase cada conta tem um chão; a reserva atual (Lote {LOTE_POR_CHAVE[meu]?.numero}) fica livre.</div>}
