@@ -3,14 +3,15 @@
 //  - limites do prédio, paredes (com o vão de cada porta) e os móveis que barram (mesas, balcão, sofás, mesa de reunião…);
 //  - zonas: recepção, hall, corredor/café são do público; salas da equipe, do CEO e de reunião são só da equipe;
 //  - um A* pequeno (grade de 25 cm) com o corpo do boneco (raio de 25 cm) e retas esticadas sem atravessar nada.
-// Sedes: data/plantaSede.ts (as mesmas paredes da cena, paredesDaSede), deslocadas para o quarteirão de cada sede.
+// Sedes: data/plantaSede.ts (as mesmas paredes da cena, paredesDaSede), em coordenadas do lote da sede e giradas para a
+// rua da frente dela (19/11/2026: cada sede num lote só; data/sedes.ts › rot).
 // Lojas: data/escritorio.ts › plantaCliente (porta da rua em [0, z0], divisória recepção | hall com passagem na frente,
 // vidro do CEO com porta, setores com porta), girada como o prédio (frente do lote, giro do dono, lote duplo).
 // Tudo aqui é função pura (sem three.js, sem React): testável com tsx.
 import { LOTE_POR_CHAVE, frenteDoLote } from "./mundo";
 import { PREDIO_CLIENTE, plantaCliente, DECORACAO_DISCRETA, type Escritorio } from "./escritorio";
-import { sedeDe, deslocamento } from "./sedes";
-import { montarSalas, paredesDaSede, lugaresDaSala, cx, X0 as SX0, X1 as SX1, Z0 as SZ0, Z1 as SZ1, ZC, CORREDOR, ESP_PAREDE } from "./plantaSede";
+import { sedeDe } from "./sedes";
+import { montarSalas, paredesDaSede, lugaresDaSala, cx, X0 as SX0, X1 as SX1, Z0 as SZ0, Z1 as SZ1, ZC, CORREDOR, ESP_PAREDE, MESA_COMPACTA, MOVEIS_SEDE } from "./plantaSede";
 import type { Ponto } from "./caminhos";
 
 type Ret = { x0: number; z0: number; x1: number; z1: number };
@@ -42,23 +43,17 @@ function plantaDaSede(chave: string, nome: string, e: Escritorio): PlantaInterna
   // mesas de cada departamento (mesma conta da cena: lugaresDaSala)
   const porSala: Record<string, number> = {};
   for (const m of e.equipe) { const s = m.setorId ?? (m.papel === "ceo" ? "diretoria" : "recepcao"); porSala[s] = (porSala[s] ?? 0) + 1; }
-  for (const s of salas) if (s.tipo === "depto") for (const l of lugaresDaSala(s, porSala[s.id] ?? 0)) bloqueios.push(caixa(l.mesa[0], l.mesa[2], l.chefe ? 1.9 : 1.5, l.chefe ? 0.9 : 0.75));
-  const rec = salas.find((s) => s.tipo === "recepcao"), reuniao = salas.find((s) => s.tipo === "reuniao");
-  if (rec) {
-    bloqueios.push(caixa(cx(rec), rec.z1 - 4.2, 3.1, 0.8)); // balcão
-    bloqueios.push(caixa(rec.x0 + 0.8, rec.z1 - 2, 0.9, 2.0)); // sofá
-    bloqueios.push(caixa(cx(rec) + 1.75, rec.z1 - 2.05, 0.8, 1.9)); // poltronas
-    bloqueios.push(caixa(cx(rec) - 1.65, rec.z1 - 6.3, 2.0, 0.35), caixa(cx(rec) + 1.6, rec.z1 - 6.3, 0.7, 0.7)); // painel da logo e ficus
-  }
-  if (reuniao) bloqueios.push(caixa(cx(reuniao), (reuniao.z0 + reuniao.z1) / 2 + 0.6, 3.6, 7.0)); // mesa comprida e cadeiras
-  bloqueios.push(caixa(SX0 + 1.2, ZC, 0.65, 1.7)); // café
-  bloqueios.push(caixa(SX0 + 2.1, ZC + 1.05, 0.8, 0.8)); // mesa alta
-  const zonas: Zona[] = salas.map((s) => ({ id: s.id, nome: s.nome, x0: s.x0, x1: s.x1, z0: s.z0, z1: s.z1, publica: s.tipo === "recepcao" }));
-  zonas.push({ id: "corredor", nome: "Corredor e café", x0: SX0, x1: SX1, z0: ZC - CORREDOR / 2, z1: ZC + CORREDOR / 2, publica: true });
-  const [dx, dz] = deslocamento(sd);
+  const M = MESA_COMPACTA;
+  for (const s of salas) if (s.tipo === "depto") for (const l of lugaresDaSala(s, porSala[s.id] ?? 0)) bloqueios.push(caixa(l.mesa[0], l.mesa[2], l.chefe ? M.chefe[0] : M.comum[0], l.chefe ? M.chefe[1] : M.comum[1]));
+  // recepção, sala de reunião e hall com café (os mesmos lugares da cena: plantaSede › MOVEIS_SEDE)
+  for (const m of Object.values(MOVEIS_SEDE)) bloqueios.push(caixa(m.x, m.z, m.w, m.d));
+  const rec = salas.find((s) => s.tipo === "recepcao");
+  // recepção e hall são do público; salas da equipe e reunião, só da equipe
+  const zonas: Zona[] = salas.map((s) => ({ id: s.id, nome: s.nome, x0: s.x0, x1: s.x1, z0: s.z0, z1: s.z1, publica: s.tipo === "recepcao" || s.tipo === "hall" }));
+  zonas.push({ id: "corredor", nome: "Corredor", x0: SX0, x1: SX1, z0: ZC - CORREDOR / 2, z1: ZC + CORREDOR / 2, publica: true });
   return {
     chave, nome, limites: { x0: SX0, z0: SZ0, x1: SX1, z1: SZ1 }, bloqueios, zonas,
-    portaDentro: rec ? [cx(rec), SZ1 - 0.6] : [(SX0 + SX1) / 2, SZ1 - 0.6], centro: [dx, dz], rot: 0,
+    portaDentro: rec ? [cx(rec), SZ1 - 0.6] : [(SX0 + SX1) / 2, SZ1 - 0.6], centro: [sd.x, sd.z], rot: sd.rot,
   };
 }
 

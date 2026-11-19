@@ -1,13 +1,13 @@
 // Caixas que podem esconder o personagem da câmera (18/11/2026, pedido do dono: "a câmera de seguir o personagem fica
 // bugada quando se aproxima de um prédio, fica escondendo o boneco"). Uma caixa simples, alinhada aos eixos, para cada
-// coisa grande da cidade: o prédio da Nuvem, a lanchonete, a torre e o totem de cada sede, o prédio de cada loja, as
+// coisa grande da cidade: o prédio da Nuvem, a lanchonete, a torre de cada sede, o prédio de cada loja, as
 // casas dos lotes à venda e os outdoors. A câmera (scene/CameraMundo.tsx) testa a cada quadro um raio do boneco até ela
 // contra estas caixas: umas poucas dezenas de testes de caixa, no lugar de um raio contra todas as malhas da cena.
 // Tudo aqui é função pura (sem three.js, sem React): testável com tsx.
-import { QUARTEIROES, centroLote, frenteDoLote, LOTE_POR_CHAVE, type ModeloCasa } from "./mundo";
+import { LOTES, frenteDoLote, LOTE_POR_CHAVE, type ModeloCasa } from "./mundo";
 import { DIM_LAYOUT, alturaPredio, andaresDoPredio, type Escritorio } from "./escritorio";
 import { ehKit, medidasKit } from "./predios";
-import { SEDES, centroTorre, alturaSede, degrausEstudio, type EstiloSede } from "./sedes";
+import { SEDES, alturaSede, degrausEstudio, type EstiloSede } from "./sedes";
 import { SEDE } from "./onestate";
 import { LANCH } from "./lanchonete";
 import { PREDIO } from "./layout";
@@ -41,18 +41,20 @@ export function caixasDaCidade(terrenos: Record<string, TerrenoCaixa>): Caixa[] 
   out.push({ x0: PREDIO.x0 - 0.8, x1: PREDIO.x1 + 0.8, z0: PREDIO.z0 - 0.8, z1: PREDIO.z1 + 0.8, y0: 0, y1: 7.6 });
   // lanchonete
   out.push({ x0: LANCH.x0, x1: LANCH.x1, z0: LANCH.z0, z1: LANCH.z1, y0: 0, y1: LANCH.altura });
-  // sedes: a torre (até a coroa), as logos do alto (na beirada sul e na oeste; no NUVCAM, no último degrau) e o totem da
-  // praça (canto sudoeste). A logo do alto tem a largura de SedeEstilos › logosBase × 0,8 × SX e nasce 1,4 m acima do topo
+  // sedes: a torre (até a coroa) e as logos do alto (na beirada da frente e na do lado da rua; no NUVCAM, no último
+  // degrau). A logo do alto tem a largura de SedeEstilos › logosBase × 0,8 × SX e nasce 1,4 m acima do topo. Desde
+  // 19/11/2026 cada sede ocupa um lote só e o desenho é girado para a rua da frente (rot): as caixas são montadas em
+  // coordenadas do lote e giradas como o prédio (o totem da praça saiu junto com a praça)
   for (const sd of SEDES) {
-    const [tx, tz] = centroTorre(sd), H = alturaSede(sd);
-    const S = tz + SEDE.d / 2, N = tz - SEDE.d / 2, O = tx - SEDE.w / 2, L = tx + SEDE.w / 2;
+    const H = alturaSede(sd), g = (lx0: number, lx1: number, lz0: number, lz1: number, y0: number, y1: number): Caixa => ({ ...girada(sd.x, sd.z, sd.rot, lx0, lx1, lz0, lz1, y1), y0 });
+    const S = SEDE.z + SEDE.d / 2, N = SEDE.z - SEDE.d / 2, O = SEDE.x - SEDE.w / 2, L = SEDE.x + SEDE.w / 2;
     const borda = sd.estilo === "festa" ? 1.5 : 0.4; // as sacadas do bday.fm saem 1,4 m para fora
-    out.push({ x0: O - borda, x1: L + borda, z0: N - borda, z1: S + borda, y0: 0, y1: H + 1.3 });
+    out.push(g(O - borda, L + borda, N - borda, S + borda, 0, H + 1.3));
     const degraus = sd.estilo === "estudio" ? degrausEstudio(sd.andares) : 0, rf = 3 * degraus, rl = 2 * degraus;
     const hLogo = 1.4 + LOGO_ALTO[sd.estilo] * 0.8 * (SEDE.w / 22) * sd.propLogo;
-    out.push({ x0: O + rl, x1: L - rl, z0: S - rf - 1.6, z1: S - rf - 0.2, y0: H, y1: H + hLogo });
-    out.push({ x0: O + rl + 0.2, x1: O + rl + 1.6, z0: N, z1: S - rf, y0: H, y1: H + hLogo });
-    out.push(caixaXZ(sd.x - 15.5, sd.z + 16.5, 2.2, 0.64, 0, 7.4));
+    out.push(g(O + rl, L - rl, S - rf - 1.6, S - rf - 0.2, H, H + hLogo));
+    // a logo do lado fica no lado da rua da esquina (sede.lado): no oeste ou espelhada no leste
+    out.push(sd.lado === "oeste" ? g(O + rl + 0.2, O + rl + 1.6, N, S - rf, H, H + hLogo) : g(L - rl - 1.6, L - rl - 0.2, N, S - rf, H, H + hLogo));
   }
   // lojas dos clientes (scene/EscritorioCliente.tsx): no lote duplo o prédio fica no meio dos dois terrenos
   const anexos: Record<string, string> = {};
@@ -74,14 +76,12 @@ export function caixasDaCidade(terrenos: Record<string, TerrenoCaixa>): Caixa[] 
       out.push(girada(cx, cz, rot, -w / 2, w / 2, -dim.prof / 2, dim.prof / 2, h));
     }
   }
-  // casas dos lotes sem dono (o terreno reservado vira obra e o ativo vira loja: a casa some)
-  for (const q of QUARTEIROES) {
-    if (!q.lotes) continue;
-    q.lotes.forEach((lote, k) => {
-      if (lote.tipo !== "casa" || terrenos[`${q.i},${q.j},${k}`] || anexos[`${q.i},${q.j},${k}`]) return;
-      const [x, z] = centroLote(q.i, q.j, k), frente = k >= 2 ? 1 : -1, e = lote.escala ?? 1, c = CASA[lote.modelo];
-      out.push(caixaXZ(x, z - frente * 1.2, c.lado * e, c.lado * e, 0, c.altura * e));
-    });
+  // casas dos lotes sem dono (o terreno reservado vira obra e o ativo vira loja: a casa some). Pela lista de lotes: a
+  // chave pode não ser a posição física (data/mundo.ts › chaveDoLote)
+  for (const l of LOTES) {
+    if (l.lote.tipo !== "casa" || terrenos[l.chave] || anexos[l.chave]) continue;
+    const [x, z] = l.centro, frente = l.k >= 2 ? 1 : -1, e = l.lote.escala ?? 1, c = CASA[l.lote.modelo];
+    out.push(caixaXZ(x, z - frente * 1.2, c.lado * e, c.lado * e, 0, c.altura * e));
   }
   // outdoors das avenidas da borda
   for (const o of OUTDOORS) {

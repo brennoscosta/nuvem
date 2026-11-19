@@ -3,7 +3,7 @@
 // que reflete ao vivo na placa e no tapume do lote. Reservar precisa da conta do WorkEnd.
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES_EMPRESA, useAgora, promocaoAtiva } from "../mundoStore";
-import { NICHOS, bairroDoLote, nomeNicho } from "../data/mundo";
+import { NICHOS, bairroDoLote, nomeNicho, vizinhoDoLado } from "../data/mundo";
 import { NomearRua } from "./NomearRua";
 import { FotoPredio } from "./FotoPredio";
 import { useEscritorio } from "../store";
@@ -198,7 +198,8 @@ export function CartaoLote() {
   const ehAnexo = !!terreno?.anexoDe;
   const numeroPrincipal = (principal ? LOTE_POR_CHAVE[principal.chave]?.numero : null) ?? l.numero;
   const anexoDeste = !ehAnexo && terreno ? Object.values(terrenos).find((t) => t.anexoDe === chave) ?? null : null;
-  const vizinho = `${l.i},${l.j},${l.k ^ 1}`; const vizinhoInfo = LOTE_POR_CHAVE[vizinho];
+  // vizinho do lado pela posição física (nos quarteirões das sedes a chave não é a posição: data/mundo.ts › chaveDoLote)
+  const vizinhoInfo = vizinhoDoLado(l), vizinho = vizinhoInfo?.chave ?? "";
   const vizinhoLivre = !!vizinhoInfo && vizinhoInfo.lote.tipo !== "praca" && !terrenos[vizinho];
   const ampliar = async () => { setErro(null); setAmpliando(true); try { const r = await fetch(`/api/terrenos/${encodeURIComponent(vizinho)}/anexo`, { method: "POST" }); const j = await r.json().catch(() => ({})); if (!r.ok) { setErro(j.erro ?? `Erro ${r.status}`); return; } await carregar(); selecionarLote(vizinho); } finally { setAmpliando(false); } };
   const livre = !terreno;

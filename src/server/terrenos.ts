@@ -5,7 +5,7 @@
 import { ehSede } from "@/office/data/sedes";
 import { avisarSeguidores } from "./seguir";
 import { sql, migrar } from "./db";
-import { QUARTEIROES, nichoValido } from "@/office/data/mundo";
+import { nichoValido, vizinhoDoLado } from "@/office/data/mundo";
 import type { Usuario } from "./usuarios";
 import { escritorioPadrao, normalizarEscritorio, trocasRestantes, TROCAS_LAYOUT_GRATIS, PRECO_TROCA_LAYOUT, LAYOUT, type Escritorio } from "@/office/data/escritorio";
 import { registrar } from "./eventos";
@@ -44,11 +44,11 @@ const MAX_LOGO = 400 * 1024;
 
 export const ehAdmin = (u: Usuario | null | undefined) => !!u && (u.papel === "admin" || u.email === ADMIN_EMAIL || (process.env.ADMIN_EMAILS ?? "").toLowerCase().split(",").map((s) => s.trim()).includes(u.email));
 
-// Lotes que podem ser comprados: os que estão em quarteirões de lotes (não a Nuvem nem o restaurante)
+// Lotes que podem ser comprados: os da lista de lotes (não a Nuvem, a lanchonete nem o lote de uma sede). Pela chave na
+// lista, nunca pela posição dentro da chave (nos quarteirões das sedes elas não batem: data/mundo.ts › chaveDoLote)
 export function loteAVenda(chave: string) {
-  const m = /^(-?\d+),(-?\d+),([0-3])$/.exec(chave); if (!m) return false;
-  const q = QUARTEIROES.find((x) => x.i === +m[1] && x.j === +m[2]);
-  return !!q?.lotes && q.lotes[+m[3]]?.tipo !== "praca"; // a praça de eventos não está à venda
+  const l = LOTE_POR_CHAVE[chave];
+  return !!l && l.lote.tipo !== "praca"; // a praça de eventos não está à venda
 }
 
 // trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
@@ -335,10 +335,11 @@ export async function encerrarPromocao(u: Usuario, chave: string) {
 // Quem tem lote ativo pode alugar UM lote vizinho do mesmo quarteirão (que divide um lado com o seu) como ampliação: o
 // prédio fica maior e passa a ocupar os dois. A ampliação tem o preço de um lote e é paga e renovada à parte.
 export function vizinhosDoLote(chave: string): string[] {
-  const m = /^(-?\d+),(-?\d+),([0-3])$/.exec(chave); if (!m) return [];
-  // só o vizinho do lado (0↔1 e 2↔3: mesma rua). Um atrás do outro (0↔2) daria um lote de fundo, com a frente no meio.
-  const lado = +m[3] ^ 1;
-  return [`${m[1]},${m[2]},${lado}`].filter((c) => loteAVenda(c));
+  const l = LOTE_POR_CHAVE[chave]; if (!l) return [];
+  // só o vizinho do lado (0↔1 e 2↔3 na posição física: mesma rua). Um atrás do outro (0↔2) daria um lote de fundo, com a
+  // frente no meio. Ao lado de uma sede não há vizinho à venda
+  const v = vizinhoDoLado(l);
+  return v ? [v.chave].filter((c) => loteAVenda(c)) : [];
 }
 export async function reservarAnexo(u: Usuario, anexo: string) {
   await migrar(); await limparVencidos();

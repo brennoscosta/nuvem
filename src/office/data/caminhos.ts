@@ -3,9 +3,9 @@
 // praça são livres; dentro dos quarteirões (prédios, lojas, a sede) não se entra. Tocar no chão calcula o caminho
 // pelas ruas e calçadas (A* numa grade de 1 m, depois esticado em retas que não encostam em nada); tocar dentro de um
 // quarteirão leva até a calçada mais perto. A caminhada pelo teclado usa o mesmo livre() (scene/CameraMundo.tsx).
-import { LOTE_POR_CHAVE, PASSO, MEIO_Q, MUNDO, N, pontoNaCalcada } from "./mundo";
+import { LOTE_POR_CHAVE, PASSO, MEIO_Q, MUNDO, N, LOTE, MEIO_CALCADA, pontoNaCalcada } from "./mundo";
 import { PRACA_CHAVE } from "./praca";
-import { SEDES } from "./sedes";
+import { sedeNoPonto, paraLocalSede, paraMundoSede } from "./sedes";
 
 export type Ponto = [number, number];
 const PRACA = LOTE_POR_CHAVE[PRACA_CHAVE]?.centro ?? null;
@@ -28,8 +28,9 @@ export function pontoLivre(x: number, z: number): Ponto {
   const lx = MUNDO.x - 2.6, lz = MUNDO.z - 2.6;
   let px = Math.max(-lx, Math.min(lx, x)), pz = Math.max(-lz, Math.min(lz, z));
   if (folgado(px, pz)) return [px, pz];
-  // tocou numa sede (data/sedes.ts): vai até a entrada, na calçada da frente (sul), e não à mais perto
-  for (const sd of SEDES) if (Math.abs(px - sd.x) < MEIO_Q && Math.abs(pz - sd.z) < MEIO_Q) return [Math.max(sd.x - 8, Math.min(sd.x + 8, px)), sd.z + MEIO_Q + 1.3];
+  // tocou numa sede (data/sedes.ts; desde 19/11/2026 num lote só): vai até a calçada da frente dela, e não à mais perto
+  const sd = sedeNoPonto(px, pz);
+  if (sd) { const [lx] = paraLocalSede(sd, px, pz); return paraMundoSede(sd, Math.max(-8, Math.min(8, lx)), LOTE / 2 + (MEIO_CALCADA - MEIO_Q)); }
   [px, pz] = pontoNaCalcada(px, pz);
   if (folgado(px, pz)) return [px, pz];
   // perto da praça ou de uma quina: procura em volta, do mais perto para o mais longe

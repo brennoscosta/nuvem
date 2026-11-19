@@ -68,8 +68,12 @@ function medidas(q: Quintal) {
 }
 
 // ---------- atlas: placa "Ponto disponível · Lote N" e plaquinha do número ----------
-// 1024 × 1024 (512 no modo leve, mesmo desenho): placas de 340 × 170 em 3 colunas e plaquinhas de 128 × 128 embaixo.
-const A = 1024, PW = 340, PH = 170, NW = 128, NY = 704;
+// 1024 de largura (512 no modo leve, mesmo desenho): placas de 340 × 170 em 3 colunas e plaquinhas de 128 × 128 embaixo.
+// 19/11/2026: com os 12 lotes novos dos quarteirões das sedes (24 lotes), a altura passou a acompanhar a lista: 1024 até
+// 12 lotes, 2048 depois disso (as placas continuam do mesmo tamanho e nitidez)
+const A = 1024, PW = 340, PH = 170, NW = 128;
+const NY = Math.max(704, Math.ceil(LOTES.length / 3) * PH); // onde começam as plaquinhas do número
+const AH = 2 ** Math.ceil(Math.log2(NY + Math.ceil(LOTES.length / 8) * NW)); // altura do atlas (potência de 2)
 const celPlaca = (i: number): [number, number, number, number] => [(i % 3) * PW, Math.floor(i / 3) * PH, PW, PH];
 const celNumero = (i: number): [number, number, number, number] => [(i % 8) * NW, NY + Math.floor(i / 8) * NW, NW, NW];
 // mesmo desenho do ícone "predios" de ui/Icone.tsx (grade de 24, traço de 1,8 e o tom)
@@ -105,7 +109,7 @@ function desenharNumero(g: Ctx, [x0, y0]: [number, number, number, number], nume
 let texAtlas: THREE.CanvasTexture | null = null;
 function atlasPontos() {
   if (texAtlas || typeof document === "undefined") return texAtlas;
-  const S = leve() ? 512 : A, c = document.createElement("canvas"); c.width = c.height = S;
+  const S = leve() ? 512 : A, c = document.createElement("canvas"); c.width = S; c.height = (S * AH) / A;
   const g = c.getContext("2d")! as Ctx; g.scale(S / A, S / A);
   LOTES.forEach((l, i) => { desenharPlaca(g, celPlaca(i), l.numero); desenharNumero(g, celNumero(i), l.numero); });
   texAtlas = new THREE.CanvasTexture(c); texAtlas.colorSpace = THREE.SRGBColorSpace; texAtlas.anisotropy = leve() ? 2 : 8;
@@ -115,7 +119,7 @@ const GEO_ATLAS = new Map<string, THREE.BufferGeometry>();
 function planoAtlas(w: number, h: number, [x0, y0, cw, ch]: [number, number, number, number]) {
   const k = `${w},${h},${x0},${y0}`; let g = GEO_ATLAS.get(k); if (g) return g;
   g = new THREE.PlaneGeometry(w, h); const uv = g.attributes.uv as THREE.BufferAttribute, m = 4; // margem: o mipmap não pega a vizinha
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, (x0 + m + uv.getX(i) * (cw - 2 * m)) / A, 1 - (y0 + m + (1 - uv.getY(i)) * (ch - 2 * m)) / A);
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, (x0 + m + uv.getX(i) * (cw - 2 * m)) / A, 1 - (y0 + m + (1 - uv.getY(i)) * (ch - 2 * m)) / AH);
   GEO_ATLAS.set(k, g); return g;
 }
 const indiceDo = (l: LoteInfo) => Math.max(0, LOTES.indexOf(l));

@@ -1,9 +1,12 @@
 "use client";
 // Sede da Social RP, antes OneState RP (16/11/2026; dados em src/office/data/onestate.ts). Torre de vidro escuro com estrutura
-// grafite e frisos dourados (as cores da marca: ouro e prata sobre preto), logo grande no alto (sul, oeste e norte),
-// pórtico dourado com a logo na entrada, praça com totem e o balão. Cada andar de cada fachada é UMA imagem desenhada na
+// grafite e frisos dourados (as cores da marca: ouro e prata sobre preto), logo grande no alto (frente e lado),
+// pórtico dourado com a logo na entrada e o balão. Cada andar de cada fachada é UMA imagem desenhada na
 // hora (salas acesas na cor da área, mesas e a placa com o nome): poucos objetos para o mapa desenhar. A fachada acende
 // à noite (brilhoSede, chamado a cada quadro). Tocar no prédio ou no balão abre o cartão com todas as áreas do site.
+// 19/11/2026 (pedido do dono): cada sede ocupa só 1 lote de 20 x 20 m. A praça de 40 x 40, o totem e os canteiros do
+// quarteirão saíram; no lote ficam o jardim pequeno da frente (SedeEstilos › JardimSede), o pórtico e a entrada. Tudo é
+// desenhado em coordenadas do lote (frente +z) e o grupo da sede leva para o lote dela, virado para a rua da frente.
 import * as THREE from "three";
 import { useRef, useState } from "react";
 import { useLoader, useFrame, type ThreeEvent } from "@react-three/fiber";
@@ -13,19 +16,19 @@ import { Estatico } from "./Estatico";
 import { ComFallback } from "./Modelos";
 import { ceu } from "./CicloDia";
 import { leve } from "./qualidade";
-import { SEDE, OS_X, OS_Z } from "../data/onestate";
-import { SEDE_SOCIALRP, deslocamento, areasDoAndarDe, andaresComAreas, SALAS_NA_FACE, alturaSede, type Sede, type AreaSede, type FaceSede, type SalasDoAndar } from "../data/sedes";
+import { SEDE } from "../data/onestate";
+import { SEDE_SOCIALRP, areasDoAndarDe, andaresComAreas, salasNaFace, salasVazias, alturaSede, type Sede, type AreaSede, type FaceSede } from "../data/sedes";
 import { abrirSede } from "../ui/CartaoOneState";
 import { InteriorSede } from "./OneStateInterior";
 import { useEscritorio } from "../store";
 import { cameraInfo } from "./CameraMundo";
-import { PALETAS, PORTICO, SX, SZ, pisosDe, logosDe, brilhoEstilos, comAlfa, CascaEstilo, TelaoEstudio, type Paleta } from "./SedeEstilos";
+import { PALETAS, PORTICO, SX, SZ, pisosDe, logosDe, brilhoEstilos, comAlfa, CascaEstilo, TelaoEstudio, JardimSede, type Paleta } from "./SedeEstilos";
 
 // 17/11/2026: a mesma torre serve a todas as sedes do cadastro (data/sedes.ts): cor de destaque, logo, áreas e balão de
-// cada uma; é desenhada em volta do centro da Social RP e deslocada para o quarteirão da sede (deslocamento()).
+// cada uma; desde 19/11/2026 é desenhada em coordenadas do lote e levada para o lote de cada sede (SedeHQ).
 // 17/11/2026 (tarde): cada sede ganhou o próprio prédio (sede.estilo; cascas em scene/SedeEstilos.tsx). A Social RP segue
-// com esta torre ("classica"); a planta térrea e a entrada sul são as mesmas em todas.
-const GRAFITE = "#1E2228", PISO = "#4A4F57";
+// com esta torre ("classica"); a planta térrea e a entrada da frente são as mesmas em todas.
+const GRAFITE = "#1E2228";
 const S = SEDE.z + SEDE.d / 2, N = SEDE.z - SEDE.d / 2, O = SEDE.x - SEDE.w / 2, L = SEDE.x + SEDE.w / 2; // faces
 
 // ---------- fachadas desenhadas em canvas ----------
@@ -145,24 +148,23 @@ function brilhoSede(noite: number) {
 let ultimoBrilho = -1;
 function brilho(t: number) { if (t === ultimoBrilho) return; ultimoBrilho = t; brilhoSede(ceu.noite); brilhoEstilos(ceu.noite, t); }
 
-// cada andar de cada face é um plano com a sua pintura; andares e faces sem nome de área (andares de cima, fundo e leste
-// quando não precisam) dividem a mesma pintura (uma textura por tamanho), e o Estatico junta os planos iguais numa malha só
+// cada andar de cada face é um plano com a sua pintura; andares e faces sem nome de área (andares de cima e as faces
+// viradas para os lotes vizinhos) dividem a mesma pintura (uma textura por tamanho), e o Estatico junta os planos iguais
+// numa malha só. As áreas ficam na frente e no lado da rua (data/sedes.ts › salasNaFace e sede.lado)
 const PX_M = 1024 / SEDE.w; // px por metro, na largura e na altura (o andar tem SEDE.andar × PX_M px de altura)
 const PX_ANDAR = Math.round(SEDE.andar * PX_M);
-const vazio = (face: FaceSede) => Array<null>(SALAS_NA_FACE[face]).fill(null); // andares sem área: o mesmo ritmo de janelas
-const VAZIO: SalasDoAndar = { sul: vazio("sul"), oeste: vazio("oeste"), leste: vazio("leste"), norte: vazio("norte") };
 function Fachadas({ sede }: { sede: Sede }) {
-  const H = SEDE.andar, nAreas = andaresComAreas(sede);
+  const H = SEDE.andar, nAreas = andaresComAreas(sede), VAZIO = salasVazias(sede), por = salasNaFace(sede); // andares sem área: o mesmo ritmo de janelas
   return (
     <group>
       {pisosDe(sede).map((p) => {
         const f = p.f, salas = f >= 1 && f <= nAreas ? areasDoAndarDe(sede, f) : VAZIO;
         const ws = p.x1 - p.x0 - 2 * p.canto, wl = p.z1 - p.z0 - 2 * p.canto, pxS = Math.round(ws * PX_M), pxL = Math.round(wl * PX_M);
         const cx = (p.x0 + p.x1) / 2, cz = (p.z0 + p.z1) / 2, y = f * H + H / 2;
-        const comumS = fachada(sede, `comum${SALAS_NA_FACE.sul}:${pxS}`, pxS, PX_ANDAR, VAZIO.sul, "comum"), comumL = fachada(sede, `comum${SALAS_NA_FACE.oeste}:${pxL}`, pxL, PX_ANDAR, VAZIO.oeste, "comum");
-        // o saguão (térreo) aparece na frente e no oeste; uma face com pelo menos uma área tem a pintura própria
+        const comumS = fachada(sede, `comum${por.sul}:${pxS}`, pxS, PX_ANDAR, VAZIO.sul, "comum"), comumL = fachada(sede, `comum${por.oeste}:${pxL}`, pxL, PX_ANDAR, VAZIO.oeste, "comum");
+        // o saguão (térreo) aparece na frente e no lado da rua; uma face com pelo menos uma área tem a pintura própria
         const pintura = (face: FaceSede, px: number, comum: THREE.Material) => {
-          const tipo: Tipo = f === 0 ? (face === "sul" || face === "oeste" ? "saguao" : "comum") : salas[face].some(Boolean) ? "areas" : "comum";
+          const tipo: Tipo = f === 0 ? (face === "sul" || face === sede.lado ? "saguao" : "comum") : salas[face].some(Boolean) ? "areas" : "comum";
           return tipo === "comum" ? comum : fachada(sede, `${face}${f}`, px, PX_ANDAR, salas[face], tipo);
         };
         return (
@@ -179,38 +181,16 @@ function Fachadas({ sede }: { sede: Sede }) {
 }
 
 // ---------- estrutura (juntada num objeto só pelo Estatico) ----------
-// parte "sempre": piso da praça e totem (iguais em todas as sedes); parte "fora": a torre clássica e a decoração (somem
-// na vista por dentro). As outras sedes trocam a parte "fora" pela casca do próprio estilo (CascaEstilo).
-function Estrutura({ parte, sede }: { parte: "sempre" | "fora"; sede: Sede }) {
+// parte "fora": a torre clássica e o pórtico (somem na vista por dentro). As outras sedes trocam a parte "fora" pela casca
+// do próprio estilo (CascaEstilo). O chão do lote e o jardim da frente (iguais em todas, nas cores de cada estilo) ficam
+// sempre à mostra: SedeEstilos › JardimSede.
+function Estrutura({ sede }: { sede: Sede }) {
   const OURO = sede.cor, H = alturaSede(sede), mG = mat(GRAFITE, { rough: 0.55, metal: 0.4 }), mOuro = mat(OURO, { rough: 0.3, metal: 0.85, emissive: OURO, ei: 0.25 });
-  const mPiso = mat(PISO, { rough: 0.92 }), mCaminho = mat("#6B7079", { rough: 0.8 }), mVerde = mat("#3E7D4A"), mTerra = mat("#5A4632");
+  const mCaminho = mat("#6B7079", { rough: 0.8 });
   const lajes = Array.from({ length: sede.andares + 1 }, (_, f) => f * SEDE.andar).filter((y) => y > 0);
-  if (parte === "sempre") return (
-    <group>
-      <mesh geometry={caixa(40, 0.08, 40)} material={mPiso} position={[OS_X, 0.04, OS_Z]} receiveShadow />
-      {/* totem da praça (canto sudoeste) */}
-      <mesh geometry={caixa(2.2, 7.4, 0.6)} material={mG} position={[OS_X - 15.5, 3.7, OS_Z + 16.5]} castShadow />
-      {[-1.12, 1.12].map((dx) => <mesh key={dx} geometry={caixa(0.08, 7.4, 0.64)} material={mOuro} position={[OS_X - 15.5 + dx, 3.7, OS_Z + 16.5]} />)}
-    </group>
-  );
   return (
     <group>
-      {/* praça: caminho de entrada com frisos dourados, canteiros e bancos */}
-      <mesh geometry={caixa(7, 0.09, 20 - (S - OS_Z) + 0.5)} material={mCaminho} position={[SEDE.x, 0.05, (S + OS_Z + 20) / 2]} receiveShadow />
-      {[-3.6, 3.6].map((dx) => <mesh key={dx} geometry={caixa(0.22, 0.1, 20 - (S - OS_Z) + 0.5)} material={mOuro} position={[SEDE.x + dx, 0.06, (S + OS_Z + 20) / 2]} />)}
-      {[[-12, 13], [12, 13], [-15.5, -2], [15.5, -2]].map(([dx, dz], i) => (
-        <group key={i} position={[OS_X + dx, 0, OS_Z + dz]}>
-          <mesh geometry={caixa(i < 2 ? 9 : 2.6, 0.6, i < 2 ? 2.6 : 12)} material={mG} position={[0, 0.3, 0]} castShadow />
-          <mesh geometry={caixa(i < 2 ? 8.6 : 2.2, 0.1, i < 2 ? 2.2 : 11.6)} material={mTerra} position={[0, 0.61, 0]} />
-          {Array.from({ length: 5 }, (_, k) => <mesh key={k} geometry={esfera(0.55, 10)} material={mVerde} position={i < 2 ? [-3.4 + k * 1.7, 0.95, 0] : [0, 0.95, -4.6 + k * 2.3]} />)}
-        </group>
-      ))}
-      {[[-8, 9.4], [8, 9.4]].map(([dx, dz], i) => (
-        <group key={`b${i}`} position={[OS_X + dx, 0, OS_Z + dz]}>
-          <mesh geometry={caixa(3, 0.12, 0.7)} material={mat("#8E6B4A", { rough: 0.7 })} position={[0, 0.48, 0]} castShadow />
-          {[-1.2, 1.2].map((x) => <mesh key={x} geometry={caixa(0.12, 0.45, 0.6)} material={mG} position={[x, 0.22, 0]} />)}
-        </group>
-      ))}
+      <JardimSede sede={sede} parte="fora" />
       {/* núcleo escuro atrás das fachadas, lajes com friso dourado e pilares de canto */}
       <mesh geometry={caixa(SEDE.w - 0.1, H, SEDE.d - 0.1)} material={mat("#0B0F15", { rough: 0.6 })} position={[SEDE.x, H / 2, SEDE.z]} castShadow receiveShadow />
       {lajes.map((y) => (
@@ -228,7 +208,7 @@ function Estrutura({ parte, sede }: { parte: "sempre" | "fora"; sede: Sede }) {
       <mesh geometry={caixa(3.2, 1.2, 2.6)} material={mat("#4A4F57", { rough: 0.7 })} position={[SEDE.x - 6.5 * SX, H + 1.2, SEDE.z - 4 * SZ]} castShadow />
       <mesh geometry={cilindro(0.09, 0.14, 7, 8)} material={mG} position={[L - 1.8, H + 4.6, N + 1.8]} />
       <mesh geometry={esfera(0.22, 10)} material={mat("#FF3B3B", { emissive: "#FF3B3B", ei: 2 })} position={[L - 1.8, H + 8.2, N + 1.8]} />
-      {/* pórtico dourado da entrada (frente sul) e degraus: a altura acompanha o pé-direito (PORTICO, SedeEstilos) */}
+      {/* pórtico dourado da entrada (frente) e degraus: a altura acompanha o pé-direito (PORTICO, SedeEstilos) */}
       <mesh geometry={caixa(9, 0.18, 2.4)} material={mCaminho} position={[SEDE.x, 0.09, S + 1.2]} receiveShadow />
       {[-3.5, 3.5].map((dx) => <mesh key={dx} geometry={caixa(0.6, PORTICO.vao, 0.6)} material={mOuro} position={[SEDE.x + dx, PORTICO.vao / 2, S + 2.1]} castShadow />)}
       <mesh geometry={caixa(7.8, 0.6, 2.6)} material={mOuro} position={[SEDE.x, PORTICO.vao, S + 1.25]} castShadow />
@@ -237,23 +217,23 @@ function Estrutura({ parte, sede }: { parte: "sempre" | "fora"; sede: Sede }) {
   );
 }
 
-// ---------- a logo da sede: no alto, na entrada e no totem (posições de cada estilo em SedeEstilos › logosDe) ----------
+// ---------- a logo da sede: no alto e na entrada (posições de cada estilo em SedeEstilos › logosDe) ----------
 function useLogos(sede: Sede) {
-  const [logo, icone] = useLoader(THREE.TextureLoader, [sede.logo, sede.icone]);
+  const logo = useLoader(THREE.TextureLoader, sede.logo);
   const placa = (t: THREE.Texture, w: number, h: number) => [
     <planeGeometry key="g" args={[w, h]} />,
     <meshBasicMaterial key="m" map={t} map-colorSpace={THREE.SRGBColorSpace} map-anisotropy={4} transparent alphaTest={0.08} toneMapped={false} />,
   ];
-  return { logo, icone, placa };
+  return { logo, placa };
 }
 function Logos({ fora, sede }: { fora: boolean; sede: Sede }) {
-  const { logo, icone, placa } = useLogos(sede);
+  const { logo, placa } = useLogos(sede);
   const PROP_LOGO = sede.propLogo, pos = logosDe(sede);
   const mPoste = mat(GRAFITE, { rough: 0.5, metal: 0.4 });
   return (
     <group>
       <group visible={fora}>
-      {/* no alto: frente (sul) com verso para o norte, e o lado oeste */}
+      {/* no alto: frente com verso para o fundo, e o lado da rua da esquina (SedeEstilos › logosDe) */}
       {pos.alto.map((a, i) => {
         const h = a.w * PROP_LOGO, y = a.chao + 1.4 + h / 2;
         return (
@@ -267,11 +247,6 @@ function Logos({ fora, sede }: { fora: boolean; sede: Sede }) {
       {/* na entrada */}
       <mesh position={pos.portico.pos}>{placa(logo, pos.portico.w, pos.portico.w * PROP_LOGO)}</mesh>
       </group>
-      {/* no totem, dos dois lados */}
-      <mesh position={[OS_X - 15.5, 5.6, OS_Z + 16.81]}>{placa(icone, 1.9, 1.9)}</mesh>
-      <mesh position={[OS_X - 15.5, 5.6, OS_Z + 16.19]} rotation={[0, Math.PI, 0]}>{placa(icone, 1.9, 1.9)}</mesh>
-      <mesh position={[OS_X - 15.5, 3.4, OS_Z + 16.81]}>{placa(logo, 2, 2 * PROP_LOGO)}</mesh>
-      <mesh position={[OS_X - 15.5, 3.4, OS_Z + 16.19]} rotation={[0, Math.PI, 0]}>{placa(logo, 2, 2 * PROP_LOGO)}</mesh>
     </group>
   );
 }
@@ -285,7 +260,6 @@ export function SedeHQ({ sede }: { sede: Sede }) {
   // o clique do prédio só vale por fora: por dentro a torre fica invisível, mas o raio ainda bate no teto dela e o clique
   // abria o cartão no lugar da conversa com a pessoa tocada (16/11/2026). Por dentro, o cartão abre pelo balão.
   const clique = fora ? { onClick: (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); abrir(); }, onPointerOver: cursor("pointer"), onPointerOut: cursor("") } : {};
-  const [dx, dz] = deslocamento(sede);
   const tipo = sede.tipo.charAt(0).toUpperCase() + sede.tipo.slice(1);
   // por dentro, só a sede perto da câmera monta a equipe (são 4 sedes com dezenas de agentes cada)
   const [perto, setPerto] = useState(false);
@@ -299,13 +273,14 @@ export function SedeHQ({ sede }: { sede: Sede }) {
     const p = Math.hypot(x - sede.x, z - sede.z) < 48;
     if (p !== perto) setPerto(p);
   });
+  // o lote da sede (data/sedes.ts: centro e giro para a rua da frente); dentro dele tudo é desenhado com a frente para +z
   return (
-    <group position={[dx, 0, dz]}>
+    <group position={[sede.x, 0, sede.z]} rotation={[0, sede.rot, 0]}>
       <group {...clique}>
-        <Estatico><Estrutura parte="sempre" sede={sede} /></Estatico>
+        <Estatico><JardimSede sede={sede} /></Estatico>
         {/* a casca do prédio e as fachadas pintadas, juntas em poucas malhas */}
         <Estatico visivel={fora}>
-          {sede.estilo === "classica" ? <Estrutura parte="fora" sede={sede} /> : <CascaEstilo sede={sede} />}
+          {sede.estilo === "classica" ? <Estrutura sede={sede} /> : <CascaEstilo sede={sede} />}
           <Fachadas sede={sede} />
         </Estatico>
         <ComFallback fallback={null}><Logos fora={fora} sede={sede} /></ComFallback>

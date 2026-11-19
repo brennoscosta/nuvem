@@ -25,13 +25,14 @@ export type Lote =
 export interface Quarteirao {
   i: number; // coluna (x)
   j: number; // linha (z)
-  ocupante?: "nuvem" | "restaurante" | "onestate" | "sede"; // quarteirão inteiro ("sede": data/sedes.ts)
-  reserva?: number; // lotes que existiam aqui antes de virar sede: os números ficam guardados (as outras lojas não mudam de número)
-  lotes?: [Lote, Lote, Lote, Lote]; // ordem: noroeste, nordeste, sudoeste, sudeste
+  ocupante?: "nuvem" | "restaurante"; // quarteirão inteiro
+  // ordem FÍSICA: noroeste, nordeste, sudoeste, sudeste (k de centroLote). null = o lote da sede de uma empresa
+  // (data/sedes.ts, 19/11/2026): fica fora da lista de lotes à venda e o número dele fica guardado
+  lotes?: [Lote | null, Lote | null, Lote | null, Lote | null];
 }
 
 export const centroQuarteirao = (i: number, j: number): [number, number] => [i * PASSO, j * PASSO];
-// k: 0 = NO (-x,-z), 1 = NE (+x,-z), 2 = SO (-x,+z), 3 = SE (+x,+z)
+// k (posição FÍSICA do lote no quarteirão): 0 = NO (-x,-z), 1 = NE (+x,-z), 2 = SO (-x,+z), 3 = SE (+x,+z)
 export const centroLote = (i: number, j: number, k: number): [number, number] => {
   const [cx, cz] = centroQuarteirao(i, j);
   return [cx + (k % 2 ? LOTE / 2 : -LOTE / 2), cz + (k >= 2 ? LOTE / 2 : -LOTE / 2)];
@@ -39,6 +40,8 @@ export const centroLote = (i: number, j: number, k: number): [number, number] =>
 // Pra onde a casa do lote k deve olhar: pra rua mais próxima (lado de fora do quarteirão).
 // Lotes do norte olham pro norte (-z), do sul pro sul (+z). rot 0 = frente pra +z.
 export const frenteDoLote = (k: number) => (k >= 2 ? 0 : Math.PI);
+// lote de esquina de um quarteirão virado para o centro da cidade (a Nuvem, em 0,0): é onde ficam as sedes
+export const cantoParaOCentro = (i: number, j: number) => (i < 0 ? 1 : 0) + (j < 0 ? 2 : 0);
 
 // Casas distribuídas pra nunca repetir o mesmo modelo lado a lado; terrenos vazios no meio.
 // 18/11/2026 (pedido do dono: "as casas velhas, melhore o visual"): a casinha caindo aos pedaços (casaVelha) saiu dos
@@ -47,37 +50,67 @@ export const frenteDoLote = (k: number) => (k >= 2 ? 0 : Math.PI);
 const V = (arvore = false): Lote => ({ tipo: "vazio", arvore });
 const C = (modelo: ModeloCasa, escala = 1): Lote => ({ tipo: "casa", modelo, escala });
 
+const SEDE = null; // o lote da sede (data/sedes.ts)
+
 export const QUARTEIROES: Quarteirao[] = [
   { i: 0, j: 0, ocupante: "nuvem" },
   { i: 1, j: 0, ocupante: "restaurante" },
   { i: -1, j: 0, lotes: [C("casaTerrea"), V(true), C("casaColonial", 1.05), C("casaModerna")] },
-  // 17/11/2026: sedes da AppZone (-1,-1), do NUVCAM (1,-1) e do bday.fm (-1,1) (data/sedes.ts); nenhum desses 12 lotes
-  // estava reservado ou vendido. Os números deles ficam guardados (reserva) para a numeração das outras lojas não mudar.
-  { i: -1, j: -1, ocupante: "sede", reserva: 4 },
+  // 17/11/2026: sedes da AppZone (-1,-1), do NUVCAM (1,-1) e do bday.fm (-1,1) (data/sedes.ts), cada uma no quarteirão
+  // inteiro; nenhum desses 12 lotes estava reservado ou vendido e os números deles ficaram guardados.
+  // 19/11/2026 (pedido do dono): cada sede passou a ocupar só o lote de esquina virado para o centro da cidade
+  // (cantoParaOCentro); os outros 3 lotes de cada quarteirão voltaram a ser pontos à venda, com os números de antes
+  // (o número do lote da sede continua guardado). A chave de banco dos lotes destes quarteirões está em chaveDoLote.
+  { i: -1, j: -1, lotes: [C("casaTerrea"), V(true), C("casaModerna"), SEDE] }, // AppZone no sudeste
   { i: 0, j: -1, lotes: [V(true), C("casaTerrea", 1.05), C("casaColonial"), V()] },
-  { i: 1, j: -1, ocupante: "sede", reserva: 4 },
-  { i: -1, j: 1, ocupante: "sede", reserva: 4 },
+  { i: 1, j: -1, lotes: [V(true), C("casaColonial"), SEDE, V()] }, // NUVCAM no sudoeste
+  { i: -1, j: 1, lotes: [C("casaModerna"), SEDE, V(true), C("casaTerrea")] }, // bday.fm no nordeste
   // o lote 0,1,1 (ao sul da Nuvem) virou a praça de eventos e da feira de sábado em 12/11/2026
   { i: 0, j: 1, lotes: [C("casaColonial", 0.95), { tipo: "praca" }, V(), C("casaTerrea", 1.05)] },
   // 16/11/2026: o quarteirão 1,1 (último na ordem, então nenhum lote mudou de número) virou a sede do OneState RP
-  // (src/office/data/onestate.ts); antes tinha 4 lotes à venda, nenhum vendido
-  { i: 1, j: 1, ocupante: "onestate" },
+  // (src/office/data/onestate.ts); antes tinha 4 lotes à venda, nenhum vendido. Desde 19/11/2026 a sede (Social RP)
+  // fica no noroeste e os outros 3 lotes estão à venda
+  { i: 1, j: 1, lotes: [SEDE, C("casaTerrea"), C("casaModerna"), V(true)] },
 ];
+// posição física (k) do lote da sede num quarteirão, ou null
+export const kDaSede = (i: number, j: number): number | null => {
+  const k = QUARTEIROES.find((q) => q.i === i && q.j === j)?.lotes?.indexOf(SEDE) ?? -1;
+  return k >= 0 ? k : null;
+};
+// Chave de banco ("i,j,c") do lote na posição física k. Até 18/11/2026 cada sede ocupava o quarteirão inteiro com a chave
+// "i,j,0", e a empresa, a equipe e as conversas dela estão gravadas nessa chave: a sede continua com "i,j,0" na posição
+// física dela, e o lote livre que ficou na posição 0 recebe a chave que sobrou ("i,j,kSede"). Fora dos quarteirões de
+// sede (e na Social RP, que está na posição 0), chave e posição são a mesma coisa. Quem acha um lote pela chave usa
+// LOTE_POR_CHAVE (o k e o centro de lá são os físicos); nunca tire a posição de dentro da chave.
+export function chaveDoLote(i: number, j: number, k: number): string {
+  const s = kDaSede(i, j);
+  const c = s == null ? k : k === 0 ? s : k === s ? 0 : k;
+  return `${i},${j},${c}`;
+}
 
 // Ruas: linhas (z fixo) e colunas (x fixo) nos eixos entre os quarteirões, cobrindo o mundo inteiro
 export const EIXOS_RUA: number[] = [];
 for (let n = -N; n <= N + 1; n++) EIXOS_RUA.push(n * PASSO - EIXO_RUA);
 export const COMPRIMENTO_RUA = 2 * (N * PASSO + EIXO_RUA) + RUA;
 
-// Lotes à venda, numerados de forma estável (Lote 1, 2, 3…) na ordem da planta
+// Lotes à venda, numerados de forma estável (Lote 1, 2, 3…) na ordem da planta. Cada quarteirão de lotes conta 4 números
+// na ordem física; o lote da sede gasta o número dele sem entrar na lista (o número fica guardado e nenhuma outra loja
+// muda de número). k e centro são a posição FÍSICA; a chave vem de chaveDoLote.
 export interface LoteInfo { chave: string; numero: number; i: number; j: number; k: number; lote: Lote; centro: [number, number] }
 export const LOTES: LoteInfo[] = [];
 let numeroLote = 0;
 for (const q of QUARTEIROES) {
-  if (!q.lotes) { numeroLote += q.reserva ?? 0; continue; }
-  q.lotes.forEach((lote, k) => LOTES.push({ chave: `${q.i},${q.j},${k}`, numero: ++numeroLote, i: q.i, j: q.j, k, lote, centro: centroLote(q.i, q.j, k) }));
+  if (!q.lotes) continue; // a Nuvem e a lanchonete nunca tiveram lotes
+  q.lotes.forEach((lote, k) => {
+    const numero = ++numeroLote;
+    if (lote) LOTES.push({ chave: chaveDoLote(q.i, q.j, k), numero, i: q.i, j: q.j, k, lote, centro: centroLote(q.i, q.j, k) });
+  });
 }
 export const LOTE_POR_CHAVE: Record<string, LoteInfo> = Object.fromEntries(LOTES.map((l) => [l.chave, l]));
+// lote à venda numa posição física (null: a sede, a Nuvem ou a lanchonete)
+export const loteNaPosicao = (i: number, j: number, k: number): LoteInfo | null => LOTES.find((l) => l.i === i && l.j === j && l.k === k) ?? null;
+// vizinho do lado, na mesma rua (0↔1 e 2↔3), para o lote duplo; null se não for um lote à venda (a sede, por exemplo)
+export const vizinhoDoLado = (l: LoteInfo): LoteInfo | null => loteNaPosicao(l.i, l.j, l.k ^ 1);
 
 export const NOME_CONSTRUCAO: Record<string, string> = {
   vazio: "terreno vazio", casaVelha: "casinha antiga pra reformar", casaTerrea: "casinha térrea", casaSobrado: "sobrado moderno", casaColonial: "sobrado colonial", casaModerna: "casa moderna",

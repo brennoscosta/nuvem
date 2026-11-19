@@ -2,7 +2,7 @@
 // Estado do mundo WorkEnd: lotes reservados, lote selecionado, usuário do WorkEnd (sessão própria, separada do admin
 // da Nuvem) e o rascunho da empresa enquanto o usuário monta a placa dele.
 import { useSede } from "./sedeStore";
-import { sedeDe, sedeDoParametro, centroTorre } from "./data/sedes";
+import { sedeDe, sedeDoParametro, frenteDaSede } from "./data/sedes";
 import { create } from "zustand";
 import { useSyncExternalStore } from "react";
 
@@ -67,6 +67,9 @@ interface Estado {
   painelEmpresa: boolean; // painel "Montar minha empresa" aberto
   rascunho: Rascunho | null; // o que está sendo editado (a cena mostra ao vivo)
   alvoCamera: [number, number, number] | null; // a câmera desliza até aqui
+  // de que lado a câmera olha o alvo (ângulo em volta do eixo vertical, 0 = do sul): só as sedes pedem (19/11/2026, as
+  // viradas para o norte são vistas de frente, pela rua delas); null = mantém o ângulo de agora (scene/Cena3D.tsx)
+  giroCamera: number | null;
   vagas: Record<string, number>; // vagas abertas por lote (placa "Estamos contratando")
   praca: Praca | null; carregarPraca: () => Promise<void>;
   abrirPix: (p: Pix) => void; // Pix de barraca e de roupa do personagem (criados fora do cartão do lote)
@@ -112,7 +115,7 @@ export const useMundo = create<Estado>((set, get) => ({
       void get().carregarOutdoors(); return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },
-  terrenos: {}, meu: null, meus: [], usuario: null, admin: false, pagamentoLigado: false, preco: 99, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null,
+  terrenos: {}, meu: null, meus: [], usuario: null, admin: false, pagamentoLigado: false, preco: 99, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null, giroCamera: null,
 
   carregar: async () => {
     void get().carregarOutdoors();
@@ -139,7 +142,7 @@ export const useMundo = create<Estado>((set, get) => ({
   selecionarLote: (chave) => {
     // a sede do OneState não é um lote da lista: abre o cartão dela (src/office/ui/CartaoOneState.tsx)
     const sd = sedeDe(chave);
-    if (sd) { const [x, z] = centroTorre(sd); set({ loteSelecionado: null, alvoCamera: [x, 0.5, z + 6] }); useSede.setState({ aberto: true, id: sd.id }); return; }
+    if (sd) { const [x, z] = frenteDaSede(sd, 0); set({ loteSelecionado: null, alvoCamera: [x, 0.5, z], giroCamera: sd.rot }); useSede.setState({ aberto: true, id: sd.id }); return; }
     const l = chave ? LOTE_POR_CHAVE[chave] : null;
     // lote duplo ativo: a câmera vai para o meio dos dois terrenos, onde fica o prédio
     let alvo: [number, number, number] | null = l ? [l.centro[0], 0.5, l.centro[1]] : null;
@@ -243,7 +246,7 @@ export const useMundo = create<Estado>((set, get) => ({
   },
 
   sairWorkend: async () => { await fetch("/api/workend/sair", { method: "POST" }); set({ usuario: null, meu: null, meus: [], painelEmpresa: false, rascunho: null }); await get().carregar(); },
-  limparAlvo: () => set({ alvoCamera: null }),
+  limparAlvo: () => set({ alvoCamera: null, giroCamera: null }),
 }));
 
 if (typeof window !== "undefined") (window as unknown as { __mundo: typeof useMundo }).__mundo = useMundo;

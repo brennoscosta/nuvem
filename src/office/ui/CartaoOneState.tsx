@@ -11,8 +11,8 @@ import { useState } from "react";
 import { useMundo } from "../mundoStore";
 import { FLUTUANTE, LARGO } from "./estilo";
 import { Icone, type NomeIcone } from "./Icone";
-import { SEDE_POR_ID, SEDE_SOCIALRP, centroTorre, deslocamento, type Sede } from "../data/sedes";
-import { centroDaSala } from "../data/plantaSede";
+import { SEDE_POR_ID, SEDE_SOCIALRP, frenteDaSede, paraMundoSede, type Sede } from "../data/sedes";
+import { centroDaSala, Z0 as ZI0, Z1 as ZI1 } from "../data/plantaSede";
 import type { Membro, Setor } from "../data/escritorio";
 import { useSede } from "../sedeStore";
 import { useEscritorio } from "../store";
@@ -22,8 +22,10 @@ import { NIVEL_COR, NIVEL_ROTULO } from "./equipeComum";
 
 export const useCartaoOneState = useSede;
 export function abrirSede(id: string) {
-  const sede = SEDE_POR_ID[id] ?? SEDE_SOCIALRP, [x, z] = centroTorre(sede);
-  useMundo.setState({ loteSelecionado: null, alvoCamera: [x, 0.5, z + 6] });
+  // a câmera vai até a frente da sede e, se estiver olhando pelas costas, dá a volta (19/11/2026: cada sede num lote, de
+  // frente para a rua dela; scene/Cena3D.tsx)
+  const sede = SEDE_POR_ID[id] ?? SEDE_SOCIALRP, [x, z] = frenteDaSede(sede, 0);
+  useMundo.setState({ loteSelecionado: null, alvoCamera: [x, 0.5, z], giroCamera: sede.rot });
   useSede.setState({ aberto: true, id: sede.id });
 }
 export function abrirOneState() { abrirSede("socialrp"); }
@@ -109,8 +111,9 @@ export function CartaoOneState() {
   const luz = useEscritorio((s) => s.luz);
   const [depto, setDepto] = useState<string | null>("diretoria");
   if (!aberto || loteAberto) return null;
-  const [tx, tz] = centroTorre(sd);
-  const alternarVista = () => { useEscritorio.getState().setVista(dentro ? "fora" : "dentro"); useMundo.setState({ alvoCamera: [tx, 0.5, tz + 3] }); };
+  // por dentro a câmera olha o meio da planta; por fora, a frente da torre (coordenadas do lote: data/plantaSede.ts)
+  const [ix, iz] = paraMundoSede(sd, 0, (ZI0 + ZI1) / 2), [fx, fz] = frenteDaSede(sd, 0);
+  const alternarVista = () => { useEscritorio.getState().setVista(dentro ? "fora" : "dentro"); useMundo.setState({ alvoCamera: dentro ? [fx, 0.5, fz] : [ix, 0.5, iz], giroCamera: sd.rot }); };
   const e = sede?.escritorio ?? null;
   // departamentos na ordem da empresa (diretoria primeiro), a recepção no fim
   const setores = e ? [...e.setores.filter((s) => s.id !== "recepcao"), ...e.setores.filter((s) => s.id === "recepcao")] : [];
@@ -118,9 +121,9 @@ export function CartaoOneState() {
     .sort((a, b) => ORDEM_NIVEL[a.nivel ?? "analista"] - ORDEM_NIVEL[b.nivel ?? "analista"]);
   const verSala = (id: string) => {
     if (!e) return;
-    const c = centroDaSala(e.setores, id), [dx, dz] = deslocamento(sd);
+    const c = centroDaSala(e.setores, id), [sx, sz] = c ? paraMundoSede(sd, c[0], c[1]) : [ix, iz];
     useEscritorio.getState().setVista("dentro");
-    useMundo.setState({ alvoCamera: c ? [c[0] + dx, 0.5, c[1] + dz] : [tx, 0.5, tz + 3] });
+    useMundo.setState({ alvoCamera: [sx, 0.5, sz], giroCamera: sd.rot });
   };
   const departamentos = setores.filter((s) => s.id !== "recepcao").length;
   return (

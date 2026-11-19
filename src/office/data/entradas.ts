@@ -7,10 +7,10 @@
 //  - olhar: para onde o personagem fica virado na espera.
 // Lojas: a planta é a mesma de data/escritorio.ts (plantaCliente: porta em [0, z0], balcão em [-5,2; -4,8]), girada como
 // o prédio em scene/EscritorioCliente.tsx (frente do lote, giro do dono e lote duplo). Sede: data/plantaSede.ts.
-import { LOTE_POR_CHAVE, frenteDoLote } from "./mundo";
+import { LOTE_POR_CHAVE, frenteDoLote, MEIO_CALCADA, MEIO_Q, LOTE } from "./mundo";
 import { PREDIO_CLIENTE, plantaCliente, type Escritorio } from "./escritorio";
-import { sedeDe, deslocamento } from "./sedes";
-import { montarSalas, cx, Z1 } from "./plantaSede";
+import { sedeDe, paraMundoSede } from "./sedes";
+import { montarSalas, cx, Z1, BALCAO_SEDE } from "./plantaSede";
 import { pontoLivre, livre, type Ponto } from "./caminhos";
 
 export interface Entrada { chave: string; nome: string; numero: number | null; fora: Ponto; porta: Ponto; espera: Ponto; olhar: number; centro: Ponto; rot: number }
@@ -23,12 +23,15 @@ export function entradaDoPredio(t: TerrenoEntrada, anexo: string | null): Entrad
   if (t.status !== "ativo" || !t.escritorio || t.anexoDe) return null;
   const sd = sedeDe(t.chave);
   if (sd) {
-    // sedes (data/sedes.ts): a planta é a da Social RP deslocada para o quarteirão de cada uma
+    // sedes (data/sedes.ts, 19/11/2026: num lote só): a planta compacta (data/plantaSede.ts) em coordenadas do lote,
+    // girada para a rua da frente. A porta é o vão no meio da parede da frente da recepção; a calçada fica reto para
+    // fora dela (na faixa do meio da calçada, como os pedestres); a espera é diante do balcão, de frente para a atendente
     const rec = montarSalas(t.escritorio.setores).find((s) => s.tipo === "recepcao");
     if (!rec) return null;
-    const [dx, dz] = deslocamento(sd), x = cx(rec) + dx, zf = Z1 + dz, zr = rec.z1 + dz;
-    // a porta é o vão de 3 m no meio da parede sul da recepção; a atendente fica atrás do balcão (z1 - 4,2)
-    return { chave: t.chave, nome: t.empresaNome, numero: sd.numeroLoja, fora: pontoLivre(x, zf + 7), porta: [x, zf + 0.4], espera: [x, zr - 3.0], olhar: Math.PI, centro: [x, zr - 4], rot: 0 };
+    const p = (lx: number, lz: number) => paraMundoSede(sd, lx, lz);
+    const fora = p(cx(rec), LOTE / 2 + (MEIO_CALCADA - MEIO_Q)), porta = p(cx(rec), Z1 + 0.4);
+    // olhar: a frente local (-z, para o balcão) girada como a sede
+    return { chave: t.chave, nome: t.empresaNome, numero: sd.numeroLoja, fora: pontoLivre(fora[0], fora[1]), porta, espera: p(BALCAO_SEDE.x, BALCAO_SEDE.z + 1.2), olhar: sd.rot + Math.PI, centro: p(BALCAO_SEDE.x, BALCAO_SEDE.z), rot: sd.rot };
   }
   const l = LOTE_POR_CHAVE[t.chave]; if (!l) return null;
   const la = anexo ? LOTE_POR_CHAVE[anexo] : null;

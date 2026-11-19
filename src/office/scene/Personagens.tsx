@@ -14,13 +14,15 @@ import { MUNDO, passeioNaCalcada, pontoNaCalcada } from "../data/mundo";
 import { usePersonagem, minhaPos, type Outro } from "../personagemStore";
 import { modoMundo, useMundo } from "../mundoStore";
 import { useEscritorio } from "../store";
+import { sedeDe } from "../data/sedes";
 
 // entrar e sair dos prédios (17/11/2026): marcos do caminho (calçada da porta, porta e balcão), ver personagemStore.ts
 const perto = (a: readonly [number, number], b: readonly [number, number], r = 0.7) => Math.hypot(a[0] - b[0], a[1] - b[1]) < r;
 function passouPor(ponto: [number, number]) {
   const p = usePersonagem.getState().predio; if (!p) return;
-  // chegou na calçada da porta: a vista vira "por dentro" e a câmera vai até a recepção
-  if (p.fase === "indo" && perto(ponto, p.fora)) { usePersonagem.setState({ predio: { ...p, fase: "entrando" } }); useEscritorio.getState().setVista("dentro"); useMundo.setState({ alvoCamera: [p.espera[0], 0.5, p.espera[1]] }); }
+  // chegou na calçada da porta: a vista vira "por dentro" e a câmera vai até a recepção (numa sede, olhando pela frente
+  // dela: 19/11/2026, cada sede num lote, de frente para a rua dela)
+  if (p.fase === "indo" && perto(ponto, p.fora)) { usePersonagem.setState({ predio: { ...p, fase: "entrando" } }); useEscritorio.getState().setVista("dentro"); useMundo.setState({ alvoCamera: [p.espera[0], 0.5, p.espera[1]], giroCamera: sedeDe(p.chave)?.rot ?? null }); }
   // saindo: passou pela porta, a vista volta para fora
   else if (p.fase === "saindo" && perto(ponto, p.porta)) useEscritorio.getState().setVista("fora");
   // saindo e passou pela calçada (tocou na rua estando dentro): a visita acaba aqui e ele segue pela rua

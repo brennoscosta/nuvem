@@ -13,9 +13,11 @@ import type { Mesa as MesaDef } from "../data/layout";
 // ---------- mesa de trabalho ----------
 // Parte fixa: tampo, pés, monitor (com a tela apagada), teclado, mouse, celular, caneca e cadeira.
 // tampoCor (12/11/2026): o interior personalizável do cliente troca o acabamento das mesas comuns
-export function Mesa({ def, cor, tampoCor }: { def: MesaDef; cor: string; tampoCor?: string }) {
+// compacta (19/11/2026): mesa menor das salas das sedes num lote só (1,1 x 0,7 m; a do chefe 1,6 x 0,8 m), as mesmas medidas
+// de data/plantaSede.ts › MESA_COMPACTA
+export function Mesa({ def, cor, tampoCor, compacta = false }: { def: MesaDef; cor: string; tampoCor?: string; compacta?: boolean }) {
   const grande = def.tipo !== "comum";
-  const w = grande ? 1.9 : 1.5, d = grande ? 0.9 : 0.75;
+  const w = compacta ? (grande ? 1.6 : 1.1) : grande ? 1.9 : 1.5, d = compacta ? (grande ? 0.8 : 0.7) : grande ? 0.9 : 0.75;
   const tampo = def.tipo === "ceo" || def.tipo === "diretor" ? COR.madeiraEscura : tampoCor ?? COR.branco;
   return (
     <group position={def.pos} rotation={[0, def.rot, 0]}>
@@ -32,9 +34,9 @@ export function Mesa({ def, cor, tampoCor }: { def: MesaDef; cor: string; tampoC
       </group>
       <mesh geometry={caixa(0.42, 0.02, 0.14)} material={mat("#E8EAED")} position={[0, 0.755, -0.2]} />
       <mesh geometry={caixa(0.06, 0.025, 0.09)} material={mat("#E8EAED")} position={[0.32, 0.755, -0.2]} />
-      <mesh geometry={caixa(0.07, 0.01, 0.14)} material={mat(COR.preto, { rough: 0.3 })} position={[-0.45, 0.75, -0.12]} rotation={[0, 0.3, 0]} />
-      <mesh geometry={cilindro(0.04, 0.035, 0.09, 12)} material={mat(cor, { rough: 0.5 })} position={[0.55, 0.79, 0.05]} />
-      {grande && <Planta pequena position={[-0.75, 0.745, 0.2]} />}
+      <mesh geometry={caixa(0.07, 0.01, 0.14)} material={mat(COR.preto, { rough: 0.3 })} position={[compacta ? -0.4 : -0.45, 0.75, -0.12]} rotation={[0, 0.3, 0]} />
+      <mesh geometry={cilindro(0.04, 0.035, 0.09, 12)} material={mat(cor, { rough: 0.5 })} position={[compacta ? w / 2 - 0.1 : 0.55, 0.79, 0.05]} />
+      {grande && <Planta pequena position={[compacta ? -w / 2 + 0.13 : -0.75, 0.745, 0.2]} />}
       <Cadeira position={[0, 0, -0.62]} cor={def.tipo === "ceo" ? "#2B2E35" : def.tipo === "comum" ? cor : "#4A4F58"} />
     </group>
   );

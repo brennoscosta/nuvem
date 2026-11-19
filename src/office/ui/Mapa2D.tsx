@@ -9,7 +9,8 @@ import { QUARTEIROES, centroQuarteirao, EIXOS_RUA, RUA, MEIO_Q, BORDA_CALCADA, P
 import { PRACA_CHAVE } from "../data/praca";
 import { escolherMapa } from "../scene/qualidade";
 import { abrirSede } from "./CartaoOneState";
-import { SEDES } from "../data/sedes";
+import { SEDES, paraMundoSede, type Sede } from "../data/sedes";
+import { SEDE } from "../data/onestate";
 
 const L = N * PASSO + EIXO_RUA + 12; // metade do lado desenhado (m)
 const ASFALTO = "#545962", FAIXA = "#F3EEDF", CALCADA = "#E4DFD4", GRAMA = "#9ACB78", GRAMA_Q = "#B2DA93";
@@ -123,6 +124,25 @@ function Lote2D({ l, t, principal, anexoMeio, sel, vagas, promo, vivo }: { l: Lo
   );
 }
 // balão do nome (como no 3D, mais simples)
+// sede no lote dela: gramado, a torre (16 x 13 m, data/onestate.ts › SEDE) girada para a rua e o pátio da entrada
+function Sede2D({ sd }: { sd: Sede }) {
+  const [x, z] = [sd.x, sd.z], s = LOTE - 1.6;
+  // retângulo local (frente +z) no mundo: com o giro de meia volta das sedes do norte, z troca de sinal
+  const ret = (lx0: number, lx1: number, lz0: number, lz1: number) => { const [ax, az] = paraMundoSede(sd, lx0, lz0), [bx, bz] = paraMundoSede(sd, lx1, lz1); return { x: Math.min(ax, bx), y: Math.min(az, bz), width: Math.abs(bx - ax), height: Math.abs(bz - az) }; };
+  const t = ret(SEDE.x - SEDE.w / 2, SEDE.x + SEDE.w / 2, SEDE.z - SEDE.d / 2, SEDE.z + SEDE.d / 2), patio = ret(-6.2, 6.2, SEDE.z + SEDE.d / 2, LOTE / 2 - 0.4);
+  return (
+    <g onClick={() => abrirSede(sd.id)} style={{ cursor: "pointer" }} role="button" aria-label={`Sede da ${sd.nome}`}>
+      <rect x={x - s / 2} y={z - s / 2} width={s} height={s} rx={2} fill="#D8E6CF" />
+      <rect {...patio} rx={0.8} fill="#CFC9BC" />
+      <rect {...t} rx={1.4} fill="#000" opacity={0.18} transform="translate(1.1 1.3)" />
+      <rect {...t} rx={1.4} fill={sd.escura} stroke={sd.cor} strokeWidth={0.7} />
+      {Array.from({ length: 4 }, (_, i) => Array.from({ length: 2 }, (_, k) => <rect key={`${i}${k}`} x={t.x + 1.4 + i * 3.5} y={t.y + 1.8 + k * 5.2} width={2.4} height={3.6} rx={0.4} fill={sd.cor} opacity={0.55} />))}
+      {/* o nome fica em cima da torre: nas viradas para o norte, do lado da rua; nas viradas para o sul, por dentro da torre
+          (atrás dela fica o lote vizinho, com a placa dele) */}
+      <Rotulo x={x} z={sd.rot === 0 ? t.y + 5.8 : t.y - 1.4} texto={sd.nome} sub={sd.tipo} cor={sd.escura} />
+    </g>
+  );
+}
 function Rotulo({ x, z, texto, sub, cor }: { x: number; z: number; texto: string; sub?: string; cor: string }) {
   // cabe na largura do lote (18 m): nome comprido fica com a letra menor, sem encostar no vizinho
   const t = texto.trim().slice(0, 20) || "Sua empresa", natural = t.length * 1.55 + 3, w = Math.min(18.4, Math.max(10, natural)), k = Math.min(1, 18.4 / natural), h = sub ? 5.4 : 3.8;
@@ -214,18 +234,6 @@ export function Mapa2D() {
               {Array.from({ length: 4 }, (_, i) => Array.from({ length: 3 }, (_, k) => <rect key={`${i}${k}`} x={cx - 12 + i * 6.4} y={cz - 10 + k * 7} width={4.6} height={4.6} rx={0.6} fill="#5B9DFF" opacity={0.6} />))}
               <Rotulo x={cx} z={cz - 14} texto="Nuvem" sub="tecnologia" cor="#1D4ED8" />
             </g>}
-            {(q.ocupante === "onestate" || q.ocupante === "sede") && (() => {
-              // sedes (data/sedes.ts): torre escura com a cor da marca
-              const sd = SEDES.find((x) => x.i === q.i && x.j === q.j); if (!sd) return null;
-              return (
-                <g onClick={() => abrirSede(sd.id)} style={{ cursor: "pointer" }}>
-                  <rect x={cx - 11} y={cz - 11} width={22} height={16} rx={2} fill="#000" opacity={0.18} transform="translate(1.2 1.4)" />
-                  <rect x={cx - 11} y={cz - 11} width={22} height={16} rx={2} fill={sd.escura} stroke={sd.cor} strokeWidth={0.8} />
-                  {Array.from({ length: 4 }, (_, i) => Array.from({ length: 2 }, (_, k) => <rect key={`${i}${k}`} x={cx - 9 + i * 4.8} y={cz - 8.6 + k * 5.6} width={3.4} height={3.6} rx={0.5} fill={sd.cor} opacity={0.55} />))}
-                  <Rotulo x={cx} z={cz - 12} texto={sd.nome} sub={sd.tipo} cor={sd.escura} />
-                </g>
-              );
-            })()}
             {q.ocupante === "restaurante" && <g>
               <rect x={cx - 12} y={cz - 9} width={24} height={18} rx={2} fill="#000" opacity={0.18} transform="translate(1.2 1.4)" />
               <rect x={cx - 12} y={cz - 9} width={24} height={18} rx={2} fill="#D97706" />
@@ -240,6 +248,9 @@ export function Mapa2D() {
           const t = terrenos[l.chave], principal = t?.anexoDe ? terrenos[t.anexoDe] : undefined;
           return <Lote2D key={l.chave} l={l} t={t} principal={principal} anexoMeio={anexos[l.chave] ?? null} sel={sel === l.chave} vagas={t && !t.anexoDe ? vagas[l.chave] ?? 0 : 0} promo={t && !t.anexoDe && t.status === "ativo" ? promocaoAtiva(t, agora)?.texto ?? null : null} vivo={vivo} />;
         })}
+        {/* sedes (data/sedes.ts; desde 19/11/2026 cada uma num lote de esquina virado para o centro): torre escura com a
+            cor da marca, o pátio de entrada do lado da rua da frente; depois dos lotes, para o nome ficar por cima */}
+        {SEDES.map((sd) => <Sede2D key={sd.id} sd={sd} />)}
       </svg>
       {/* aproximar, afastar e voltar ao 3D */}
       <div className="pointer-events-auto absolute bottom-14 left-3 z-10 flex items-center gap-1 rounded-2xl bg-[#111418]/75 p-1 text-white shadow-xl backdrop-blur">

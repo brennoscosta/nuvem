@@ -65,6 +65,8 @@ const LIMITE = typeof window !== "undefined" && modoMundo() ? LIMITE_CAMERA : { 
 if (typeof window !== "undefined" && modoMundo()) precarregarCidade();
 
 const DESLOCA = new THREE.Vector3();
+const ESFERA = new THREE.Spherical();
+const RAIO_SEDE = 36; // distância máxima da câmera ao abrir uma sede (a volta em arco de FocoCamera)
 // Quando o usuário seleciona um agente, a câmera desliza até a mesa dele; trocar de vista reenquadra
 function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
   const selecionado = useEscritorio((s) => s.selecionado);
@@ -76,6 +78,7 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
   }, [selecionado]);
   const vista = useEscritorio((s) => s.vista);
   const posAlvo = useRef<THREE.Vector3 | null>(null);
+  const volta = useRef<{ t0: number; de: THREE.Spherical; ate: number; raio: number; alvoDe: THREE.Vector3; alvoAte: THREE.Vector3 } | null>(null);
   const primeira = useRef(true);
   // lote clicado no mapa: a câmera desliza (arrasta) até ele, mantendo a altura e o ângulo
   const alvoLote = useMundo((s) => s.alvoCamera);
@@ -87,6 +90,19 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
     const novo = new THREE.Vector3(...alvoLote);
     const d = novo.clone().sub(t);
     alvo.current = novo; posAlvo.current = camera.position.clone().add(d);
+    // sede virada para outro lado (19/11/2026, cada sede num lote, de frente para a rua dela): se a câmera estiver olhando
+    // pelas costas do prédio (mais de 100° de diferença), ela dá a volta em arco (sem atravessar a torre) e olha de frente,
+    // na mesma altura; de longe, chega mais perto (a sede e a planta por dentro ficaram menores)
+    const giro = useMundo.getState().giroCamera;
+    if (giro != null) {
+      const de = new THREE.Spherical().setFromVector3(camera.position.clone().sub(t));
+      const dif = Math.atan2(Math.sin(giro - de.theta), Math.cos(giro - de.theta)), virar = Math.abs(dif) > (100 * Math.PI) / 180;
+      const raio = Math.min(de.radius, RAIO_SEDE);
+      if (de.radius > 0.5 && (virar || raio < de.radius - 0.5)) {
+        volta.current = { t0: performance.now(), de, ate: de.theta + (virar ? dif : 0), raio, alvoDe: t.clone(), alvoAte: novo };
+        alvo.current = null; posAlvo.current = null;
+      }
+    }
     useMundo.getState().limparAlvo();
   }, [alvoLote, camera, controles]);
   useEffect(() => {
@@ -99,6 +115,17 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
   }, [vista, controles]);
   useFrame(({ camera }, dt) => {
     const c = controles.current; if (!c) return;
+    // a volta em arco até a frente de uma sede (1 s): o alvo desliza e a câmera gira em volta dele
+    const v = volta.current;
+    if (v) {
+      const k = Math.min(1, (performance.now() - v.t0) / 1000), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+      (c.target as THREE.Vector3).lerpVectors(v.alvoDe, v.alvoAte, e);
+      ESFERA.set(v.de.radius + (v.raio - v.de.radius) * e, v.de.phi, v.de.theta + (v.ate - v.de.theta) * e);
+      camera.position.setFromSpherical(ESFERA).add(c.target as THREE.Vector3);
+      c.update();
+      if (k >= 1) volta.current = null;
+      return;
+    }
     if (posAlvo.current) { camera.position.lerp(posAlvo.current, Math.min(1, dt * 3)); if (camera.position.distanceTo(posAlvo.current) < 0.1) posAlvo.current = null; }
     if (alvo.current) { c.target.lerp(alvo.current, Math.min(1, dt * 3)); if (c.target.distanceTo(alvo.current) < 0.05) alvo.current = null; }
     // trava o arrasto dentro do terreno (move câmera e alvo juntos)

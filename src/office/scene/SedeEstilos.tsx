@@ -1,10 +1,10 @@
 "use client";
 // Estilos das sedes (17/11/2026, pedido do dono: "quero prédios diferentes, visuais; estão todos iguais. Estilo diferente,
-// com vidros bonitos, outro com outros detalhes"). A planta térrea (19 x 14 m desde 18/11/2026, data/onestate.ts › SEDE) e
-// a entrada sul são as mesmas em todas; muda a casca:
+// com vidros bonitos, outro com outros detalhes"). A planta térrea (16 x 13 m desde 19/11/2026, quando cada sede passou a
+// ocupar um lote só; data/onestate.ts › SEDE) e a entrada da frente (+z local) são as mesmas em todas; muda a casca:
 //  - classica (Social RP): a torre original, vidro escuro e frisos dourados (desenhada em scene/OneStateHQ.tsx);
 //  - tech (AppZone, "Distrito Tech"): vidro azul espelhado com montantes finos de alumínio, aletas na cor da
-//    marca que acendem à noite (no leste elas sobem em degraus, como as barras de sinal do celular), terraço com jardim,
+//    marca que acendem à noite (no lado de dentro do quarteirão sobem em degraus, como as barras de sinal do celular), terraço com jardim,
 //    pérgola e caixa de vidro no topo, e marquise de vidro na entrada;
 //  - festa (bday.fm): vidro lilás com quinas arredondadas, sacada branca em cada andar com floreiras e fita de luz rosa,
 //    varal de lâmpadas no terraço e letreiro de lâmpadas na entrada, como marquise de teatro;
@@ -17,8 +17,9 @@ import { useFrame, useLoader } from "@react-three/fiber";
 import { caixa, cilindro, circulo, esfera, mat, plano } from "./geo";
 import { leve } from "./qualidade";
 import { ceu } from "./CicloDia";
-import { SEDE, OS_X, OS_Z } from "../data/onestate";
-import { alturaSede, andaresComAreas, degrausEstudio, type Sede, type EstiloSede } from "../data/sedes";
+import { SEDE } from "../data/onestate";
+import { LOTE } from "../data/mundo";
+import { alturaSede, andaresComAreas, degrausEstudio, salasNaFace, type Sede, type EstiloSede } from "../data/sedes";
 
 type V3 = [number, number, number];
 const PI = Math.PI;
@@ -68,15 +69,17 @@ export function pisosDe(sede: Sede): Piso[] {
   });
 }
 
-// ---------- logos: no alto (frente sul e lado oeste) e na entrada ----------
+// ---------- logos: no alto (frente e lado da rua) e na entrada ----------
 // chao = altura onde os postes da placa nascem (ficam 0,8 m enterrados na coroa, como na torre original)
 export interface LogoAlto { x: number; z: number; rotY: number; w: number; chao: number; verso: boolean; postes: number[] }
 export interface LogosEstilo { alto: LogoAlto[]; portico: { pos: V3; w: number } }
 // 18/11/2026: com as torres mais baixas, as logos do alto ficaram 20% menores; depois, com a planta menor, acompanham
 // também a largura da torre (SX)
+// 19/11/2026: a logo do lado vai para o lado da rua da esquina (sede.lado); as posições de logosBase são do lado oeste e,
+// no leste, espelham em volta do meio da torre
 export function logosDe(sede: Sede): LogosEstilo {
-  const l = logosBase(sede), k = 0.8 * SX;
-  return { ...l, alto: l.alto.map((a) => ({ ...a, w: a.w * k, postes: a.postes.map((p) => p * k) })) };
+  const l = logosBase(sede), k = 0.8 * SX, espelha = sede.lado === "leste";
+  return { ...l, alto: l.alto.map((a, i) => ({ ...a, w: a.w * k, postes: a.postes.map((p) => p * k), ...(i === 1 && espelha ? { x: 2 * SEDE.x - a.x, rotY: -a.rotY } : {}) })) };
 }
 function logosBase(sede: Sede): LogosEstilo {
   const H = alturaSede(sede);
@@ -208,35 +211,57 @@ function Guarda({ x0, x1, z0, z1, r, y0, h, vidro, corrimao }: { x0: number; x1:
   );
 }
 
-// ---------- praça de entrada de cada estilo (caminho com frisos, canteiros e bancos, no mesmo lugar da original) ----------
-function PracaEstilo({ caminho, friso, canteiro, verde, flor, redondos = false }: { caminho: THREE.Material; friso: THREE.Material; canteiro: THREE.Material; verde: THREE.Material; flor: THREE.Material; redondos?: boolean }) {
-  const comp = 20 - (S - OS_Z) + 0.5, zc = (S + OS_Z + 20) / 2, mTerra = mat("#5A4632"), mMadeira = mat("#8E6B4A", { rough: 0.7 }), mPe = mat("#2A2D33", { rough: 0.5, metal: 0.4 });
+// ---------- o lote da sede (19/11/2026, pedido do dono: cada sede num lote de 20 x 20 m) ----------
+// No lugar da praça de 40 x 40 m com totem e canteiros: gramado, o pátio de entrada da fachada até a calçada (na largura
+// das marquises, com a faixa do caminho até a porta) e um canteiro em cada ponta, fora das colunas das marquises. Nas
+// cores de cada estilo. Parte "sempre": o chão e o jardim da frente, à mostra também na vista por dentro (o interior
+// cobre o resto do lote); parte "fora": os arbustos dos lados e do fundo, que ficariam dentro das salas.
+const JARDIM: Record<EstiloSede, { piso: string; canteiro: string; verde: string; flor: string; redondos?: boolean }> = {
+  classica: { piso: "#6B7079", canteiro: "#1E2228", verde: "#3E7D4A", flor: "#4C9A5A" },
+  tech: { piso: "#AEB8C2", canteiro: "#D5DCE3", verde: "#3E8B4F", flor: "#5BAA5E" },
+  festa: { piso: "#E6DDEF", canteiro: "#F7F4FB", verde: "#4C9A5A", flor: "#F472B6", redondos: true }, // vasos redondos com flores
+  estudio: { piso: "#2B2C31", canteiro: "#121216", verde: "#3E7D4A", flor: "#4C9A5A" },
+};
+// friso do caminho: dourado na clássica; nas outras, a fita na cor da marca que acende à noite (a mesma da casca)
+function frisoDe(sede: Sede) {
+  if (sede.estilo === "classica") return mat(sede.cor, { rough: 0.3, metal: 0.85, emissive: sede.cor, ei: 0.25 });
+  if (sede.estilo === "festa") return luz(`${sede.id}:friso`, "#FF5FB8", { dia: 0.3, noite: 1.4 });
+  return luz(`${sede.id}:friso`, sede.cor, sede.estilo === "tech" ? { dia: 0.25, noite: 1 } : { dia: 0.35, noite: 2 });
+}
+const PATIO = { x: 6.2, z0: S, z1: LOTE / 2 - 0.1 }; // pátio da frente: largura das marquises (12 m) e até a divisa
+export function JardimSede({ sede, parte = "sempre" }: { sede: Sede; parte?: "sempre" | "fora" }) {
+  const J = JARDIM[sede.estilo];
+  const canteiro = mat(J.canteiro, { rough: 0.6 }), verde = mat(J.verde), flor = mat(J.flor), mTerra = mat("#5A4632");
+  if (parte === "fora") return (
+    // arbustos baixos nas faixas de grama dos lados e do fundo da torre
+    <group>
+      {[-1, 1].flatMap((s) => [-6, -1.5, 3].map((z) => <mesh key={`${s}:${z}`} geometry={bola(0.55, 1)} material={verde} position={[s * (LOTE / 2 - 0.85), 0.45, z]} castShadow />))}
+      {[-1, 1].map((s) => <mesh key={`f${s}`} geometry={bola(0.7, 1)} material={flor} position={[s * (LOTE / 2 - 1.1), 0.55, -LOTE / 2 + 0.9]} castShadow />)}
+    </group>
+  );
+  const zc = (PATIO.z0 + PATIO.z1) / 2, comp = PATIO.z1 - PATIO.z0, cz = (PATIO.z0 + 0.4 + PATIO.z1) / 2, cd = PATIO.z1 - PATIO.z0 - 0.6, xc = (PATIO.x + LOTE / 2) / 2 + 0.05;
   return (
     <group>
-      <mesh geometry={caixa(7, 0.09, comp)} material={caminho} position={[SEDE.x, 0.05, zc]} receiveShadow />
-      {[-3.6, 3.6].map((dx) => <mesh key={dx} geometry={caixa(0.22, 0.1, comp)} material={friso} position={[SEDE.x + dx, 0.06, zc]} />)}
-      {[[-12, 13], [12, 13], [-15.5, -2], [15.5, -2]].map(([dx, dz], i) => (
-        <group key={i} position={[OS_X + dx, 0, OS_Z + dz]}>
-          {redondos
-            // bday.fm: vasos redondos com flores
-            ? [-1, 0, 1].map((k) => { const p: V3 = i < 2 ? [k * 3, 0, 0] : [0, 0, k * 4]; return (
-              <group key={k} position={p}>
-                <mesh geometry={cilindro(1.15, 1.3, 0.7, 14)} material={canteiro} position={[0, 0.35, 0]} castShadow />
-                <mesh geometry={cilindro(1.05, 1.05, 0.08, 14)} material={mTerra} position={[0, 0.7, 0]} />
-                <mesh geometry={bola(0.62, 1)} material={verde} position={[0, 1.05, 0]} />
-                {[0, 1, 2].map((j) => <mesh key={j} geometry={bola(0.24, 0)} material={flor} position={[Math.cos(j * 2.1) * 0.55, 1.3, Math.sin(j * 2.1) * 0.55]} />)}
-              </group>); })
+      {/* gramado do lote todo e o pátio de entrada com a faixa do caminho até a porta */}
+      <mesh geometry={caixa(LOTE - 0.2, 0.06, LOTE - 0.2)} material={mat("#6FAA5C", { rough: 1 })} position={[0, 0.03, 0]} receiveShadow />
+      <mesh geometry={caixa(2 * PATIO.x, 0.08, comp)} material={mat(J.piso, { rough: 0.85 })} position={[0, 0.045, zc]} receiveShadow />
+      {[-1.6, 1.6].map((x) => <mesh key={x} geometry={caixa(0.16, 0.1, comp)} material={frisoDe(sede)} position={[x, 0.055, zc]} />)}
+      {/* um canteiro em cada ponta da frente */}
+      {[-1, 1].map((s) => (
+        <group key={s} position={[s * xc, 0, cz]}>
+          {J.redondos
+            ? [-1, 0, 1].map((k) => (
+              <group key={k} position={[0, 0, k * 1.4]}>
+                <mesh geometry={cilindro(0.62, 0.7, 0.55, 14)} material={canteiro} position={[0, 0.28, 0]} castShadow />
+                <mesh geometry={cilindro(0.56, 0.56, 0.06, 14)} material={mTerra} position={[0, 0.56, 0]} />
+                <mesh geometry={bola(0.4, 1)} material={verde} position={[0, 0.82, 0]} />
+                {[0, 1, 2].map((j) => <mesh key={j} geometry={bola(0.16, 0)} material={flor} position={[Math.cos(j * 2.1) * 0.36, 1.0, Math.sin(j * 2.1) * 0.36]} />)}
+              </group>))
             : <>
-              <mesh geometry={caixa(i < 2 ? 9 : 2.6, 0.6, i < 2 ? 2.6 : 12)} material={canteiro} position={[0, 0.3, 0]} castShadow />
-              <mesh geometry={caixa(i < 2 ? 8.6 : 2.2, 0.1, i < 2 ? 2.2 : 11.6)} material={mTerra} position={[0, 0.61, 0]} />
-              {Array.from({ length: 5 }, (_, k) => <mesh key={k} geometry={esfera(0.55, 10)} material={k % 2 ? flor : verde} position={i < 2 ? [-3.4 + k * 1.7, 0.95, 0] : [0, 0.95, -4.6 + k * 2.3]} />)}
+              <mesh geometry={caixa(LOTE / 2 - PATIO.x - 0.5, 0.5, cd)} material={canteiro} position={[0, 0.25, 0]} castShadow />
+              <mesh geometry={caixa(LOTE / 2 - PATIO.x - 0.8, 0.08, cd - 0.3)} material={mTerra} position={[0, 0.51, 0]} />
+              {[-1.4, 0, 1.4].map((z, k) => <mesh key={z} geometry={esfera(0.5, 10)} material={k === 1 ? flor : verde} position={[0, 0.85, z]} />)}
             </>}
-        </group>
-      ))}
-      {[[-8, 9.4], [8, 9.4]].map(([dx, dz], i) => (
-        <group key={`b${i}`} position={[OS_X + dx, 0, OS_Z + dz]}>
-          <mesh geometry={caixa(3, 0.12, 0.7)} material={mMadeira} position={[0, 0.48, 0]} castShadow />
-          {[-1.2, 1.2].map((x) => <mesh key={x} geometry={caixa(0.12, 0.45, 0.6)} material={mPe} position={[x, 0.22, 0]} />)}
         </group>
       ))}
     </group>
@@ -258,7 +283,7 @@ function Tech({ sede }: { sede: Sede }) {
   const meio = Array.from({ length: n - 1 }, (_, i) => i + 1);
   return (
     <group>
-      <PracaEstilo caminho={mat("#AEB8C2", { rough: 0.8 })} friso={luz(`${sede.id}:friso`, cor, { dia: 0.25, noite: 1 })} canteiro={mVaso} verde={mCopa} flor={mCopa2} />
+      <JardimSede sede={sede} parte="fora" />
       {/* núcleo e bordas finas de alumínio em cada piso */}
       <mesh geometry={caixa(SEDE.w - 0.1, H, SEDE.d - 0.1)} material={mNucleo} position={[SEDE.x, H / 2, SEDE.z]} castShadow receiveShadow />
       {meio.map((f) => <mesh key={`l${f}`} geometry={caixa(SEDE.w + 0.24, 0.14, SEDE.d + 0.24)} material={mPrata} position={[SEDE.x, f * AND, SEDE.z]} />)}
@@ -273,9 +298,10 @@ function Tech({ sede }: { sede: Sede }) {
           <mesh geometry={plano(SEDE.d, hJ)} material={mPele} position={[O - 0.05, y, SEDE.z]} rotation={[0, -PI / 2, 0]} />
           <mesh geometry={plano(SEDE.d, hJ)} material={mPele} position={[L + 0.05, y, SEDE.z]} rotation={[0, PI / 2, 0]} />
         </group>); })}
-      {/* aletas na cor da marca: no oeste no ritmo das salas; no leste sobem em degraus, como barras de sinal */}
-      {[S, SEDE.z, N].map((z) => <mesh key={`ao${z}`} geometry={caixa(0.85, H - AND + 0.8, 0.2)} material={mAleta} position={[O - 0.43, (AND + H + 0.8) / 2, z]} castShadow />)}
-      {[0, 1, 2, 3, 4].map((k) => { const topo = H + 1.2 + k * 1.7; return <mesh key={`al${k}`} geometry={caixa(0.85, topo - AND, 0.2)} material={mAleta} position={[L + 0.43, (AND + topo) / 2, S - k * (SEDE.d / 4)]} castShadow />; })}
+      {/* aletas na cor da marca: no lado da rua (o das áreas, sede.lado) no ritmo das salas, nas divisas entre elas, sem
+          cobrir os nomes; no outro lado sobem em degraus, como barras de sinal */}
+      {Array.from({ length: salasNaFace(sede)[sede.lado] + 1 }, (_, m) => S - (m * SEDE.d) / salasNaFace(sede)[sede.lado]).map((z) => <mesh key={`ao${z}`} geometry={caixa(0.85, H - AND + 0.8, 0.2)} material={mAleta} position={[sede.lado === "oeste" ? O - 0.43 : L + 0.43, (AND + H + 0.8) / 2, z]} castShadow />)}
+      {[0, 1, 2, 3, 4].map((k) => { const topo = H + 1.2 + k * 1.7; return <mesh key={`al${k}`} geometry={caixa(0.85, topo - AND, 0.2)} material={mAleta} position={[sede.lado === "oeste" ? L + 0.43 : O - 0.43, (AND + topo) / 2, S - k * (SEDE.d / 4)]} castShadow />; })}
       {/* coroa: laje fina, deck, guarda-corpo de vidro com a fita acesa */}
       <mesh geometry={caixa(SEDE.w + 0.3, 0.5, SEDE.d + 0.3)} material={mPrata} position={[SEDE.x, H + 0.25, SEDE.z]} castShadow />
       <mesh geometry={caixa(SEDE.w - 1.2, 0.1, SEDE.d - 1.2)} material={mDeck} position={[SEDE.x, H + 0.55, SEDE.z]} />
@@ -341,11 +367,11 @@ function Festa({ sede }: { sede: Sede }) {
   });
   // varal de lâmpadas do terraço: do mastro do meio até postes na beirada (só para trás e para os lados: a frente é da logo)
   const topoMastro: V3 = [SEDE.x, H + 7, SEDE.z - 2 * SZ];
-  // (a ponta do oeste fica recuada: a logo do lado oeste está na beirada)
-  const pontas: [number, number][] = [[-9.2, 5.5], [-7.6, -0.5], [-8.6, -6.3], [0, -7.2], [8.6, -6.3], [10.2, -1], [9.2, 5.5]];
+  // (a ponta do lado da rua fica recuada: a logo do lado está na beirada; no leste, as pontas espelham)
+  const pontas: [number, number][] = ([[-9.2, 5.5], [-7.6, -0.5], [-8.6, -6.3], [0, -7.2], [8.6, -6.3], [10.2, -1], [9.2, 5.5]] as [number, number][]).map(([x, z]) => [sede.lado === "leste" ? -x : x, z]);
   return (
     <group>
-      <PracaEstilo caminho={mat("#E6DDEF", { rough: 0.8 })} friso={luz(`${sede.id}:friso`, "#FF5FB8", { dia: 0.3, noite: 1.4 })} canteiro={mBranco} verde={mFolha} flor={mFlor} redondos />
+      <JardimSede sede={sede} parte="fora" />
       {/* núcleo arredondado e as quinas de vidro lilás (acendem à noite) */}
       <Arredondado x0={O + 0.05} x1={L - 0.05} z0={N + 0.05} z1={S - 0.05} r={r - 0.05} y={H / 2} h={H} m={mNucleo} sombra />
       {cantos.map(([x, z], i) => <mesh key={`q${i}`} geometry={cilindro(r + 0.03, r + 0.03, H, 28)} material={mCanto} position={[x, H / 2, z]} />)}
@@ -431,7 +457,7 @@ function Estudio({ sede }: { sede: Sede }) {
   const mastro: V3 = [L - 5.2, H + 0.6, N + 2];
   return (
     <group>
-      <PracaEstilo caminho={mat("#2B2C31", { rough: 0.8 })} friso={mFriso} canteiro={mat("#121216", { rough: 0.6 })} verde={mat("#3E7D4A")} flor={mat("#4C9A5A")} />
+      <JardimSede sede={sede} parte="fora" />
       {/* núcleos dos três degraus */}
       {degraus.map((d, k) => <mesh key={`n${k}`} geometry={caixa(d.x1 - d.x0 - 0.1, d.y1 - d.y0, d.z1 - d.z0 - 0.1)} material={mPreto} position={[(d.x0 + d.x1) / 2, (d.y0 + d.y1) / 2, (d.z0 + d.z1) / 2]} castShadow receiveShadow />)}
       {/* lajes pretas com friso vermelho aceso */}

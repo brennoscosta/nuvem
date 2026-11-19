@@ -48,7 +48,7 @@ function lotesComKit(terrenos: Record<string, Terreno>, sel: string | null, rasc
   if (sel && rascunho && ehKit(rascunho.layout)) { out.push(sel); for (const t of Object.values(terrenos)) if (t.anexoDe === sel) out.push(t.chave); }
   return out.sort().join("|");
 }
-import { QUARTEIROES, centroQuarteirao, centroLote, EIXOS_RUA, COMPRIMENTO_RUA, RUA, CALCADA, MEIO_Q, BORDA_CALCADA, MUNDO, PASSO, N, EIXO_RUA, NORTE, BAIRRO_DO_QUARTEIRAO } from "../data/mundo";
+import { QUARTEIROES, LOTES, centroQuarteirao, EIXOS_RUA, COMPRIMENTO_RUA, RUA, CALCADA, MEIO_Q, BORDA_CALCADA, MUNDO, PASSO, N, EIXO_RUA, NORTE, BAIRRO_DO_QUARTEIRAO } from "../data/mundo";
 
 const ASFALTO = "#4A4E55", FAIXA = "#E8E4D8", CALC = "#D9D5CC";
 
@@ -136,19 +136,15 @@ export function Mundo() {
   const arvores: ItemInstancia[] = useMemo(() => {
     const lista: ItemInstancia[] = []; let n = 0; const comKit = new Set(lotesKit.split("|"));
     const add = (x: number, z: number, h = 4.5) => lista.push({ pos: [x, 0, z], rot: (n++ * 1.7) % (Math.PI * 2), altura: h });
-    for (const q of QUARTEIROES) {
-      if (!q.lotes) continue;
-      q.lotes.forEach((l, k) => {
-        const [x, z] = centroLote(q.i, q.j, k); const fundo = k >= 2 ? -1 : 1, kit = comKit.has(`${q.i},${q.j},${k}`);
-        // a árvore do terreno vazio fica no canto do fundo (18/11/2026): o meio fica livre para o prédio (PontoDisponivel.tsx)
-        if (l.tipo === "vazio" && l.arvore) { const [ax, az] = noLote({ centro: [x, z], k }, ...ARVORE_TERRENO(k)); add(ax, az, kit ? 0 : 6.5); }
-        else if (l.tipo === "casa") { add(x - 7, z + fundo * 7, kit ? 0 : 4.8); if (!poucos) add(x + 7.5, z + fundo * 6, kit ? 0 : 4.2); }
-      });
+    // pela lista de lotes (k e centro físicos; a chave pode não ser a posição: data/mundo.ts › chaveDoLote)
+    for (const lt of LOTES) {
+      const l = lt.lote, k = lt.k, [x, z] = lt.centro; const fundo = k >= 2 ? -1 : 1, kit = comKit.has(lt.chave);
+      // a árvore do terreno vazio fica no canto do fundo (18/11/2026): o meio fica livre para o prédio (PontoDisponivel.tsx)
+      if (l.tipo === "vazio" && l.arvore) { const [ax, az] = noLote(lt, ...ARVORE_TERRENO(k)); add(ax, az, kit ? 0 : 6.5); }
+      else if (l.tipo === "casa") { add(x - 7, z + fundo * 7, kit ? 0 : 4.8); if (!poucos) add(x + 7.5, z + fundo * 6, kit ? 0 : 4.2); }
     }
     // cantos verdes do quarteirão do restaurante
     for (const [dx, dz] of [[-18, -18], [18, 18], [18, -18]]) add(PASSO + dx, dz, 5.5);
-    // cantos da praça de cada sede (data/sedes.ts; o sudoeste tem o totem)
-    for (const sd of SEDES) for (const [dx, dz] of [[-17.5, -17.5], [17.5, -17.5], [17.5, 17.5]]) add(sd.x + dx, sd.z + dz, 5.5);
     // fileira na borda do mundo (depois da última rua)
     const B = N * PASSO + EIXO_RUA + 7;
     // (a fileira do norte agora fica no calçadão da beira-rio, em Rio.tsx)
@@ -202,7 +198,7 @@ export function Mundo() {
       {/* quarteirões */}
       <Perto cx={0} cz={0} raio={raio + 60}><Isolado><Entorno /></Isolado></Perto>
       <Perto cx={PASSO} cz={0} raio={raio}><Isolado><Restaurante /></Isolado></Perto>
-      {/* sedes (data/sedes.ts): Social RP, AppZone, bday.fm e NUVCAM, cada uma no seu quarteirão */}
+      {/* sedes (data/sedes.ts): Social RP, AppZone, bday.fm e NUVCAM, cada uma num lote de esquina virado para o centro */}
       {SEDES.map((sd) => <Perto key={sd.id} cx={sd.x} cz={sd.z} raio={raio}><Isolado><SedeHQ sede={sd} /></Isolado></Perto>)}
       <Depois etapa={2}><GentePraia /></Depois>
       <Depois etapa={1}><Personagens /></Depois>
