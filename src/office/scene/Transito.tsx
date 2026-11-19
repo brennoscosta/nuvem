@@ -24,6 +24,7 @@ import { clima } from "../clima";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle } from "./Boneco";
 import { BONECO } from "../data/bonecos";
 import { ceu, texturaLuz } from "./CicloDia";
+import { MORADORES_NA_RUA } from "../moradorStore";
 
 // ---------- tempos do semáforo (segundos) ----------
 const VERDE = 9, AMARELO = 2.5, TODOS_VERMELHOS = 1.5;
@@ -624,11 +625,13 @@ const EIXO = PASSO / 2; // eixo da rua a partir do centro do quarteirão (26)
 const QUART = new Set(QUARTEIROES.map((q) => `${q.i},${q.j}`));
 interface Passante { x: number; z: number; v: number; vMax: number; estado: "andando" | "esperando" | "atravessando"; alvo: [number, number]; i: number; j: number; canto: number; sentido: 1 | -1; espera: { cr: Cruzamento; eixoCarros: "x" | "z"; i: number; j: number; canto: number } | null; boneco: string; camisa: string; rot: number }
 export const PEDESTRES: Passante[] = [];
+// quem atravessa: os pedestres daqui e os moradores da cidade (scene/Moradores.tsx), que também atravessam nas faixas
+const QUEM_ATRAVESSA: { x: number; z: number; estado: string }[][] = [PEDESTRES, MORADORES_NA_RUA];
 const cantoXZ = (i: number, j: number, k: number): [number, number] => [i * PASSO + (k === 1 || k === 2 ? B_CALCADA : -B_CALCADA), j * PASSO + (k >= 2 ? B_CALCADA : -B_CALCADA)];
 
 function pedestreAFrente(x: number, z: number, hx: number, hz: number, alcance: number, largura: number): number | null {
   let menor: number | null = null;
-  for (const p of PEDESTRES) {
+  for (const lista of QUEM_ATRAVESSA) for (const p of lista) {
     if (p.estado !== "atravessando") continue;
     const dx = p.x - x, dz = p.z - z, g = dx * hx + dz * hz, lat = Math.abs(-dx * hz + dz * hx);
     if (g > 0 && g < alcance && lat < largura && (menor == null || g < menor)) menor = g;
@@ -695,7 +698,8 @@ function PassanteBoneco({ p }: { p: Passante }) {
 }
 
 export function Passantes() {
-  const lista = useMemo(() => criarPedestres(leve() ? 6 : 14), []);
+  // 19/11/2026: parte dos pedestres virou os moradores da cidade (scene/Moradores.tsx): 14 → 6 no computador, 6 → 3 no celular
+  const lista = useMemo(() => criarPedestres(leve() ? 3 : 6), []);
   useEffect(() => { PEDESTRES.length = 0; PEDESTRES.push(...lista); return () => { PEDESTRES.length = 0; }; }, [lista]);
   useFrame((_, dt) => passoPedestres(lista, Math.min(dt, 0.1), relogio.t));
   return <group>{lista.map((p, i) => <PassanteBoneco key={i} p={p} />)}</group>;

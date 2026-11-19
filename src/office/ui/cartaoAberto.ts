@@ -4,11 +4,13 @@ import { useMundo } from "../mundoStore";
 import { useSede } from "../sedeStore";
 import { usePersonagem } from "../personagemStore";
 import { useChatEquipe } from "./ChatEquipe";
+import { useMoradores } from "../moradorStore";
 
 export function useCartaoAberto() {
   const mundo = useMundo((s) => !!s.loteSelecionado || s.painelEmpresa || s.painelEscritorio || !!s.outdoorSelecionado);
   const sede = useSede((s) => s.aberto);
   const personagem = usePersonagem((s) => s.painel !== null || (s.predio?.fase === "recepcao" || s.predio?.fase === "dentro"));
   const chat = useChatEquipe((s) => s.aberto);
-  return mundo || sede || personagem || chat;
+  const morador = useMoradores((s) => s.aberto !== null); // conversa com um morador da cidade (19/11/2026)
+  return mundo || sede || personagem || chat || morador;
 }

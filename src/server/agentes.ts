@@ -148,7 +148,7 @@ export function modeloPadrao(nivel: string) {
   switch (nivel) {
     case "ceo": case "diretor": case "gerente": return "gpt-4.1";
     case "senior": case "pleno": return "gpt-4.1-mini";
-    default: return "gpt-4.1-nano";
+    default: return "gpt-4o-mini"; // o gpt-4.1-nano foi desativado em 19/11/2026
   }
 }
 export function tetoPadrao(nivel: string) {

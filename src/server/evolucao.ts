@@ -6,7 +6,7 @@
 // limite. Os limites do cargo nunca mudam aqui. Toda versão fica guardada e dá para voltar. Teto por ciclo e por mês.
 import OpenAI from "openai";
 import { sql, migrar, temBanco } from "./db";
-import { custoBRL, temIA } from "./motor";
+import { custoBRL, temIA, parametrosDoModelo } from "./motor";
 import { ESPECIALISTAS_IA, ESPECIALISTA_POR_ID, type EspecialistaIA, type SkillEspecialista } from "@/office/data/especialistas";
 import { AREAS, NIVEL } from "@/office/data/org";
 import { referenciasPara, type Referencia } from "@/office/data/referencias";
@@ -20,7 +20,7 @@ type Db = typeof sql;
 // ---------- configuração ----------
 export interface ConfigEvolucao { ligada: boolean; intervaloHoras: number; skillsPorCiclo: number; tetoCicloBrl: number; tetoMesBrl: number; modelo: string; modeloJuiz: string }
 export const CONFIG_PADRAO: ConfigEvolucao = { ligada: true, intervaloHoras: 24, skillsPorCiclo: 4, tetoCicloBrl: 1, tetoMesBrl: 20, modelo: "gpt-4.1-mini", modeloJuiz: "gpt-4.1-mini" };
-export const MODELOS_EVOLUCAO = ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4.1"];
+export const MODELOS_EVOLUCAO = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1"]; // gpt-4.1-nano desativado em 19/11/2026
 export const CUSTO_ESTIMADO_SKILL = 0.05; // R$ por skill avaliada com gpt-4.1-mini (medido no 1º ciclo real em 10/11: R$ 0,02 a 0,04)
 
 export async function lerConfig(): Promise<ConfigEvolucao> {
@@ -66,7 +66,7 @@ const openai = () => (cliente ??= new OpenAI({ apiKey: process.env.OPENAI_API_KE
 async function chamar(o: Orcamento, modelo: string, sistema: string, usuario: string, opt: { json?: boolean; max?: number; temp?: number } = {}) {
   if (o.gasto >= o.teto) throw new TetoAtingido();
   const r = await openai().chat.completions.create({
-    model: modelo, temperature: opt.temp ?? 0.4, max_completion_tokens: opt.max ?? 900,
+    model: modelo, ...parametrosDoModelo(modelo, opt.temp ?? 0.4, opt.max ?? 900),
     ...(opt.json ? { response_format: { type: "json_object" as const } } : {}),
     messages: [{ role: "system", content: sistema }, { role: "user", content: usuario }],
   });

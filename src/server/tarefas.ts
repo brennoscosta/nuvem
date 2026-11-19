@@ -8,7 +8,7 @@ import path from "node:path";
 import OpenAI from "openai";
 import { sql, id, migrar } from "./db";
 import { EMPRESA_PADRAO, fichaCompleta, gravarEvento, registrarUso, salvarFalaPublica, gastoHoje } from "./agentes";
-import { montarSistema, custoBRL, temIA } from "./motor";
+import { montarSistema, custoBRL, temIA, parametrosDoModelo } from "./motor";
 import { gravarMural } from "./mural";
 import { publicarNoYouTube } from "./youtube";
 import { publicarNoInstagram } from "./instagram";
@@ -92,7 +92,7 @@ async function planejarPublicacao(f: Awaited<ReturnType<typeof fichaCompleta>> &
   const cli = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const modelo = f.agente.modelo;
   const r = await cli.chat.completions.create({
-    model: modelo, temperature: 0.4, max_completion_tokens: 700, response_format: { type: "json_object" },
+    model: modelo, ...parametrosDoModelo(modelo, 0.4, 700), response_format: { type: "json_object" },
     messages: [
       { role: "system", content: montarSistema(f) },
       { role: "user", content: `Tarefa real: publicar um vídeo nas redes (${dados.plataformas.join(", ")}). Arquivo: ${dados.arquivoNome}.
@@ -176,7 +176,7 @@ async function planejarArte(f: Awaited<ReturnType<typeof fichaCompleta>> & objec
   const cli = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const modelo = f.agente.modelo;
   const r = await cli.chat.completions.create({
-    model: modelo, temperature: 0.5, max_completion_tokens: 900, response_format: { type: "json_object" },
+    model: modelo, ...parametrosDoModelo(modelo, 0.5, 900), response_format: { type: "json_object" },
     messages: [
       { role: "system", content: montarSistema(f) },
       { role: "user", content: `Tarefa real: criar UMA arte (imagem) com o gerador de imagens da empresa (gpt-image-2). Formato: ${FORMATOS[dados.formato].nome} (${FORMATOS[dados.formato].size}).

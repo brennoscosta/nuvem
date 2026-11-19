@@ -5,7 +5,8 @@ import { NIVEL, AREAS, type Nivel, type AreaId } from "@/office/data/org";
 
 // Preço aproximado em R$ por 1M tokens (entrada / saída). Ajustável.
 const PRECO_BRL: Record<string, [number, number]> = {
-  "gpt-4.1": [11, 44], "gpt-4.1-mini": [2.2, 8.8], "gpt-4.1-nano": [0.55, 2.2],
+  // 19/11/2026: o gpt-4.1-nano foi desativado pela OpenAI (404); no lugar dele entrou o gpt-4o-mini (migração 0041)
+  "gpt-4.1": [11, 44], "gpt-4.1-mini": [2.2, 8.8], "gpt-4o-mini": [0.83, 3.3],
   "gpt-5": [7, 55], "gpt-5-mini": [1.4, 11], "gpt-5-nano": [0.3, 2.2], "o4-mini": [6, 24],
 };
 export const MODELOS_DISPONIVEIS = Object.keys(PRECO_BRL);
@@ -21,6 +22,28 @@ function openai() {
   return (cliente ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY }));
 }
 export function temIA() { return !!process.env.OPENAI_API_KEY; }
+// modelo barato para frases curtas (fala pública, moradores): substituiu o gpt-4.1-nano, desativado em 19/11/2026
+export const MODELO_BARATO = "gpt-4o-mini";
+
+// Família gpt-5 e série o (modelos de raciocínio, 19/11/2026): só aceitam a temperatura padrão (mandar outra dá erro 400)
+// e gastam parte do limite de saída pensando. Para eles: sem temperature, raciocínio mínimo e uma folga no limite.
+export const ehModeloRaciocinio = (m: string) => /^(gpt-5|o\d)/.test(m);
+export function parametrosDoModelo(modelo: string, temperatura: number, maxTokens: number): { temperature?: number; max_completion_tokens: number; reasoning_effort?: "minimal" | "low" } {
+  if (!ehModeloRaciocinio(modelo)) return { temperature: temperatura, max_completion_tokens: maxTokens };
+  // gpt-5, gpt-5-mini e gpt-5-nano aceitam "minimal"; os o-série, "low"; da 5.1 em diante o padrão já é sem raciocínio
+  const esforco = /^gpt-5(-mini|-nano)?(-\d{4}-\d{2}-\d{2})?$/.test(modelo) ? "minimal" as const : /^o\d/.test(modelo) ? "low" as const : undefined;
+  return { max_completion_tokens: maxTokens + 600, ...(esforco ? { reasoning_effort: esforco } : {}) };
+}
+
+// Chamada curta de uso geral (moradores da cidade): devolve o texto, os tokens e o custo em R$.
+export async function completar(d: { modelo: string; mensagens: OpenAI.Chat.ChatCompletionMessageParam[]; temperatura?: number; max?: number; json?: boolean }) {
+  const r = await openai().chat.completions.create({
+    model: d.modelo, messages: d.mensagens, ...parametrosDoModelo(d.modelo, d.temperatura ?? 0.7, d.max ?? 300),
+    ...(d.json ? { response_format: { type: "json_object" as const } } : {}),
+  });
+  const tin = r.usage?.prompt_tokens ?? 0, tout = r.usage?.completion_tokens ?? 0;
+  return { texto: r.choices[0]?.message?.content?.trim() ?? "", tokensIn: tin, tokensOut: tout, custo: custoBRL(d.modelo, tin, tout) };
+}
 
 export type Ficha = NonNullable<Awaited<ReturnType<typeof fichaCompleta>>>;
 
@@ -116,7 +139,7 @@ export async function conversar(agenteId: string, texto: string, autor = "admin"
   msgs.push({ role: "user", content: texto });
   const modelo = f.agente.modelo;
   const t0 = Date.now();
-  const r = await openai().chat.completions.create({ model: modelo, messages: msgs, temperature: 0.4, max_completion_tokens: opts.maxTokens ?? (modo === "visitante" ? 400 : 2000) });
+  const r = await openai().chat.completions.create({ model: modelo, messages: msgs, ...parametrosDoModelo(modelo, 0.4, opts.maxTokens ?? (modo === "visitante" ? 400 : 2000)) });
   const resposta = r.choices[0]?.message?.content?.trim() || "(sem resposta)";
   const tin = r.usage?.prompt_tokens ?? 0, tout = r.usage?.completion_tokens ?? 0;
   const custo = custoBRL(modelo, tin, tout);
@@ -133,7 +156,7 @@ export async function conversar(agenteId: string, texto: string, autor = "admin"
 
 async function falaPublica(nome: string, funcao: string, pedido: string, resposta: string) {
   const r = await openai().chat.completions.create({
-    model: "gpt-4.1-nano", temperature: 0.7, max_completion_tokens: 40,
+    model: MODELO_BARATO, ...parametrosDoModelo(MODELO_BARATO, 0.7, 40),
     messages: [
       { role: "system", content: `Você é ${nome} (${funcao}). Escreva UMA frase curta (máx. 12 palavras), em primeira pessoa, informal e subjetiva, dizendo o que está fazendo agora, sem revelar conteúdo, nomes, números ou dados do trabalho. Exemplos: "Tô online montando um plano pra semana." / "Revisando uma entrega do time." Responda só a frase.` },
       { role: "user", content: `Pedido recebido: ${pedido.slice(0, 300)}
@@ -152,12 +175,11 @@ function resumo(t: string, n = 70) {
 // ---- treino: transforma a correção do admin numa regra curta e permanente ----
 export async function destilarRegra(agenteId: string, correcao: string, respostaOriginal: string) {
   const r = await openai().chat.completions.create({
-    model: "gpt-4.1-mini", temperature: 0,
+    model: "gpt-4.1-mini", ...parametrosDoModelo("gpt-4.1-mini", 0, 80),
     messages: [
       { role: "system", content: "Você transforma o feedback de um gestor sobre a resposta de um funcionário em UMA regra permanente, curta (máx. 25 palavras), em português, começando com verbo no imperativo (ex.: 'Responda em no máximo 5 linhas'). Responda só com a regra." },
       { role: "user", content: `Resposta do funcionário:\n${respostaOriginal.slice(0, 1500)}\n\nFeedback do gestor:\n${correcao}` },
     ],
-    max_completion_tokens: 80,
   });
   return r.choices[0]?.message?.content?.trim().replace(/^["'\-\s]+|["'\s]+$/g, "") || correcao;
 }

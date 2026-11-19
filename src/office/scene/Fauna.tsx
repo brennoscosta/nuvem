@@ -183,7 +183,8 @@ function Cachorro({ c }: { c: Cao }) {
   );
 }
 function Cachorros() {
-  const caes = useMemo(() => (leve() ? criarCaes([2], 1) : criarCaes([2, 5, 9, 12], 3)), []);
+  // donos: índices de PEDESTRES (desde 19/11/2026 são 6 no computador e 3 no celular; o resto virou morador da cidade)
+  const caes = useMemo(() => (leve() ? criarCaes([2], 1) : criarCaes([2, 5], 5)), []);
   useFrame(({ clock }, dt) => passoCaes(caes, Math.min(dt, 0.1), clock.elapsedTime));
   return <group>{caes.map((c, i) => <Cachorro key={i} c={c} />)}</group>;
 }

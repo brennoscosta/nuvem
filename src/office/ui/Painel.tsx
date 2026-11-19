@@ -4,6 +4,7 @@ import { ControlesCamera, ControlesCameraCelular } from "./ControlesCamera";
 import { CartaoOutdoor } from "./Outdoor";
 import { PainelEscritorio } from "./Escritorio";
 import { PainelPersonagem, FichaPersonagem, ChatPersonagem, CaixaPersonagem } from "./Personagem";
+import { FichaMorador } from "./Morador";
 import { JanelaChamada } from "./Chamada";
 import { AREAS, AREAS_APOIO, FUNCOES, NIVEIS, NIVEL, PERSONALIDADES, type AreaId, type Nivel } from "../data/org";
 import { SETORES_ESCRITORIO } from "../data/layout";
@@ -295,6 +296,7 @@ export function Painel() {
       <PainelEscritorio />
       <PainelPersonagem />
       <FichaPersonagem />
+      <FichaMorador />
       <ChatPersonagem />
       <CaixaPersonagem />
       <JanelaChamada />

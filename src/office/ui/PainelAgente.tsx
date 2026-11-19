@@ -28,7 +28,7 @@ interface Ficha {
   subordinados: { id: string; nome: string; nivel: Nivel; funcao: string }[];
 }
 
-const MODELOS = ["gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-5", "gpt-5-mini", "gpt-5-nano", "o4-mini"];
+const MODELOS = ["gpt-4.1", "gpt-4.1-mini", "gpt-4o-mini", "gpt-5", "gpt-5-mini", "gpt-5-nano", "o4-mini"];
 const api = async (url: string, method = "GET", body?: unknown) => {
   const r = await fetch(url, { method, headers: body ? { "content-type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({}));

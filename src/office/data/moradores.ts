@@ -1,0 +1,342 @@
+// Moradores da cidade (19/11/2026, pedido do dono): parte dos pedestres virou gente fixa, com nome, profissão, idade,
+// jeito, gostos, casa e roupa própria. Cada um tem uma agenda do dia (sai de casa, trabalha, almoça, passeia, volta para
+// casa e dorme) e anda pelas calçadas entre os lugares, atravessando nas esquinas como os outros pedestres.
+// A rotina é DETERMINÍSTICA pela hora da cidade (horário de Brasília, o mesmo relógio do servidor): todo visitante vê o
+// mesmo morador no mesmo lugar na mesma hora, e o servidor sabe o que cada um está fazendo para conversar.
+// Este arquivo é puro (sem React nem three.js): o mapa (scene/Moradores.tsx) e o servidor (src/server/moradores.ts) usam.
+// Desempenho: os caminhos e a linha do tempo de cada morador são montados uma vez; a posição de cada quadro sai de uma
+// conta simples, escrita num objeto reaproveitado (nenhuma alocação por quadro).
+import { PASSO, MEIO_CALCADA, centroLote } from "./mundo";
+import { BONECO, codificarVisual, visualCompleto, type Visual } from "./bonecos";
+
+export type Ponto = [number, number];
+
+// ---------------- rede de calçadas ----------------
+// Nós: as 4 esquinas da calçada de cada um dos 9 quarteirões (mesma convenção dos pedestres de Transito.tsx: 0 = -x-z,
+// 1 = +x-z, 2 = +x+z, 3 = -x+z), mais o calçadão do rio (norte) e as orlas leste e sul. Arestas: os lados de cada
+// calçada, as faixas de pedestre entre quarteirões vizinhos e as travessias das avenidas da borda.
+const B = MEIO_CALCADA; // 21,3
+const Z_CALCADAO = -85.6, X_ORLA = 95.5, Z_ORLA = 95.5;
+const NOS: Ponto[] = [];
+const ARESTAS: { a: number; b: number; travessia: boolean }[] = [];
+const idNo = new Map<string, number>();
+function no(x: number, z: number) {
+  const k = `${x.toFixed(2)},${z.toFixed(2)}`; let i = idNo.get(k);
+  if (i == null) { i = NOS.length; NOS.push([x, z]); idNo.set(k, i); }
+  return i;
+}
+const esquina = (i: number, j: number, k: number) => no(i * PASSO + (k === 1 || k === 2 ? B : -B), j * PASSO + (k >= 2 ? B : -B));
+const ligar = (a: number, b: number, travessia = false) => ARESTAS.push({ a, b, travessia });
+for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+  for (let k = 0; k < 4; k++) ligar(esquina(i, j, k), esquina(i, j, (k + 1) % 4));
+  if (i < 1) { ligar(esquina(i, j, 1), esquina(i + 1, j, 0), true); ligar(esquina(i, j, 2), esquina(i + 1, j, 3), true); }
+  if (j < 1) { ligar(esquina(i, j, 3), esquina(i, j + 1, 0), true); ligar(esquina(i, j, 2), esquina(i, j + 1, 1), true); }
+}
+// calçadão do rio (atravessa a Avenida Beira-Rio), orla leste (Avenida Atlântica) e orla sul (Avenida da Praia)
+const calcadao: number[] = [], orlaL: number[] = [], orlaS: number[] = [];
+for (let i = -1; i <= 1; i++) for (const k of [0, 1]) { const e = esquina(i, -1, k); const n = no(NOS[e][0], Z_CALCADAO); ligar(e, n, true); calcadao.push(n); }
+for (let j = -1; j <= 1; j++) for (const k of [1, 2]) { const e = esquina(1, j, k); const n = no(X_ORLA, NOS[e][1]); ligar(e, n, true); orlaL.push(n); }
+for (let i = -1; i <= 1; i++) for (const k of [3, 2]) { const e = esquina(i, 1, k); const n = no(NOS[e][0], Z_ORLA); ligar(e, n, true); orlaS.push(n); }
+for (const fila of [calcadao, orlaL, orlaS]) for (let k = 0; k + 1 < fila.length; k++) ligar(fila[k], fila[k + 1]);
+
+// menor caminho entre todos os pares (Floyd-Warshall, ~54 nós: feito uma vez, sob demanda)
+let DIST: Float64Array | null = null, PROX: Int16Array | null = null;
+const dNo = (a: number, b: number) => Math.hypot(NOS[a][0] - NOS[b][0], NOS[a][1] - NOS[b][1]);
+function montarDistancias() {
+  const n = NOS.length; const d = new Float64Array(n * n).fill(Infinity); const p = new Int16Array(n * n).fill(-1);
+  for (let i = 0; i < n; i++) { d[i * n + i] = 0; p[i * n + i] = i; }
+  for (const e of ARESTAS) { const c = dNo(e.a, e.b); d[e.a * n + e.b] = d[e.b * n + e.a] = c; p[e.a * n + e.b] = e.b; p[e.b * n + e.a] = e.a; }
+  for (let k = 0; k < n; k++) for (let i = 0; i < n; i++) { const ik = d[i * n + k]; if (ik === Infinity) continue; for (let j = 0; j < n; j++) { const v = ik + d[k * n + j]; if (v < d[i * n + j]) { d[i * n + j] = v; p[i * n + j] = p[i * n + k]; } } }
+  DIST = d; PROX = p;
+}
+const ehTravessia = (a: number, b: number) => ARESTAS.some((e) => e.travessia && ((e.a === a && e.b === b) || (e.a === b && e.b === a)));
+
+// aresta da calçada mais perto de um ponto (onde o lugar "encosta" na rede)
+function arestaDe(p: Ponto) {
+  let melhor = 0, dm = Infinity;
+  ARESTAS.forEach((e, k) => {
+    if (e.travessia) return;
+    const [ax, az] = NOS[e.a], [bx, bz] = NOS[e.b]; const vx = bx - ax, vz = bz - az; const L2 = vx * vx + vz * vz || 1;
+    const t = Math.max(0, Math.min(1, ((p[0] - ax) * vx + (p[1] - az) * vz) / L2)); const d = Math.hypot(ax + vx * t - p[0], az + vz * t - p[1]);
+    if (d < dm) { dm = d; melhor = k; }
+  });
+  return ARESTAS[melhor];
+}
+
+// ---------------- lugares ----------------
+// ancora: ponto na calçada onde o lugar começa; entrada: passos de lá até o primeiro ponto; pontos: onde a pessoa fica
+// (ela troca de ponto de tempos em tempos, devagar); dentro: some da rua quando chega (casa, cozinha, escritório).
+export interface Lugar { id: string; nome: string; indo: string; ancora: Ponto; entrada?: Ponto[]; pontos: Ponto[]; olhar?: number; dentro?: boolean }
+const L = (l: Lugar) => l;
+export const LUGARES: Record<string, Lugar> = Object.fromEntries([
+  L({ id: "praca", nome: "Praça de Eventos", indo: "indo para a praça", ancora: [10, PASSO - B], entrada: [[10, 33.6]], pontos: [[10, 34.4], [4.6, 40], [15.4, 43.6], [10, 43.5]] }),
+  L({ id: "praca-cafe", nome: "carrinho de café da praça", indo: "indo montar o carrinho de café", ancora: [15.6, 30.7], pontos: [[15.6, 35.2], [14.6, 35.6]], olhar: -Math.PI / 2 }),
+  L({ id: "praca-domino", nome: "mesa de dominó da praça", indo: "indo para o dominó da praça", ancora: [4.6, 30.7], entrada: [[4.6, 34.6]], pontos: [[4.6, 40], [4.8, 38.4]], olhar: Math.PI / 2 }),
+  L({ id: "praca-palco", nome: "frente do palco da praça", indo: "indo tocar na praça", ancora: [10, 30.7], entrada: [[10, 33.6]], pontos: [[10, 43.4], [11, 43.2]], olhar: Math.PI }),
+  L({ id: "restaurante", nome: "mesinhas do restaurante", indo: "indo para o restaurante", ancora: [30.7, -0.35], entrada: [[40.4, -0.35]], pontos: [[43.6, -4], [41.6, -6.5], [43.6, -9]], olhar: Math.PI / 2 }),
+  L({ id: "cozinha", nome: "cozinha do restaurante", indo: "indo para o restaurante", ancora: [30.7, -0.35], entrada: [[40.4, -0.35], [47.4, -7.55]], pontos: [[50.2, -7.55]], dentro: true }),
+  L({ id: "nuvem", nome: "escritório da Nuvem", indo: "indo para o escritório da Nuvem", ancora: [-B, -1.1], pontos: [[-10.4, -1.1]], dentro: true }),
+  L({ id: "bancos-nuvem", nome: "bancos da praça da Nuvem", indo: "indo para os bancos da praça da Nuvem", ancora: [-3, B], pontos: [[-7, 14.7], [8.5, 14.7], [1.2, 16.4]], olhar: 0 }),
+  L({ id: "calcadao", nome: "calçadão do rio", indo: "indo para o calçadão do rio", ancora: [0, Z_CALCADAO], pontos: [[-12, -86.4], [6, -87.2], [20, -85.8]], olhar: Math.PI }),
+  L({ id: "orla-leste", nome: "orla da praia", indo: "indo para a orla", ancora: [X_ORLA, 0], pontos: [[95.6, -18], [96.2, 6], [95.6, 28]], olhar: Math.PI / 2 }),
+  L({ id: "orla-sul", nome: "orla sul", indo: "indo para a orla sul", ancora: [0, Z_ORLA], pontos: [[-30, 95.6], [-6, 96.2], [24, 95.6]], olhar: 0 }),
+  L({ id: "comercio", nome: "banca de chaves da Rua do Comércio", indo: "indo para a banca da Rua do Comércio", ancora: [PASSO - B, 13], pontos: [[PASSO - B + 0.3, 13], [PASSO - B + 0.3, 11.6]], olhar: -Math.PI / 2 }),
+  L({ id: "vila", nome: "Vila dos Criativos", indo: "indo para a Vila dos Criativos", ancora: [-4, -PASSO + B], pontos: [[-12, -30.9], [5, -30.9], [14, -30.9]], olhar: Math.PI }),
+].map((l) => [l.id, l]));
+
+// casa num lote (posição física i, j, k): a porta fica a uns 5 m da calçada da frente, e lá dentro a pessoa some
+function casa(i: number, j: number, k: number): Lugar {
+  const [x] = centroLote(i, j, k); const cz = j * PASSO, s = k >= 2 ? 1 : -1;
+  return { id: `casa:${i},${j},${k}`, nome: "casa", indo: "voltando para casa", ancora: [x, cz + s * B], pontos: [[x, cz + s * 15.6]], dentro: true, olhar: s > 0 ? Math.PI : 0 };
+}
+
+// ---------------- moradores ----------------
+export type Tom = "desconfiado" | "neutro" | "simpatico" | "amigo";
+export interface Compromisso { h: number; lugar: string; fazendo: string }
+export interface Morador {
+  id: string; nome: string; curto: string; idade: number; profissao: string; genero: "f" | "m";
+  personalidade: string; jeito: string; gostos: string[]; bairro: string; casa: Lugar;
+  boneco: string; roupa: string; acessorios?: string[];
+  celular: boolean; // aparece também no modo leve (celular)
+  base: number; // afinidade inicial (o jeito da pessoa: a Dona Cida já começa gostando, o Seu Valdir é desconfiado)
+  agenda: Compromisso[];
+  nichos: string[]; // assuntos de empresa que ela costuma indicar (ids de NICHOS, data/mundo.ts)
+  bordao: string; // expressão que a pessoa usa
+}
+const visual = (roupa: string, v: Visual) => codificarVisual(visualCompleto(BONECO.classico, roupa, v));
+const H = (h: number, lugar: string, fazendo: string): Compromisso => ({ h, lugar, fazendo });
+
+export const MORADORES: Morador[] = [
+  {
+    id: "cida", nome: "Dona Cida", curto: "Cida", idade: 64, genero: "f", profissao: "quituteira que vende café e bolo num carrinho na praça",
+    personalidade: "acolhedora, maternal, conta causos e conhece todo mundo da cidade", jeito: "chama todo mundo de meu bem, fala devagar e sempre oferece um cafezinho",
+    gostos: ["bolo de milho", "novela das nove", "plantas"], bairro: "Largo da Praça", casa: casa(0, 1, 0),
+    boneco: visual("#DB2777", { pele: "#C98E68", cabelo: "#9A9A9A", estiloCabelo: "coque", traje: "vestido", calca: "#6B7280", calcado: "#8B5E3C" }), roupa: "#DB2777", acessorios: ["oculos-redondo"],
+    celular: true, base: 8, nichos: ["alimentacao", "casa", "saude"], bordao: "meu bem",
+    agenda: [H(0, "casa", "dormindo"), H(5.75, "praca-cafe", "vendendo café e bolo de milho na praça"), H(11.5, "restaurante", "almoçando nas mesinhas do restaurante"), H(13, "casa", "descansando em casa"), H(15.5, "bancos-nuvem", "conversando nos bancos da praça da Nuvem"), H(18, "praca", "vendo o movimento da praça"), H(19.5, "casa", "em casa, vendo a novela")],
+  },
+  {
+    id: "valdir", nome: "Seu Valdir", curto: "Valdir", idade: 71, genero: "m", profissao: "motorista de ônibus aposentado",
+    personalidade: "ranzinza mas de bom coração, reclama do trânsito e desconfia de quem chega com muita pressa", jeito: "fala pouco, resmunga, mas quando gosta de alguém vira um avô contando história",
+    gostos: ["dominó", "futebol no rádio", "café sem açúcar"], bairro: "Saúde & Bem-estar", casa: casa(-1, 0, 0),
+    boneco: visual("#8B5E3C", { pele: "#F1C9A5", cabelo: "#E8E8E8", estiloCabelo: "curto", barba: "bigode", calca: "#C8B79A", calcado: "#1F2227", oculos: true }), roupa: "#8B5E3C",
+    celular: true, base: -8, nichos: ["automotivo", "saude", "financas"], bordao: "no meu tempo",
+    agenda: [H(0, "casa", "dormindo"), H(6.5, "calcadao", "caminhando no calçadão do rio"), H(8, "praca-domino", "jogando dominó na praça"), H(11.75, "restaurante", "almoçando no restaurante"), H(13, "casa", "tirando o cochilo da tarde"), H(15.5, "bancos-nuvem", "lendo o jornal no banco da praça da Nuvem"), H(18.5, "casa", "em casa, ouvindo o jogo no rádio")],
+  },
+  {
+    id: "larissa", nome: "Larissa", curto: "Larissa", idade: 27, genero: "f", profissao: "designer gráfica freelancer",
+    personalidade: "animada, curiosa e criativa, sempre com uma ideia nova", jeito: "fala rápido, usa \"tipo\" e \"amei\", adora dar palpite em marca e vitrine",
+    gostos: ["tipografia", "café gelado", "séries de suspense"], bairro: "Vila dos Criativos", casa: casa(0, -1, 2),
+    boneco: visual("#7C3AED", { pele: "#F5D6BC", cabelo: "#B5532D", estiloCabelo: "cacheado", traje: "jaqueta", calca: "#1F2329", calcado: "#F4F4F4" }), roupa: "#7C3AED", acessorios: ["oculos-redondo"],
+    celular: true, base: 4, nichos: ["marketing", "conteudo", "tecnologia"], bordao: "tipo",
+    agenda: [H(0, "casa", "dormindo"), H(8.25, "restaurante", "tomando café e respondendo clientes no notebook"), H(10, "vila", "fotografando fachadas para um projeto"), H(12.5, "restaurante", "almoçando no restaurante"), H(14, "casa", "trabalhando de casa numa identidade visual"), H(17.25, "orla-leste", "vendo o pôr do sol na orla"), H(19.5, "praca", "encontrando os amigos na praça"), H(21.5, "casa", "em casa, maratonando uma série")],
+  },
+  {
+    id: "rafa", nome: "Rafa", curto: "Rafa", idade: 34, genero: "m", profissao: "personal trainer",
+    personalidade: "enérgico, motivador e disciplinado", jeito: "fala alto, dá conselho de treino sem ninguém pedir e acredita que tudo se resolve com constância",
+    gostos: ["surfe", "açaí", "podcasts de negócios"], bairro: "Saúde & Bem-estar", casa: casa(-1, 0, 2),
+    boneco: visual("#16A34A", { pele: "#8D5B3E", cabelo: "#1E1A18", estiloCabelo: "curto", barba: "rala", traje: "regata", calca: "#1F2329", calcado: "#2563EB" }), roupa: "#16A34A", acessorios: ["bone-workend"],
+    celular: true, base: 6, nichos: ["saude", "beleza", "alimentacao"], bordao: "bora",
+    agenda: [H(0, "casa", "dormindo"), H(5.5, "orla-sul", "dando aula de funcional na orla sul"), H(9, "calcadao", "atendendo um aluno no calçadão do rio"), H(12, "restaurante", "almoçando a marmita fit no restaurante"), H(13.5, "casa", "descansando em casa"), H(16.5, "orla-leste", "dando aula de funcional na orla"), H(19.5, "bancos-nuvem", "alongando na praça da Nuvem"), H(21, "casa", "em casa")],
+  },
+  {
+    id: "jessica", nome: "Jéssica", curto: "Jéssica", idade: 31, genero: "f", profissao: "analista de suporte no escritório da Nuvem",
+    personalidade: "prática, organizada e prestativa", jeito: "explica tudo passo a passo, adora ajudar quem está abrindo a loja no WorkEnd",
+    gostos: ["suculentas", "k-drama", "planilhas bem organizadas"], bairro: "perto da Social RP", casa: casa(1, 1, 2),
+    boneco: visual("#1E3A5F", { pele: "#E7B48C", cabelo: "#2A1E19", estiloCabelo: "longo", traje: "blazer", calca: "#22252B", calcado: "#F4F4F4", tenis: "#0A6CFF" }), roupa: "#1E3A5F",
+    celular: false, base: 4, nichos: ["tecnologia", "negocios", "consultoria"], bordao: "passo a passo",
+    agenda: [H(0, "casa", "dormindo"), H(7.75, "restaurante", "tomando café da manhã no restaurante"), H(8.5, "nuvem", "trabalhando no suporte da Nuvem"), H(12, "praca", "almoçando na praça"), H(13, "nuvem", "trabalhando no suporte da Nuvem"), H(18, "orla-sul", "caminhando na orla sul"), H(19.5, "casa", "em casa")],
+  },
+  {
+    id: "joaquim", nome: "Seu Joaquim", curto: "Joaquim", idade: 58, genero: "m", profissao: "jardineiro da cidade",
+    personalidade: "calmo, de poucas palavras e cheio de sabedoria simples", jeito: "fala manso, compara a vida com as plantas e sabe o nome de toda árvore da cidade",
+    gostos: ["ipês floridos", "passarinhos", "moda de viola"], bairro: "Largo da Praça", casa: casa(0, 1, 3),
+    boneco: visual("#4D7C0F", { pele: "#A86E4A", cabelo: "#9A9A9A", estiloCabelo: "curto", barba: "cheia", calca: "#8B5E3C", calcado: "#1F2227" }), roupa: "#4D7C0F", acessorios: ["chapeu-palha"],
+    celular: false, base: 2, nichos: ["casa", "eventos", "servicos"], bordao: "com calma",
+    agenda: [H(0, "casa", "dormindo"), H(6, "bancos-nuvem", "regando os canteiros da praça da Nuvem"), H(9, "praca", "podando as árvores da praça"), H(11.5, "restaurante", "almoçando no restaurante"), H(12.75, "vila", "cuidando dos jacarandás da Vila dos Criativos"), H(15.5, "calcadao", "varrendo o calçadão do rio"), H(17.5, "casa", "em casa")],
+  },
+  {
+    id: "bia", nome: "Bia", curto: "Bia", idade: 22, genero: "f", profissao: "estudante de administração e estagiária",
+    personalidade: "sonhadora, faladeira e cheia de perguntas sobre negócios", jeito: "conta para todo mundo que vai abrir uma loja de roupas no WorkEnd e pede dica",
+    gostos: ["brechó", "música pop", "fotografia de celular"], bairro: "Saúde & Bem-estar", casa: casa(-1, 0, 3),
+    boneco: visual("#FACC15", { pele: "#D9A072", cabelo: "#4A3121", estiloCabelo: "rabo", traje: "moletom", calca: "#5B7DB1", calcado: "#F4F4F4" }), roupa: "#FACC15", acessorios: ["mochila"],
+    celular: false, base: 5, nichos: ["varejo", "beleza", "cursos"], bordao: "sério?",
+    agenda: [H(0, "casa", "dormindo"), H(7.5, "praca", "estudando na praça"), H(10, "nuvem", "no estágio na Nuvem"), H(12.5, "restaurante", "almoçando com os colegas"), H(13.5, "nuvem", "no estágio na Nuvem"), H(17.5, "vila", "garimpando ideias de vitrine na Vila dos Criativos"), H(19, "orla-sul", "com as amigas na orla sul"), H(21, "casa", "em casa")],
+  },
+  {
+    id: "marcos", nome: "Marcos", curto: "Marcos", idade: 45, genero: "m", profissao: "chaveiro e faz-tudo da Rua do Comércio",
+    personalidade: "piadista e bem-humorado, resolve qualquer coisa", jeito: "solta uma piada a cada frase e chama todo mundo de chefia",
+    gostos: ["futebol de várzea", "churrasco de domingo", "consertar rádio velho"], bairro: "perto da Social RP", casa: casa(1, 1, 1),
+    boneco: visual("#2563EB", { pele: "#C98E68", cabelo: "#2A1E19", estiloCabelo: "careca", barba: "bigode", calca: "#3B5B8C", calcado: "#1F2227" }), roupa: "#2563EB", acessorios: ["bone-workend"],
+    celular: false, base: 6, nichos: ["casa", "automotivo", "servicos"], bordao: "chefia",
+    agenda: [H(0, "casa", "dormindo"), H(7.5, "comercio", "abrindo a banca de chaves na Rua do Comércio"), H(8, "comercio", "atendendo na banca de chaves"), H(12, "restaurante", "almoçando no restaurante"), H(13, "comercio", "consertando uma fechadura na banca"), H(18, "praca", "tomando um ar na praça"), H(19.5, "casa", "em casa")],
+  },
+  {
+    id: "taina", nome: "Tainá", curto: "Tainá", idade: 29, genero: "f", profissao: "salva-vidas e bióloga marinha",
+    personalidade: "direta, protetora e apaixonada pelo mar", jeito: "fala sem rodeio, puxa a orelha de quem joga lixo e conta curiosidade de bicho do mar",
+    gostos: ["tartarugas marinhas", "mergulho", "reciclagem"], bairro: "perto do NUVCAM", casa: casa(1, -1, 1),
+    boneco: visual("#E11D48", { pele: "#6E4329", cabelo: "#14110F", estiloCabelo: "rabo", traje: "regata", calca: "#1F2329", calcado: "#FACC15" }), roupa: "#E11D48", acessorios: ["oculos-sol"],
+    celular: false, base: 0, nichos: ["turismo", "saude", "eventos"], bordao: "olha só",
+    agenda: [H(0, "casa", "dormindo"), H(6.5, "orla-leste", "de plantão como salva-vidas na orla"), H(12, "restaurante", "almoçando no restaurante"), H(13, "orla-sul", "de plantão como salva-vidas na orla sul"), H(17.5, "calcadao", "recolhendo lixo do calçadão do rio"), H(19, "casa", "em casa")],
+  },
+  {
+    id: "neide", nome: "Dona Neide", curto: "Neide", idade: 68, genero: "f", profissao: "costureira que faz ajustes em casa",
+    personalidade: "carinhosa e fofoqueira do bem, sabe de tudo que acontece na cidade", jeito: "conta as novidades da cidade antes de qualquer um e pergunta da vida de todo mundo",
+    gostos: ["crochê", "quermesse", "novela"], bairro: "Vila dos Criativos", casa: casa(0, -1, 1),
+    boneco: visual("#0EA5A4", { pele: "#FBE3D0", cabelo: "#E8E8E8", estiloCabelo: "curto", traje: "vestido", calca: "#6B7280", calcado: "#F4F4F4", oculos: true }), roupa: "#0EA5A4",
+    celular: false, base: 7, nichos: ["varejo", "eventos", "beleza"], bordao: "você soube?",
+    agenda: [H(0, "casa", "dormindo"), H(7, "restaurante", "tomando café com pão na chapa"), H(8.25, "casa", "costurando em casa"), H(10.5, "praca", "batendo papo na praça"), H(12, "casa", "almoçando em casa"), H(15, "bancos-nuvem", "fazendo crochê no banco da praça da Nuvem"), H(17.5, "casa", "costurando em casa")],
+  },
+  {
+    id: "pedro", nome: "Pedro", curto: "Pedro", idade: 38, genero: "m", profissao: "chapeiro do restaurante drive-thru",
+    personalidade: "ranzinza na hora do pico, gente boa depois do expediente", jeito: "fala de comida o tempo todo e jura que faz o melhor hambúrguer da cidade",
+    gostos: ["hambúrguer artesanal", "rock dos anos 90", "pescaria"], bairro: "perto da AppZone", casa: casa(-1, -1, 0),
+    boneco: visual("#F4F4F0", { pele: "#F3D2B3", cabelo: "#1E1A18", estiloCabelo: "topete", barba: "rala", calca: "#1F2329", calcado: "#1F2227" }), roupa: "#F4F4F0",
+    celular: true, base: -2, nichos: ["alimentacao", "eventos"], bordao: "pode crer",
+    agenda: [H(0, "casa", "dormindo"), H(9, "calcadao", "caminhando antes do trabalho"), H(10, "cozinha", "trabalhando na chapa do restaurante"), H(15, "restaurante", "no intervalo, nas mesinhas do restaurante"), H(15.75, "cozinha", "trabalhando na chapa do restaurante"), H(22.5, "casa", "em casa, depois do expediente")],
+  },
+  {
+    id: "lucas", nome: "Lucas", curto: "Lucas", idade: 19, genero: "m", profissao: "músico de rua",
+    personalidade: "sonhador, tranquilo e gentil", jeito: "fala devagar, cita letra de música e sonha em tocar no palco da praça num evento grande",
+    gostos: ["MPB", "skate", "pôr do sol"], bairro: "perto da AppZone", casa: casa(-1, -1, 2),
+    boneco: visual("#F59E0B", { pele: "#8D5B3E", cabelo: "#14110F", estiloCabelo: "cacheado", calca: "#3B5B8C", calcado: "#E11D48" }), roupa: "#F59E0B", acessorios: ["fone"],
+    celular: true, base: 5, nichos: ["eventos", "cursos", "conteudo"], bordao: "massa",
+    agenda: [H(0, "casa", "dormindo"), H(10.5, "vila", "andando de skate pela Vila dos Criativos"), H(12.5, "restaurante", "almoçando no restaurante"), H(14, "orla-sul", "tocando violão na orla sul"), H(17, "praca-palco", "tocando violão na frente do palco da praça"), H(23, "casa", "em casa")],
+  },
+];
+export const MORADOR_POR_ID: Record<string, Morador> = Object.fromEntries(MORADORES.map((m) => [m.id, m]));
+export const lugarDe = (m: Morador, id: string): Lugar => (id === "casa" ? m.casa : LUGARES[id] ?? m.casa);
+
+// ---------------- hora da cidade ----------------
+// Segundos desde a meia-noite em Brasília (UTC-3, sem horário de verão). `desvioMs` = relógio do servidor - do aparelho.
+export const DIA = 86400;
+export function segundosBrasilia(agoraMs = Date.now()) { return ((((agoraMs / 1000 - 3 * 3600) % DIA) + DIA) % DIA); }
+
+// ---------------- caminhos e linha do tempo ----------------
+interface Trecho { pts: Float32Array; cum: Float32Array; trav: Uint8Array; total: number }
+function trecho(pontos: Ponto[], travessia: boolean[]): Trecho {
+  const n = pontos.length; const pts = new Float32Array(n * 2), cum = new Float32Array(n), trav = new Uint8Array(Math.max(0, n - 1));
+  let total = 0;
+  pontos.forEach((p, k) => { pts[k * 2] = p[0]; pts[k * 2 + 1] = p[1]; if (k) { total += Math.hypot(p[0] - pontos[k - 1][0], p[1] - pontos[k - 1][1]); trav[k - 1] = travessia[k - 1] ? 1 : 0; } cum[k] = total; });
+  return { pts, cum, trav, total };
+}
+// do ponto onde a pessoa está (primeiro ponto do lugar de origem) até o primeiro ponto do lugar de destino
+function rotaEntre(de: Lugar, para: Lugar): Trecho {
+  const pontos: Ponto[] = [], trav: boolean[] = [];
+  const empurra = (p: Ponto, t = false) => { const u = pontos[pontos.length - 1]; if (u && Math.hypot(u[0] - p[0], u[1] - p[1]) < 0.01) return; if (pontos.length) trav.push(t); pontos.push(p); };
+  if (de.id === para.id) { empurra(de.pontos[0]); return trecho(pontos, trav); }
+  empurra(de.pontos[0]);
+  for (const p of [...(de.entrada ?? [])].reverse()) empurra(p);
+  empurra(de.ancora);
+  if (!DIST) montarDistancias();
+  const n = NOS.length, ea = arestaDe(de.ancora), eb = arestaDe(para.ancora);
+  const mesmaAresta = (ea.a === eb.a && ea.b === eb.b) || (ea.a === eb.b && ea.b === eb.a);
+  if (!mesmaAresta) {
+    let melhor = Infinity, ini = ea.a, fim = eb.a;
+    for (const a of [ea.a, ea.b]) for (const b of [eb.a, eb.b]) {
+      const c = Math.hypot(NOS[a][0] - de.ancora[0], NOS[a][1] - de.ancora[1]) + DIST![a * n + b] + Math.hypot(NOS[b][0] - para.ancora[0], NOS[b][1] - para.ancora[1]);
+      if (c < melhor) { melhor = c; ini = a; fim = b; }
+    }
+    let atual = ini; empurra(NOS[atual]);
+    for (let guarda = 0; atual !== fim && guarda < 80; guarda++) { const prox = PROX![atual * n + fim]; if (prox < 0) break; empurra(NOS[prox], ehTravessia(atual, prox)); atual = prox; }
+  }
+  empurra(para.ancora);
+  for (const p of para.entrada ?? []) empurra(p);
+  empurra(para.pontos[0]);
+  return trecho(pontos, trav);
+}
+
+const hash = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+interface Bloco { t0: number; chegada: number; trecho: Trecho; lugar: Lugar; fazendo: string; indo: string; c: Compromisso }
+interface Linha { blocos: Bloco[]; vel: number; troca: number }
+const linhas = new Map<string, Linha>();
+export const velocidadeDe = (m: Morador) => 1.1 + (hash(m.id) % 5) * 0.06;
+function linhaDe(m: Morador): Linha {
+  const pronta = linhas.get(m.id); if (pronta) return pronta;
+  const vel = velocidadeDe(m), ag = [...m.agenda].sort((a, b) => a.h - b.h);
+  const blocos = ag.map((c, k) => {
+    const de = lugarDe(m, ag[(k - 1 + ag.length) % ag.length].lugar), para = lugarDe(m, c.lugar);
+    const tr = rotaEntre(de, para); const t0 = c.h * 3600;
+    return { t0, chegada: t0 + tr.total / vel, trecho: tr, lugar: para, fazendo: c.fazendo, indo: para.indo, c };
+  });
+  const l = { blocos, vel, troca: 150 + (hash(m.id + "t") % 5) * 25 };
+  linhas.set(m.id, l); return l;
+}
+
+export interface EstadoMorador { x: number; z: number; rot: number; andando: boolean; visivel: boolean; travessia: boolean; fazendo: string; lugar: string; bloco: number }
+export const novoEstado = (): EstadoMorador => ({ x: 0, z: 0, rot: 0, andando: false, visivel: true, travessia: false, fazendo: "", lugar: "", bloco: 0 });
+
+// ponto a uma distância d do começo do trecho (escreve em `o`; devolve o índice do pedaço)
+function noTrecho(tr: Trecho, d: number, o: EstadoMorador) {
+  const n = tr.cum.length;
+  if (n === 1 || d <= 0) { o.x = tr.pts[0]; o.z = tr.pts[1]; return 0; }
+  let k = 1; while (k < n - 1 && tr.cum[k] < d) k++;
+  const a = tr.cum[k - 1], b = tr.cum[k], t = b > a ? Math.min(1, (d - a) / (b - a)) : 1;
+  const ax = tr.pts[(k - 1) * 2], az = tr.pts[(k - 1) * 2 + 1], bx = tr.pts[k * 2], bz = tr.pts[k * 2 + 1];
+  o.x = ax + (bx - ax) * t; o.z = az + (bz - az) * t; o.rot = Math.atan2(bx - ax, bz - az);
+  return k - 1;
+}
+
+// Onde o morador está e o que está fazendo, em `seg` segundos do dia (0..86400). Sem alocação: escreve em `o`.
+export function estadoMorador(m: Morador, seg: number, o: EstadoMorador = novoEstado()): EstadoMorador {
+  const ln = linhaDe(m), bl = ln.blocos;
+  let k = bl.length - 1;
+  for (let i = 0; i < bl.length; i++) if (bl[i].t0 <= seg) k = i; else break;
+  const b = bl[k]; const t0 = b.t0 > seg ? b.t0 - DIA : b.t0; // antes do primeiro compromisso: ainda é o último de ontem
+  const passou = seg - t0; const andar = b.chegada - b.t0;
+  o.bloco = k; o.lugar = b.lugar.id;
+  if (passou < andar && b.trecho.total > 0.01) {
+    const p = noTrecho(b.trecho, passou * ln.vel, o);
+    o.andando = true; o.visivel = true; o.travessia = b.trecho.trav[p] === 1; o.fazendo = b.indo;
+    return o;
+  }
+  // chegou: fica no lugar, trocando de ponto de tempos em tempos (devagar)
+  o.andando = false; o.travessia = false; o.fazendo = b.fazendo; o.visivel = !b.lugar.dentro;
+  const pts = b.lugar.pontos; const ficou = passou - andar;
+  if (pts.length < 2) { o.x = pts[0][0]; o.z = pts[0][1]; if (b.lugar.olhar != null) o.rot = b.lugar.olhar; return o; }
+  const vez = Math.floor(ficou / ln.troca), dentroDaVez = ficou - vez * ln.troca;
+  const ponto = (v: number) => (v <= 0 ? 0 : hash(`${m.id}:${k}:${v}`) % pts.length);
+  const de = pts[ponto(vez - 1)], para = pts[ponto(vez)];
+  const dist = Math.hypot(para[0] - de[0], para[1] - de[1]), lento = 0.8;
+  if (vez > 0 && dentroDaVez * lento < dist) {
+    const t = (dentroDaVez * lento) / dist; o.x = de[0] + (para[0] - de[0]) * t; o.z = de[1] + (para[1] - de[1]) * t;
+    o.rot = Math.atan2(para[0] - de[0], para[1] - de[1]); o.andando = true; return o;
+  }
+  o.x = para[0]; o.z = para[1]; if (b.lugar.olhar != null) o.rot = b.lugar.olhar;
+  return o;
+}
+// o próximo compromisso (para a conversa: "depois vou almoçar")
+export function proximoCompromisso(m: Morador, seg: number) {
+  const ln = linhaDe(m); const k = estadoMorador(m, seg).bloco; return ln.blocos[(k + 1) % ln.blocos.length].c;
+}
+
+// ---------------- jeito de tratar ----------------
+export function tomDaAfinidade(a: number): Tom { return a < -30 ? "desconfiado" : a < 15 ? "neutro" : a < 50 ? "simpatico" : "amigo"; }
+export const NOME_TOM: Record<Tom, string> = { desconfiado: "desconfiado", neutro: "conhecido", simpatico: "simpático", amigo: "amigo" };
+
+// Cumprimento curto quando o visitante passa perto de um morador que o conhece (sem IA, sem servidor: da memória).
+export interface RelacaoCurta { id: string; chamar: string | null; afinidade: number; plano: string; conversas: number }
+export function cumprimentoDePassagem(m: Morador, r: RelacaoCurta, seg: number) {
+  const tom = tomDaAfinidade(r.afinidade); const nome = r.chamar ? `, ${r.chamar}` : "";
+  const h = seg / 3600; const periodo = h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+  const v = hash(`${m.id}:${r.conversas}:${Math.floor(seg / 600)}`) % 3;
+  if (tom === "desconfiado") return ["Hm.", "...", `${periodo}.`][v];
+  if (tom === "neutro") return [`${periodo}${nome}.`, `Oi${nome}.`, `E aí${nome}?`][v];
+  if (tom === "simpatico") return [`${periodo}${nome}!`, `Oi${nome}! Tudo bem?`, `Olha quem passou${nome}!`][v];
+  return [r.plano ? `Ô${nome}! E aí, conseguiu ${r.plano}?` : `Ô${nome}! Que bom te ver!`, `${periodo}${nome}! Passa aqui depois!`, `Ei${nome}! Saudade de você!`][v];
+}
+
+// lista do modo leve (celular): menos gente na rua
+export const moradoresDoAparelho = (leve: boolean) => (leve ? MORADORES.filter((m) => m.celular) : MORADORES);
+
+// Botões da conversa (sem IA ou com IA, é o mesmo caminho): o rótulo do botão e o que o visitante "diz" ao tocar nele
+export const ACOES_MORADOR = [
+  { id: "cumprimentar", rotulo: "Cumprimentar", fala: "Oi! Tudo bem?" },
+  { id: "agora", rotulo: "O que está fazendo?", fala: "O que você está fazendo?" },
+  { id: "cidade", rotulo: "Perguntar da cidade", fala: "Me conta da cidade?" },
+  { id: "indicacao", rotulo: "Pedir indicação de empresa", fala: "Pode me indicar uma empresa daqui?" },
+  { id: "sobre_mim", rotulo: "Contar sobre mim", fala: "Quero te contar um pouco sobre mim." },
+  { id: "despedir", rotulo: "Despedir-se", fala: "Tchau, até mais!" },
+  { id: "desculpa", rotulo: "Pedir desculpas", fala: "Desculpa pelo que eu disse." },
+] as const;
+export type AcaoMorador = (typeof ACOES_MORADOR)[number]["id"];

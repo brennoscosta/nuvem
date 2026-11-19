@@ -25,6 +25,7 @@ import { Clima } from "./Clima";
 import { Fauna } from "./Fauna";
 import { SomCena } from "./SomCena";
 import { Semaforos, Trafego, Passantes, PontosOnibus } from "./Transito";
+import { Moradores } from "./Moradores";
 import { LuzesPostes } from "./CicloDia";
 import { natalAtivo, ArvoreNatal, LuzesNatalPostes } from "./Natal";
 import { Outdoors } from "./Anuncios";
@@ -192,6 +193,8 @@ export function Mundo() {
       <Depois etapa={1}><Trafego /></Depois>
       {/* vida na rua (12/11/2026): pedestres que atravessam na faixa e o ônibus com pontos */}
       <Depois etapa={1}><Passantes /><PontosOnibus /></Depois>
+      {/* moradores da cidade (19/11/2026): gente fixa com nome, casa e rotina pela hora da cidade; clicar abre a conversa */}
+      <Depois etapa={1}><Moradores /></Depois>
       <Depois etapa={2}><Fauna /></Depois>
       {/* outdoors nas avenidas da borda (aluguel de 30 dias) */}
       <Depois etapa={2}><Outdoors /></Depois>
