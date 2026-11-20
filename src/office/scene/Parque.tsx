@@ -264,9 +264,12 @@ function itensParque() {
   let n = 0; const poucos = leve();
   const longeDe = (x: number, z: number) => Math.hypot((x - LAGO.x) / (BEIRA.rx + 3), (z - LAGO.z) / (BEIRA.rz + 3)) > 1 && Math.hypot(x - CORETO.x, z - CORETO.z) > 7.5 && Math.hypot(x - QUIOSQUE.x, z - QUIOSQUE.z) > 8 && !NORTE.pontes.some((p) => Math.abs(x - p) < 6 && z > Z_INI - 12);
   const add = (x: number, z: number, h = 5.5) => { if (longeDe(x, z)) arvores.push({ pos: [x, 0, z], rot: (n++ * 1.9) % 6.28, altura: h + (n % 3) * 0.6 }); };
-  for (let x = X_OESTE + 6; x <= X_LESTE - 4; x += poucos ? 16 : 10) { add(x, Z_INI - 3.2, 5); add(x + 4, Z_FIM + 3, 6.5); }
-  for (let z = Z_INI - 10; z >= Z_FIM + 8; z -= poucos ? 16 : 10) { add(X_OESTE + 5, z, 6); add(X_LESTE - 3, z, 6); }
-  for (const [cx, cz] of [[-38, -113], [36, -113], [-62, -142], [62, -146], [0, -149], [-22, -148], [24, -149], [-66, -118], [70, -122]]) for (const [dx, dz] of [[0, 0], [3.8, 1.5], [-2.5, 3.2]]) add(cx + dx, cz + dz, 6);
+  // 20/11/2026 (metade da arborização): fileiras com o dobro do espaço e 6 bosques de 2 árvores (eram 9 bosques de 3: saíram
+  // os de 70,-122, 24,-149 e -22,-148, ficando 3 a oeste, 2 a leste e 1 no meio); os ipês floridos da beira do lago ficaram
+  for (let x = X_OESTE + 6; x <= X_LESTE - 4; x += poucos ? 32 : 20) { add(x, Z_INI - 3.2, 5); add(x + 4, Z_FIM + 3, 6.5); }
+  // as fileiras dos lados e a segunda árvore de cada bosque só nos gráficos completos (no leve ficava 59% das árvores de antes)
+  if (!poucos) for (let z = Z_INI - 10; z >= Z_FIM + 8; z -= 20) { add(X_OESTE + 5, z, 6); add(X_LESTE - 3, z, 6); }
+  for (const [cx, cz] of [[-38, -113], [36, -113], [-62, -142], [62, -146], [0, -149], [-66, -118]]) for (const [dx, dz] of poucos ? [[0, 0]] : [[0, 0], [3.8, 1.5]]) add(cx + dx, cz + dz, 6);
   // ipês floridos (amarelos e rosa) nas pontas do caminho do lago
   for (const [x, z, cor] of [[-30, -120, "#F2C230"], [30, -120, "#E86AA6"], [-30, -137, "#E86AA6"], [30, -137, "#F2C230"], [-14, -144.5, "#F2C230"], [14, -144.5, "#E86AA6"], [-56, -126, "#F2C230"], [58, -129, "#E86AA6"]] as const) ipes.push({ x, z, cor });
   // bancos virados para o lago, na beira de fora do caminho (menos onde chegam os caminhos)
@@ -288,8 +291,8 @@ function Ipes({ lista }: { lista: { x: number; z: number; cor: string }[] }) {
   }, [lista]);
   return (
     <group>
-      <ArvoresInstanciadas especie="ipeAmarelo" itens={grupos.amarelos} />
-      <ArvoresInstanciadas especie="ipeRosa" itens={grupos.rosas} />
+      <ArvoresInstanciadas especie="ipeAmarelo" itens={grupos.amarelos} grupo="parque-ipes" />
+      <ArvoresInstanciadas especie="ipeRosa" itens={grupos.rosas} grupo="parque-ipes" />
     </group>
   );
 }
@@ -304,7 +307,7 @@ export function Parque() {
       <Lago />
       <Cisne fase={0} cor="#F2C230" />
       <Cisne fase={Math.PI} cor="#5FB4E8" />
-      <ArvoresMistas itens={arvores} mistura={MISTURA_PARQUE} />
+      <ArvoresMistas itens={arvores} mistura={MISTURA_PARQUE} grupo="parque" />
       <ComFallback fallback={null}><ModeloInstanciado nome="banco" itens={bancos} /></ComFallback>
       <Ipes lista={ipes} />
       <PostesClassicos itens={postes} />

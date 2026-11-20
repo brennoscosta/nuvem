@@ -2,7 +2,8 @@
 // vê quem mais está online e interage. Presença por "batida" (o navegador manda a posição a cada poucos segundos).
 import { sql, id, migrar } from "./db";
 import { TIPOS_AVATAR, TODOS_BONECOS, bonecoDe, codificarVisual, limparVisual, visualCompleto, type Visual } from "@/office/data/bonecos";
-import { ehAdmin } from "./terrenos";
+import { ACESSORIO_POR_ID, ITEM_PAGO_POR_ID, ROUPA_PAGA_POR_ID, ehGratis, itensPagosDoVisual, limparEquipados } from "@/office/data/acessorios";
+import { ehAdmin, ehDonoOuSocio, obterTerreno } from "./terrenos";
 import { avisarRecado } from "./avisos";
 import type { Usuario } from "./usuarios";
 import { registrar } from "./eventos";
@@ -48,10 +49,35 @@ export async function meuPersonagem(usuarioId: string): Promise<Personagem | nul
 }
 export const personagemAtivo = (p: Personagem | null, u?: Usuario | null) => !!p && (!!(p.pagoAte && new Date(p.pagoAte).getTime() > Date.now()) || ehAdmin(u));
 
+// o boneco (código v1:…) e a cor da roupa de um visual sobre o tipo pronto
+function bonecoDoVisual(tipo: (typeof TIPOS_AVATAR)[number], v: Visual) {
+  const personalizado = Object.keys(v).length > 0;
+  return { boneco: personalizado ? codificarVisual(visualCompleto(bonecoDe(tipo.boneco), tipo.roupa, v), tipo.boneco) : TODOS_BONECOS[tipo.boneco] ? tipo.boneco : "classico", roupa: v.roupa ?? tipo.roupa };
+}
+const itensComprados = async (usuarioId: string, db: typeof sql = sql) => (await db<{ item: string }[]>`SELECT item FROM item_comprado WHERE usuario_id = ${usuarioId}`).map((r) => r.item);
+// Editor completo (20/11/2026): o uniforme só vale para empresa ativa de que a pessoa é dona ou sócia, e a cor da roupa é a
+// da empresa; roupa paga (terno de grife, jaqueta de couro, tênis de grife) só com o item comprado
+async function conferirVisual(u: Usuario, v: Visual) {
+  if (v.uniforme) {
+    const t = await obterTerreno(v.uniforme);
+    if (!t || t.status !== "ativo" || !ehDonoOuSocio(t, u.id)) delete v.uniforme;
+    else if (/^#[0-9a-fA-F]{6}$/.test(t.cor)) v.roupa = t.cor.toUpperCase();
+  }
+  const pagos = itensPagosDoVisual(v);
+  if (pagos.length && !ehAdmin(u)) {
+    const comprados = await itensComprados(u.id);
+    const falta = pagos.filter((i) => !comprados.includes(i));
+    if (falta.length) throw new Error(`Para usar ${falta.map((i) => ITEM_PAGO_POR_ID[i]?.nome ?? i).join(" e ")}, compre o item primeiro (ou escolha outra peça).`);
+  }
+  return v;
+}
+
 // Cria ou edita (nome, tipo, bio, redes). Não mexe no pagamento.
 // Desde 16/11/2026 aceita o visual personalizado (pele, cabelo, roupa, calça, tênis, barba, óculos): vai inteiro na coluna
 // visual e, codificado (v1:…), na coluna boneco, que é o que o mapa, a rede e a busca já leem.
-export async function salvarPersonagem(u: Usuario, d: { nome?: string; tipo?: string; bio?: string; redes?: unknown; mostrarRedes?: boolean; perfil?: unknown; visual?: unknown }) {
+// 20/11/2026: o visual do editor completo (corpo, rosto, parte de baixo, sapatos, uniforme) e, se vierem, os acessórios
+// em uso (os grátis e os comprados) vão juntos no mesmo salvar.
+export async function salvarPersonagem(u: Usuario, d: { nome?: string; tipo?: string; bio?: string; redes?: unknown; mostrarRedes?: boolean; perfil?: unknown; visual?: unknown; acessorios?: unknown }) {
   await migrar();
   if (u.banidoEm) throw new Error("Conta suspensa.");
   const atual = await meuPersonagem(u.id);
@@ -59,10 +85,11 @@ export async function salvarPersonagem(u: Usuario, d: { nome?: string; tipo?: st
   const nome = texto(d.nome, 24, atual?.nome ?? u.nome.split(" ")[0]);
   if (nome.length < 2) throw new Error("Dê um nome ao seu personagem.");
   // visual: o que veio no pedido; sem ele (aplicativo antigo), mantém o salvo se o tipo não mudou
-  const v = limparVisual(d.visual !== undefined ? d.visual : atual && atual.tipo === tipo.id ? atual.visual : {});
-  const personalizado = Object.keys(v).length > 0;
-  const boneco = personalizado ? codificarVisual(visualCompleto(bonecoDe(tipo.boneco), tipo.roupa, v), tipo.boneco) : TODOS_BONECOS[tipo.boneco] ? tipo.boneco : "classico";
-  const roupa = v.roupa ?? tipo.roupa;
+  const v = await conferirVisual(u, limparVisual(d.visual !== undefined ? d.visual : atual && atual.tipo === tipo.id ? atual.visual : {}));
+  const { boneco, roupa } = bonecoDoVisual(tipo, v);
+  // acessórios em uso: só os grátis e os comprados, um por lugar (sem o campo, ficam os de antes)
+  let acessorios: string[] | null = null;
+  if (d.acessorios !== undefined) { const comprados = await itensComprados(u.id); acessorios = limparEquipados((Array.isArray(d.acessorios) ? d.acessorios : []).filter((i) => typeof i === "string" && (ehGratis(i) || comprados.includes(i) || (ehAdmin(u) && !!ACESSORIO_POR_ID[i])))); }
   const redes = sql.json(limparRedes(d.redes ?? atual?.redes ?? {}) as unknown as Parameters<typeof sql.json>[0]);
   const pf = limparPerfil(d.perfil, atual);
   const [p] = await sql<Personagem[]>`INSERT INTO personagem (usuario_id, nome, tipo, boneco, roupa, bio, redes, mostrar_redes, profissao, nicho, servicos, preco, local, portfolio, disponivel, visual)
@@ -72,8 +99,27 @@ export async function salvarPersonagem(u: Usuario, d: { nome?: string; tipo?: st
       profissao = EXCLUDED.profissao, nicho = EXCLUDED.nicho, servicos = EXCLUDED.servicos, preco = EXCLUDED.preco, local = EXCLUDED.local, portfolio = EXCLUDED.portfolio, disponivel = EXCLUDED.disponivel,
       visual = CASE WHEN personagem.visual ? 'veiculo' THEN EXCLUDED.visual || jsonb_build_object('veiculo', personagem.visual->'veiculo') ELSE EXCLUDED.visual END, atualizado_em = now()
     RETURNING ${CAMPOS()}`;
+  let final = p;
+  if (acessorios) { const [q] = await sql<Personagem[]>`UPDATE personagem SET acessorios = ${sql.json(acessorios)} WHERE usuario_id = ${u.id} RETURNING ${CAMPOS()}`; if (q) final = q; }
   if (!atual) void registrar("cadastro", `${u.nome} montou o personagem "${nome}"`, { usuarioId: u.id });
-  return p;
+  return final;
+}
+// Roupa premium paga (20/11/2026, chamado pelo Pix aprovado em src/server/cidade.ts › ativarItem): já veste a peça no
+// visual salvo. No estorno (comprada = false) troca pela peça comum parecida, se estiver em uso.
+const PECA_COMUM: Record<string, string> = { ternoGrife: "terno", jaquetaCouro: "jaqueta", tenisGrife: "tenis" };
+export async function vestirRoupaComprada(usuarioId: string, itemId: string, comprada: boolean, db: typeof sql = sql) {
+  const r = ROUPA_PAGA_POR_ID[itemId]; if (!r) return false;
+  const [p] = await db<Personagem[]>`SELECT ${CAMPOS()} FROM personagem WHERE usuario_id = ${usuarioId}`;
+  if (!p) return true; // comprou antes de montar o personagem: fica na conta
+  const tipo = TIPOS_AVATAR.find((t) => t.id === p.tipo) ?? TIPOS_AVATAR[0];
+  const v = limparVisual(p.visual ?? {});
+  const campo = r.parte === "traje" ? "traje" : "sapato";
+  if (comprada) (v as Record<string, unknown>)[campo] = r.valor;
+  else if ((v as Record<string, unknown>)[campo] === r.valor) (v as Record<string, unknown>)[campo] = PECA_COMUM[r.valor];
+  else return true;
+  const { boneco, roupa } = bonecoDoVisual(tipo, v);
+  await db`UPDATE personagem SET boneco = ${boneco}, roupa = ${roupa}, visual = ${sql.json(v as never)}::jsonb || CASE WHEN visual ? 'veiculo' THEN jsonb_build_object('veiculo', visual->'veiculo') ELSE '{}'::jsonb END, atualizado_em = now() WHERE usuario_id = ${usuarioId}`;
+  return true;
 }
 // Pagamento aprovado (ou admin): +30 dias
 export async function ativarPersonagem(usuarioId: string, dias = 30, db: typeof sql = sql) {

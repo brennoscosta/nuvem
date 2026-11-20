@@ -3,12 +3,13 @@
 import { sql, migrar, id } from "./db";
 import type { Usuario } from "./usuarios";
 import { ehAdmin, terrenoDoUsuario } from "./terrenos";
-import { criarCobrancaGenerica, type CobrancaPix } from "./mercadopago";
+import { criarCobrancaGenerica, type CobrancaPix, type OpcoesCobranca } from "./mercadopago";
 import { avisarSeguidores } from "./seguir";
 import { avisar } from "./avisos";
 import { LOTE_POR_CHAVE, nomeNicho, NICHOS } from "@/office/data/mundo";
 import { MISSOES } from "@/office/data/missoes";
-import { ACESSORIO_POR_ID, limparEquipados } from "@/office/data/acessorios";
+import { ACESSORIO_POR_ID, ITEM_PAGO_POR_ID, ROUPA_PAGA_POR_ID, ehGratis, limparEquipados } from "@/office/data/acessorios";
+import { vestirRoupaComprada } from "./personagens";
 import { PRACA_CHAVE, PRECO_BARRACA, VAGAS_FEIRA, MAX_EVENTOS_FUTUROS, DURACOES_EVENTO, TIPOS_BARRACA, CORES_BARRACA, proximaFeira } from "@/office/data/praca";
 
 const texto = (t: unknown, max: number) => (typeof t === "string" ? t : "").replace(/[<>{}\[\]\\]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -178,7 +179,7 @@ export async function feira(euId: string | null, dia = proximaFeira()) {
   });
   return { dia, barracas, preco: PRECO_BARRACA };
 }
-export async function alugarBarraca(u: Usuario, d: { vaga?: unknown; nome?: unknown; descricao?: unknown; cor?: unknown; tipo?: unknown; whatsapp?: unknown; instagram?: unknown }, base: string): Promise<CobrancaPix> {
+export async function alugarBarraca(u: Usuario, d: { vaga?: unknown; nome?: unknown; descricao?: unknown; cor?: unknown; tipo?: unknown; whatsapp?: unknown; instagram?: unknown }, base: string, opc: OpcoesCobranca = {}): Promise<CobrancaPix> {
   await migrar();
   if (u.banidoEm) throw new Error("Conta suspensa.");
   const lote = await terrenoDoUsuario(u.id);
@@ -205,7 +206,7 @@ export async function alugarBarraca(u: Usuario, d: { vaga?: unknown; nome?: unkn
   const [b] = await sql<{ status: string }[]>`SELECT status FROM barraca WHERE id = ${bid}`;
   if (b?.status === "paga") throw new Error("Sua barraca já está paga para este sábado. Os dados foram atualizados.");
   const valor = ehAdmin(u) ? Math.round(PRECO_BARRACA * 100) / 10000 : PRECO_BARRACA;
-  return criarCobrancaGenerica(u, base, { tipo: "barraca", chave: `barraca:${bid}`, valor, descricao: `WorkEnd · barraca na feira de ${dia.split("-").reverse().join("/")} (${nome})`, metadata: { barraca: bid } });
+  return criarCobrancaGenerica(u, base, { tipo: "barraca", chave: `barraca:${bid}`, valor, descricao: `WorkEnd · barraca na feira de ${dia.split("-").reverse().join("/")} (${nome})`, metadata: { barraca: bid } }, opc);
 }
 type Db = typeof sql;
 export async function ativarBarraca(chave: string, usuarioId: string, db: Db = sql) {
@@ -223,18 +224,23 @@ export async function meusItens(u: Usuario) {
   const [p] = await sql<{ acessorios: string[] }[]>`SELECT acessorios FROM personagem WHERE usuario_id = ${u.id}`;
   return { comprados: rows.map((r) => r.item), usando: limparEquipados(p?.acessorios ?? []) };
 }
-export async function comprarItem(u: Usuario, itemId: string, base: string): Promise<CobrancaPix> {
+// Cobrança dos itens do personagem: o ÚNICO ponto que cobra (acessórios pagos e roupas premium, 20/11/2026). Créditos, Pix
+// ou os dois pelo caminho único (mercadopago.ts › cobrar, frente creditos). Os itens grátis (relógio, pulseira, brincos) não passam por aqui.
+export async function comprarItem(u: Usuario, itemId: string, base: string, opc: OpcoesCobranca = {}): Promise<CobrancaPix> {
   await migrar();
   if (u.banidoEm) throw new Error("Conta suspensa.");
-  const a = ACESSORIO_POR_ID[itemId]; if (!a) throw new Error("Item não encontrado.");
+  if (ehGratis(itemId)) throw new Error("Esse item é grátis: é só usar.");
+  const a = ITEM_PAGO_POR_ID[itemId]; if (!a) throw new Error("Item não encontrado.");
   const [ja] = await sql`SELECT 1 FROM item_comprado WHERE usuario_id = ${u.id} AND item = ${itemId}`;
   if (ja) throw new Error("Você já tem esse item.");
   const valor = ehAdmin(u) ? Math.round(a.preco * 100) / 10000 : a.preco;
-  return criarCobrancaGenerica(u, base, { tipo: "item", chave: `item:${itemId}`, valor, descricao: `WorkEnd · ${a.nome} para o personagem`, metadata: { item: itemId } });
+  return criarCobrancaGenerica(u, base, { tipo: "item", chave: `item:${itemId}`, valor, descricao: `WorkEnd · ${a.nome} para o personagem`, metadata: { item: itemId } }, opc);
 }
 export async function ativarItem(chave: string, usuarioId: string, db: Db = sql) {
-  const item = chave.replace(/^item:/, ""); if (!ACESSORIO_POR_ID[item]) return false;
+  const item = chave.replace(/^item:/, ""); if (!ITEM_PAGO_POR_ID[item]) return false;
   await db`INSERT INTO item_comprado (usuario_id, item) VALUES (${usuarioId}, ${item}) ON CONFLICT DO NOTHING`;
+  // roupa premium: já vai para o visual salvo (no traje ou no sapato)
+  if (ROUPA_PAGA_POR_ID[item]) return vestirRoupaComprada(usuarioId, item, true, db);
   // já veste o item novo (troca o do mesmo lugar)
   const [p] = await db<{ acessorios: string[] }[]>`SELECT acessorios FROM personagem WHERE usuario_id = ${usuarioId}`;
   if (p) { const lugar = ACESSORIO_POR_ID[item].lugar; const novos = limparEquipados([item, ...(p.acessorios ?? []).filter((i) => ACESSORIO_POR_ID[i]?.lugar !== lugar)]); await db`UPDATE personagem SET acessorios = ${sql.json(novos)} WHERE usuario_id = ${usuarioId}`; }
@@ -243,12 +249,13 @@ export async function ativarItem(chave: string, usuarioId: string, db: Db = sql)
 export async function reverterItem(chave: string, usuarioId: string, db: Db = sql) {
   const item = chave.replace(/^item:/, "");
   await db`DELETE FROM item_comprado WHERE usuario_id = ${usuarioId} AND item = ${item}`;
+  if (ROUPA_PAGA_POR_ID[item]) { await vestirRoupaComprada(usuarioId, item, false, db); return; }
   await db`UPDATE personagem SET acessorios = COALESCE((SELECT jsonb_agg(x) FROM jsonb_array_elements_text(acessorios) x WHERE x <> ${item}), '[]'::jsonb) WHERE usuario_id = ${usuarioId}`;
 }
 export async function vestir(u: Usuario, itens: unknown) {
   await migrar();
   const { comprados } = await meusItens(u);
-  const lista = limparEquipados((Array.isArray(itens) ? itens : []).filter((i) => comprados.includes(String(i))));
+  const lista = limparEquipados((Array.isArray(itens) ? itens : []).filter((i) => comprados.includes(String(i)) || ehGratis(String(i))));
   const r = await sql`UPDATE personagem SET acessorios = ${sql.json(lista)}, atualizado_em = now() WHERE usuario_id = ${u.id}`;
   if (!r.count) throw new Error("Monte seu personagem primeiro.");
   return lista;

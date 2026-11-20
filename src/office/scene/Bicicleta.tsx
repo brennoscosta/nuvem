@@ -129,14 +129,16 @@ export const bicicletasNaCena = { minha: 0, outros: 0, paradas: 0 };
 
 export interface BicicletaHandle { rodaT: THREE.Object3D | null; rodaF: THREE.Object3D | null; pedivela: THREE.Object3D | null }
 type Quem = "minha" | "outros" | "paradas";
-export const Bicicleta = forwardRef<BicicletaHandle, { cor: string; quem: Quem }>(function Bicicleta({ cor, quem }, ref) {
+// escala (20/11/2026, editor do personagem): a bicicleta acompanha a altura do boneco (baixa 0,93×, alta 1,07×), assim os
+// pés continuam nos pedais e as mãos no guidão
+export const Bicicleta = forwardRef<BicicletaHandle, { cor: string; quem: Quem; escala?: number }>(function Bicicleta({ cor, quem, escala = 1 }, ref) {
   const rodaT = useRef<THREE.Mesh>(null), rodaF = useRef<THREE.Mesh>(null), ped = useRef<THREE.Mesh>(null);
   useImperativeHandle(ref, () => ({ get rodaT() { return rodaT.current; }, get rodaF() { return rodaF.current; }, get pedivela() { return ped.current; } }), []);
   useEffect(() => { bicicletasNaCena[quem]++; return () => { bicicletasNaCena[quem]--; }; }, [quem]);
   const corpo = useMemo(() => geoCorpo(cor), [cor]);
   const m = material();
   return (
-    <group>
+    <group scale={escala}>
       <mesh geometry={corpo} material={m} raycast={() => null} />
       <mesh ref={rodaT} geometry={geoRoda()} material={m} position={[0, EIXO_T[0], EIXO_T[1]]} raycast={() => null} />
       <mesh ref={rodaF} geometry={geoRoda()} material={m} position={[0, EIXO_F[0], EIXO_F[1]]} raycast={() => null} />

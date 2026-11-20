@@ -6,6 +6,7 @@
 import { LOTE_POR_CHAVE, PASSO, MEIO_Q, MUNDO, N, LOTE, MEIO_CALCADA, pontoNaCalcada } from "./mundo";
 import { PRACA_CHAVE } from "./praca";
 import { sedeNoPonto, paraLocalSede, paraMundoSede } from "./sedes";
+import { quiosqueNoPonto } from "./quiosques";
 
 export type Ponto = [number, number];
 const PRACA = LOTE_POR_CHAVE[PRACA_CHAVE]?.centro ?? null;
@@ -13,6 +14,7 @@ const PRACA = LOTE_POR_CHAVE[PRACA_CHAVE]?.centro ?? null;
 // calçadas, ruas e a grama das bordas são livres; dentro dos quarteirões só a praça é aberta
 export function livre(x: number, z: number) {
   if (Math.abs(x) > MUNDO.x - 2 || Math.abs(z) > MUNDO.z - 2) return false;
+  if (quiosqueNoPonto(x, z)) return false; // quiosques (20/11/2026): desvia do corpo; o balcão e os banquinhos ficam de fora
   const i = Math.round(x / PASSO), j = Math.round(z / PASSO);
   if (Math.abs(i) > N || Math.abs(j) > N) return true;
   const B = MEIO_Q + 0.35;

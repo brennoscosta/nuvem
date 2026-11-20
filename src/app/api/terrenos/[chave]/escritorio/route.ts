@@ -13,5 +13,6 @@ export async function PUT(req: Request, { params }: Ctx) {
     const u = await usuarioAtual(); if (!u) return erro("Entre na sua conta do WorkEnd.", 401);
     const { chave } = await params;
     return ok(await salvarEscritorio(u, decodeURIComponent(chave), await corpo(req)));
-  } catch (e) { return erro(e); }
+    // regra do prédio (modelo pago, troca, lote duplo: src/server/terrenos.ts › salvarEscritorio) é recusa, não falha
+  } catch (e) { return erro(e, e instanceof Error && /modelo|Modelo|troca|lote|catálogo|não é seu|Pague/.test(e.message) ? 400 : 500); }
 }

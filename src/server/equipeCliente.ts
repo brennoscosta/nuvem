@@ -12,8 +12,9 @@
 import { sql, migrar, id } from "./db";
 import type { Usuario } from "./usuarios";
 import { ehAdmin, obterTerreno, terrenoDoUsuario, ehDonoOuSocio, type Terreno } from "./terrenos";
-import { avaliarMensagem, gravarMensagem, listarMensagens, salvarRegra, removerRegra, type RegraDB, type AgenteDB } from "./agentes";
-import { conversar, destilarRegra, temIA } from "./motor";
+import { avaliarMensagem, gravarMensagem, listarMensagens, salvarRegra, removerRegra, registrarUso, type RegraDB, type AgenteDB } from "./agentes";
+import { conversar, destilarRegra, temIA, completar, MODELO_BARATO } from "./motor";
+import { destinosDaRecepcao, classificarPorPalavras, falaDoEncaminhamento, FALA_SEM_DESTINO, saudacaoDoSetor, recadoDoSetor, type Destino } from "@/office/data/recepcao";
 import { versoesAtivas, skillEfetiva } from "./evolucao";
 import { bloqueio, contar } from "./limite";
 import { contextoAgendaIA, aplicarMarcacaoDaAtendente, temMarcacao } from "./agenda";
@@ -25,7 +26,11 @@ import type { Membro, NivelMembro, Escritorio } from "@/office/data/escritorio";
 import { pedirComEquipe, trabalhando, trocasInternas, atividadeInterna } from "./delegacao";
 import type { AreaId, Nivel } from "@/office/data/org";
 import { avisar, contatosNaFala } from "./conectores";
-import { numeroDaLoja } from "@/office/data/numeroLoja";
+import { numeroDaLoja, chaveDaLoja } from "@/office/data/numeroLoja";
+import { tetoDaEmpresa, MSG_SEM_UNIDADES, AVISO_UNIDADES } from "./unidadesIA";
+import { roteiroDono, roteiroVisitante } from "./escopoEquipe";
+import { PERSONALIDADE_POR_ID, personalidadeParaIA } from "@/office/data/personalidades";
+import { escopoDe } from "@/office/data/escopo";
 
 export const TETO_IA_MES = 10; // R$ de IA por lote por mês
 export const AVISO_TETO = 0.8; // a partir de 80% o painel avisa
@@ -109,6 +114,8 @@ async function sincronizarEquipe(t: Terreno, empId: string) {
   const mapa = await versoesAtivas().catch(() => new Map());
   const existentes = new Set((await sql<{ id: string }[]>`SELECT id FROM agente WHERE empresa_id = ${empId}`).map((a) => a.id));
   const ceoId = agenteIdDe(empId, e.equipe.find((m) => m.papel === "ceo")?.id ?? "ceo");
+  // equipe sem CEO (o quiosque, 20/11/2026, vem só com a atendente): ninguém responde a um CEO que não existe (chefe_id é FK)
+  const temCeo = e.equipe.some((m) => m.papel === "ceo");
   const criados = new Set<string>();
   for (const m of ordemPorChefe(e)) {
     const esp = m.papel === "profissional" ? especialistaDe(m) : null;
@@ -118,11 +125,14 @@ async function sincronizarEquipe(t: Terreno, empId: string) {
     const aid = agenteIdDe(empId, m.id);
     const chefeMembro = chefeDoMembro(m, e);
     const chefeAg = chefeMembro ? agenteIdDe(empId, chefeMembro) : null;
-    const chefe = chefeAg && (criados.has(chefeAg) || existentes.has(chefeAg)) ? chefeAg : m.papel === "ceo" ? null : ceoId;
-    const config = { membroId: m.id, papel: m.papel, setorId: m.setorId ?? null, saudacao: m.treino?.saudacao || esp?.saudacao || "", especialista: esp?.id ?? null, atendeVisitantes: m.papel === "atendente" };
+    const chefe = chefeAg && (criados.has(chefeAg) || existentes.has(chefeAg)) ? chefeAg : m.papel === "ceo" || !temCeo ? null : ceoId;
+    // personalidade (20/11/2026): quem tem uma do banco de perfis fala do jeito dela; os antigos seguem com a do especialista
+    const pers = m.personalidadeId ? PERSONALIDADE_POR_ID[m.personalidadeId] : null;
+    const nomeSetor = m.papel === "ceo" ? "Diretoria" : m.papel === "atendente" ? "Recepção" : setor?.nome ?? null;
+    const config = { membroId: m.id, papel: m.papel, setorId: m.setorId ?? null, saudacao: m.treino?.saudacao || esp?.saudacao || "", especialista: esp?.id ?? null, atendeVisitantes: m.papel === "atendente", personalidadeId: m.personalidadeId ?? null, escopo: escopoDe(m), setor: nomeSetor };
     await sql`INSERT INTO agente (id, empresa_id, nome, area, nivel, funcao, personalidade, tom_de_voz, descricao, modelo, boneco, chefe_id, teto_diario_brl, ativo, config)
-      VALUES (${aid}, ${empId}, ${m.nome}, ${area}, ${nivel}, ${m.cargo}, ${esp?.personalidade ?? ""}, ${esp?.tomDeVoz ?? ""}, ${m.treino?.descricao || esp?.descricao || ""},
-              ${MODELO_CLIENTE}, ${m.boneco}, ${chefe}, ${TETO_IA_MES}, true, ${sql.json(config)})
+      VALUES (${aid}, ${empId}, ${m.nome}, ${area}, ${nivel}, ${m.cargo}, ${pers ? personalidadeParaIA(pers) : esp?.personalidade ?? ""}, ${pers ? pers.tom : esp?.tomDeVoz ?? ""}, ${m.treino?.descricao || esp?.descricao || ""},
+              ${MODELO_CLIENTE}, ${m.boneco}, ${chefe}, ${TETO_IA_MES}, true, ${sql.json(config as unknown as Parameters<typeof sql.json>[0])})
       ON CONFLICT (id) DO UPDATE SET nome = EXCLUDED.nome, area = EXCLUDED.area, nivel = EXCLUDED.nivel, funcao = EXCLUDED.funcao,
         personalidade = EXCLUDED.personalidade, tom_de_voz = EXCLUDED.tom_de_voz, descricao = EXCLUDED.descricao, boneco = EXCLUDED.boneco,
         chefe_id = EXCLUDED.chefe_id, ativo = true, config = agente.config || EXCLUDED.config, atualizado_em = now()`;
@@ -139,6 +149,11 @@ async function sincronizarEquipe(t: Terreno, empId: string) {
   const ids = e.equipe.map((m) => agenteIdDe(empId, m.id));
   await sql`UPDATE agente SET ativo = false, atualizado_em = now() WHERE empresa_id = ${empId} AND ativo AND id <> ALL(${sql.array(ids)})`;
 }
+
+// Unidades de IA (20/11/2026): o teto da empresa passou a ser o saldo de unidades (src/server/unidadesIA.ts). A conta
+// continua "gasto >= teto = parou": teto = gasto do mês + saldo em R$ (1 unidade = R$ 0,01). Visitante não paga nada.
+async function tetoIA(empId: string) { return tetoDaEmpresa(empId, await gastoDoMes(empId)); }
+const tetoParaTela = (x: Awaited<ReturnType<typeof tetoIA>>) => ({ mes: x.gasto, teto: Number.isFinite(x.teto) ? x.teto : x.gasto, unidades: x.unidades.total, unidadesMes: x.unidades.baseMes });
 
 export async function gastoDoMes(empId: string) {
   const [r] = await sql<{ g: string }[]>`SELECT COALESCE(SUM(u.custo_brl), 0)::text AS g FROM uso_ia u JOIN agente a ON a.id = u.agente_id
@@ -191,7 +206,8 @@ export async function painelEquipe(u: Usuario, chave?: string | null) {
   const [vis] = await sql<{ n: number; hoje: number }[]>`SELECT COUNT(DISTINCT m.visitante_id)::int AS n,
       COUNT(DISTINCT m.visitante_id) FILTER (WHERE m.criado_em >= now() - interval '24 hours')::int AS hoje
     FROM mensagem m JOIN agente a ON a.id = m.agente_id WHERE a.empresa_id = ${empId} AND m.visitante_id IS NOT NULL`;
-  const gasto = await gastoDoMes(empId);
+  const ia = await tetoIA(empId);
+  const { gasto, teto, unidades } = ia;
   const equipe = (t.escritorio?.equipe ?? []).map((m) => {
     const aid = agenteIdDe(empId, m.id);
     const ag = ags.find((a) => a.id === aid);
@@ -218,7 +234,7 @@ export async function painelEquipe(u: Usuario, chave?: string | null) {
   return {
     lote: { chave: t.chave, numero: numeroDaLoja(t), empresaNome: t.empresaNome, cor: t.cor, nicho: nomeNicho(t.nicho), pagoAte: t.pagoAte },
     sobre: emp?.sobre ?? "", contatos: emp?.contatos ?? {}, equipe, departamentos,
-    gasto: { mes: gasto, teto: TETO_IA_MES, aviso: gasto >= TETO_IA_MES * AVISO_TETO, esgotado: gasto >= TETO_IA_MES },
+    gasto: { ...tetoParaTela(ia), aviso: unidades.cobrada && unidades.baseMes > 0 && unidades.total > 0 && unidades.total <= unidades.baseMes * AVISO_UNIDADES, esgotado: gasto >= teto },
     visitantes: { total: vis?.n ?? 0, ultimas24h: vis?.hoje ?? 0 }, ia: temIA(),
   };
 }
@@ -263,31 +279,54 @@ export async function falarComMembro(u: Usuario, chave: string | null, membroId:
   const t = await loteDoDono(u, chave);
   const pedido = String(texto ?? "").trim().slice(0, 4000);
   if (!pedido) throw new ErroHttp("Escreva o que você precisa.");
-  if (!temIA()) throw new ErroHttp("A IA está desligada no servidor agora. Tente de novo mais tarde.", 503);
   const chaveLim = `equipe:${u.id}`;
   if (bloqueio(chaveLim, LIMITE_DONO_HORA)) throw new ErroHttp("Muitas mensagens em pouco tempo. Espere alguns minutos.", 429);
   contar(chaveLim, 60);
   const empId = await garantirEmpresaDoLote(t);
   const a = await agenteDoMembro(empId, membroId);
-  const gasto = await gastoDoMes(empId);
-  if (gasto >= TETO_IA_MES) throw new ErroHttp(`A equipe já usou os R$ ${TETO_IA_MES.toFixed(2).replace(".", ",")} de IA deste mês. Ela volta a responder no dia 1º.`, 402);
+  const { gasto, teto } = await tetoIA(empId);
+  // sem IA (OpenAI fora ou sem unidades): o roteiro responde no jeito da personalidade e passa o pedido a quem faz
+  const semIA = async (motivo: string) => {
+    const membro = t.escritorio?.equipe.find((m) => m.id === membroId);
+    if (!membro || !t.escritorio) throw new ErroHttp(motivo, gasto >= teto ? 402 : 503);
+    const [ja] = await sql`SELECT 1 FROM mensagem WHERE agente_id = ${a.id} AND papel = 'user' AND visitante_id IS NULL AND conteudo = ${pedido} AND criado_em > now() - interval '3 minutes'`;
+    if (!ja) await gravarMensagem({ agenteId: a.id, papel: "user", autor: `dono:${u.id}`, conteudo: pedido });
+    const r = await roteiroDono({ empId, empresa: t.empresaNome, e: t.escritorio, membro, agenteId: a.id, texto: pedido, agenteDe: (mid) => agenteIdDe(empId, mid) });
+    const msg = await gravarMensagem({ agenteId: a.id, papel: "assistant", autor: `agente:${a.id}`, conteudo: r.texto });
+    return { mensagem: { id: msg.id, papel: "assistant", autor: "agente", deNome: null, conteudo: msg.conteudo, avaliacao: null, correcao: null, em: msg.criadoEm }, delegados: r.delegado ? [r.delegado] : [], gasto: tetoParaTela(await tetoIA(empId)), semIA: motivo };
+  };
+  if (!temIA()) return semIA("A IA está desligada no servidor agora: respondi pelo roteiro.");
+  if (gasto >= teto) return semIA(MSG_SEM_UNIDADES);
   try {
     const [ag] = await sql<AgenteDB[]>`SELECT * FROM agente WHERE id = ${a.id}`;
-    const r = await pedirComEquipe({ empId, autorDono: `dono:${u.id}`, teto: async () => ({ gasto: await gastoDoMes(empId), teto: TETO_IA_MES }) }, ag, pedido);
+    const r = await pedirComEquipe({ empId, autorDono: `dono:${u.id}`, teto: async () => { const x = await tetoIA(empId); return { gasto: x.gasto, teto: x.teto }; } }, ag, pedido);
     // conectores: tarefa que a equipe dividiu entre si → aviso tarefa.entregue quando a entrega final sair
     if (r.delegados.length) void r.fim.then((entrega) => { if (entrega) avisar(empId, "tarefa.entregue", { origem: "dono", tarefa: { para: { id: membroId, nome: ag.nome, cargo: ag.funcao }, texto: pedido, entrega } }); });
-    return { mensagem: { id: r.mensagem.id, papel: "assistant", autor: "agente", deNome: null, conteudo: r.mensagem.conteudo, avaliacao: null, correcao: null, em: r.mensagem.criadoEm }, delegados: r.delegados, gasto: { mes: await gastoDoMes(empId), teto: TETO_IA_MES } };
+    return { mensagem: { id: r.mensagem.id, papel: "assistant", autor: "agente", deNome: null, conteudo: r.mensagem.conteudo, avaliacao: null, correcao: null, em: r.mensagem.criadoEm }, delegados: r.delegados, gasto: tetoParaTela(await tetoIA(empId)) };
   } catch (e) {
-    throw new ErroHttp((e as Error).message, gasto >= TETO_IA_MES ? 402 : 502);
+    // a OpenAI falhou (sem crédito, fora do ar): o dono não fica sem resposta
+    console.error("[equipe] IA falhou, roteiro:", (e as Error).message);
+    return semIA(`A IA não respondeu agora (${(e as Error).message.slice(0, 120)}): respondi pelo roteiro.`);
   }
 }
 
 // 👍 / 👎 com correção: a correção vira uma regra permanente da pessoa (o mesmo treino do escritório interno)
-export async function treinarMembro(u: Usuario, chave: string | null, membroId: string, d: { mensagemId?: string; avaliacao?: 1 | -1 | null; correcao?: string; removerRegra?: string }) {
+// Treino individual (20/11/2026): regras, exemplos de resposta, o que não fazer e frases fixas do roteiro sem IA ficam só
+// naquele agente (tabela regra, agente_id). listar devolve o treino dele; novaRegra grava uma.
+export const TIPOS_TREINO = { regra: "", exemplo: "Exemplo de resposta: ", nao: "Não faça: ", saudacao: "Saudação: ", recado: "Recado: ", despedida: "Despedida: " } as const;
+export async function treinarMembro(u: Usuario, chave: string | null, membroId: string, d: { mensagemId?: string; avaliacao?: 1 | -1 | null; correcao?: string; removerRegra?: string; listar?: boolean; novaRegra?: { tipo?: string; texto?: string } }) {
   const t = await loteDoDono(u, chave);
   const empId = await garantirEmpresaDoLote(t);
   const a = await agenteDoMembro(empId, membroId);
   if (d.removerRegra) { await removerRegra(a.id, String(d.removerRegra)); return { regra: null }; }
+  if (d.listar) return { regras: (await sql<{ id: string; texto: string }[]>`SELECT id, texto FROM regra WHERE agente_id = ${a.id} AND ativo ORDER BY criado_em`).map((r) => ({ id: r.id, texto: r.texto })) };
+  if (d.novaRegra) {
+    const tipo = (d.novaRegra.tipo ?? "regra") as keyof typeof TIPOS_TREINO;
+    const texto = String(d.novaRegra.texto ?? "").replace(/\s+/g, " ").trim().slice(0, 280);
+    if (texto.length < 3 || !(tipo in TIPOS_TREINO)) throw new ErroHttp("Escreva o treino (pelo menos 3 letras).");
+    const regra = await salvarRegra(a.id, { texto: `${TIPOS_TREINO[tipo]}${texto}`.slice(0, 300) });
+    return { regra: { id: regra.id, texto: regra.texto } };
+  }
   const [m] = await sql<{ id: string; conteudo: string }[]>`SELECT id, conteudo FROM mensagem WHERE id = ${String(d.mensagemId ?? "")} AND agente_id = ${a.id} AND visitante_id IS NULL AND papel = 'assistant'`;
   if (!m) throw new ErroHttp("Resposta não encontrada.", 404);
   const correcao = String(d.correcao ?? "").trim().slice(0, 600);
@@ -323,12 +362,12 @@ export async function pedirRelatorio(u: Usuario, chave: string | null) {
     vis.length ? `Mensagens de visitantes da loja:\n${vis.join("\n")}` : "Mensagens de visitantes da loja: nenhuma nesta semana.",
     "Escreva para o dono, em até 25 linhas: 1) o que a equipe entregou; 2) o que está pendente ou precisa de decisão dele; 3) o que os visitantes procuraram e os contatos que deixaram; 4) três próximos passos sugeridos. Se a semana estiver vazia, diga isso em uma linha e proponha três tarefas úteis para a equipe, com quem faz cada uma.",
   ].join("\n\n");
-  const gasto = await gastoDoMes(empId);
+  const { gasto, teto } = await tetoIA(empId);
   try {
-    const r = await conversar(ceo.id, "Me mande o relatório da semana.", `dono:${u.id}`, { modo: "dono", contexto, tetoMes: { gasto, teto: TETO_IA_MES }, maxTokens: 1500 });
+    const r = await conversar(ceo.id, "Me mande o relatório da semana.", `dono:${u.id}`, { modo: "dono", contexto, tetoMes: { gasto, teto }, maxTokens: 1500 });
     return { membroId: ceoMembro.id, mensagem: { id: r.mensagem.id, papel: "assistant", conteudo: r.mensagem.conteudo, avaliacao: null, correcao: null, em: r.mensagem.criadoEm } };
   } catch (e) {
-    throw new ErroHttp((e as Error).message, gasto >= TETO_IA_MES ? 402 : 502);
+    throw new ErroHttp((e as Error).message, gasto >= teto ? 402 : 502);
   }
 }
 
@@ -353,7 +392,9 @@ export async function conversaDeVisitante(u: Usuario, chave: string | null, visi
 async function lojaPorNumero(numero: number) {
   // sedes (data/sedes.ts) não têm número de loja: a recepção de cada uma atende pelo número dela (Social RP 0, outras 901+)
   const sd = SEDE_POR_NUMERO[numero];
-  const l = sd ? { chave: sd.chave } : LOTES.find((x) => x.numero === numero);
+  // quiosques (101+, data/quiosques.ts) pelo mesmo caminho dos lotes: chaveDaLoja
+  const ch = sd ? sd.chave : chaveDaLoja(numero);
+  const l = ch ? { chave: ch } : LOTES.find((x) => x.numero === numero);
   if (!l) throw new ErroHttp("Loja não encontrada.", 404);
   let t = await obterTerreno(l.chave);
   if (t?.anexoDe) t = await obterTerreno(t.anexoDe); // lote duplo: a ampliação mostra a loja principal
@@ -377,11 +418,11 @@ export async function lojaPublica(numero: number) {
   };
 }
 
-export async function conversaNaLoja(u: Usuario, numero: number) {
+export async function conversaNaLoja(u: Usuario, numero: number, membroId?: string | null) {
   const { t, empId } = await lojaPorNumero(numero);
-  const atendente = t.escritorio?.equipe.find((m) => m.papel === "atendente");
-  if (!atendente) return [];
-  const msgs = await listarMensagens(agenteIdDe(empId, atendente.id), 60, u.id);
+  let quem: ReturnType<typeof quemAtende>;
+  try { quem = quemAtende(t, membroId); } catch { return []; }
+  const msgs = await listarMensagens(agenteIdDe(empId, quem.membro.id), 60, u.id);
   // pedidos feitos pela atendente (17/11/2026): o cartão volta para a mensagem em que o pedido nasceu
   const pedidos = await pedidosDasMensagens(u.id, msgs.filter((m) => m.papel === "assistant").map((m) => m.id)).catch(() => new Map());
   return msgs.map((m) => ({ id: m.id, papel: m.papel, conteudo: m.conteudo, em: m.criadoEm, pedido: pedidos.get(m.id) ?? null }));
@@ -389,7 +430,29 @@ export async function conversaNaLoja(u: Usuario, numero: number) {
 
 const RECADO_SEM_IA = "Obrigado pela mensagem! A equipe não consegue responder agora, mas o seu recado ficou anotado para o dono. Se quiser retorno, deixe o seu nome e um WhatsApp ou e-mail.";
 
-export async function falarNaLoja(u: Usuario, numero: number, texto: string, ip?: string | null) {
+// Quem atende o visitante (20/11/2026, recepção que encaminha: src/office/data/recepcao.ts): sem membroId, a atendente da
+// recepção; com membroId, só o responsável de um setor para onde a recepção encaminha (não dá para falar com qualquer um)
+function quemAtende(t: Terreno, membroId?: string | null): { membro: Membro; destino: Destino | null } {
+  const e = t.escritorio, atendente = e?.equipe.find((m) => m.papel === "atendente");
+  if (!e || !atendente) throw new ErroHttp("Esta loja ainda não tem atendente.", 404);
+  if (!membroId || membroId === atendente.id) return { membro: atendente, destino: null };
+  const d = destinosDaRecepcao(e, ehSede(t.chave)).find((x) => x.membroId === membroId);
+  const m = d ? e.equipe.find((x) => x.id === d.membroId) : null;
+  if (!d || !m) throw new ErroHttp("Essa pessoa não atende visitantes. Volte à recepção para ser encaminhado.", 403);
+  return { membro: m, destino: d };
+}
+// o que a recepção passou para o setor: o que o visitante disse no balcão nas últimas 3 horas
+async function contextoDoSetor(empId: string, t: Terreno, visitanteId: string, d: Destino) {
+  const atendente = t.escritorio?.equipe.find((m) => m.papel === "atendente");
+  const msgs = atendente ? await listarMensagens(agenteIdDe(empId, atendente.id), 10, visitanteId) : [];
+  const disse = msgs.filter((m) => m.papel === "user" && Date.now() - new Date(m.criadoEm).getTime() < 3 * 3600_000).map((m) => `- ${m.conteudo.replace(/\s+/g, " ").slice(0, 300)}`);
+  return [
+    `Você atende pelo setor ${d.setorNome} da ${t.empresaNome}: a recepção encaminhou este visitante para você.${disse.length ? `\nO que ele disse na recepção:\n${disse.join("\n")}` : ""}`,
+    "Se o assunto for de outro setor, diga com educação que ele pode voltar à recepção para ser encaminhado ao setor certo.",
+  ].join("\n");
+}
+
+export async function falarNaLoja(u: Usuario, numero: number, texto: string, ip?: string | null, membroId?: string | null) {
   const fala = String(texto ?? "").trim().slice(0, 800);
   if (!fala) throw new ErroHttp("Escreva a sua mensagem.");
   const kLoja = `loja:${numero}:${u.id}`, kTotal = `lojas:${u.id}`;
@@ -399,23 +462,29 @@ export async function falarNaLoja(u: Usuario, numero: number, texto: string, ip?
   // conectores: visitante escreveu e-mail ou telefone → aviso visitante.contato
   const contatos = contatosNaFala(fala);
   if (contatos) avisar(empId, "visitante.contato", { loja: { numero, nome: t.empresaNome }, visitante: { id: u.id, nome: u.nome }, mensagem: fala, contatos });
-  const atendente = t.escritorio?.equipe.find((m) => m.papel === "atendente");
-  if (!atendente) throw new ErroHttp("Esta loja ainda não tem atendente.", 404);
-  const aid = agenteIdDe(empId, atendente.id);
-  const gasto = await gastoDoMes(empId);
-  // sem IA ou no teto do mês: o recado fica guardado para o dono, com uma resposta fixa (sem custo)
-  if (!temIA() || gasto >= TETO_IA_MES) {
+  const quem = quemAtende(t, membroId);
+  const aid = agenteIdDe(empId, quem.membro.id);
+  const setor = quem.destino ? { nome: quem.destino.setorNome, quem: quem.membro.nome } : null;
+  // recado sem IA (20/11/2026): no jeito da personalidade de quem atende (recepção ou setor), com as frases fixas do treino
+  // e o escopo (pedido que é de um colega vai para ele: frente creditos). No setor, o recado é o do setor (data/recepcao.ts).
+  const recadoFixo = quem.destino ? recadoDoSetor(quem.destino, t.empresaNome) : RECADO_SEM_IA;
+  const recadoSemIA = () => roteiroVisitante({ empId, empresa: t.empresaNome, e: t.escritorio, atendente: quem.membro, agenteId: aid, texto: fala, visitante: u.nome.split(" ")[0] || "visitante", agenteDe: (mid) => agenteIdDe(empId, mid), recado: quem.destino ? recadoFixo : undefined }).catch((x) => { console.error("[loja] roteiro:", (x as Error).message); return recadoFixo; });
+  // as unidades de IA são da empresa visitada: a conversa no setor também desconta delas (agentes.ts › registrarUso)
+  const { gasto, teto } = await tetoIA(empId);
+  // sem IA ou sem unidades de IA: o recado fica guardado para o dono, com uma resposta fixa (sem custo)
+  if (!temIA() || gasto >= teto) {
     await gravarMensagem({ agenteId: aid, papel: "user", autor: `visitante:${u.id}`, conteudo: fala, visitanteId: u.id });
-    const m = await gravarMensagem({ agenteId: aid, papel: "assistant", autor: `agente:${aid}`, conteudo: RECADO_SEM_IA, visitanteId: u.id });
-    return { id: m.id, papel: "assistant", conteudo: m.conteudo, em: m.criadoEm };
+    const m = await gravarMensagem({ agenteId: aid, papel: "assistant", autor: `agente:${aid}`, conteudo: await recadoSemIA(), visitanteId: u.id });
+    return { id: m.id, papel: "assistant", conteudo: m.conteudo, em: m.criadoEm, setor };
   }
   try {
     // agenda ligada (12/11/2026): a atendente recebe os serviços e as faixas livres e pode marcar pela conversa
     const ctxAgenda = await contextoAgendaIA(numero, u).catch((e) => { console.error("[loja] agenda:", (e as Error).message); return null; });
     // vitrine e pedidos (17/11/2026): a atendente monta o pedido e o servidor cria (src/server/pedidos.ts)
     const ctxPedidos = await contextoPedidosIA(numero, u).catch((e) => { console.error("[loja] pedidos:", (e as Error).message); return null; });
-    const contexto = [ctxAgenda, ctxPedidos].filter(Boolean).join("\n\n");
-    const r = await conversar(aid, fala, `visitante:${u.id}`, { modo: "visitante", visitanteId: u.id, tetoMes: { gasto, teto: TETO_IA_MES }, contexto: contexto || undefined, maxTokens: ctxAgenda && ctxPedidos ? 650 : contexto ? 500 : undefined });
+    const ctxSetor = quem.destino ? await contextoDoSetor(empId, t, u.id, quem.destino).catch(() => null) : null;
+    const contexto = [ctxSetor, ctxAgenda, ctxPedidos].filter(Boolean).join("\n\n");
+    const r = await conversar(aid, fala, `visitante:${u.id}`, { modo: "visitante", visitanteId: u.id, tetoMes: { gasto, teto }, contexto: contexto || undefined, maxTokens: ctxAgenda && ctxPedidos ? 650 : contexto ? 500 : undefined });
     let conteudo = r.mensagem.conteudo;
     const original = conteudo;
     // as marcações [[AGENDAR ...]] e [[PEDIDO ...]] nunca ficam na conversa: o servidor valida, faz e escreve o resultado no lugar
@@ -423,13 +492,74 @@ export async function falarNaLoja(u: Usuario, numero: number, texto: string, ip?
     let pedido = null;
     if (temMarcacaoPedido(conteudo)) ({ texto: conteudo, pedido } = await aplicarPedidoDaAtendente(conteudo, u, numero, r.mensagem.id, ip));
     if (conteudo !== original) await sql`UPDATE mensagem SET conteudo = ${conteudo} WHERE id = ${r.mensagem.id}`;
-    return { id: r.mensagem.id, papel: "assistant", conteudo, em: r.mensagem.criadoEm, pedido };
+    return { id: r.mensagem.id, papel: "assistant", conteudo, em: r.mensagem.criadoEm, pedido, setor };
   } catch (e) {
     // a mensagem do visitante já ficou gravada; responde com o recado fixo para ele não ficar sem retorno
     console.error("[loja] atendente falhou:", (e as Error).message);
-    const m = await gravarMensagem({ agenteId: aid, papel: "assistant", autor: `agente:${aid}`, conteudo: RECADO_SEM_IA, visitanteId: u.id });
-    return { id: m.id, papel: "assistant", conteudo: m.conteudo, em: m.criadoEm };
+    const m = await gravarMensagem({ agenteId: aid, papel: "assistant", autor: `agente:${aid}`, conteudo: await recadoSemIA(), visitanteId: u.id });
+    return { id: m.id, papel: "assistant", conteudo: m.conteudo, em: m.criadoEm, setor };
   }
+}
+
+// ---------- recepção que encaminha (20/11/2026) ----------
+// O visitante escolhe um assunto (botão) ou escreve o que quer. Com texto e IA disponível, a recepcionista classifica com o
+// modelo barato (desconta das unidades de IA da empresa); sem IA, ou se a IA não decidir, usa as palavras (data/recepcao.ts). Nada
+// casou: pede para escolher; na segunda vez (insistiu), leva ao responsável. Tudo fica gravado: o que ele disse e a
+// resposta na conversa da recepcionista; a saudação de quem atende, já com o pedido, na conversa do setor.
+async function classificarComIA(aid: string, empresa: string, fala: string, destinos: Destino[]): Promise<Destino | null> {
+  const lista = destinos.map((x) => `- ${x.id}: ${x.rotulo}${x.setorNome !== x.rotulo ? ` (setor ${x.setorNome})` : ""}; quem atende: ${x.cargo}`).join("\n");
+  const pedido = completar({ modelo: MODELO_BARATO, json: true, temperatura: 0, max: 40, mensagens: [
+    { role: "system", content: `Você é a recepcionista da empresa ${empresa} e decide para qual setor encaminhar quem chegou. Setores:\n${lista}\nResponda só com JSON: {"setor": "<id da lista>"}. Se a mensagem não disser o que a pessoa quer (um cumprimento, por exemplo), responda {"setor": null}.` },
+    { role: "user", content: fala.slice(0, 500) },
+  ] });
+  const r = await Promise.race([pedido, new Promise<never>((_, nao) => setTimeout(() => nao(new Error("a IA demorou demais")), 8000))]);
+  await registrarUso({ agenteId: aid, modelo: MODELO_BARATO, tokensIn: r.tokensIn, tokensOut: r.tokensOut, custoBrl: r.custo }).catch(() => {});
+  let id: unknown = null;
+  try { id = (JSON.parse(r.texto) as { setor?: unknown }).setor; } catch { id = null; }
+  return typeof id === "string" ? destinos.find((x) => x.id === id) ?? null : null;
+}
+
+export async function recepcaoNaLoja(u: Usuario, numero: number, d: { destino?: unknown; texto?: unknown; insistiu?: unknown }) {
+  const escolha = typeof d.destino === "string" ? d.destino.trim().slice(0, 40) : "";
+  const fala = typeof d.texto === "string" ? d.texto.trim().slice(0, 800) : "";
+  if (!escolha && !fala) throw new ErroHttp("Escolha um assunto ou escreva o que você procura.");
+  const kLoja = `loja:${numero}:${u.id}`, kTotal = `lojas:${u.id}`;
+  if (bloqueio(kLoja, LIMITE_VISITANTE_LOJA_DIA) || bloqueio(kTotal, LIMITE_VISITANTE_DIA)) throw new ErroHttp("Você mandou muitas mensagens hoje. Volte amanhã ou fale direto com a loja pelos contatos dela.", 429);
+  contar(kLoja, 24 * 60); contar(kTotal, 24 * 60);
+  const { t, empId } = await lojaPorNumero(numero);
+  const e = t.escritorio, atendente = e?.equipe.find((m) => m.papel === "atendente");
+  if (!e || !atendente) throw new ErroHttp("Esta loja ainda não tem atendente.", 404);
+  const destinos = destinosDaRecepcao(e, ehSede(t.chave));
+  const aid = agenteIdDe(empId, atendente.id);
+  let destino: Destino | null = null, como: "botao" | "ia" | "palavras" | "responsavel" | null = null;
+  if (escolha) {
+    destino = destinos.find((x) => x.id === escolha) ?? null;
+    if (!destino) throw new ErroHttp("Esse setor não está mais nesta empresa. Escolha outro assunto.", 404);
+    como = "botao";
+  } else {
+    const contatos = contatosNaFala(fala);
+    if (contatos) avisar(empId, "visitante.contato", { loja: { numero, nome: t.empresaNome }, visitante: { id: u.id, nome: u.nome }, mensagem: fala, contatos });
+    // a classificação com o modelo barato desconta das unidades de IA da empresa visitada (frente creditos)
+    const { gasto, teto } = await tetoIA(empId);
+    if (temIA() && gasto < teto && destinos.length) {
+      destino = await classificarComIA(aid, t.empresaNome, fala, destinos).catch((er: Error) => { console.error("[recepção] IA:", er.message); return null; });
+      if (destino) como = "ia";
+    }
+    if (!destino) { destino = classificarPorPalavras(fala, destinos); if (destino) como = "palavras"; }
+    if (!destino && d.insistiu === true) { destino = destinos.find((x) => x.assunto === "responsavel") ?? null; if (destino) como = "responsavel"; }
+  }
+  const disse = fala || (destino!.assunto === "responsavel" ? "Quero falar com o responsável." : `Quero falar com ${destino!.rotulo}.`);
+  await gravarMensagem({ agenteId: aid, papel: "user", autor: `visitante:${u.id}`, conteudo: disse, visitanteId: u.id });
+  const resposta = destino ? falaDoEncaminhamento(destino) : FALA_SEM_DESTINO;
+  const m = await gravarMensagem({ agenteId: aid, papel: "assistant", autor: `agente:${aid}`, conteudo: resposta, visitanteId: u.id });
+  let nomeVisitante = u.nome ?? "";
+  if (destino) {
+    const sid = agenteIdDe(empId, destino.membroId);
+    const [p] = await sql<{ nome: string }[]>`SELECT nome FROM personagem WHERE usuario_id = ${u.id}`.catch(() => []);
+    if (p?.nome) nomeVisitante = p.nome;
+    await gravarMensagem({ agenteId: sid, papel: "assistant", autor: `agente:${sid}`, conteudo: saudacaoDoSetor(destino, nomeVisitante, fala), visitanteId: u.id });
+  }
+  return { id: m.id, fala: resposta, destino, como, dono: t.usuarioId, nomeVisitante };
 }
 
 // ---------- busca de empresas (/encontrar) ----------

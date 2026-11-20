@@ -1,10 +1,12 @@
 // Encontrar (11/11/2026): busca pública de profissionais e empresas do WorkEnd, por área e texto.
+// Desde 20/11/2026 também os perfis do cadastro (?tipo=perfis), com "quem combina com você" (./_perfis.tsx).
 import { usuarioAtual } from "@/server/usuarios";
 import { ehAdmin } from "@/server/terrenos";
 import { Topo, Rodape } from "../_partes";
 import { CabecalhoApp } from "../_cabecalho";
 import { meta } from "../seo";
 import { Busca } from "./_busca";
+import "../perfil/perfil.css";
 
 export const metadata = meta({ titulo: "Encontrar profissionais e empresas — WorkEnd", descricao: "Ache profissionais disponíveis, empresas com endereço no mapa 3D do WorkEnd e vagas abertas. Converse, peça orçamento, candidate-se e feche negócio com avaliação dos dois lados.", caminho: "/encontrar" });
 export const dynamic = "force-dynamic";
@@ -15,7 +17,7 @@ export default async function Encontrar({ searchParams }: { searchParams: Promis
   return (
     <>
       {u ? <CabecalhoApp atual="encontrar" email={u.email} admin={ehAdmin(u)} /> : <Topo />}
-      <Busca logado={!!u} euId={u?.id ?? null} inicial={{ tipo: sp.tipo === "empresas" ? "empresas" : sp.tipo === "vagas" ? "vagas" : "profissionais", nicho: sp.nicho ?? "", q: sp.q ?? "" }} />
+      <Busca logado={!!u} euId={u?.id ?? null} inicial={{ tipo: sp.tipo === "empresas" ? "empresas" : sp.tipo === "vagas" ? "vagas" : sp.tipo === "perfis" ? "perfis" : "profissionais", nicho: sp.nicho ?? "", q: sp.q ?? "" }} />
       <div className="h-16" />
       <Rodape />
     </>

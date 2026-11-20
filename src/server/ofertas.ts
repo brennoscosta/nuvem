@@ -10,7 +10,12 @@ import { randomBytes } from "node:crypto";
 import { sql, migrar } from "./db";
 import type { Usuario } from "./usuarios";
 import { PRECO_LOTE, ADMIN_EMAIL, ehAdmin, obterTerreno } from "./terrenos";
+// lote extra e quiosque (20/11/2026, data/precosTerreno.ts): preço do quiosque e renovação do lote extra junto com o principal
+import { cotacaoLoteExtra, lotesExtrasAtivos } from "./terrenoExtra";
+import { PRECO_QUIOSQUE, PRECO_LOTE_EXTRA } from "@/office/data/precosTerreno";
+import { ehQuiosque } from "@/office/data/quiosques";
 import { avisar } from "./avisos";
+import { saldoDe, lancar, debitarAte } from "./creditos";
 
 export const FUNDADOR = { id: "fundador", nome: "Preço de fundador", valor: 49.9, vagas: 10 } as const;
 export const FEIRA = { id: "feira", nome: "Da feira para o lote", valor: 69.9 } as const;
@@ -31,7 +36,7 @@ export async function vagasFundador(excetoUsuario: string | null = null) {
 }
 // nunca teve lote: sem pagamento de lote aprovado, sem lote ativo e sem lote guardado no arquivo
 export async function primeiraVez(uid: string) {
-  const [r] = await sql<{ ja: boolean }[]>`SELECT (EXISTS (SELECT 1 FROM pagamento WHERE usuario_id = ${uid} AND tipo = 'lote' AND status = 'aprovado')
+  const [r] = await sql<{ ja: boolean }[]>`SELECT (EXISTS (SELECT 1 FROM pagamento WHERE usuario_id = ${uid} AND tipo IN ('lote', 'quiosque') AND status = 'aprovado')
     OR EXISTS (SELECT 1 FROM terreno WHERE usuario_id = ${uid} AND status = 'ativo') OR EXISTS (SELECT 1 FROM terreno_arquivo WHERE usuario_id = ${uid})) AS ja`;
   return !r?.ja;
 }
@@ -41,16 +46,13 @@ async function indicacaoPendente(uid: string) {
     FROM indicacao i WHERE i.indicado_id = ${uid} AND i.status = 'pendente'`;
   return r ?? null;
 }
-// crédito de indicação disponível: o que foi liberado menos o que já foi usado (pago ou com Pix aberto)
-export async function creditoDisponivel(uid: string, excetoChave: string | null = null) {
-  await migrar();
-  const [r] = await sql<{ ganho: string; usado: string }[]>`SELECT
-      COALESCE((SELECT sum(credito) FROM indicacao WHERE indicador_id = ${uid} AND status = 'liberada'), 0) AS ganho,
-      COALESCE((SELECT sum(credito_usado) FROM pagamento WHERE usuario_id = ${uid} AND (status = 'aprovado' OR (status = 'pendente' AND criado_em > now() - interval '1 hour' AND terreno_chave <> ${excetoChave ?? ""}))), 0) AS usado`;
-  return Math.max(0, centavos(Number(r?.ganho ?? 0) - Number(r?.usado ?? 0)));
+// Saldo da carteira de créditos. Desde 20/11/2026 o crédito de indicação é bônus na carteira (src/server/creditos.ts,
+// migração 0042) e entra pelo botão "Pagar com créditos"; a cotação do lote não desconta mais nada sozinha.
+export async function creditoDisponivel(uid: string) {
+  return (await saldoDe(uid)).total;
 }
 
-export interface Cotacao { base: number; valor: number; primeiroMes: number | null; oferta: { id: IdOferta; nome: string; desconto: number; detalhe: string } | null; creditoUsado: number; creditoDisponivel: number; meses: number; admin: boolean; restamFundador: number }
+export interface Cotacao { base: number; valor: number; primeiroMes: number | null; oferta: { id: IdOferta; nome: string; desconto: number; detalhe: string } | null; creditoUsado: number; creditoDisponivel: number; meses: number; admin: boolean; restamFundador: number; mensal?: number; extras?: number }
 
 // Quanto custa pagar `meses` deste lote agora, para esta conta (em reais de verdade; a conta admin paga 1/100 no fim)
 export async function cotacaoLote(u: Usuario, chave: string, meses = 1): Promise<Cotacao> {
@@ -58,8 +60,14 @@ export async function cotacaoLote(u: Usuario, chave: string, meses = 1): Promise
   meses = Math.max(1, Math.min(12, meses | 0));
   const admin = ehAdmin(u);
   const t = await obterTerreno(chave);
-  const base = PRECO_LOTE * meses;
-  const novo = !!t && t.usuarioId === u.id && t.status === "reservado" && !t.anexoDe;
+  // lote extra ainda não pago: só os dias até o vencimento do principal (terrenoExtra.ts)
+  if (t?.anexoDe && t.status === "reservado") return cotacaoLoteExtra(u, t);
+  // quiosque: preço próprio e sem as ofertas de entrada do lote; o lote com extras ativos renova os extras junto
+  const quiosque = ehQuiosque(chave);
+  const extras = quiosque || !t || t.anexoDe ? 0 : await lotesExtrasAtivos(chave);
+  const mensal = quiosque ? PRECO_QUIOSQUE : PRECO_LOTE + extras * PRECO_LOTE_EXTRA;
+  const base = mensal * meses;
+  const novo = !!t && t.usuarioId === u.id && t.status === "reservado" && !t.anexoDe && !quiosque;
   const restam = await vagasFundador(u.id);
   let oferta: Cotacao["oferta"] = null;
   if (novo && (admin || (await primeiraVez(u.id)))) {
@@ -71,11 +79,11 @@ export async function cotacaoLote(u: Usuario, chave: string, meses = 1): Promise
     oferta = opcoes.sort((a, b) => b.desconto - a.desconto)[0] ?? null;
   }
   const subtotal = centavos(base - (oferta?.desconto ?? 0));
-  const disp = await creditoDisponivel(u.id, chave);
-  const creditoUsado = centavos(Math.min(disp, subtotal * TETO_CREDITO));
-  let valor = centavos(subtotal - creditoUsado);
+  const disp = await creditoDisponivel(u.id);
+  const creditoUsado = 0; // o campo fica para as telas antigas; o crédito agora é pago pela carteira
+  let valor = subtotal;
   if (admin) valor = Math.max(0.01, Math.round(valor) / 100);
-  return { base, valor, primeiroMes: novo ? centavos(PRECO_LOTE - (oferta?.desconto ?? 0)) : null, oferta, creditoUsado, creditoDisponivel: disp, meses, admin, restamFundador: restam };
+  return { base, valor, primeiroMes: novo ? centavos(PRECO_LOTE - (oferta?.desconto ?? 0)) : null, oferta, creditoUsado, creditoDisponivel: disp, meses, admin, restamFundador: restam, mensal, extras };
 }
 
 // ---------- indicação ----------
@@ -106,22 +114,32 @@ export async function registrarIndicacao(indicadoId: string, codigo: unknown): P
   if (!ind || ind.id === indicadoId || !ind.empresa) return null;
   if (!(await primeiraVez(indicadoId))) return null;
   const r = await sql`INSERT INTO indicacao (indicado_id, indicador_id) VALUES (${indicadoId}, ${ind.id}) ON CONFLICT (indicado_id) DO NOTHING`;
-  if (r.count) void avisar(ind.id, { tipo: "indicacao", ref: `indicacao:${indicadoId}`, titulo: "Uma empresa chegou pelo seu link", texto: `Quando ela pagar o 1º mês, você ganha R$ ${CREDITO_INDICACAO},00 de desconto na sua mensalidade.`, link: "/app/resultados#indicacao" });
+  if (r.count) void avisar(ind.id, { tipo: "indicacao", ref: `indicacao:${indicadoId}`, titulo: "Uma empresa chegou pelo seu link", texto: `Quando ela pagar o 1º mês, você ganha ${CREDITO_INDICACAO} créditos de bônus na sua carteira.`, link: "/app/resultados#indicacao" });
   return ind.empresa;
 }
-// pagamento de lote aprovado: se quem pagou veio por indicação, libera o crédito de quem indicou
+// pagamento de lote aprovado: se quem pagou veio por indicação, quem indicou ganha o bônus na carteira de créditos
+// (a indicação liberada e o lançamento de bônus na mesma transação; a chave impede lançar duas vezes)
 export async function liberarIndicacao(pagamentoId: string, indicadoId: string) {
   try {
-    const [i] = await sql<{ indicadorId: string }[]>`UPDATE indicacao SET status = 'liberada', credito = ${CREDITO_INDICACAO}, pagamento_id = ${pagamentoId}, liberada_em = now()
-      WHERE indicado_id = ${indicadoId} AND status = 'pendente' RETURNING indicador_id`;
+    const i = await sql.begin(async (tx) => {
+      const db = tx as unknown as typeof sql;
+      const [x] = await db<{ indicadorId: string }[]>`UPDATE indicacao SET status = 'liberada', credito = ${CREDITO_INDICACAO}, pagamento_id = ${pagamentoId}, liberada_em = now()
+        WHERE indicado_id = ${indicadoId} AND status = 'pendente' RETURNING indicador_id`;
+      if (x) await lancar(db, x.indicadorId, { tipo: "bonus", comprado: 0, bonus: CREDITO_INDICACAO * 100, descricao: "Bônus de indicação: a empresa que você indicou pagou o 1º mês", pagamentoId, chave: `indicacao:${indicadoId}` });
+      return x ?? null;
+    });
     if (!i) return;
     const [quem] = await sql<{ empresa: string | null; nome: string }[]>`SELECT u.nome, (SELECT t.empresa_nome FROM terreno t WHERE t.usuario_id = u.id AND t.anexo_de IS NULL ORDER BY t.status = 'ativo' DESC LIMIT 1) AS empresa FROM usuario u WHERE u.id = ${indicadoId}`;
-    void avisar(i.indicadorId, { tipo: "indicacao", ref: `indicacao-paga:${indicadoId}`, titulo: `Você ganhou R$ ${CREDITO_INDICACAO},00 de desconto`, texto: `${quem?.empresa ?? quem?.nome ?? "A empresa que você indicou"} pagou o 1º mês. O desconto entra na sua próxima mensalidade.`, link: "/app/resultados#indicacao" });
+    void avisar(i.indicadorId, { tipo: "indicacao", ref: `indicacao-paga:${indicadoId}`, titulo: `Você ganhou ${CREDITO_INDICACAO} créditos de bônus`, texto: `${quem?.empresa ?? quem?.nome ?? "A empresa que você indicou"} pagou o 1º mês. O bônus já está na sua carteira e paga a mensalidade, agentes e o que mais o WorkEnd vende.`, link: "/app/creditos" });
   } catch (e) { console.error("[indicacao]", (e as Error).message); }
 }
-// pagamento estornado: se foi ele que liberou um crédito, o crédito sai
+// pagamento estornado: se foi ele que liberou um bônus, o bônus sai da carteira (o que ainda houver)
 export async function estornarIndicacao(pagamentoId: string) {
-  await sql`UPDATE indicacao SET status = 'estornada', credito = 0 WHERE pagamento_id = ${pagamentoId} AND status = 'liberada'`.catch((e) => console.error("[indicacao]", (e as Error).message));
+  await sql.begin(async (tx) => {
+    const db = tx as unknown as typeof sql;
+    const lista = await db<{ indicadorId: string; indicadoId: string }[]>`UPDATE indicacao SET status = 'estornada', credito = 0 WHERE pagamento_id = ${pagamentoId} AND status = 'liberada' RETURNING indicador_id, indicado_id`;
+    for (const x of lista) await debitarAte(db, x.indicadorId, CREDITO_INDICACAO, { tipo: "estorno", descricao: "Bônus de indicação retirado: o pagamento da empresa indicada foi estornado", chave: `indicacao-estorno:${x.indicadoId}` });
+  }).catch((e) => console.error("[indicacao]", (e as Error).message));
 }
 export async function minhasIndicacoes(u: Usuario) {
   await migrar();

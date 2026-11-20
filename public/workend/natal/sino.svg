@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 48" width="40" height="48">
+  <defs>
+    <linearGradient id="ouro" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#7a4b00"/>
+      <stop offset=".22" stop-color="#e9b632"/>
+      <stop offset=".36" stop-color="#fff1a8"/>
+      <stop offset=".55" stop-color="#f2c23c"/>
+      <stop offset=".82" stop-color="#b47a0c"/>
+      <stop offset="1" stop-color="#6e4200"/>
+    </linearGradient>
+    <linearGradient id="aro" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#6a3f00"/>
+      <stop offset=".35" stop-color="#ffe27a"/>
+      <stop offset=".6" stop-color="#d9a020"/>
+      <stop offset="1" stop-color="#5e3800"/>
+    </linearGradient>
+    <radialGradient id="badalo" cx=".38" cy=".35" r=".7">
+      <stop offset="0" stop-color="#fff3b8"/>
+      <stop offset=".45" stop-color="#e2a825"/>
+      <stop offset="1" stop-color="#704400"/>
+    </radialGradient>
+    <linearGradient id="fita" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#ff5468"/>
+      <stop offset="1" stop-color="#a30f22"/>
+    </linearGradient>
+    <linearGradient id="sombra" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".28"/>
+    </linearGradient>
+  </defs>
+  <!-- argola -->
+  <circle cx="20" cy="7.6" r="2.3" fill="none" stroke="#d9a020" stroke-width="1.4"/>
+  <!-- badalo -->
+  <circle cx="20" cy="42.2" r="3.4" fill="url(#badalo)"/>
+  <!-- corpo -->
+  <path d="M20 10.2c-6.6 0-9.4 5.1-9.4 12.2 0 6.1-1.2 9.8-4.7 13.4-1 1-.5 2.6 1 2.6h26.2c1.5 0 2-1.6 1-2.6-3.5-3.6-4.7-7.3-4.7-13.4 0-7.1-2.8-12.2-9.4-12.2z" fill="url(#ouro)"/>
+  <path d="M20 10.2c-6.6 0-9.4 5.1-9.4 12.2 0 6.1-1.2 9.8-4.7 13.4-1 1-.5 2.6 1 2.6h26.2c1.5 0 2-1.6 1-2.6-3.5-3.6-4.7-7.3-4.7-13.4 0-7.1-2.8-12.2-9.4-12.2z" fill="url(#sombra)"/>
+  <!-- aro da boca -->
+  <path d="M5.4 37.1c4.6 2.7 24.6 2.7 29.2 0l.6 2.2c-4.9 3.3-25.5 3.3-30.4 0z" fill="url(#aro)"/>
+  <!-- brilho -->
+  <ellipse cx="15.3" cy="21.5" rx="1.9" ry="6.4" transform="rotate(-10 15.3 21.5)" fill="#fff" opacity=".6"/>
+  <ellipse cx="17" cy="13.6" rx="2.6" ry="1.1" transform="rotate(-18 17 13.6)" fill="#fff" opacity=".45"/>
+  <!-- laço -->
+  <path d="M20 11.3c-3.2-4.3-8.6-4.6-8.3-1.1.3 2.9 4.8 2.8 8.3 1.1z" fill="url(#fita)"/>
+  <path d="M20 11.3c3.2-4.3 8.6-4.6 8.3-1.1-.3 2.9-4.8 2.8-8.3 1.1z" fill="url(#fita)"/>
+  <path d="M19.2 11.8l-3.7 6.6 2.1-.5 1 2.1 1.6-7.6z" fill="#c4182d"/>
+  <path d="M20.8 11.8l3.7 6.6-2.1-.5-1 2.1-1.6-7.6z" fill="#c4182d"/>
+  <ellipse cx="20" cy="11.4" rx="2" ry="1.7" fill="#b3122a"/>
+  <ellipse cx="19.4" cy="10.9" rx=".8" ry=".5" fill="#ff9aa6" opacity=".8"/>
+</svg>

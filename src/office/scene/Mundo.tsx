@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import { caixa, cilindro, mat, plano } from "./geo";
 import { ComFallback, ModeloInstanciado, precarregarModelo, type ItemInstancia } from "./Modelos";
-import { Depois, Isolado, MarcadorEtapas } from "./etapas";
+import { Depois, Isolado, MarcadorEtapas, SoDePerto } from "./etapas";
 import { LAYOUT } from "../data/escritorio";
 import { Estatico } from "./Estatico";
 import { leve } from "./qualidade";
@@ -20,6 +20,8 @@ import { Restaurante } from "./Restaurante";
 import { SedeHQ } from "./OneStateHQ";
 import { SEDES } from "../data/sedes";
 import { Lotes } from "./Lotes";
+import { Quiosques } from "./Quiosques";
+import { RealceExpansao } from "./RealceExpansao";
 import { Horizonte } from "./Horizonte";
 import { Clima } from "./Clima";
 import { Fauna } from "./Fauna";
@@ -27,12 +29,12 @@ import { SomCena } from "./SomCena";
 import { Semaforos, Trafego, Passantes, PontosOnibus } from "./Transito";
 import { Moradores } from "./Moradores";
 import { LuzesPostes } from "./CicloDia";
-import { natalAtivo, ArvoreNatal, LuzesNatalPostes } from "./Natal";
+import { natalAtivo, ArvoreNatal, LuzesNatalPostes, LacosPostes, NatalSedes, NatalPraca, LuzesRioNatal } from "./Natal";
 import { Outdoors } from "./Anuncios";
 import { Praca } from "./Praca";
 import { CalcadaBairro, ArvoresDeRua, Galhardetes, PlacasBairro, HalosPostes, planoMetros } from "./Bairros";
 import { materialGrama, METROS_GRAMA } from "./Gramado";
-import { ARVORE_TERRENO, noLote } from "./PontoDisponivel";
+import { ARVORE_TERRENO, noLote, arvoreDoTerrenoFica } from "./PontoDisponivel";
 import { PlacasDeRua } from "./RuasPlacas";
 import { Rio } from "./Rio";
 import { Parque, ParqueChao, LAGO } from "./Parque";
@@ -121,7 +123,8 @@ export function Mundo() {
   const poucos = leve();
   const natal = useMemo(() => natalAtivo(), []);
   const lotesKit = useMundo((s) => lotesComKit(s.terrenos, s.loteSelecionado, s.rascunhoEscritorio));
-  const raio = poucos ? 150 : 220;
+  // 20/11/2026: a câmera afasta 30% mais (até 155 m; 180 no celular): lá de cima o lado de lá da cidade continua desenhado
+  const raio = poucos ? 200 : 270;
   const calcadas = useMemo(() => QUARTEIROES.map((q) => centroQuarteirao(q.i, q.j)), []);
   // postes nas esquinas e no meio de cada lado dos quarteirões, do lado de fora da calçada
   const postes: ItemInstancia[] = useMemo(() => {
@@ -133,7 +136,10 @@ export function Mundo() {
     }
     return lista;
   }, [calcadas, poucos]);
-  // árvores: nos terrenos vazios marcados, nos fundos dos lotes com casa e na borda do mundo
+  // árvores: nos terrenos vazios marcados, nos fundos dos lotes com casa e na borda do mundo.
+  // 20/11/2026 (pedido do dono: "50% a menos de arborização"): metade, espalhada. Cada casa fica com a árvore do fundo
+  // (a do lado saiu), metade dos terrenos vazios fica com a sua (arvoreDoTerrenoFica, a mesma regra dos tufos do quintal),
+  // a lanchonete fica com 2 cantos verdes e a fileira da borda do mundo fica com uma árvore sim, outra não.
   const arvores: ItemInstancia[] = useMemo(() => {
     const lista: ItemInstancia[] = []; let n = 0; const comKit = new Set(lotesKit.split("|"));
     const add = (x: number, z: number, h = 4.5) => lista.push({ pos: [x, 0, z], rot: (n++ * 1.7) % (Math.PI * 2), altura: h });
@@ -141,15 +147,15 @@ export function Mundo() {
     for (const lt of LOTES) {
       const l = lt.lote, k = lt.k, [x, z] = lt.centro; const fundo = k >= 2 ? -1 : 1, kit = comKit.has(lt.chave);
       // a árvore do terreno vazio fica no canto do fundo (18/11/2026): o meio fica livre para o prédio (PontoDisponivel.tsx)
-      if (l.tipo === "vazio" && l.arvore) { const [ax, az] = noLote(lt, ...ARVORE_TERRENO(k)); add(ax, az, kit ? 0 : 6.5); }
-      else if (l.tipo === "casa") { add(x - 7, z + fundo * 7, kit ? 0 : 4.8); if (!poucos) add(x + 7.5, z + fundo * 6, kit ? 0 : 4.2); }
+      if (l.tipo === "vazio" && l.arvore) { if (arvoreDoTerrenoFica(lt)) { const [ax, az] = noLote(lt, ...ARVORE_TERRENO(k)); add(ax, az, kit ? 0 : 6.5); } }
+      else if (l.tipo === "casa" && (!poucos || lt.numero % 2 === 0)) add(x - 7, z + fundo * 7, kit ? 0 : 4.8); // leve: uma casa sim, outra não
     }
     // cantos verdes do quarteirão do restaurante
-    for (const [dx, dz] of [[-18, -18], [18, 18], [18, -18]]) add(PASSO + dx, dz, 5.5);
+    for (const [dx, dz] of [[-18, -18], [18, 18]]) add(PASSO + dx, dz, 5.5);
     // fileira na borda do mundo (depois da última rua)
     const B = N * PASSO + EIXO_RUA + 7;
     // (a fileira do norte agora fica no calçadão da beira-rio, em Rio.tsx)
-    for (let s = -B + 6; s <= B - 6; s += poucos ? 24 : 14) { add(s, B, 5 + (n % 3)); add(-B, s, 5 + (n % 3)); add(B, s, 5 + (n % 3)); }
+    for (let s = -B + 6, f = 0; s <= B - 6; s += poucos ? 24 : 14, f++) { if (f % 2) continue; add(s, B, 5 + (n % 3)); add(-B, s, 5 + (n % 3)); add(B, s, 5 + (n % 3)); }
     return lista;
   }, [poucos, lotesKit]);
   const [arvoresPraia, arvoresRua] = useMemo(() => {
@@ -177,25 +183,27 @@ export function Mundo() {
       {/* à noite os postes acendem (luz no chão e lâmpada) e ganham um halo na cor do bairro */}
       <Depois etapa={1}><LuzesPostes itens={postes} /><HalosPostes postes={postes} /></Depois>
       {/* bairros com identidade (12/11/2026): galhardetes, árvores de rua e a placa de cada bairro; placas com o nome das ruas */}
-      <Depois etapa={1}><Galhardetes postes={postes} /><ArvoresDeRua /></Depois>
-      <Isolado><PlacasBairro /></Isolado>
-      <Isolado><PlacasDeRua /></Isolado>
+      <Depois etapa={1}><SoDePerto nome="galhardetes"><Galhardetes postes={postes} /></SoDePerto><ArvoresDeRua /></Depois>
+      {/* SoDePerto (20/11/2026): no celular, com o zoom bem afastado, o que vira um ponto na tela não é desenhado (etapas.tsx) */}
+      <SoDePerto nome="placas"><Isolado><PlacasBairro /></Isolado><Isolado><PlacasDeRua /></Isolado></SoDePerto>
       {/* além da Avenida Beira-Rio: calçadão, rio, pontes e o Parque da Cidade (o chão aparece sempre; o resto, de perto) */}
       <Depois etapa={2}><Rio /><ParqueChao /><Perto cx={LAGO.x} cz={LAGO.z} raio={raio + 10}><Parque /></Perto></Depois>
-      {/* Natal (1º/12 a 6/1): árvore na praça da Nuvem e pisca-pisca nos postes */}
-      {natal && <><ArvoreNatal /><LuzesNatalPostes itens={postes} /></>}
+      {/* Natal (20/11 a 6/1, scene/Natal.tsx): árvores na praça da Nuvem e na Praça de Eventos, trenó, guirlandas nas sedes,
+          laço e pisca-pisca nos postes e fios de luz no calçadão e nas pontes. ?natal=0 desliga (prévias) */}
+      {natal && <Isolado><group name="natal"><ArvoreNatal /><NatalPraca /><SoDePerto nome="natal-miudo"><LuzesNatalPostes itens={postes} /><LacosPostes itens={postes} /><NatalSedes /></SoDePerto></group></Isolado>}
+      {natal && <Depois etapa={2}><group name="natal-rio"><SoDePerto><LuzesRioNatal /></SoDePerto></group></Depois>}
       {/* árvores do mundo (v63): espécies brasileiras desenhadas em código (scene/Arvores.tsx), sorteadas pela posição;
           na borda da praia (sul e leste) entram coqueiros e palmeiras imperiais */}
-      <Depois etapa={2}><ArvoresMistas itens={arvoresPraia} mistura={MISTURA_PRAIA} /></Depois>
-      <Depois etapa={1}><ArvoresMistas itens={arvoresRua} mistura={MISTURA_RUA} /></Depois>
+      <Depois etapa={2}><ArvoresMistas itens={arvoresPraia} mistura={MISTURA_PRAIA} grupo="praia" /></Depois>
+      <Depois etapa={1}><ArvoresMistas itens={arvoresRua} mistura={MISTURA_RUA} grupo="lotes" /></Depois>
       {/* trânsito: semáforos, faixas de pedestre e carros que obedecem (11/11/2026) */}
-      <Semaforos />
-      <Depois etapa={1}><Trafego /></Depois>
+      <SoDePerto nome="semaforos"><Semaforos /></SoDePerto>
+      <Depois etapa={1}><SoDePerto nome="trafego"><Trafego /></SoDePerto></Depois>
       {/* vida na rua (12/11/2026): pedestres que atravessam na faixa e o ônibus com pontos */}
-      <Depois etapa={1}><Passantes /><PontosOnibus /></Depois>
+      <Depois etapa={1}><SoDePerto nome="passantes"><Passantes /><PontosOnibus /></SoDePerto></Depois>
       {/* moradores da cidade (19/11/2026): gente fixa com nome, casa e rotina pela hora da cidade; clicar abre a conversa */}
-      <Depois etapa={1}><Moradores /></Depois>
-      <Depois etapa={2}><Fauna /></Depois>
+      <Depois etapa={1}><SoDePerto nome="moradores"><Moradores /></SoDePerto></Depois>
+      <Depois etapa={2}><SoDePerto nome="fauna"><Fauna /></SoDePerto></Depois>
       {/* outdoors nas avenidas da borda (aluguel de 30 dias) */}
       <Depois etapa={2}><Outdoors /></Depois>
       {/* quarteirões */}
@@ -203,9 +211,11 @@ export function Mundo() {
       <Perto cx={PASSO} cz={0} raio={raio}><Isolado><Restaurante /></Isolado></Perto>
       {/* sedes (data/sedes.ts): Social RP, AppZone, bday.fm e NUVCAM, cada uma num lote de esquina virado para o centro */}
       {SEDES.map((sd) => <Perto key={sd.id} cx={sd.x} cz={sd.z} raio={raio}><Isolado><SedeHQ sede={sd} /></Isolado></Perto>)}
-      <Depois etapa={2}><GentePraia /></Depois>
+      <Depois etapa={2}><SoDePerto nome="gente-praia"><GentePraia /></SoDePerto></Depois>
       <Depois etapa={1}><Personagens /></Depois>
       <Perto cx={0} cz={0} raio={raio + 100}><Isolado><Lotes /></Isolado>
+      {/* quiosques e o realce do vizinho ao expandir o terreno (20/11/2026) */}
+      <Isolado><Quiosques /><RealceExpansao /></Isolado>
       <Isolado><EscritoriosClientes /></Isolado>
       <Isolado><PortasPredios /></Isolado>
       {/* praça de eventos e feira de sábado no lote 0,1,1 (12/11/2026) */}

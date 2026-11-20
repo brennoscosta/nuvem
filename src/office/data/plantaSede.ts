@@ -39,6 +39,20 @@ export const MOVEIS_SEDE = {
 // onde os agentes param no café do hall (na rotina)
 export const CAFE_SEDE = { x: XM1 - 0.95, z: ZMEIO_FUNDO };
 
+// Catraca da recepção (20/11/2026, pedido do dono: o visitante só tem acesso à recepcionista; data/recepcao.ts). Uma linha
+// ao longo de x, em z: vidro baixo de x0 a g0 e de g1 a x1, e o portão (duas folhas de vidro) entre g0 e g1. Quem pode
+// passar (dono, sócio ou visitante encaminhado pela recepção) atravessa pelo portão; o vidro barra todo mundo.
+// Coordenadas locais da planta (aqui, as do lote da sede; nas lojas, as do prédio do cliente: data/escritorio.ts).
+export interface Catraca { id: string; x0: number; x1: number; z: number; g0: number; g1: number }
+export const LARG_PORTAO = 1.1;
+// na sede: na passagem da recepção para o hall com o café (o resto da recepção é fechado por paredes). O portão fica no
+// meio do hall, por onde a recepcionista e quem vem do corredor já passam
+export function catracasDaSede(salas: Sala[]): Catraca[] {
+  const hall = salas.find((s) => s.tipo === "hall"); if (!hall) return [];
+  const c = cx(hall);
+  return [{ id: "hall", x0: hall.x0 + 0.06, x1: hall.x1 - 0.06, z: Z_RECEPCAO + 0.2, g0: c - LARG_PORTAO / 2, g1: c + LARG_PORTAO / 2 }];
+}
+
 export function montarSalas(setores: Setor[]): Sala[] {
   const deptos = setores.filter((s) => s.id !== "recepcao");
   const sala = (s: { id: string; nome: string; cor: string }, tipo: Sala["tipo"], norte: boolean, i: number, x0: number, x1: number, z0: number, z1: number): Sala => ({ id: s.id, nome: s.nome, cor: s.cor, tipo, norte, i, x0, x1, z0, z1 });

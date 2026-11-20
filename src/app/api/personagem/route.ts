@@ -16,5 +16,5 @@ export async function PUT(req: Request) {
     const u = await usuarioAtual(); if (!u) return erro("Entre na sua conta do WorkEnd.", 401);
     const p = await salvarPersonagem(u, await corpo(req));
     return ok({ personagem: p, ativo: personagemAtivo(p, u) });
-  } catch (e) { return erro(e); }
+  } catch (e) { return erro(e, 400); } // nome curto, item pago sem compra e afins: é o pedido que está errado
 }

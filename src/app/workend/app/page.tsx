@@ -15,6 +15,7 @@ import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
 import { CabecalhoApp } from "../_cabecalho";
 import { Contador, ContagemReserva, CopiarLink, Catalogo } from "./_painel";
 import { Icone } from "@/office/ui/Icone";
+import { LembretePerfil } from "../_lembrete-perfil"; // o que falta no perfil do cadastro (20/11/2026)
 import { meta } from "../seo";
 import "./painel.css";
 
@@ -54,6 +55,7 @@ export default async function App() {
             : chao ? <>Falta pagar o 1º mês para a <b>{empresa}</b> abrir as portas no mapa.</>
             : <>Falta só o endereço da sua empresa na cidade.</>}
         </p>
+        <LembretePerfil usuarioId={u.id} />
       </section>
 
       {ativo && chao && p ? <LojaAberta chao={chao} p={p} empresa={empresa} linkLote={linkLote} vendas={vendas} />
@@ -310,10 +312,19 @@ function LojaAberta({ chao, p, empresa, linkLote, vendas }: { chao: Terreno; p: 
             ))}
             {p.equipe.length > 9 && <li className="pn-rostos-mais"><span>+{p.equipe.length - 9}</span></li>}
           </ul>
-          <div className="pn-ia">
-            <div className="flex justify-between text-sm"><span>IA usada neste mês</span><b>{reais(p.ia.gasto)} de {reais(p.ia.teto)}</b></div>
-            <div className="pn-ia-trilho"><i style={{ width: `${Math.max(2, Math.min(100, (p.ia.gasto / p.ia.teto) * 100))}%` }} /></div>
-          </div>
+          {/* medidor "Unidades de IA" (20/11/2026): saldo, consumo do mês e estimativa em respostas, nunca em tokens */}
+          {p.ia.unidades?.cobrada ? (
+            <div className="pn-ia" data-medidor-ia={p.ia.unidades.saldo}>
+              <div className="flex justify-between gap-2 text-sm"><span>Unidades de IA</span><b>{p.ia.unidades.saldo.toLocaleString("pt-BR")} · ≈ {p.ia.unidades.respostas.toLocaleString("pt-BR")} respostas</b></div>
+              <div className="pn-ia-trilho"><i style={{ width: `${Math.max(2, Math.min(100, (p.ia.unidades.saldo / Math.max(1, p.ia.unidades.mes)) * 100))}%`, ...(p.ia.unidades.esgotado ? { background: "#E2575B" } : p.ia.unidades.aviso ? { background: "#F59E0B" } : {}) }} /></div>
+              <div className="mt-1 flex justify-between gap-2 text-[12px] opacity-80"><span>{p.ia.unidades.usadas.toLocaleString("pt-BR")} usadas neste mês{p.ia.unidades.esgotado ? " · acabaram" : p.ia.unidades.aviso ? " · restam menos de 20%" : ""}</span><Link href="/app/creditos#unidades" className="font-semibold underline">Comprar unidades</Link></div>
+            </div>
+          ) : (
+            <div className="pn-ia">
+              <div className="flex justify-between text-sm"><span>IA usada neste mês</span><b>{reais(p.ia.gasto)} de {reais(p.ia.teto)}</b></div>
+              <div className="pn-ia-trilho"><i style={{ width: `${Math.max(2, Math.min(100, (p.ia.gasto / p.ia.teto) * 100))}%` }} /></div>
+            </div>
+          )}
           <div className="mt-6 flex flex-wrap gap-2.5">
             <Link href="/app/equipe" className="btn btn-azul">Falar com a equipe</Link>
             <Link href={linkLote} className="btn pn-btn-vidro">Contratar no mapa</Link>
@@ -322,7 +333,7 @@ function LojaAberta({ chao, p, empresa, linkLote, vendas }: { chao: Terreno; p: 
 
         <div className="pn-cartao pn-indica">
           <h3>Indique um vizinho</h3>
-          <p className="pn-mudo">Cada empresa que entrar pelo seu link e pagar o lote vale {reais(p.indicacao.porEmpresa)} de crédito nas suas mensalidades (até metade de cada uma). Ela ganha {p.indicacao.descontoIndicado}% no 1º mês.</p>
+          <p className="pn-mudo">Cada empresa que entrar pelo seu link e pagar o lote vale {p.indicacao.porEmpresa} créditos de bônus na sua carteira, que pagam a mensalidade, agentes e o que mais o WorkEnd vende. Ela ganha {p.indicacao.descontoIndicado}% no 1º mês.</p>
           {p.indicacao.codigo && p.indicacao.link ? (
             <>
               <div className="pn-codigo"><span>Seu código</span><b>{p.indicacao.codigo}</b></div>
@@ -331,7 +342,7 @@ function LojaAberta({ chao, p, empresa, linkLote, vendas }: { chao: Terreno; p: 
             </>
           ) : <p className="pn-mudo">O seu código aparece aqui em instantes. Recarregue a página.</p>}
           <dl className="pn-indica-num">
-            <div><dt>Crédito para usar</dt><dd><Contador valor={p.indicacao.credito} prefixo="R$ " casas={2} /></dd></div>
+            <div><dt>Saldo de créditos</dt><dd><Contador valor={p.indicacao.credito} prefixo="" casas={2} /></dd></div>
             <div><dt>Indicações pagas</dt><dd>{p.indicacao.pagas}</dd></div>
             <div><dt>Esperando pagar</dt><dd>{p.indicacao.esperando}</dd></div>
           </dl>

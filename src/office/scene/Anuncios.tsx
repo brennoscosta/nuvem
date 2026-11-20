@@ -2,14 +2,15 @@
 // Outdoors nas avenidas e placa de esquina (12/11/2026). A arte é desenhada num canvas com a marca da empresa: fundo na
 // cor, logo, nome, frase e o endereço da loja. Clicar no outdoor abre o cartão (alugar ou ver a loja). À noite acendem.
 import * as THREE from "three";
-import { useEffect, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { caixa, cilindro, mat, plano } from "./geo";
 import { leve } from "./qualidade";
 import { Estatico } from "./Estatico";
 import { ceu } from "./CicloDia";
 import { useMundo } from "../mundoStore";
 import { OUTDOORS, type OutdoorPublico } from "../data/outdoors";
+import { useModalOutdoor } from "../modalOutdoor";
 
 export interface DadosMarca { nome: string; cor: string; nicho: string; frase?: string; numero?: number | null; logo?: string | null }
 const FONTE = "system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
@@ -71,6 +72,32 @@ function registrarAceso(m: THREE.MeshStandardMaterial) { acesos.add(m); return (
 const materialAceso = (tex: THREE.Texture) => new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: "#FFFFFF", emissiveIntensity: 0.12, roughness: 0.6 });
 function acender() { for (const m of acesos) m.emissiveIntensity = 0.12 + ceu.noite * 0.9; }
 
+// vídeo de propaganda nos outdoors livres (20/11/2026): versão leve (640×320, 2:1 como a face, sem som) num <video> só,
+// em loop, que toca apenas com um outdoor livre na tela e pausa fora dela. No modo leve (celular) fica a arte parada.
+const VIDEO_LIVRE: { el: HTMLVideoElement | null; mat: THREE.MeshStandardMaterial | null; pronto: boolean; ouvintes: Set<() => void> } = { el: null, mat: null, pronto: false, ouvintes: new Set() };
+function videoLivre() {
+  if (VIDEO_LIVRE.el || typeof document === "undefined") return VIDEO_LIVRE;
+  const v = document.createElement("video"); v.muted = true; v.defaultMuted = true; v.loop = true; v.playsInline = true; v.preload = "auto"; v.setAttribute("muted", ""); v.setAttribute("playsinline", "");
+  v.src = v.canPlayType('video/mp4; codecs="avc1.4D401E"') ? "/workend/outdoor/anuncie-outdoor-leve.mp4" : "/workend/outdoor/anuncie-outdoor-leve.webm";
+  const tex = new THREE.VideoTexture(v); tex.colorSpace = THREE.SRGBColorSpace;
+  VIDEO_LIVRE.el = v; VIDEO_LIVRE.mat = materialAceso(tex); registrarAceso(VIDEO_LIVRE.mat);
+  v.addEventListener("loadeddata", () => { VIDEO_LIVRE.pronto = true; for (const f of VIDEO_LIVRE.ouvintes) f(); }, { once: true });
+  v.load();
+  if (MEDIR) (window as unknown as { __outdoorVideoEl: HTMLVideoElement }).__outdoorVideoEl = v; // testes: o próprio vídeo (tempo real)
+  return VIDEO_LIVRE;
+}
+function useVideoLivrePronto(ligado: boolean) {
+  const [pronto, setPronto] = useState(VIDEO_LIVRE.pronto);
+  useEffect(() => {
+    if (!ligado) return;
+    const vl = videoLivre(); const f = () => setPronto(true); vl.ouvintes.add(f);
+    const t = setTimeout(() => { if (vl.pronto) setPronto(true); }, 0);
+    return () => { clearTimeout(t); vl.ouvintes.delete(f); };
+  }, [ligado]);
+  return ligado && pronto;
+}
+const P_OUT = new THREE.Vector3(), M_OUT = new THREE.Matrix4(), FRUSTUM_OUT = new THREE.Frustum(), ESFERA_OUT = new THREE.Sphere(new THREE.Vector3(), 9);
+
 // ---------- outdoor de estrada (v63, 12/11/2026: "aumentar o outdoors", ~1,8× o de antes) ----------
 // Face de 14,4 × 7,2 m (mesma proporção 2:1 da arte) em cima de duas colunas tubulares com sapata de concreto,
 // treliça de aço atrás, passarela com guarda-corpo e escada, e quatro refletores na passarela que lavam a arte de luz à
@@ -109,7 +136,9 @@ function PainelOutdoor({ o, preco }: { o: OutdoorPublico | undefined; preco: num
   const tex = useTexturaMarca(dados, w, h, false, livre);
   const m = useMemo(() => materialAceso(tex), [tex]);
   useEffect(() => registrarAceso(m), [m]);
-  return <mesh material={m} geometry={plano(FACE_OUTDOOR.larg, FACE_OUTDOOR.alt)} position={[0, FYM, 0.13]} />;
+  // livre (e fora do modo leve): o vídeo de propaganda no lugar da arte, assim que ele tiver o primeiro quadro
+  const comVideo = useVideoLivrePronto((!o || o.status === "livre") && !leve());
+  return <mesh material={comVideo && VIDEO_LIVRE.mat ? VIDEO_LIVRE.mat : m} geometry={plano(FACE_OUTDOOR.larg, FACE_OUTDOOR.alt)} position={[0, FYM, 0.13]} />;
 }
 
 // estrutura de um outdoor (coordenadas locais: a arte olha para +z, a cidade)
@@ -160,11 +189,30 @@ function EstruturaOutdoor() {
   );
 }
 
+const MEDIR = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("medir") === "1";
 export function Outdoors() {
   const outdoors = useMundo((s) => s.outdoors), preco = useMundo((s) => s.precoOutdoor), abrir = useMundo((s) => s.abrirOutdoor);
+  const abrirModal = useModalOutdoor((s) => s.abrir);
   // lâmpadas dos refletores (acendem à noite) e o leque de luz na arte
   const lampada = mat("#F5F3EA", { emissive: "#FFF1C9", ei: 1.4 });
-  useFrame(() => { acender(); if (MAT_LEQUE) MAT_LEQUE.opacity = Math.max(0, ceu.noite - 0.15) * 0.75; });
+  const camera = useThree((st) => st.camera); const passo = useRef(0);
+  useFrame((_, dt) => {
+    acender(); if (MAT_LEQUE) MAT_LEQUE.opacity = Math.max(0, ceu.noite - 0.15) * 0.75;
+    // o vídeo dos outdoors livres só toca com um deles na tela (e a aba visível), conferido 2 vezes por segundo
+    const v = VIDEO_LIVRE.el; if (!v) return;
+    passo.current += dt; if (passo.current < 0.5) return; passo.current = 0;
+    let ve = false;
+    if (!document.hidden) {
+      FRUSTUM_OUT.setFromProjectionMatrix(M_OUT.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      for (const vg of OUTDOORS) {
+        const o = outdoors.find((x) => x.slot === vg.id); if (o && o.status !== "livre") continue;
+        P_OUT.set(vg.pos[0], FYM, vg.pos[1]); ESFERA_OUT.center.copy(P_OUT);
+        if (camera.position.distanceTo(P_OUT) < 230 && FRUSTUM_OUT.intersectsSphere(ESFERA_OUT)) { ve = true; break; }
+      }
+    }
+    if (ve && v.paused) void v.play().catch(() => {}); else if (!ve && !v.paused) v.pause();
+    if (MEDIR) (window as unknown as { __outdoorVideo: unknown }).__outdoorVideo = { tocando: !v.paused, tempo: v.currentTime, pronto: VIDEO_LIVRE.pronto };
+  });
   return (
     <group>
       <Estatico>
@@ -174,7 +222,7 @@ export function Outdoors() {
       </Estatico>
       {OUTDOORS.map((v) => (
         <group key={v.id} position={[v.pos[0], 0, v.pos[1]]} rotation={[0, v.rot, 0]}
-          onClick={(e) => { e.stopPropagation(); abrir(v.id); }} onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = ""; }}>
+          onClick={(e) => { e.stopPropagation(); const o = outdoors.find((x) => x.slot === v.id); abrir(v.id); abrirModal(!o || o.status === "livre" ? v.id : null); }} onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = ""; }}>
           <PainelOutdoor o={outdoors.find((x) => x.slot === v.id)} preco={preco} />
           {REFLETORES.map((x) => <mesh key={x} geometry={caixa(0.46, 0.06, 0.24)} material={lampada} position={[x, FY0 - 0.2, 1.3]} rotation={[-0.75, 0, 0]} />)}
           {MAT_LEQUE && REFLETORES.map((x) => <mesh key={`l${x}`} geometry={plano(3.6, FACE_OUTDOOR.alt * 0.9)} material={MAT_LEQUE} position={[x, FY0 + FACE_OUTDOOR.alt * 0.42, 0.55]} rotation={[-0.12, 0, 0]} />)}

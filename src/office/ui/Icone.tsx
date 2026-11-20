@@ -75,6 +75,7 @@ const ICONES = {
   sacola: <><path {...T} d="M5 8h14l-1.2 12a1.5 1.5 0 0 1-1.5 1.4H7.7a1.5 1.5 0 0 1-1.5-1.4z" /><path d="M5 8h14l-1.2 12a1.5 1.5 0 0 1-1.5 1.4H7.7a1.5 1.5 0 0 1-1.5-1.4zM9 10.5V7a3 3 0 0 1 6 0v3.5" /></>,
   // vendas e pedidos pela atendente (17/11/2026)
   recibo: <><path {...T} d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21z" /><path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21zM9 8h6M9 11.5h6M9 15h3.5" /></>,
+  baixar: <><path {...T} d="M4.5 15.5v3A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-3z" /><path d="M12 4v11M7.6 10.8L12 15.2l4.4-4.4M4.5 15.5v3A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5v-3" /></>,
   copiar: <><rect {...T} x="8.5" y="8.5" width="12" height="12" rx="2.2" /><rect x="8.5" y="8.5" width="12" height="12" rx="2.2" /><path d="M15.5 8.5V5.2a1.7 1.7 0 0 0-1.7-1.7H5.2a1.7 1.7 0 0 0-1.7 1.7v8.6a1.7 1.7 0 0 0 1.7 1.7h3.3" /></>,
   cupom: <><path {...T} d="M3 8.6V6.6A1.6 1.6 0 0 1 4.6 5h14.8A1.6 1.6 0 0 1 21 6.6v2a2.4 2.4 0 0 0 0 4.8v2a1.6 1.6 0 0 1-1.6 1.6H4.6A1.6 1.6 0 0 1 3 15.4v-2a2.4 2.4 0 0 0 0-4.8z" /><path d="M3 8.6V6.6A1.6 1.6 0 0 1 4.6 5h14.8A1.6 1.6 0 0 1 21 6.6v2a2.4 2.4 0 0 0 0 4.8v2a1.6 1.6 0 0 1-1.6 1.6H4.6A1.6 1.6 0 0 1 3 15.4v-2a2.4 2.4 0 0 0 0-4.8zM14.5 5.8v1.4M14.5 10.3v1.4M14.5 14.8v1.4" /></>,
   cameraOff: <><rect {...T} x="3" y="6.5" width="12.5" height="11" rx="2.6" /><rect x="3" y="6.5" width="12.5" height="11" rx="2.6" /><path d="M15.5 10.4l5.5-3.1v9.4l-5.5-3.1M3 3.5l18 17" /></>,
@@ -104,6 +105,8 @@ const ICONES = {
   tenis: <><path {...T} d="M3 16.4V9.8c0-.6.6-1 1.1-.8l3.3 1.2 2-2.8 3 3.1c2.2 2.1 4.8 2.7 7.1 3.3.8.2 1.5.9 1.5 1.7v.9z" /><path d="M3 16.4V9.8c0-.6.6-1 1.1-.8l3.3 1.2 2-2.8 3 3.1c2.2 2.1 4.8 2.7 7.1 3.3.8.2 1.5.9 1.5 1.7v.9zM3 16.4v2.1h18v-2.1M10.4 9.8l-1.3 1.4M12.6 11.8l-1.3 1.4" /></>,
   contaGotas: <><path {...T} d="M13.6 7.4l3 3-8.2 8.2-3.6.6.6-3.6z" /><path d="M13.6 7.4l3 3-8.2 8.2-3.6.6.6-3.6zM12.4 6.2l5.4 5.4M15 5.4l1.6-1.6a2.1 2.1 0 0 1 3 0l.6.6a2.1 2.1 0 0 1 0 3L18.6 9" /></>,
   dado: <><rect {...T} x="4" y="4" width="16" height="16" rx="3.4" /><rect x="4" y="4" width="16" height="16" rx="3.4" /><path d="M8.6 8.6h.01M15.4 8.6h.01M12 12h.01M8.6 15.4h.01M15.4 15.4h.01" strokeWidth="2.6" /></>,
+  // catraca da recepção (20/11/2026): dois postes com a luz no alto e as folhas do portão
+  catraca: <><rect {...T} x="3.5" y="6" width="4" height="14" rx="1.2" /><rect x="3.5" y="6" width="4" height="14" rx="1.2" /><rect {...T} x="16.5" y="6" width="4" height="14" rx="1.2" /><rect x="16.5" y="6" width="4" height="14" rx="1.2" /><path d="M7.5 12.5h3.4M16.5 12.5h-3.4M2 20.5h20" /><path d="M5.5 3.4h.01M18.5 3.4h.01" strokeWidth="2.6" /></>,
   // conectores (17/11/2026)
   chave: <><circle {...T} cx="8" cy="15.5" r="4.3" /><circle cx="8" cy="15.5" r="4.3" /><path d="M11.1 12.4l8.7-8.7M16.3 7.2l2.6 2.6M14 9.5l2 2" /></>,
   plugue: <><path {...T} d="M6.8 9h10.4v3.4a5.2 5.2 0 0 1-10.4 0z" /><path d="M6.8 9h10.4v3.4a5.2 5.2 0 0 1-10.4 0z" /><path d="M9.6 9V4.2M14.4 9V4.2M12 17.6V21" /></>,
@@ -117,12 +120,34 @@ const ICONES = {
   poltrona: <><path {...T} d="M6 10V7.5A2.5 2.5 0 0 1 8.5 5h7A2.5 2.5 0 0 1 18 7.5V10" /><path d="M6 10V7.5A2.5 2.5 0 0 1 8.5 5h7A2.5 2.5 0 0 1 18 7.5V10M4 11.5a2 2 0 0 1 4 0V14h8v-2.5a2 2 0 0 1 4 0V17H4zM6 17v2M18 17v2" /></>,
   lousa: <><rect {...T} x="3" y="4" width="18" height="12" rx="1.5" /><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M7 8.5c2-1.5 3 1.5 5 0s3-1 5 .5M7 12h6M8 16l-2 5M16 16l2 5" /></>,
   cafe: <><path {...T} d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z" /><path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5c-.8 1 .8 2 0 3M12 3.5c-.8 1 .8 2 0 3" /></>,
+  // créditos e unidades de IA (20/11/2026, frente "creditos")
+  carteira: <><rect {...T} x="3.5" y="6.5" width="17" height="13" rx="2.4" /><rect x="3.5" y="6.5" width="17" height="13" rx="2.4" /><path d="M6 6.5l9.5-3 1.2 3" /><path d="M20.5 11h-4.2a2 2 0 0 0 0 4h4.2" /><circle cx="16.6" cy="13" r=".6" /></>,
+  unidades: <><rect {...T} x="7" y="7" width="10" height="10" rx="1.8" /><rect x="7" y="7" width="10" height="10" rx="1.8" /><path d="M10 3.5V7M14 3.5V7M10 17v3.5M14 17v3.5M3.5 10H7M3.5 14H7M17 10h3.5M17 14h3.5" /><path d="M10.2 13.8l1.8-3.8 1.8 3.8M10.7 12.8h2.6" /></>,
+  // frente terreno (20/11/2026): expandir o terreno (o lote e a extensão tracejada) e o quiosque (toldo e balcão)
+  juntar: <><rect {...T} x="3" y="8" width="9" height="12" rx="1.4" /><rect x="3" y="8" width="9" height="12" rx="1.4" /><path d="M12 8h7.6c.8 0 1.4.6 1.4 1.4v9.2c0 .8-.6 1.4-1.4 1.4H12" strokeDasharray="2.2 2" /><path d="M7.5 4.4h9M14.6 2.6l1.9 1.8-1.9 1.8" /></>,
+  quiosque: <><path {...T} d="M3.5 8.5h17L19 4H5z" /><path d="M3.5 8.5h17L19 4H5zM3.5 8.5c0 1.2 1.3 2 2.8 2s2.9-.8 2.9-2c0 1.2 1.3 2 2.8 2s2.8-.8 2.8-2c0 1.2 1.3 2 2.9 2s2.8-.8 2.8-2M5 10.4V20h14v-9.6M5 15h14M9.5 20v-5M14.5 20v-5" /></>,
+  // editor do personagem (20/11/2026): abas, desfazer, cadeado do item pago e os acessórios novos
+  rosto: <><circle {...T} cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="8.5" /><path d="M9 10.2h.01M15 10.2h.01" strokeWidth="2.6" /><path d="M8.6 14.2c.9 1.5 2 2.2 3.4 2.2s2.5-.7 3.4-2.2" /></>,
+  uniforme: <><path {...T} d="M8 4L3.5 7l2 4 2-1v10h9V10l2 1 2-4L16 4c-.6 1.5-2.2 2.5-4 2.5S8.6 5.5 8 4z" /><path d="M8 4L3.5 7l2 4 2-1v10h9V10l2 1 2-4L16 4c-.6 1.5-2.2 2.5-4 2.5S8.6 5.5 8 4z" /><rect x="12.4" y="10.6" width="3.2" height="3.2" rx=".7" /></>,
+  desfazer: <><path d="M8.5 6.5L4 11l4.5 4.5" /><path d="M4.5 11H14a4.75 4.75 0 0 1 0 9.5h-3" /></>,
+  cadeado: <><rect {...T} x="5" y="10.5" width="14" height="10" rx="2.2" /><rect x="5" y="10.5" width="14" height="10" rx="2.2" /><path d="M8.2 10.5V8a3.8 3.8 0 0 1 7.6 0v2.5M12 14.4v2.4" /></>,
+  panama: <><path {...T} d="M7.5 13.5c0-4 2-6.5 4.5-6.5s4.5 2.5 4.5 6.5z" /><path d="M7.5 13.5c0-4 2-6.5 4.5-6.5s4.5 2.5 4.5 6.5M2.5 14.5c2.5 1.6 5.8 2.4 9.5 2.4s7-.8 9.5-2.4M7.6 11.6h8.8" /></>,
+  boina: <><path {...T} d="M3.5 13c0-3.8 3.8-6.5 8.5-6.5s8.5 2.7 8.5 6.5c0 .9-.6 1.5-1.5 1.5H5c-.9 0-1.5-.6-1.5-1.5z" /><path d="M3.5 13c0-3.8 3.8-6.5 8.5-6.5s8.5 2.7 8.5 6.5c0 .9-.6 1.5-1.5 1.5H5c-.9 0-1.5-.6-1.5-1.5zM12 6.5V4.8M6.5 17.5h11" /></>,
+  aviador: <><path {...T} d="M3.5 10h6.5c0 3.2-1.4 5.5-3.4 5.5S3.5 13.2 3.5 10zM14 10h6.5c0 3.2-1.4 5.5-3.1 5.5S14 13.2 14 10z" /><path d="M3.5 10h6.5c0 3.2-1.4 5.5-3.4 5.5S3.5 13.2 3.5 10zM14 10h6.5c0 3.2-1.4 5.5-3.1 5.5S14 13.2 14 10zM10 10.6h4M9 8.6h6" /></>,
+  gravata: <><path {...T} d="M3.5 8l7 3v2l-7 3zM20.5 8l-7 3v2l7 3z" /><path d="M3.5 8l7 3v2l-7 3zM20.5 8l-7 3v2l7 3z" /><rect x="10.5" y="10.5" width="3" height="3" rx="1" /></>,
+  bolsa: <><rect {...T} x="5" y="11" width="14" height="9" rx="2" /><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M5 11l7-7 7 7M5 14.5h14M11 14.5v2h2v-2" /></>,
+  relogioPulso: <><circle {...T} cx="12" cy="12" r="4.6" /><circle cx="12" cy="12" r="4.6" /><path d="M9.4 8.2l.8-4.2h3.6l.8 4.2M9.4 15.8l.8 4.2h3.6l.8-4.2M12 10v2.2l1.4.9" /></>,
+  pulseira: <><ellipse {...T} cx="12" cy="12" rx="8" ry="4.5" /><ellipse cx="12" cy="12" rx="8" ry="4.5" /><circle cx="12" cy="16.5" r="1.6" /><path d="M6 9.2h.01M9 7.9h.01M15 7.9h.01M18 9.2h.01" strokeWidth="2.4" /></>,
+  brinco: <><circle cx="12" cy="4.6" r="1.5" /><path d="M12 6.1v3" /><circle {...T} cx="12" cy="14.6" r="5.4" /><circle cx="12" cy="14.6" r="5.4" /></>,
 } satisfies Record<string, ReactNode>;
 
 export type NomeIcone = keyof typeof ICONES;
 export const ICONE_ACESSORIO: Record<string, NomeIcone> = {
   "bone-workend": "bone", "chapeu-palha": "chapeu", cartola: "cartola", coroa: "coroa", fone: "fone",
   "oculos-sol": "oculosSol", "oculos-redondo": "oculosRedondo", mochila: "mochila", asas: "asas", cachecol: "cachecol", colar: "colar",
+  // 20/11/2026 (editor completo)
+  "chapeu-panama": "panama", boina: "boina", "oculos-aviador": "aviador", "gravata-borboleta": "gravata", "bolsa-couro": "bolsa",
+  "relogio-ouro": "relogioPulso", relogio: "relogioPulso", pulseira: "pulseira", "brinco-argola": "brinco", "brinco-ponto": "brinco",
 };
 // selo de cada missão de visitante (src/office/data/missoes.ts)
 export const ICONE_MISSAO: Record<string, NomeIcone> = { explorador: "explorador", papo: "conversar", amigos: "equipe", negociante: "maleta", avaliador: "estrela", candidato: "candidato", feirante: "feirante" };

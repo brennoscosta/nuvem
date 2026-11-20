@@ -122,8 +122,11 @@ export async function gastoHoje(agenteId: string) {
   const [r] = await sql<{ total: string }[]>`SELECT COALESCE(SUM(custo_brl), 0)::text AS total FROM uso_ia WHERE agente_id = ${agenteId} AND criado_em >= date_trunc('day', now())`;
   return Number(r.total);
 }
-export async function registrarUso(d: { agenteId: string; modelo: string; tokensIn: number; tokensOut: number; custoBrl: number }) {
+export async function registrarUso(d: { agenteId: string; modelo: string; tokensIn: number; tokensOut: number; custoBrl: number; categoria?: "conversa" | "tarefa" | "imagem" }) {
   await sql`INSERT INTO uso_ia (id, agente_id, modelo, tokens_in, tokens_out, custo_brl) VALUES (${id("uso")}, ${d.agenteId}, ${d.modelo}, ${d.tokensIn}, ${d.tokensOut}, ${d.custoBrl})`;
+  // Unidades de IA (20/11/2026): a chamada sai da carteira da empresa do agente (a Nuvem e os moradores ficam de fora)
+  const { debitarUsoIA } = await import("./unidadesIA");
+  await debitarUsoIA({ agenteId: d.agenteId, modelo: d.modelo, custoBrl: d.custoBrl, categoria: d.categoria });
 }
 
 // ---- eventos da cena ----

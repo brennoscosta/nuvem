@@ -6,12 +6,13 @@ import { useEffect, useRef, useState } from "react";
 import { MiniAvatar } from "@/office/ui/MiniAvatar";
 import { Icone, ICONE_ACESSORIO, type NomeIcone } from "@/office/ui/Icone";
 import { TIPOS_AVATAR } from "@/office/data/bonecos";
-import { ACESSORIOS } from "@/office/data/acessorios";
+import { ACESSORIOS as TODOS_ACESSORIOS } from "@/office/data/acessorios";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const ESTILOS = Array.from(new Set(TIPOS_AVATAR.map((t) => t.estilo)));
+const ACESSORIOS = TODOS_ACESSORIOS.filter((a) => a.preco > 0); // os pagos (relógio, pulseira e brincos são grátis desde 20/11/2026)
 const MENOR_ACESSORIO = Math.min(...ACESSORIOS.map((a) => a.preco));
-const LUGAR: Record<string, string> = { cabeca: "cabeça", rosto: "rosto", pescoco: "pescoço", costas: "costas" };
+const LUGAR: Record<string, string> = { cabeca: "cabeça", rosto: "rosto", pescoco: "pescoço", costas: "costas", pulso: "pulso" };
 
 type Passo = { id: string; icone: NomeIcone; curto: string; titulo: string; texto: string; itens: [NomeIcone, string][] };
 
@@ -29,7 +30,7 @@ export function ComoFunciona({ aberto, fechar, preco, precoCheio, rotuloFinal }:
       texto: "Coloque Instagram, WhatsApp, LinkedIn e site. Você decide: mostrar para todo mundo ou só para quem você aceitar como amigo. Se você presta serviço, ligue o perfil profissional e apareça na busca de Encontrar.",
       itens: [["link", "Redes visíveis para todos ou só para amigos"], ["maleta", "Perfil profissional: o que faz, preço e onde atende"], ["encontrar", "Empresas acham você em Encontrar"]] },
     { id: "acessorios", icone: "bone", curto: "Acessórios", titulo: "Roupas e acessórios",
-      texto: `${ACESSORIOS.length} itens a partir de ${brl(MENOR_ACESSORIO)}, pagos no Pix. Um por lugar do corpo: cabeça, rosto, pescoço e costas. Comprou, é seu para sempre: tira e põe quando quiser, e quem passa por você no mapa vê o visual novo.`,
+      texto: `${ACESSORIOS.length} itens a partir de ${brl(MENOR_ACESSORIO)}, pagos no Pix. Um por lugar do corpo: cabeça, rosto, pescoço, costas e pulso; relógio, pulseira e brincos são grátis. Comprou, é seu para sempre: tira e põe quando quiser, e quem passa por você no mapa vê o visual novo.`,
       itens: [["bone", "Boné, chapéu, cartola, coroa e fone"], ["oculosSol", "Óculos, cachecol, colar, mochila e asinhas"], ["check", "Comprou uma vez, usa sempre"]] },
     { id: "ativar", icone: "raio", curto: "Ativar", titulo: "Ative e entre na cidade",
       texto: `${brl(preco)} por mês na promoção de lançamento (de ${brl(precoCheio)}), no Pix e sem fidelidade. Ativo, você toca no chão para andar, entra nas lojas, fala com a equipe, conversa com quem está online, faz amigos, negocia e faz chamadas.`,

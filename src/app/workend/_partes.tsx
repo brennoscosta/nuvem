@@ -1,7 +1,7 @@
 // Peças compartilhadas do site WorkEnd: topo, rodapé e dados do catálogo de setores/especialistas.
 import Link from "next/link";
 import { usuarioAtual } from "@/server/usuarios";
-import { Logotipo } from "./_marca";
+import { Logotipo, MarcaTopo } from "./_marca";
 import { AREAS, AREAS_OPERACIONAIS, FUNCOES, type AreaId } from "@/office/data/org";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 
@@ -11,7 +11,7 @@ export const DEMO = "/mundo?sede=1";
 export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
   return (
     <header className="faixa flex items-center justify-between py-4">
-      <Link href="/" aria-label="WorkEnd, início" className="flex items-center py-2"><Logotipo altura={22} /></Link>
+      <Link href="/" aria-label="WorkEnd, início" className="flex items-center py-2"><MarcaTopo altura={22} /></Link>
       <nav className="flex items-center gap-3 text-[15px]">
         {logado ? (
           <>

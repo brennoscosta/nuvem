@@ -12,13 +12,14 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle } from "./Boneco";
 import { SombraContato } from "./SombraContato";
-import { bonecoDe, BONECOS } from "../data/bonecos";
+import { bonecoDe, BONECOS, escalaDoBoneco } from "../data/bonecos";
 import { MUNDO, passeioNaCalcada, pontoNaCalcada } from "../data/mundo";
 import { usePersonagem, minhaPos, type Outro } from "../personagemStore";
 import { modoMundo, useMundo } from "../mundoStore";
 import { useEscritorio } from "../store";
 import { sedeDe } from "../data/sedes";
 import { VEICULOS } from "../data/veiculos";
+import { plantaPorChave, zonaNoMundo } from "../data/plantaInterna";
 import { Bicicleta, BicicletaParada, SombraAlongada, usePedalar, bicicletasNaCena, type BicicletaHandle } from "./Bicicleta";
 
 // entrar e sair dos prédios (17/11/2026): marcos do caminho (calçada da porta, porta e balcão), ver personagemStore.ts
@@ -33,17 +34,27 @@ function passouPor(ponto: [number, number]) {
   // saindo e passou pela calçada (tocou na rua estando dentro): a visita acaba aqui e ele segue pela rua
   else if (p.fase === "saindo" && perto(ponto, p.fora)) usePersonagem.setState({ predio: null, falaRecepcao: null });
 }
-// chegou no balcão: o dono é reconhecido na hora; o visitante espera a vez (mais 4 s por pessoa na frente dele)
+// chegou no balcão: o dono é reconhecido na hora; o visitante espera a vez (mais 4 s por pessoa na frente dele). Quem
+// volta de um setor (20/11/2026) não espera de novo, e a catraca fecha atrás dele (liberado some)
 function chegouNoBalcao() {
   const st = usePersonagem.getState(), p = st.predio; if (!p) return;
   const dono = useMundo.getState().meus.includes(p.chave); // dono ou sócio
-  const fila = dono ? 0 : st.outros.filter((o) => o.online && perto([o.x, o.z], p.espera, 2.6)).length;
+  const voltou = !!p.atendido;
+  const fila = dono || voltou ? 0 : st.outros.filter((o) => o.online && perto([o.x, o.z], p.espera, 2.6)).length;
   const nome = st.meu?.nome ?? "";
   usePersonagem.setState({
-    predio: { ...p, fase: "recepcao", fila, esperaMs: dono ? 0 : 3500 + fila * 4000 },
-    falaRecepcao: { chave: p.chave, texto: dono ? `Bem-vindo de volta${nome ? `, ${nome}` : ""}! A equipe já sabe que você chegou.` : fila ? "Olá! Já vou te atender, aguarde a sua vez." : "Olá! Seja bem-vindo. Só um instante, já vou te atender." },
+    predio: { ...p, fase: "recepcao", fila, esperaMs: dono || voltou ? 0 : 3500 + fila * 4000, liberado: null },
+    falaRecepcao: { chave: p.chave, texto: dono ? `Bem-vindo de volta${nome ? `, ${nome}` : ""}! A equipe já sabe que você chegou.` : voltou ? "Que bom te ver de novo! Posso ajudar em mais alguma coisa?" : fila ? "Olá! Já vou te atender, aguarde a sua vez." : "Olá! Seja bem-vindo. Só um instante, já vou te atender." },
   });
 }
+// chegou no setor para onde a recepção o mandou: fica de frente para quem atende, que cumprimenta (ui/Recepcao.tsx abre
+// a conversa com essa pessoa)
+function chegouNoSetor(o: THREE.Group) {
+  const p = usePersonagem.getState().predio, l = p?.liberado; if (!p || !l) return;
+  o.rotation.y = Math.atan2(l.agente[0] - o.position.x, l.agente[1] - o.position.z);
+  usePersonagem.setState({ predio: { ...p, liberado: { ...l, chegou: true } }, falaRecepcao: { chave: p.chave, membroId: l.membroId, texto: `Oi! Sou ${l.nome}. Pode falar comigo por aqui.` } });
+}
+const naSala = (chave: string, sala: string, x: number, z: number) => { const pl = plantaPorChave(chave, useMundo.getState().terrenos); return !!pl && zonaNoMundo(pl, x, z)?.id === sala; };
 
 // ?correr=1 (só roteiros de teste): o navegador do servidor desenha poucos quadros por segundo e o boneco anda devagar demais
 const CORRER = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("correr") ? 8 : 1;
@@ -132,6 +143,7 @@ function Meu() {
       const pd = usePersonagem.getState().predio;
       if (pd && (pd.fase === "entrando" || pd.fase === "indo") && perto(destino, pd.espera, 0.4)) { o.rotation.y = pd.olhar; chegouNoBalcao(); }
       else if (pd && pd.fase === "saindo" && perto(destino, pd.fora, 0.4)) usePersonagem.setState({ predio: null, falaRecepcao: null });
+      else if (pd && pd.fase === "dentro" && pd.liberado && !pd.liberado.chegou && ultimo && naSala(pd.chave, pd.liberado.salaId, o.position.x, o.position.z)) chegouNoSetor(o);
       paradoDesde.current = performance.now() - (st.passeio ? PAUSA_PASSEIO * 400 : 0);
       usePersonagem.setState({ destino: null, passeio: false }); st.setPosicao(o.position.x, o.position.z, o.rotation.y); st.avisarMovimento();
       return;
@@ -146,7 +158,7 @@ function Meu() {
     <group ref={g}>{/* posição só via ref: passar position= aqui faria o boneco pular de volta a cada re-render */}
       <group ref={inclina}>
         <BonecoProcedural ref={h} def={b} camisa={meu.roupa} cracha="#FFD166" acessorios={meu.acessorios} />
-        {veiculo === "bicicleta" && <Bicicleta ref={bike} cor={corBici} quem="minha" />}
+        {veiculo === "bicicleta" && <Bicicleta ref={bike} cor={corBici} quem="minha" escala={escalaDoBoneco(b)} />}
       </group>
       {veiculo ? <SombraAlongada /> : <SombraContato r={0.36} />}
       <Nome nome={meu.nome} cor={meu.roupa} eu />
@@ -206,7 +218,7 @@ function OutroBoneco({ o }: { o: Outro }) {
     <group ref={g}>{/* posição só via ref (ver Meu) */}
       <group ref={inclina}>
         <BonecoProcedural ref={h} def={def(o.boneco)} camisa={o.roupa} cracha="#B8C0CC" acessorios={o.acessorios} />
-        {montado && <Bicicleta ref={bike} cor={o.veiculo?.cor ?? VEICULOS.bicicleta.cores[0].cor} quem="outros" />}
+        {montado && <Bicicleta ref={bike} cor={o.veiculo?.cor ?? VEICULOS.bicicleta.cores[0].cor} quem="outros" escala={escalaDoBoneco(def(o.boneco))} />}
       </group>
       {montado ? <SombraAlongada /> : <SombraContato r={0.36} />}
       {/* área de clique (invisível) em volta do boneco */}

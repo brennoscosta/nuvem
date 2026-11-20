@@ -3,7 +3,7 @@
 import { sql, migrar } from "./db";
 import type { Usuario } from "./usuarios";
 import { ehAdmin, terrenoDoUsuario } from "./terrenos";
-import { criarCobrancaOutdoor, type CobrancaPix } from "./mercadopago";
+import { criarCobrancaOutdoor, type CobrancaPix, type OpcoesCobranca } from "./mercadopago";
 import { OUTDOORS, OUTDOOR_POR_ID, PRECO_OUTDOOR, DIAS_OUTDOOR, MAX_FRASE_OUTDOOR, type OutdoorPublico } from "@/office/data/outdoors";
 import { LOTE_POR_CHAVE, nomeNicho } from "@/office/data/mundo";
 
@@ -29,7 +29,7 @@ export async function listarOutdoors(euId: string | null): Promise<OutdoorPublic
   });
 }
 
-export async function alugarOutdoor(u: Usuario, slot: string, fraseIn: unknown, base: string): Promise<CobrancaPix> {
+export async function alugarOutdoor(u: Usuario, slot: string, fraseIn: unknown, base: string, opc: OpcoesCobranca = {}): Promise<CobrancaPix> {
   await migrar();
   if (u.banidoEm) throw new Error("Conta suspensa.");
   const vaga = OUTDOOR_POR_ID[slot]; if (!vaga) throw new Error("Outdoor não encontrado.");
@@ -43,7 +43,7 @@ export async function alugarOutdoor(u: Usuario, slot: string, fraseIn: unknown, 
     ON CONFLICT (slot) DO UPDATE SET usuario_id = EXCLUDED.usuario_id, terreno_chave = EXCLUDED.terreno_chave, frase = EXCLUDED.frase, reservado_ate = EXCLUDED.reservado_ate,
       pago_ate = CASE WHEN outdoor.usuario_id = EXCLUDED.usuario_id THEN outdoor.pago_ate ELSE NULL END, atualizado_em = now()`;
   const valor = ehAdmin(u) ? Math.round(PRECO_OUTDOOR * 100) / 10000 : PRECO_OUTDOOR; // admin paga 1/100 para testar de verdade
-  return criarCobrancaOutdoor(u, base, slot, valor, `WorkEnd · outdoor ${vaga.nome} · ${DIAS_OUTDOOR} dias (${lote.empresaNome})`);
+  return criarCobrancaOutdoor(u, base, slot, valor, `WorkEnd · outdoor ${vaga.nome} · ${DIAS_OUTDOOR} dias (${lote.empresaNome})`, opc);
 }
 
 // a frase pode ser trocada a qualquer momento por quem alugou (sem pagar de novo)

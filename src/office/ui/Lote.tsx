@@ -3,7 +3,10 @@
 // que reflete ao vivo na placa e no tapume do lote. Reservar precisa da conta do WorkEnd.
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES_EMPRESA, useAgora, promocaoAtiva } from "../mundoStore";
-import { NICHOS, bairroDoLote, nomeNicho, vizinhoDoLado } from "../data/mundo";
+import { NICHOS, bairroDoLote, nomeNicho } from "../data/mundo";
+// expandir o terreno e quiosques (20/11/2026)
+import { ExpandirTerreno } from "./ExpandirTerreno";
+import { QUIOSQUE_POR_CHAVE, ehQuiosque } from "../data/quiosques";
 import { NomearRua } from "./NomearRua";
 import { FotoPredio } from "./FotoPredio";
 import { useEscritorio } from "../store";
@@ -20,6 +23,8 @@ import { BotaoSeguir } from "./BotaoSeguir";
 import { PegarCupom } from "./PegarCupom";
 import { VitrineLoja } from "./VitrineLoja";
 import { PRACA_CHAVE } from "../data/praca";
+import { BotaoCobrar } from "./Cobrar";
+import { fmtCreditos } from "../creditosStore";
 
 // Contagem regressiva da reserva (usa o relógio do servidor); quando zera, recarrega (o lote volta a ficar livre)
 function useContagem(ate: string | null | undefined) {
@@ -44,7 +49,7 @@ const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms 
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 // Cotação do Pix do meu lote (12/11/2026): oferta de entrada (fundador, feira, indicação) e crédito de indicação
-interface Cotacao { valor: number; base: number; primeiroMes: number | null; oferta: { id: string; nome: string; desconto: number; detalhe: string } | null; creditoUsado: number; creditoDisponivel: number; admin: boolean }
+interface Cotacao { valor: number; base: number; primeiroMes: number | null; oferta: { id: string; nome: string; desconto: number; detalhe: string } | null; creditoUsado: number; creditoDisponivel: number; admin: boolean; extras?: number; loteExtra?: { dias: number; ate: string } }
 function useCotacao(chave: string | null, ligado: boolean, versao: string) {
   const [cot, setCot] = useState<{ k: string; c: Cotacao } | null>(null);
   const k = `${chave}|${versao}`;
@@ -109,10 +114,12 @@ export function PixAberto({ chave }: { chave: string }) {
     return () => clearInterval(t);
   }, [pendente, pix, conferir]);
   if (!pix || pix.lote !== chave) return null;
-  if (pix.tipo === "layout" && !painelEsc) return null; // o Pix da troca de prédio aparece dentro do painel do escritório
+  if ((pix.tipo === "layout" || pix.tipo === "modelo" || pix.tipo === "agente" || pix.tipo === "personalidade") && !painelEsc) return null; // aparecem dentro do painel do escritório
+  // quiosque e lote extra (20/11/2026) não montam escritório depois de pagar
+  const pixQuiosque = ehQuiosque(pix.lote), pixExtra = !!useMundo.getState().terrenos[pix.lote]?.anexoDe;
   const copiar = async () => { try { await navigator.clipboard.writeText(pix.codigo); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { window.prompt("Copie o código Pix:", pix.codigo); } };
   if (pix.status === "aprovado") return (
-    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]"><div className="font-bold"><Icone nome="check" tamanho={16} className="mr-1 inline align-[-3px]" />Pagamento confirmado!</div><div className="mt-1 text-xs">{pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : pix.tipo === "personagem" ? "Seu personagem está ativo por 30 dias. Clique no chão pra andar e nos outros pra conversar." : pix.tipo === "outdoor" ? "Seu anúncio já está no outdoor por 30 dias. Quem clicar nele vem até a sua loja." : pix.tipo === "barraca" ? "Sua barraca está garantida no sábado. Ela aparece na praça das 8h às 18h, com o seu nome na placa." : pix.tipo === "item" ? "Item liberado: o seu personagem já está usando." : "O chão é seu por 30 dias. Próximo passo: montar o escritório (prédio, salas e equipe)."}</div>{/* 17/11/2026: o "Fechar" daqui repetia o X do cartão; no Pix do lote o botão já leva ao próximo passo */}{pix.tipo === "lote" ? <button onClick={() => { fechar(); abrirEscritorio("predio"); }} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">Montar escritório agora</button> : <button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">Entendi</button>}</div>
+    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]" data-pago={pix.valor > 0 ? "pix" : "creditos"}><div className="font-bold"><Icone nome="check" tamanho={16} className="mr-1 inline align-[-3px]" />{pix.valor > 0 ? "Pagamento confirmado!" : `Pago com ${fmtCreditos(pix.creditos ?? 0)} créditos`}</div><div className="mt-1 text-xs">{pix.tipo === "agente" ? "O agente novo já está na equipe, com a personalidade escolhida. Salve o escritório quando terminar." : pix.tipo === "personalidade" ? "A personalidade nova já vale nas próximas conversas." : pix.tipo === "ia" ? "As unidades de IA já estão na empresa." : pix.tipo === "creditos" ? "Os créditos já estão na sua carteira." : pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : pix.tipo === "modelo" ? "Modelo comprado: o prédio novo já está no seu lote." : pix.tipo === "personagem" ? "Seu personagem está ativo por 30 dias. Clique no chão pra andar e nos outros pra conversar." : pix.tipo === "outdoor" ? "Seu anúncio já está no outdoor por 30 dias. Quem clicar nele vem até a sua loja." : pix.tipo === "barraca" ? "Sua barraca está garantida no sábado. Ela aparece na praça das 8h às 18h, com o seu nome na placa." : pix.tipo === "item" ? "Item liberado: o seu personagem já está usando." : pixQuiosque ? "Seu quiosque está aberto por 30 dias. A atendente já atende no balcão." : pixExtra ? "Terreno expandido: o seu prédio já ocupa os dois lotes e renova junto com o lote principal." : "O chão é seu por 30 dias. Próximo passo: montar o escritório (prédio, salas e equipe)."}</div>{/* 17/11/2026: o "Fechar" daqui repetia o X do cartão; no Pix do lote o botão já leva ao próximo passo */}{pix.tipo === "lote" && !pixQuiosque && !pixExtra ? <button onClick={() => { fechar(); abrirEscritorio("predio"); }} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">Montar escritório agora</button> : <button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">Entendi</button>}</div>
   );
   if (pix.status !== "pendente") return (
     <div className="mt-3 rounded-2xl bg-[#FDE8E8] px-3 py-3 text-sm text-[#8A2A2A]"><div className="font-bold">{pix.status === "expirado" ? "Este Pix expirou." : "Pagamento não aprovado."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-bold text-white">Gerar outro Pix</button></div>
@@ -120,6 +127,7 @@ export function PixAberto({ chave }: { chave: string }) {
   return (
     <div className="mt-3 rounded-2xl border border-[#16A34A]/30 bg-[#F3FBF5] p-3 text-sm">
       <div className="flex items-center justify-between"><div className="font-bold text-[#166534]">Pague {brl(pix.valor)} no Pix</div>{resta != null && <div className="text-xs text-[#5B6472]">vale {mmss(resta)}</div>}</div>
+      {(pix.creditos ?? 0) > 0 && <div className="mt-1 text-[11px] text-[#166534]">{fmtCreditos(pix.creditos ?? 0)} créditos já estão reservados para esta compra. Se o Pix não for pago, eles voltam para a sua carteira.</div>}
       {pix.qrBase64 && <img src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code Pix" className="mx-auto mt-2 h-44 w-44 rounded-xl bg-white p-1" />}
       <div className="mt-1 text-center text-[11px] text-[#5B6472]">Abra o app do seu banco, escolha Pix → ler QR Code, ou copie o código:</div>
       <button onClick={copiar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">{copiado ? "Código copiado ✓" : "Copiar código Pix (copia e cola)"}</button>
@@ -181,8 +189,6 @@ export function CartaoLote() {
   const pagar = useMundo((s) => s.pagar);
   const pixAberto = useMundo((s) => !!s.pix && s.pix.lote === s.loteSelecionado && s.pix.status === "pendente");
   const terrenos = useMundo((s) => s.terrenos);
-  const carregar = useMundo((s) => s.carregar);
-  const [ampliando, setAmpliando] = useState(false);
   const vagasDoLote = useMundo((s) => (s.loteSelecionado ? s.vagas[s.loteSelecionado] ?? 0 : 0));
   const agenteSelecionado = useEscritorio((s) => s.selecionado);
   const [confirma, setConfirma] = useState<string | null>(null); // lote cujo "Desistir" está aguardando confirmação
@@ -197,15 +203,11 @@ export function CartaoLote() {
   const principal = terreno?.anexoDe ? terrenos[terreno.anexoDe] : null;
   const ehAnexo = !!terreno?.anexoDe;
   const numeroPrincipal = (principal ? LOTE_POR_CHAVE[principal.chave]?.numero : null) ?? l.numero;
-  const anexoDeste = !ehAnexo && terreno ? Object.values(terrenos).find((t) => t.anexoDe === chave) ?? null : null;
-  // vizinho do lado pela posição física (nos quarteirões das sedes a chave não é a posição: data/mundo.ts › chaveDoLote)
-  const vizinhoInfo = vizinhoDoLado(l), vizinho = vizinhoInfo?.chave ?? "";
-  const vizinhoLivre = !!vizinhoInfo && vizinhoInfo.lote.tipo !== "praca" && !terrenos[vizinho];
-  const ampliar = async () => { setErro(null); setAmpliando(true); try { const r = await fetch(`/api/terrenos/${encodeURIComponent(vizinho)}/anexo`, { method: "POST" }); const j = await r.json().catch(() => ({})); if (!r.ok) { setErro(j.erro ?? `Erro ${r.status}`); return; } await carregar(); selecionarLote(vizinho); } finally { setAmpliando(false); } };
+  // expandir o terreno (20/11/2026): o botão, o realce e o Pix ficam em ui/ExpandirTerreno.tsx
   const livre = !terreno;
   const ativo = terreno?.status === "ativo";
   const diasRestantes = terreno?.pagoAte ? Math.ceil((new Date(terreno.pagoAte).getTime() - agora) / 86400000) : null;
-  const clicarPagar = async (meses = 1) => { setErro(null); const e = await pagar(meses); if (e) setErro(e); };
+  const clicarPagar = async (meses = 1, creditos = false) => { setErro(null); const e = await pagar(meses, "lote", creditos); if (e) setErro(e); };
   return (
     <div data-tour="cartao-loja" className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
@@ -252,16 +254,15 @@ export function CartaoLote() {
               <div className="text-xs text-[#5B6472]">{ehAnexo ? `Lote duplo com o Lote ${principal ? LOTE_POR_CHAVE[principal.chave]?.numero ?? "" : ""} · ` : ""}{ativo ? `${ehAnexo ? "ativo" : "Empresa ativa"} · até ${terreno.pagoAte ? dataBR(terreno.pagoAte) : "—"}` : resta != null ? `Reservado · expira em ${mmss(resta)}` : "Reservado"}</div>
             </div>
           </div>
-          {ehAnexo && ehMeu && !ativo && <div className="mt-2 rounded-2xl bg-[#EEF3FF] px-3 py-2 text-xs text-[#1D4ED8]">Pagando este lote, o seu prédio cresce e passa a ocupar os dois terrenos. Cada lote tem a sua mensalidade.</div>}
+          {ehAnexo && ehMeu && !ativo && <div className="mt-2 rounded-2xl bg-[#EEF3FF] px-3 py-2 text-xs text-[#1D4ED8]">Pagando este lote extra, o seu prédio cresce e passa a ocupar os dois terrenos. Depois ele renova junto com o Lote {numeroPrincipal}, num Pix só.</div>}
+          {ehAnexo && ehMeu && ativo && <div className="mt-2 rounded-2xl bg-[#EEF3FF] px-3 py-2 text-xs text-[#1D4ED8]">Lote extra: renova junto com o Lote {numeroPrincipal}, no Pix do lote principal.</div>}
           {ehAnexo && principal && <button onClick={() => selecionarLote(principal.chave)} className="mt-2 w-full rounded-xl bg-[#F1F3F6] px-3 py-2 text-xs font-semibold text-[#1D4ED8]">Ir para o lote principal (Lote {LOTE_POR_CHAVE[principal.chave]?.numero})</button>}
 
           {ehMeu && <PixAberto chave={chave} />}
           {ehMeu && !ativo && !pixAberto && (
             <>
               <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">Garanta o chão pagando o 1º mês agora. Sem pagamento, a reserva some em {resta != null ? mmss(resta) : `${minutos} min`}.</div>
-              {pagamentoLigado
-                ? <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Pagar ${brl(cot?.valor ?? preco)} no Pix · 1º mês`}</button>
-                : <div className="mt-2 rounded-xl bg-[#F1F3F6] px-3 py-2 text-center text-xs text-[#5B6472]">Pagamento em instantes: estamos ligando o Mercado Pago.</div>}
+              <BotaoCobrar valor={cot?.valor ?? preco} rotuloPix={cot?.loteExtra ? `Pagar ${brl(cot.valor)} no Pix · ${cot.loteExtra.dias} dia${cot.loteExtra.dias === 1 ? "" : "s"}, até ${dataBR(cot.loteExtra.ate).slice(0, 5)}` : `Pagar ${brl(cot?.valor ?? preco)} no Pix · 1º mês`} rotuloCreditos={cot?.loteExtra ? `Pagar ${cot.loteExtra.dias} dia${cot.loteExtra.dias === 1 ? "" : "s"} com créditos` : "Pagar o 1º mês com créditos"} pagando={pagando} pixLigado={pagamentoLigado} onPagar={(c) => clicarPagar(1, c)} />
               {pagamentoLigado && <ResumoPreco cot={cot} preco={preco} />}
               {pagamentoLigado && cot?.primeiroMes != null && cot.oferta?.id !== "indicado" && !cot.admin && <CodigoIndicacao aoAplicar={() => setRecargaCot((n) => n + 1)} />}
             </>
@@ -269,10 +270,10 @@ export function CartaoLote() {
           {ehMeu && ativo && diasRestantes != null && diasRestantes <= 7 && (
             <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">{diasRestantes > 0 ? `Vence em ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"}.` : "Vencido: você tem 5 dias de tolerância antes de o lote ficar livre."}</div>
           )}
-          {ehMeu && ativo && pagamentoLigado && !pixAberto && (
-            <button onClick={() => clicarPagar(1)} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `Renovar +30 dias · ${brl(cot?.valor ?? preco)} no Pix`}</button>
+          {ehMeu && ativo && pagamentoLigado && !pixAberto && !ehAnexo && (
+            <BotaoCobrar valor={cot?.valor ?? preco} rotuloPix={`Renovar +30 dias · ${brl(cot?.valor ?? preco)} no Pix${cot?.extras ? " · com o lote extra" : ""}`} rotuloCreditos={cot?.extras ? "Renovar +30 dias com o lote extra" : "Renovar +30 dias"} pagando={pagando} compacto onPagar={(c) => clicarPagar(1, c)} />
           )}
-          {ehMeu && ativo && pagamentoLigado && !pixAberto && <ResumoPreco cot={cot} preco={preco} />}
+          {ehMeu && ativo && pagamentoLigado && !pixAberto && !ehAnexo && <ResumoPreco cot={cot} preco={preco} />}
           {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
           {ehMeu && ativo && !ehAnexo && (
             // a equipe de IA do lote trabalha de verdade desde 11/11/2026; desde 16/11 a conversa abre aqui mesmo no mapa
@@ -289,6 +290,8 @@ export function CartaoLote() {
               {/* três ações principais (falar, entrar, montar) e o resto em "Mais opções" (17/11/2026, revisão geral:
                   eram 14 botões em 6 cores) */}
               <button onClick={() => abrirEscritorio("predio")} className="block w-full rounded-xl bg-[#EEF3FF] px-3 py-2.5 text-center text-sm font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]"><Icone nome="escritorio" tamanho={17} className="mr-1 inline align-[-3px]" />Montar escritório</button>
+              {/* expandir o terreno (20/11/2026): à vista, fora de "Mais opções" */}
+              <ExpandirTerreno chave={chave} />
               <details className="group mt-2 rounded-2xl bg-[#F6F7F9] px-2.5 py-1.5">
                 <summary className="flex cursor-pointer list-none items-center justify-between py-1 text-[13px] font-semibold text-[#1D2128]"><span className="inline-flex items-center gap-1.5"><Icone nome="ajustes" tamanho={16} />Mais opções da empresa</span><Icone nome="baixo" tamanho={15} className="transition group-open:rotate-180" /></summary>
                 <div className="pb-1.5 pt-1">
@@ -309,16 +312,6 @@ export function CartaoLote() {
               <PromocaoDono chave={chave} />
               <div className="mt-1.5"><FotoPredio chave={chave} /></div>
               <NomearRua />
-              {/* lote duplo: o vizinho do lado vira ampliação e o prédio cresce */}
-              {anexoDeste ? (
-                <button onClick={() => selecionarLote(anexoDeste.chave)} className="mt-2 w-full rounded-xl bg-[#EEF3FF] px-3 py-2 text-left text-xs text-[#1D4ED8]"><b>Lote duplo</b> com o Lote {LOTE_POR_CHAVE[anexoDeste.chave]?.numero} · {anexoDeste.status === "ativo" ? "ativo" : "reservado, falta pagar"} →</button>
-              ) : vizinhoLivre ? (
-                <div className="mt-2 rounded-2xl border border-dashed border-[#1D4ED8]/40 px-3 py-2.5">
-                  <div className="text-xs font-bold text-[#1D2128]">Lote duplo: prédio maior</div>
-                  <div className="mt-0.5 text-[11px] text-[#5B6472]">Compre o Lote {vizinhoInfo.numero}, aqui do lado, por {brl(preco)}/mês: seu prédio cresce e ocupa os dois terrenos, com a fachada mais larga da rua.</div>
-                  <button onClick={ampliar} disabled={ampliando} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{ampliando ? "Reservando…" : `Reservar o Lote ${vizinhoInfo.numero} para ampliar`}</button>
-                </div>
-              ) : null}
                 </div>
               </details>
             </div>
@@ -388,7 +381,7 @@ function PromocaoDono({ chave }: { chave: string }) {
   );
 }
 
-function LojaNoMapa({ numero, ativo, chave }: { numero: number; ativo: boolean; chave: string }) {
+export function LojaNoMapa({ numero, ativo, chave }: { numero: number; ativo: boolean; chave: string }) {
   const usuario = useMundo((s) => s.usuario);
   const vagas = useMundo((s) => s.vagas[chave] ?? 0);
   const terrenoLoja = useMundo((s) => s.terrenos[chave]);
@@ -419,7 +412,7 @@ function LojaNoMapa({ numero, ativo, chave }: { numero: number; ativo: boolean; 
 }
 
 // Admin: liberar ou banir direto do mapa
-function AcoesAdminLote({ chave }: { chave: string }) {
+export function AcoesAdminLote({ chave }: { chave: string }) {
   const carregar = useMundo((s) => s.carregar);
   const [motivo, setMotivo] = useState("");
   const [modo, setModo] = useState<"nada" | "banir">("nada");
@@ -495,13 +488,14 @@ export function PainelEmpresa() {
   const arquivo = useRef<HTMLInputElement>(null);
   if (!aberto || !chave || !rascunho) return null;
   const l = LOTE_POR_CHAVE[chave];
+  const qk = QUIOSQUE_POR_CHAVE[chave] ?? null; // quiosque (20/11/2026): só a atendente, sem CEO
   const editando = meu === chave;
   const enviar = async () => { setEnviando(true); setErro(null); const e = await reservar(); setEnviando(false); if (e) setErro(e); };
   return (
     <div className={`${FLUTUANTE} ${LARGO} painel-entra overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-[12px] font-bold text-[#1D4ED8]">Lote {l?.numero} · {editando ? "sua placa" : "montar minha empresa"}</div>
+          <div className="text-[12px] font-bold text-[#1D4ED8]">{qk ? `Quiosque ${qk.numero}` : `Lote ${l?.numero}`} · {editando ? (qk ? "seu letreiro" : "sua placa") : qk ? "abrir meu quiosque" : "montar minha empresa"}</div>
           <div className="text-lg font-bold">{editando ? "Editar a placa" : "Como vai se chamar?"}</div>
           <div className="text-xs text-[#5B6472]">Olhe o lote no mapa: a placa e o tapume mudam enquanto você preenche.</div>
         </div>
@@ -525,15 +519,15 @@ export function PainelEmpresa() {
           {NICHOS.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}
         </select>
       </label>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <label className="block text-xs font-semibold text-[#5B6472]">Quem é o CEO?
+      <div className={`mt-3 grid gap-2 ${qk ? "grid-cols-1" : "grid-cols-2"}`}>
+        {!qk && <label className="block text-xs font-semibold text-[#5B6472]">Quem é o CEO?
           <input value={rascunho.ceoNome} onChange={(e) => setRascunho({ ceoNome: e.target.value.slice(0, 24) })} placeholder="Ex.: Maria" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
-        </label>
+        </label>}
         <label className="block text-xs font-semibold text-[#5B6472]">Nome da atendente
           <input value={rascunho.atendenteNome} onChange={(e) => setRascunho({ atendenteNome: e.target.value.slice(0, 24) })} placeholder="Ex.: Ana" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
         </label>
       </div>
-      <div className="mt-1 text-[11px] text-[#5B6472]">Todo escritório nasce com um CEO e uma atendente; depois você edita, treina e contrata mais gente em “Montar escritório”.</div>
+      <div className="mt-1 text-[11px] text-[#5B6472]">{qk ? "O quiosque vem com a atendente, que atende quem chega no balcão; você treina ela depois." : "Todo escritório nasce com um CEO e uma atendente; depois você edita, treina e contrata mais gente em “Montar escritório”."}</div>
 
       <div className="mt-3 text-xs font-semibold text-[#5B6472]">Logomarca (opcional)</div>
       <div className="mt-1 flex items-center gap-3">

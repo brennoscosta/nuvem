@@ -21,6 +21,8 @@ import { Torre, Cobertura } from "./PredioTopo";
 import { PredioKit, RelogioKit } from "./KitPredio";
 import { ehKit, medidasKit, KIT_ANDARES, KIT_TOLDO, type KitId } from "../data/predios";
 import { LetreiroLed, VitrineJanela } from "./PredioFrente";
+import { TelaoModelo } from "./TelaoModelo";
+import type { MaterialFachada } from "../data/escritorio";
 import { PecaArea } from "./PecasArea";
 import { Inauguracao, LOTES_EM_OBRA_VISTOS, INAUGURAR_TESTE, easeSubida } from "./ObraFesta";
 import { plantaCliente, PREDIO_CLIENTE, ALT_PAREDE_CLIENTE, LAYOUT, DECOR_PADRAO, andaresDoPredio, alturaPredio, pecaEfetiva, LED_PADRAO, type Led, MAX_ANDARES, MAX_ANDARES_KIT, COBERTURAS, DIM_LAYOUT, type CoberturaId, INTERIOR_PADRAO, PISOS_INTERIOR, MOVEIS_INTERIOR, type Escritorio, type Membro, type SalaCliente, type Decoracao, type EstiloLetreiro, type PisoLote, type ExtraLote , DECORACAO_DISCRETA, type Interior, type PlantaCliente } from "../data/escritorio";
@@ -29,6 +31,8 @@ import { abrirChatEquipe } from "../ui/ChatEquipe";
 import { useFrame } from "@react-three/fiber";
 import { useEscritorio } from "../store";
 import { usePersonagem } from "../personagemStore";
+import { catracasCliente } from "../data/escritorio";
+import { Catracas } from "./Catraca";
 
 const FONTE = "/fonts/inter-700.woff";
 const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = PREDIO_CLIENTE;
@@ -45,10 +49,14 @@ function ExteriorKit({ chave, e, cor, nome, logo, duplo = false, contratando = f
   const cobertura = COBERTURA_TESTE ?? d.cobertura ?? "nenhuma", plana = cobertura !== "nenhuma";
   const m = medidasKit(id, andares, duplo, plana), lt = m.letreiro;
   const led = LED_TESTE ?? d.led;
+  // Sede corporativa (20/11/2026, data/modelos.ts › sede): nos dois lotes são duas torres de vidro gêmeas, com o saguão de
+  // vidro entre elas e uma passarela no meio (num lote duplo qualquer modelo fica largo: a sede tem de ser diferente)
+  const gemeas = e.modelo === "sede" && duplo;
   return (
     <group>
-      <PredioKit id={id} andares={andares} duplo={duplo} material={material} corFachada={corF} corMarca={cor} semente={chave} plana={plana} />
-      {plana && <group position={[m.topo.x, 0, 0]}><Cobertura tipo={cobertura} w={m.topo.w} d={m.topo.d} y={m.topo.y} cz={m.topo.cz} nome={nome} cor={cor} logo={logo} /></group>}
+      {gemeas ? <TorresGemeas chave={chave} andares={andares} material={material} corF={corF} cor={cor} /> : <PredioKit id={id} andares={andares} duplo={duplo} material={material} corFachada={corF} corMarca={cor} semente={chave} plana={plana} />}
+      {m.telao && <TelaoModelo nome={nome} cor={cor} logo={logo} telao={m.telao} />}
+      {plana && !gemeas && <group position={[m.topo.x, 0, 0]}><Cobertura tipo={cobertura} w={m.topo.w} d={m.topo.d} y={m.topo.y} cz={m.topo.cz} nome={nome} cor={cor} logo={logo} /></group>}
       <group position={[lt.x, 0, 0]}>
         <Letreiro nome={nome} cor={cor} logo={logo} y={lt.y} z={lt.z} largura={lt.largura} estilo={d.letreiro} />
         {led?.ligado && <LetreiroLed led={led} numero={numero} promo={promo} nome={nome} y={lt.y + 1.0} z={lt.z - 0.02} largura={lt.largura} />}
@@ -57,6 +65,26 @@ function ExteriorKit({ chave, e, cor, nome, logo, duplo = false, contratando = f
         {d.extras.includes("natal") && natalAtivo() && <NatalLetreiro y={lt.y} z={lt.z} largura={lt.largura} />}
       </group>
       {(d.vitrineJanela ?? true) && <VitrineJanela numero={numero} layout={e.layout} lugares={m.vitrine} z={m.vidroZ + 0.1} sx={1} sy={1} cor={cor} />}
+    </group>
+  );
+}
+// Torres gêmeas da Sede corporativa: duas torres do kit (13 m cada, nos centros x = ±8,4), saguão de vidro de 3,8 m entre
+// elas (o letreiro fica na platibanda dele) e a passarela de vidro na metade da altura
+export const X_GEMEAS = 8.4;
+function TorresGemeas({ chave, andares, material, corF, cor }: { chave: string; andares: number; material: MaterialFachada; corF: string; cor: string }) {
+  const m = medidasKit("torre", andares, false), meio = Math.max(1, Math.floor((m.n - 1) / 2)), yp = m.terreo + (meio - 1) * m.andar;
+  const gap = 2 * X_GEMEAS - m.w, vidro = mat("#9DB8CC", { rough: 0.08, metal: 0.5, opacity: 0.55 }), aco = mat("#2B3036", { metal: 0.5, rough: 0.4 });
+  return (
+    <group>
+      {[-X_GEMEAS, X_GEMEAS].map((x) => <group key={x} position={[x, 0, 0]}><PredioKit id="torre" andares={andares} duplo={false} material={material} corFachada={corF} corMarca={cor} semente={`${chave}${x}`} plana={false} /></group>)}
+      {/* saguão entre as torres */}
+      <mesh geometry={caixa(gap + 0.2, 0.3, m.z1 - m.z0 - 2)} material={aco} position={[0, m.terreo - 0.15, (m.z0 + m.z1) / 2 + 0.6]} castShadow />
+      <mesh geometry={caixa(gap, m.terreo - 0.35, 0.06)} material={vidro} position={[0, (m.terreo - 0.35) / 2 + 0.05, m.z0 + 0.4]} />
+      <mesh geometry={caixa(gap + 0.24, 0.5, 0.2)} material={aco} position={[0, m.terreo + 0.25, m.z0 + 0.4]} />
+      {/* passarela de vidro */}
+      <mesh geometry={caixa(gap + 0.4, 3.0, 4.0)} material={vidro} position={[0, yp + 1.5, (m.z0 + m.z1) / 2]} />
+      {[0.02, 3.0].map((dy) => <mesh key={dy} geometry={caixa(gap + 0.44, 0.16, 4.1)} material={aco} position={[0, yp + dy, (m.z0 + m.z1) / 2]} />)}
+      <mesh geometry={caixa(gap + 0.46, 0.06, 0.06)} material={mat(cor, { emissive: cor, ei: 0.8 })} position={[0, yp + 0.2, (m.z0 + m.z1) / 2 - 2.06]} />
     </group>
   );
 }
@@ -392,7 +420,8 @@ function MembroCena({ m, lugar, chave }: { m: Membro; lugar: { pos: [number, num
     else useMundo.getState().selecionarLote(chave);
   };
   // a atendente fala com quem chega na recepção (17/11/2026, ui/Recepcao.tsx)
-  const falaRec = usePersonagem((s) => (m.papel === "atendente" && s.falaRecepcao?.chave === chave ? s.falaRecepcao.texto : null));
+  // 20/11/2026: com membroId, quem fala é a pessoa do setor para onde a recepção mandou o visitante
+  const falaRec = usePersonagem((s) => { const f = s.falaRecepcao; return f && f.chave === chave && (f.membroId ? f.membroId === m.id : m.papel === "atendente") ? f.texto : null; });
   return (
     <group position={lugar.pos} rotation={[0, lugar.rot, 0]}>
       {falaRec && !hover && (
@@ -457,6 +486,7 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
         <>
           <Estatico key={"d" + assinatura}><InteriorFixo e={e} cor={cor} logo={logo} /></Estatico>
           {it?.quadros && <QuadrosLogo logo={logo} cor={cor} />}
+          <Catracas chave={chave} lista={catracasCliente(planta)} dentro={1} />
           {planta.salas.filter((s) => s.tipo !== "hall").map((s) => <NomeSala key={s.id} s={s} />)}
           {e.equipe.map((m) => { const lugar = planta.lugares[m.id]; return lugar ? <MembroCena key={m.id} m={m} lugar={lugar} chave={chave} /> : null; })}
         </>

@@ -8,6 +8,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { LOTES } from "@/office/data/mundo";
+import { QUIOSQUE_POR_NUMERO } from "@/office/data/quiosques";
 import { SEDE_POR_NUMERO, type Sede } from "@/office/data/sedes";
 import { rotuloLoja } from "@/office/data/numeroLoja";
 import { NaoEncontrada } from "../../_nao-encontrada";
@@ -54,7 +55,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function Pagina({ params }: Props) {
   const { numero } = await params;
   const n = Number(numero) | 0;
-  const lote = LOTES.find((x) => x.numero === n) ?? null;
+  // quiosque (20/11/2026): endereço próprio a partir de 101, com a mesma página
+  const quiosque = QUIOSQUE_POR_NUMERO[n] ?? null;
+  const lote = LOTES.find((x) => x.numero === n) ?? (quiosque ? { chave: quiosque.chave } : null);
   // lote duplo: o número da ampliação leva ao número da loja principal (um número só por loja, 17/11/2026)
   const t0 = lote ? await obterTerreno(lote.chave).catch(() => null) : null;
   const principal = t0?.anexoDe ? LOTES.find((x) => x.chave === t0.anexoDe) : null;
@@ -65,7 +68,7 @@ export default async function Pagina({ params }: Props) {
     // a loja não está aberta: endereço livre (dá para reservar) ou empresa montando o escritório
     const livre = !t0 || (t0.status !== "ativo" && t0.status !== "reservado");
     return livre
-      ? <NaoEncontrada livre chaveLote={lote.chave} titulo={`O lote ${n} está livre`} texto="Ninguém abriu loja neste endereço ainda. Reserve no mapa e ponha a marca da sua empresa na placa, com equipe de IA atendendo quem chega." />
+      ? <NaoEncontrada livre chaveLote={lote.chave} titulo={quiosque ? `O quiosque ${n} está livre` : `O lote ${n} está livre`} texto={quiosque ? "Ninguém abriu este quiosque ainda. Reserve no mapa, ponha a marca da sua empresa no toldo e tenha a atendente de IA no balcão." : "Ninguém abriu loja neste endereço ainda. Reserve no mapa e ponha a marca da sua empresa na placa, com equipe de IA atendendo quem chega."} />
       : <NaoEncontrada chaveLote={lote.chave} titulo="Esta loja não está aberta agora" texto="A empresa deste endereço está montando o escritório ou com o aluguel em dia por pagar. Enquanto isso, passeie pela cidade e conheça as outras lojas." />;
   }
   const u = await usuarioAtual().catch(() => null);

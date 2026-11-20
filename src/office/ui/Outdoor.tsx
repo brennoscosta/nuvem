@@ -1,10 +1,13 @@
 "use client";
 // Cartão do outdoor (12/11/2026): ver quem anuncia (e ir até a loja), ou alugar a vaga com a sua marca por 30 dias no Pix.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useModalOutdoor } from "../modalOutdoor";
 import { useMundo, LOTE_POR_CHAVE } from "../mundoStore";
 import { OUTDOOR_POR_ID, MAX_FRASE_OUTDOOR, DIAS_OUTDOOR } from "../data/outdoors";
 import { nomeNicho } from "../data/mundo";
 import { PixAberto } from "./Lote";
+import { BotaoCobrar } from "./Cobrar";
 import { FLUTUANTE, ESTREITO } from "./estilo";
 import { Icone } from "./Icone";
 
@@ -28,26 +31,60 @@ function Previa({ nome, cor, frase, nicho, logo }: { nome: string; cor: string; 
   );
 }
 
+// Modal do outdoor livre (20/11/2026, pedido do dono): o vídeo de propaganda completo (mudo até o visitante tocar em
+// "Ouvir com som"), onde o outdoor fica, o preço e "Anunciar aqui", que fecha o modal e deixa a compra à vista.
+function ModalOutdoor({ slot, preco, aoAnunciar, aoFechar }: { slot: string; preco: number; aoAnunciar: () => void; aoFechar: () => void }) {
+  const vaga = OUTDOOR_POR_ID[slot]; const video = useRef<HTMLVideoElement>(null); const [som, setSom] = useState(false);
+  useEffect(() => { const esc = (e: KeyboardEvent) => { if (e.key === "Escape") aoFechar(); }; window.addEventListener("keydown", esc); return () => window.removeEventListener("keydown", esc); }, [aoFechar]);
+  const ouvir = () => { const v = video.current; if (!v) return; v.muted = false; v.currentTime = 0; void v.play().catch(() => {}); setSom(true); };
+  return createPortal(
+    <div data-modal-outdoor className="fixed inset-0 z-[80] flex items-end justify-center bg-[#0B1220]/70 sm:items-center sm:p-4" onClick={aoFechar} role="dialog" aria-modal="true" aria-label="Anunciar neste outdoor">
+      <div className="painel-entra max-h-[100dvh] w-full max-w-[44rem] overflow-y-auto rounded-t-3xl bg-white text-[#1D2128] shadow-2xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+        <div className="relative bg-black">
+          <video ref={video} className="block aspect-video w-full" autoPlay muted playsInline loop={!som} controls={som} preload="auto" poster="/workend/outdoor/anuncie-outdoor.jpg">
+            <source src="/workend/outdoor/anuncie-outdoor.mp4" type='video/mp4; codecs="avc1.4D401F, mp4a.40.2"' />
+            <source src="/workend/outdoor/anuncie-outdoor.webm" type="video/webm" />
+          </video>
+          {!som && <button onClick={ouvir} className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-bold text-white hover:bg-black/80"><Icone nome="som" tamanho={15} />Ouvir com som</button>}
+          <button onClick={aoFechar} className="absolute right-3 top-3 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/75"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 p-4 sm:p-5">
+          <div className="min-w-0 flex-1 basis-64">
+            <div className="text-[12px] font-bold text-[#1D4ED8]">Outdoor livre · {vaga?.nome ?? slot}</div>
+            <div className="mt-0.5 text-2xl font-extrabold leading-tight">{brl(preco)} <span className="text-sm font-semibold text-[#5B6472]">a cada {DIAS_OUTDOOR} dias, no Pix</span></div>
+            <p className="mt-1 text-xs text-[#5B6472]">A logo, o nome e uma frase da sua loja num outdoor de 14,4 × 7,2 m, aceso à noite. Quem clica nele vai direto até a sua loja no mapa.</p>
+          </div>
+          <button data-anunciar-aqui onClick={aoAnunciar} className="w-full rounded-xl bg-[#16A34A] px-5 py-3 text-sm font-bold text-white hover:bg-[#15803d] sm:w-auto">Anunciar aqui</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function CartaoOutdoor() {
   const slot = useMundo((s) => s.outdoorSelecionado);
   const o = useMundo((s) => s.outdoors.find((x) => x.slot === s.outdoorSelecionado));
   const abrir = useMundo((s) => s.abrirOutdoor), selecionarLote = useMundo((s) => s.selecionarLote), pagar = useMundo((s) => s.pagarOutdoor), carregar = useMundo((s) => s.carregarOutdoors);
   const usuario = useMundo((s) => s.usuario), meu = useMundo((s) => s.meu), terrenos = useMundo((s) => s.terrenos), preco = useMundo((s) => s.precoOutdoor);
   const pagamentoLigado = useMundo((s) => s.pagamentoLigado), pagando = useMundo((s) => s.pagando);
-  const pixAberto = useMundo((s) => !!s.pix && s.pix.lote === `outdoor:${s.outdoorSelecionado}` && s.pix.status === "pendente");
+  const pixAberto = useMundo((s) => !!s.pix && s.pix.lote === `outdoor:${s.outdoorSelecionado}` && (s.pix.status === "pendente" || s.pix.status === "aprovado"));
   const [frase, setFrase] = useState<{ de: string; texto: string } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [salvo, setSalvo] = useState(false);
+  const modal = useModalOutdoor((s) => s.slot), abrirModal = useModalOutdoor((s) => s.abrir);
   if (!slot) return null;
   const vaga = OUTDOOR_POR_ID[slot]; if (!vaga) return null;
   const meuLote = meu ? terrenos[meu] : undefined; const loteAtivo = meuLote?.status === "ativo";
   const texto = frase?.de === slot ? frase.texto : o?.meu ? o.frase : "";
   const setTexto = (t: string) => setFrase({ de: slot, texto: t.slice(0, MAX_FRASE_OUTDOOR) });
-  const alugar = async () => { setErro(null); const e = await pagar(slot, texto); if (e) setErro(e); };
+  const alugar = async (creditos = false) => { setErro(null); const e = await pagar(slot, texto, creditos); if (e) setErro(e); };
   const salvarFrase = async () => { setErro(null); const r = await fetch(`/api/outdoors/${slot}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ frase: texto }) }); if (!r.ok) setErro(((await r.json().catch(() => ({}))) as { erro?: string }).erro ?? "Não deu."); else { setSalvo(true); setTimeout(() => setSalvo(false), 1600); void carregar(); } };
   const ativoOutro = o?.status === "ativo" && !o.meu;
   return (
-    <div className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
+    <>
+    {modal === slot && !ativoOutro && <ModalOutdoor slot={slot} preco={preco} aoAnunciar={() => abrirModal(null)} aoFechar={() => { abrirModal(null); abrir(null); }} />}
+    <div data-cartao-outdoor className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div><div className="text-[12px] font-bold text-[#1D4ED8]">WorkEnd · Outdoor</div><div className="text-lg font-bold">{vaga.nome}</div><div className="text-xs text-[#5B6472]">14,4 × 7,2 m, com refletores à noite · {brl(preco)} por {DIAS_OUTDOOR} dias</div></div>
         <button onClick={() => abrir(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
@@ -81,14 +118,15 @@ export function CartaoOutdoor() {
               </label>
               <div className="mt-1 text-[11px] text-[#5B6472]">Só texto: o anúncio usa o nome, a cor e a logo da {meuLote.empresaNome} (Lote {LOTE_POR_CHAVE[meuLote.chave]?.numero}).</div>
               {o?.meu && o.status === "ativo" && <button onClick={salvarFrase} className="mt-2 w-full rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm font-semibold text-[#1D4ED8]">{salvo ? "Frase salva ✓" : "Salvar a frase"}</button>}
-              {pixAberto ? <PixAberto chave={`outdoor:${slot}`} /> : pagamentoLigado ? (
-                <button onClick={alugar} disabled={pagando} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{pagando ? "Gerando o Pix…" : `${o?.meu && o.status === "ativo" ? "Renovar +30 dias" : "Alugar"} · ${brl(preco)} no Pix`}</button>
-              ) : <div className="mt-2 rounded-xl bg-[#F1F3F6] px-3 py-2 text-center text-xs text-[#5B6472]">Pagamento em instantes.</div>}
+              {pixAberto ? <PixAberto chave={`outdoor:${slot}`} /> : (
+                <BotaoCobrar valor={preco} rotuloPix={`${o?.meu && o.status === "ativo" ? "Renovar +30 dias" : "Alugar"} · ${brl(preco)} no Pix`} rotuloCreditos={o?.meu && o.status === "ativo" ? "Renovar +30 dias" : "Alugar com créditos"} pagando={pagando} pixLigado={pagamentoLigado} onPagar={(c) => void alugar(c)} />
+              )}
             </>
           )}
         </>
       )}
       {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
     </div>
+    </>
   );
 }

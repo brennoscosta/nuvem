@@ -11,18 +11,19 @@
 import * as THREE from "three";
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useCamera, joystick, type ComandoCamera } from "../cameraStore";
-import { minhaPos, usePersonagem } from "../personagemStore";
+import { useCamera, joystick, RAIO_MAXIMO, cameraInfo, type ComandoCamera } from "../cameraStore";
+import { minhaPos, usePersonagem, acessoNoPredio } from "../personagemStore";
 import { useMundo } from "../mundoStore";
 import { useEscritorio } from "../store";
 import { LOTE_POR_CHAVE, PASSO, MEIO_Q, MUNDO, N } from "../data/mundo";
 import { PRACA_CHAVE } from "../data/praca";
 import { caminhar, livre } from "../data/caminhos";
-import { plantaPorChave, caminharDentro, livreDentro, dentroDoPredio, paraMundo } from "../data/plantaInterna";
+import { plantaPorChave, caminharDentro, livreDentro, dentroDoPredio, paraMundo, zonaNoMundo, podeEntrarEm } from "../data/plantaInterna";
 import { caixasDaCidade, primeiraBatida, type Caixa } from "../data/obstaculos";
 import { registrarPonte, tirarFotoPredio } from "./fotoPredio";
 
-const MIN_RAIO = 6, MAX_RAIO = 119;
+// 20/11/2026: o máximo subiu 30% (cameraStore › RAIO_MAXIMO)
+const MIN_RAIO = 6, MAX_RAIO = RAIO_MAXIMO;
 const POLAR_PADRAO = 0.95, POLAR_CIMA = 0.36, POLAR_RUA = 1.27;
 export interface Controles {
   target: THREE.Vector3; maxPolarAngle: number; autoRotate: boolean; autoRotateSpeed: number;
@@ -195,8 +196,9 @@ function aFrente(atraso: number): [number, number] {
   const v = usePersonagem.getState().veiculo ? Math.min(minhaPos.vel, 8) * atraso : 0;
   frente[0] = Math.sin(minhaPos.rot) * v; frente[1] = Math.cos(minhaPos.rot) * v; return frente;
 }
-// para onde a câmera olha (alvo no chão e direção), lido pelo mini-mapa a cada quadro (12/11/2026)
-export const cameraInfo = { x: 0, z: 0, ang: 0, pronto: false };
+// para onde a câmera olha (alvo no chão e direção), lido pelo mini-mapa a cada quadro (12/11/2026); mora no cameraStore
+// desde 20/11/2026 (a névoa do CicloDia também lê, sem importar este arquivo)
+export { cameraInfo };
 function quadroDrone(x: Ctx, dt: number) {
   const r = x.rota; if (!r) return;
   r.u = (r.u + (6.5 * dt) / r.comprimento) % 1; // 6,5 m/s pela rota
@@ -221,7 +223,7 @@ function quadroAndar(x: Ctx, dt: number) {
   const dentro = !!pd && (pd.fase === "recepcao" || pd.fase === "dentro"), preso = !!pd && (pd.fase === "entrando" || pd.fase === "saindo");
   const mundo = useMundo.getState();
   const pl = dentro && pd ? plantaPorChave(pd.chave, mundo.terrenos) : null;
-  const publico = !!pd && !mundo.meus.includes(pd.chave);
+  const publico = pd ? acessoNoPredio(pd) : false; // visitante: só a recepção ou o caminho que a recepção liberou
   const passo = (dx: number, dz: number) => (pl ? caminharDentro(pl, minhaPos.x, minhaPos.z, dx, dz, publico) : caminhar(minhaPos.x, minhaPos.z, dx, dz));
   if (mov.lengthSq() > 0.02 && !preso) {
     // o boneco anda até um ponto 2,6 m à frente (4,5 m de bicicleta), renovado várias vezes por segundo (a cena dele faz
@@ -393,7 +395,7 @@ export function CameraMundo({ controles, inicio }: { controles: React.RefObject<
     gl.domElement.addEventListener("dblclick", dbl); gl.domElement.addEventListener("pointerdown", toque); gl.domElement.addEventListener("wheel", toque, { passive: true });
     // foto do meu prédio (ui/FotoPredio) usa a mesma câmera e o mesmo desenho
     registrarPonte({ gl, scene, camera: camera as THREE.PerspectiveCamera, controles: x.c, pararModos: () => { if (useCamera.getState().drone) pararDrone(x); if (useCamera.getState().andar) sairAndar(x); useCamera.getState().set({ seguir: false, passeio: false }); x.c.autoRotate = false; x.anim = null; } });
-    if (MEDIR) Object.assign(window, { __minhaPos: minhaPos, __fotoPredio: tirarFotoPredio, __camInfo: cameraInfo, __livre: livre, __personagem: usePersonagem, __planta: { porChave: (k: string) => plantaPorChave(k, useMundo.getState().terrenos), livreDentro, dentroDoPredio, paraMundo }, __camera: useCamera, __desvio: x.desvio, __obstaculos: { caixas: caixasAgora, primeiraBatida } });
+    if (MEDIR) Object.assign(window, { __minhaPos: minhaPos, __fotoPredio: tirarFotoPredio, __camInfo: cameraInfo, __livre: livre, __personagem: usePersonagem, __planta: { porChave: (k: string) => plantaPorChave(k, useMundo.getState().terrenos), livreDentro, dentroDoPredio, paraMundo, zonaNoMundo, podeEntrarEm }, __camera: useCamera, __desvio: x.desvio, __obstaculos: { caixas: caixasAgora, primeiraBatida } });
     // ?drone=1 liga o voo quando a cidade já abriu
     const q = new URLSearchParams(window.location.search);
     const tDrone = q.get("drone") === "1" ? setTimeout(() => { if (!useCamera.getState().drone) useCamera.getState().pedir("drone"); }, 2500) : null;

@@ -23,7 +23,11 @@ export const useAgora = () => useSyncExternalStore(assinarRelogio, () => agoraRe
 export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
 export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null; ceoNome: string; atendenteNome: string; nicho: string }
 export type AbaEscritorio = "predio" | "visual" | "interior" | "setores" | "equipe" | "contratar" | "treinar";
-export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" | "personagem" | "outdoor" | "barraca" | "item" }
+// creditos: o que a carteira de créditos cobriu (20/11/2026); valor é só a parte do Pix (0 = pago todo com créditos)
+// modelo (20/11/2026, frente predios): compra de um modelo de prédio do catálogo (data/modelos.ts); `modelo` diz qual
+export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" | "personagem" | "outdoor" | "barraca" | "item" | "creditos" | "agente" | "ia" | "personalidade" | "modelo"; creditos?: number; modelo?: string }
+// resposta de qualquer rota de pagamento (mercadopago.ts › cobrar): Pix pendente ou já aprovado com créditos
+export interface RespostaCobranca { id: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status?: "pendente" | "aprovado"; creditos?: number }
 // praça de eventos e feira de sábado (12/11/2026)
 export interface EventoPraca { id: string; titulo: string; descricao: string; link: string; inicio: string; fim: string; meu: boolean; empresa: { nome: string; cor: string; numero: number | null; chave: string | null; logo: string | null } }
 export interface BarracaFeira { vaga: number; status: "livre" | "reservada" | "paga"; meu: boolean; nome: string; descricao: string; cor: string; tipo: string; contato: { whatsapp?: string; instagram?: string } }
@@ -35,6 +39,8 @@ export { LOTES, LOTE_POR_CHAVE, NOME_CONSTRUCAO, descricaoLote, type LoteInfo } 
 import { LOTE_POR_CHAVE } from "./data/mundo";
 import { OUTDOOR_POR_ID, type OutdoorPublico } from "./data/outdoors";
 import { PRACA_CHAVE } from "./data/praca";
+import { useCreditos, novoIdem } from "./creditosStore";
+import { QUIOSQUE_POR_CHAVE, balcaoDoQuiosque } from "./data/quiosques";
 
 // Estamos no mapa do WorkEnd (workend.online/mundo)? Aí o login é o do WorkEnd, não o do admin da Nuvem.
 export const modoMundo = () => typeof window !== "undefined" && (window.location.pathname.startsWith("/mundo") || new URLSearchParams(window.location.search).has("mundo"));
@@ -73,11 +79,14 @@ interface Estado {
   vagas: Record<string, number>; // vagas abertas por lote (placa "Estamos contratando")
   praca: Praca | null; carregarPraca: () => Promise<void>;
   abrirPix: (p: Pix) => void; // Pix de barraca e de roupa do personagem (criados fora do cartão do lote)
+  // cobrança única (20/11/2026): abre o Pix ou, se já foi pago com créditos, mostra o "confirmado" e recarrega
+  abrirCobranca: (j: RespostaCobranca, lote: string, tipo: Pix["tipo"], extra?: { modelo?: string }) => Promise<void>;
+  aposAprovado: (p: Pix) => Promise<void>;
   // outdoors nas avenidas (12/11/2026)
   outdoors: OutdoorPublico[]; precoOutdoor: number; outdoorSelecionado: string | null;
   carregarOutdoors: () => Promise<void>;
   abrirOutdoor: (slot: string | null) => void;
-  pagarOutdoor: (slot: string, frase: string) => Promise<string | null>;
+  pagarOutdoor: (slot: string, frase: string, creditos?: boolean) => Promise<string | null>;
   carregar: () => Promise<void>;
   selecionarLote: (chave: string | null) => void;
   setLoteHover: (chave: string | null) => void;
@@ -86,7 +95,7 @@ interface Estado {
   setRascunho: (r: Partial<Rascunho>) => void;
   reservar: () => Promise<string | null>;
   desistir: () => Promise<string | null>;
-  pagar: (meses?: number, tipo?: "lote" | "layout" | "personagem") => Promise<string | null>;
+  pagar: (meses?: number, tipo?: "lote" | "layout" | "personagem" | "modelo", creditos?: boolean, modelo?: string) => Promise<string | null>;
   conferirPagamento: (ref: string) => Promise<string>;
   fecharPix: () => void;
   abrirEscritorio: (aba?: AbaEscritorio) => void;
@@ -102,16 +111,49 @@ export const useMundo = create<Estado>((set, get) => ({
   vagas: {}, praca: null,
   carregarPraca: async () => { const j = await fetch("/api/workend/praca", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null); if (j?.agenda) set({ praca: j as Praca }); },
   abrirPix: (p) => set({ pix: p }),
+  abrirCobranca: async (j, lote, tipo, extra) => {
+    const p: Pix = { id: j.id, lote, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: j.status === "aprovado" ? "aprovado" : "pendente", tipo, creditos: j.creditos ?? 0, ...(extra?.modelo ? { modelo: extra.modelo } : {}) };
+    set({ pix: p });
+    void useCreditos.getState().carregar();
+    if (p.status === "aprovado") await get().aposAprovado(p);
+  },
+  // Pagamento confirmado (Pix ou créditos): recarrega o que mudou e atualiza o rascunho do escritório aberto
+  aposAprovado: async (pix) => {
+    const antes = new Set((get().terrenos[pix.lote]?.escritorio?.equipe ?? []).map((m) => m.id));
+    await get().carregar();
+    void useCreditos.getState().carregar();
+    if (pix.tipo === "outdoor") await get().carregarOutdoors();
+    if (pix.tipo === "barraca") await get().carregarPraca();
+    if (pix.tipo === "personagem" || pix.tipo === "item") { const { usePersonagem } = await import("./personagemStore"); await usePersonagem.getState().carregar(); }
+    const t = get().terrenos[pix.lote]; const r = get().rascunhoEscritorio;
+    // modelo comprado com o painel aberto (frente predios): o servidor já trocou o prédio; o rascunho fica com o modelo e a compra
+    if (pix.tipo === "modelo" && t?.escritorio && r) set({ rascunhoEscritorio: { ...r, layout: t.escritorio.layout, modelo: t.escritorio.modelo, modelosComprados: t.escritorio.modelosComprados } });
+    // crédito de troca de prédio comprado com o painel aberto: atualiza os contadores do rascunho
+    if (pix.tipo === "layout" && t?.escritorio && r) set({ rascunhoEscritorio: { ...r, trocasLayout: t.escritorio.trocasLayout, creditosLayout: t.escritorio.creditosLayout } });
+    // agente comprado (ou personalidade trocada) com o painel aberto: o membro novo e o setor dele entram no rascunho
+    if ((pix.tipo === "agente" || pix.tipo === "personalidade") && t?.escritorio && r) {
+      const novos = pix.tipo === "agente" ? t.escritorio.equipe.filter((m) => !antes.has(m.id) && !r.equipe.some((x) => x.id === m.id)) : [];
+      const setores = [...r.setores];
+      for (const m of novos) {
+        const s = t.escritorio.setores.find((x) => x.id === m.setorId); if (!s) continue;
+        const i = setores.findIndex((x) => x.id === s.id);
+        if (i < 0) setores.push(s); else if (setores[i].mesas < s.mesas) setores[i] = { ...setores[i], mesas: s.mesas };
+      }
+      const doServidor = new Map(t.escritorio.equipe.map((m) => [m.id, m]));
+      const equipe = r.equipe.map((m) => { const s = doServidor.get(m.id); return s ? { ...m, personalidadeId: s.personalidadeId, escopo: s.escopo, nome: pix.tipo === "agente" ? m.nome : m.nome } : m; });
+      set({ rascunhoEscritorio: { ...r, setores, equipe: [...equipe, ...novos] } });
+    }
+  },
   outdoors: [], precoOutdoor: 29.9, outdoorSelecionado: null,
   carregarOutdoors: async () => { const j = await fetch("/api/outdoors", { cache: "no-store" }).then((r) => r.json()).catch(() => null); if (j?.vagas) set({ outdoors: j.vagas, precoOutdoor: j.preco ?? 29.9 }); },
   abrirOutdoor: (slot) => { const v = slot ? OUTDOOR_POR_ID[slot] : null; set({ outdoorSelecionado: v ? slot : null, loteSelecionado: v ? null : get().loteSelecionado, painelEmpresa: false, painelEscritorio: false, alvoCamera: v ? [v.pos[0] * 0.82, 0.5, v.pos[1] * 0.82] : get().alvoCamera }); },
-  pagarOutdoor: async (slot, frase) => {
+  pagarOutdoor: async (slot, frase, creditos = false) => {
     set({ pagando: true });
     try {
-      const r = await fetch(`/api/outdoors/${encodeURIComponent(slot)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ frase }) });
+      const r = await fetch(`/api/outdoors/${encodeURIComponent(slot)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ frase, creditos, idem: novoIdem() }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return j.erro ?? `Erro ${r.status}`;
-      set({ pix: { id: j.id, lote: `outdoor:${slot}`, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: "pendente", tipo: "outdoor" } });
+      await get().abrirCobranca(j, `outdoor:${slot}`, "outdoor");
       void get().carregarOutdoors(); return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },
@@ -135,7 +177,7 @@ export const useMundo = create<Estado>((set, get) => ({
       const sedePedida = sedeDoParametro(busca?.get("sede")); // ?sede=1 (Social RP) ou ?sede=<id da sede>
       if (sedePedida) get().selecionarLote(sedePedida.chave);
       const pedido = busca?.get("lote") ?? null;
-      if (pedido && LOTE_POR_CHAVE[pedido] && !get().loteSelecionado) { get().selecionarLote(pedido); if (u && u.id && !terrenos[pedido] && pedido !== PRACA_CHAVE && !busca?.get("pagamento")) get().abrirPainel(); }
+      if (pedido && (LOTE_POR_CHAVE[pedido] || QUIOSQUE_POR_CHAVE[pedido]) && !get().loteSelecionado) { get().selecionarLote(pedido); if (u && u.id && !terrenos[pedido] && pedido !== PRACA_CHAVE && !busca?.get("pagamento")) get().abrirPainel(); }
     } catch (e) { console.warn("[mundo] sem servidor:", e); set({ carregado: true }); }
   },
 
@@ -143,6 +185,10 @@ export const useMundo = create<Estado>((set, get) => ({
     // a sede do OneState não é um lote da lista: abre o cartão dela (src/office/ui/CartaoOneState.tsx)
     const sd = sedeDe(chave);
     if (sd) { const [x, z] = frenteDaSede(sd, 0); set({ loteSelecionado: null, alvoCamera: [x, 0.5, z], giroCamera: sd.rot }); useSede.setState({ aberto: true, id: sd.id }); return; }
+    // quiosque (20/11/2026, data/quiosques.ts): fora da lista de lotes; a câmera olha o balcão
+    const qk = chave ? QUIOSQUE_POR_CHAVE[chave] : null;
+    // giroCamera: a câmera olha pelo lado do balcão (no calçadão e na orla o balcão não está virado para o sul)
+    if (qk && chave) { const [bx, bz] = balcaoDoQuiosque(qk); set({ outdoorSelecionado: null, loteSelecionado: chave, painelEmpresa: false, rascunho: null, painelEscritorio: false, rascunhoEscritorio: null, alvoCamera: [(qk.pos[0] + bx) / 2, 0.5, (qk.pos[1] + bz) / 2], giroCamera: qk.rot }); return; }
     const l = chave ? LOTE_POR_CHAVE[chave] : null;
     // lote duplo ativo: a câmera vai para o meio dos dois terrenos, onde fica o prédio
     let alvo: [number, number, number] | null = l ? [l.centro[0], 0.5, l.centro[1]] : null;
@@ -189,14 +235,14 @@ export const useMundo = create<Estado>((set, get) => ({
   },
 
   // Gera o Pix (QR Code + copia e cola) e mostra no cartão do lote; o mapa confere o pagamento a cada poucos segundos
-  pagar: async (meses = 1, tipo = "lote") => {
+  pagar: async (meses = 1, tipo = "lote", creditos = false, modelo) => {
     const { loteSelecionado } = get(); if (!loteSelecionado) return "Escolha um lote.";
     set({ pagando: true });
     try {
-      const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/pagar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ meses, tipo }) });
+      const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/pagar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ meses, tipo, creditos, idem: novoIdem(), ...(modelo ? { modelo } : {}) }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return j.erro ?? `Erro ${r.status}`;
-      set({ pix: { id: j.id, lote: loteSelecionado, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: "pendente", tipo } });
+      await get().abrirCobranca(j, loteSelecionado, tipo, modelo ? { modelo } : undefined);
       return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },
@@ -207,15 +253,7 @@ export const useMundo = create<Estado>((set, get) => ({
     const status = r.ok ? (j.status as string) : "erro";
     const { pix } = get();
     if (pix && pix.id === ref) {
-      if (status === "aprovado") {
-        set({ pix: { ...pix, status: "aprovado" } }); await get().carregar();
-        if (pix.tipo === "outdoor") await get().carregarOutdoors();
-        if (pix.tipo === "barraca") await get().carregarPraca();
-        if (pix.tipo === "personagem") { const { usePersonagem } = await import("./personagemStore"); await usePersonagem.getState().carregar(); }
-        // crédito de troca de prédio comprado com o painel aberto: atualiza os contadores do rascunho
-        const t = get().terrenos[pix.lote]; const r = get().rascunhoEscritorio;
-        if (pix.tipo === "layout" && t?.escritorio && r) set({ rascunhoEscritorio: { ...r, trocasLayout: t.escritorio.trocasLayout, creditosLayout: t.escritorio.creditosLayout } });
-      }
+      if (status === "aprovado") { set({ pix: { ...pix, status: "aprovado" } }); await get().aposAprovado(pix); }
       else if (status === "rejeitado" || status === "cancelado" || status === "estornado") set({ pix: { ...pix, status: "rejeitado" } });
       else if (new Date(pix.expiraEm).getTime() < Date.now()) set({ pix: { ...pix, status: "expirado" } });
     } else await get().carregar();

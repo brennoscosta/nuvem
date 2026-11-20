@@ -3,6 +3,7 @@
 // Presença por batida: a cada 3 s mando minha posição e recebo quem está por perto. Chat por consulta a cada 2,5 s.
 import { create } from "zustand";
 import { useMundo } from "./mundoStore";
+import { novoIdem } from "./creditosStore";
 import type { TipoAvatar, Visual } from "./data/bonecos";
 import { pontoNaCalcada } from "./data/mundo";
 import { useChamada, type ChamadaInfo } from "./chamadaStore";
@@ -10,7 +11,8 @@ import { rota, livre, pontoLivre, type Ponto } from "./data/caminhos";
 import { corDaBicicleta, ehVeiculo, COR_BICICLETA_PADRAO, type IdVeiculo, type VeiculoPublico } from "./data/veiculos";
 import type { Entrada } from "./data/entradas";
 import { useSede } from "./sedeStore";
-import { plantaPorChave, rotaDentro, dentroDoPredio, areaDaEquipe, portaDentroMundo } from "./data/plantaInterna";
+import { plantaPorChave, rotaDentro, dentroDoPredio, areaDaEquipe, portaDentroMundo, podeEntrarEm, liberarCaminho, pontoDeAtendimento, paraMundo, type Acesso, type AcessoLiberado } from "./data/plantaInterna";
+import type { Destino } from "./data/recepcao";
 
 // Dentro de um prédio (17/11/2026, pedido do dono: "preciso que possa entrar, e que apareça uma porta ou se direcione para a
 // recepção onde será atendido"): o personagem vai pela rua até a calçada da porta (indo), passa pela porta e anda até o
@@ -19,7 +21,16 @@ import { plantaPorChave, rotaDentro, dentroDoPredio, areaDaEquipe, portaDentroMu
 // "dentro": andando livre por dentro (17/11/2026, data/plantaInterna.ts): dono e sócio por todo o prédio; visitante na
 // recepção, no hall e no corredor/café
 export type FasePredio = "indo" | "entrando" | "recepcao" | "dentro" | "saindo";
-export type PredioAtual = Pick<Entrada, "chave" | "nome" | "numero" | "fora" | "porta" | "espera" | "olhar" | "centro"> & { fase: FasePredio; visita: number; fila: number; esperaMs: number };
+// 20/11/2026 (pedido do dono: o visitante só tem acesso à recepcionista, que o encaminha para o setor): `liberado` é o
+// setor para onde a recepção mandou o visitante, com o caminho que a catraca liberou (data/plantaInterna.ts ›
+// liberarCaminho), onde ele para (ponto) e quem atende (agente). `atendido`: a recepção já falou com ele nesta visita.
+export type Liberado = Destino & { acesso: AcessoLiberado; ponto: [number, number]; agente: [number, number]; chegou: boolean };
+export type PredioAtual = Pick<Entrada, "chave" | "nome" | "numero" | "fora" | "porta" | "espera" | "olhar" | "centro"> & { fase: FasePredio; visita: number; fila: number; esperaMs: number; atendido?: boolean; liberado?: Liberado | null };
+// o que o meu personagem pode usar por dentro deste prédio: dono e sócio, tudo; visitante, a recepção ou o caminho liberado
+export function acessoNoPredio(p: Pick<PredioAtual, "chave" | "liberado">): Acesso {
+  if (useMundo.getState().meus.includes(p.chave)) return false;
+  return p.liberado ? p.liberado.acesso : true;
+}
 
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
 // perfil profissional (11/11/2026): aparece na ficha e na busca de profissionais
@@ -68,13 +79,14 @@ interface Estado {
   itens: { comprados: string[]; usando: string[] } | null;
   carregarItens: () => Promise<void>;
   vestir: (usando: string[]) => Promise<string | null>;
-  comprarItem: (id: string) => Promise<string | null>;
+  comprarItem: (id: string, creditos?: boolean) => Promise<string | null>;
   carregar: () => Promise<void>;
-  salvar: (d: { nome: string; tipo: string; bio: string; redes: Redes; mostrarRedes: boolean; perfil?: Perfil; visual?: Visual }) => Promise<string | null>;
-  pagar: (meses?: number) => Promise<string | null>;
+  salvar: (d: { nome: string; tipo: string; bio: string; redes: Redes; mostrarRedes: boolean; perfil?: Perfil; visual?: Visual; acessorios?: string[] }) => Promise<string | null>;
+  pagar: (meses?: number, creditos?: boolean) => Promise<string | null>;
   abrir: (painel: Estado["painel"]) => void;
   predio: PredioAtual | null; // em que prédio estou entrando, estou ou estou saindo
-  falaRecepcao: { chave: string; texto: string } | null; // o que a atendente está dizendo (balão na cena)
+  falaRecepcao: { chave: string; texto: string; membroId?: string } | null; // o que a atendente (ou, com membroId, quem atende no setor) está dizendo (balão na cena)
+  encaminhar: (d: Destino) => string | null; // a recepção mandou para um setor: libera a catraca e leva o personagem (null = foi)
   entrarNoPredio: (e: Entrada) => void;
   sairDoPredio: () => void;
   andarNoPredio: (x: number, z: number) => void; // tocar no chão estando dentro (ou fora: sai pela porta e segue na rua)
@@ -132,12 +144,13 @@ export const usePersonagem = create<Estado>((set, get) => ({
     set({ meu: meu ? { ...meu, acessorios: lista } : meu, itens: { comprados: itens?.comprados ?? [], usando: lista } });
     return null;
   },
-  // Pix da roupa: reaproveita o painel de Pix do mapa (chave "item:<id>"); aprovado, o servidor já veste o item
-  comprarItem: async (id) => {
-    const r = await fetch("/api/workend/itens", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ comprar: id }) });
+  // Pix da roupa: reaproveita o painel de Pix do mapa (chave "item:<id>"); aprovado, o servidor já veste o item.
+  // É a única função do cliente que cobra um item do personagem (acessórios pagos e roupas premium, 20/11/2026).
+  comprarItem: async (id, creditos = false) => {
+    const r = await fetch("/api/workend/itens", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ comprar: id, creditos, idem: novoIdem() }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return j.erro ?? `Erro ${r.status}`;
-    useMundo.getState().abrirPix({ id: j.id, lote: `item:${id}`, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: "pendente", tipo: "item" });
+    await useMundo.getState().abrirCobranca(j, `item:${id}`, "item");
     return null;
   },
 
@@ -157,15 +170,17 @@ export const usePersonagem = create<Estado>((set, get) => ({
     const r = await fetch("/api/personagem", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(d) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return j.erro ?? `Erro ${r.status}`;
-    set({ meu: j.personagem, ativo: !!j.ativo });
+    // editor completo (20/11/2026): os acessórios em uso vão no mesmo salvar
+    const itens = get().itens;
+    set({ meu: j.personagem, ativo: !!j.ativo, itens: itens && j.personagem ? { comprados: itens.comprados, usando: j.personagem.acessorios ?? [] } : itens });
     return null;
   },
   // Pix do personagem: reaproveita o painel de Pix do mapa (chave "personagem")
-  pagar: async (meses = 1) => {
-    const r = await fetch("/api/personagem/pagar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ meses }) });
+  pagar: async (meses = 1, creditos = false) => {
+    const r = await fetch("/api/personagem/pagar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ meses, creditos, idem: novoIdem() }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return j.erro ?? `Erro ${r.status}`;
-    useMundo.setState({ pix: { id: j.id, lote: "personagem", valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: "pendente", tipo: "personagem" } });
+    await useMundo.getState().abrirCobranca(j, "personagem", "personagem");
     return null;
   },
   abrir: (painel) => set({ painel }),
@@ -201,8 +216,7 @@ export const usePersonagem = create<Estado>((set, get) => ({
     if (p.fase === "indo") { set({ predio: null, destino: null, rota: [], falaRecepcao: null }); return; }
     // de onde estiver por dentro até a porta, pelo caminho interno, e então para a calçada
     const pl = plantaPorChave(p.chave, useMundo.getState().terrenos);
-    const publico = !useMundo.getState().meus.includes(p.chave);
-    const ate = pl ? rotaDentro(pl, [minhaPos.x, minhaPos.z], portaDentroMundo(pl), publico) ?? [portaDentroMundo(pl)] : [];
+    const ate = pl ? rotaDentro(pl, [minhaPos.x, minhaPos.z], portaDentroMundo(pl), acessoNoPredio(p)) ?? [portaDentroMundo(pl)] : [];
     const sb = subirNaSaida(p, get().bicicletaParada);
     const [primeiro, ...resto] = [...ate, p.porta, p.fora, ...sb.pts];
     set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "saindo" }, falaRecepcao: null, acaoNoPonto: sb.acao }); get().avisarMovimento();
@@ -211,16 +225,20 @@ export const usePersonagem = create<Estado>((set, get) => ({
     const st = get(), p = st.predio; if (!p) return;
     const mundo = useMundo.getState();
     const pl = plantaPorChave(p.chave, mundo.terrenos); if (!pl) return;
-    const publico = !mundo.meus.includes(p.chave);
+    const publico = acessoNoPredio(p);
     const de: [number, number] = [minhaPos.x, minhaPos.z];
     const avisar = (texto: string) => set({ avisoPredio: { texto, n: (st.avisoPredio?.n ?? 0) + 1 } });
     if (dentroDoPredio(pl, x, z)) {
-      // visitante: salas da equipe, do CEO e de reunião são só da equipe
-      if (publico && areaDaEquipe(pl, x, z)) { avisar("Área só da equipe"); return; }
+      // visitante (20/11/2026): sem ser encaminhado, só a recepção; encaminhado, só o caminho até o setor. Um aviso gentil
+      // explica a catraca em vez de só barrar
+      if (publico !== false && !podeEntrarEm(pl, x, z, publico)) {
+        avisar(p.liberado ? `A catraca liberou só o caminho até ${p.liberado.setorNome}.` : areaDaEquipe(pl, x, z) ? "Área só da equipe: a recepção te leva ao setor certo." : "Para passar da catraca, fale com a recepção: ela te leva ao setor certo.");
+        return;
+      }
       const r = rotaDentro(pl, de, [x, z], publico);
       if (!r || !r.length) { avisar("Não dá para chegar aí por dentro"); return; }
       const [primeiro, ...resto] = r;
-      set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "dentro" }, falaRecepcao: null });
+      set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "dentro", liberado: p.liberado ? { ...p.liberado, chegou: false } : p.liberado }, falaRecepcao: null });
       // a câmera vai de leve até onde o personagem vai (quem arrasta continua mandando)
       useMundo.setState({ alvoCamera: [x, 0.5, z] });
       get().avisarMovimento(); return;
@@ -236,10 +254,29 @@ export const usePersonagem = create<Estado>((set, get) => ({
     const p = get().predio; if (!p || p.fase !== "dentro") return;
     const mundo = useMundo.getState();
     const pl = plantaPorChave(p.chave, mundo.terrenos);
-    const r = pl ? rotaDentro(pl, [minhaPos.x, minhaPos.z], p.espera, !mundo.meus.includes(p.chave)) : null;
+    // volta pelo mesmo caminho liberado; ao chegar no balcão a catraca fecha de novo (Personagens.tsx › chegouNoBalcao)
+    const r = pl ? rotaDentro(pl, [minhaPos.x, minhaPos.z], p.espera, acessoNoPredio(p)) : null;
     const [primeiro, ...resto] = r && r.length ? r : [p.espera];
     // "entrando": ao chegar no balcão a recepção atende de novo (scene/Personagens.tsx › chegouNoBalcao)
-    set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "entrando" } }); get().avisarMovimento();
+    set({ destino: primeiro, rota: resto, passeio: false, falaRecepcao: null, predio: { ...p, fase: "entrando", liberado: p.liberado ? { ...p.liberado, chegou: false } : p.liberado } }); get().avisarMovimento();
+  },
+  // a recepção encaminhou para um setor (ui/Recepcao.tsx): libera só o caminho até a sala, leva o personagem até a frente
+  // de quem atende e, ao chegar, a conversa passa para essa pessoa (Personagens.tsx › chegouNoSetor)
+  encaminhar: (d) => {
+    const st = get(), p = st.predio; if (!p) return "Você não está dentro de um prédio.";
+    const mundo = useMundo.getState(), t = mundo.terrenos[p.chave];
+    const pl = plantaPorChave(p.chave, mundo.terrenos); if (!pl || !t?.escritorio) return "Não achei a planta deste prédio.";
+    const pa = pontoDeAtendimento(pl, t.escritorio, d.membroId);
+    const sala = pl.zonas.find((z) => z.id === d.salaId);
+    const alvo = pa?.ponto ?? (sala ? paraMundo(pl, (sala.x0 + sala.x1) / 2, (sala.z0 + sala.z1) / 2) : null);
+    if (!alvo) return "Esse setor não tem sala neste prédio.";
+    const lib = liberarCaminho(pl, [minhaPos.x, minhaPos.z], alvo, d.salaId);
+    if (!lib) return `Não achei o caminho até ${d.setorNome}.`;
+    const fim = lib.rota[lib.rota.length - 1];
+    const [primeiro, ...resto] = lib.rota;
+    set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "dentro", atendido: true, liberado: { ...d, acesso: lib.acesso, ponto: [fim[0], fim[1]], agente: pa?.agente ?? [fim[0], fim[1]], chegou: false } } });
+    useMundo.setState({ alvoCamera: [fim[0], 0.5, fim[1]] });
+    get().avisarMovimento(); return null;
   },
   setPosicao: (x, z, rot) => { minhaPos.x = x; minhaPos.z = z; minhaPos.rot = rot; set({ posicao: [x, z, rot] }); },
   // mudou o destino (clique, passeio ou chegada): manda a batida logo, pra quem olha de fora acompanhar sem atraso

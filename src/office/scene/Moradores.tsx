@@ -10,9 +10,10 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { BonecoProcedural, HIPS, useAnimacao, type BonecoHandle } from "./Boneco";
 import { SombraContato } from "./SombraContato";
-import { bonecoDe } from "../data/bonecos";
+import { bonecoDe, novidadeNoVisual } from "../data/bonecos";
+import { ACESSORIO_POR_ID } from "../data/acessorios";
 import { leve } from "./qualidade";
-import { MORADOR_POR_ID, moradoresDoAparelho, estadoMorador, novoEstado, cumprimentoDePassagem, type Morador, type EstadoMorador } from "../data/moradores";
+import { MORADOR_POR_ID, moradoresDoAparelho, estadoMorador, novoEstado, cumprimentoDePassagem, tomDaAfinidade, type Morador, type EstadoMorador } from "../data/moradores";
 import { useMoradores, MORADORES_NA_RUA, segundosCidade } from "../moradorStore";
 import { minhaPos, usePersonagem } from "../personagemStore";
 import { useMundo } from "../mundoStore";
@@ -20,6 +21,15 @@ import { useMundo } from "../mundoStore";
 const DIST_NOME = 95; // m da câmera: mais longe que isso, o nome some (menos trabalho para o navegador)
 const PERTO = 6.5; // m: o morador cumprimenta quem passa a essa distância
 const INTERVALO_CUMPRIMENTO = 4 * 60_000; // o mesmo morador não cumprimenta a mesma pessoa de novo antes disso
+// O morador repara no visual (20/11/2026, editor do personagem): guarda no aparelho como viu você da última vez e, se
+// mudou, comenta no cumprimento ("Gostei da jaqueta de couro!"). Quem está desconfiado não elogia.
+const CHAVE_VISTOS = "we:visual-visto";
+function lerVistos(): Record<string, string> { try { return JSON.parse(window.localStorage.getItem(CHAVE_VISTOS) ?? "{}") ?? {}; } catch { return {}; } }
+function comentarioDoVisual(visto: string | undefined, agora: string, acessoriosAgora: string[]) {
+  if (!visto || visto === agora) return null;
+  const [b0, r0, a0] = visto.split("|"), [b1, r1] = agora.split("|");
+  return novidadeNoVisual(bonecoDe(b0), bonecoDe(b1), { roupaAntes: r0 ?? "", roupaAgora: r1 ?? "", acessoriosAntes: a0 ? a0.split(",") : [], acessoriosAgora, nomeAcessorio: (id) => ACESSORIO_POR_ID[id]?.nome ?? null });
+}
 
 function Etiqueta({ m, onClick }: { m: Morador; onClick: () => void }) {
   const fala = useMoradores((s) => s.falas[m.id]?.texto ?? null);
@@ -80,6 +90,7 @@ export function Moradores() {
   // o que cada morador lembra de quem está logado (para o cumprimento de passagem)
   useEffect(() => { if (usuario) void useMoradores.getState().carregarRelacoes(); else useMoradores.setState({ relacoes: null }); }, [usuario]);
   const ultimo = useRef<Record<string, number>>({});
+  const vistos = useRef<Record<string, string> | null>(null);
   const acc = useRef(0);
   useFrame((_, dt) => {
     acc.current += dt; if (acc.current < 1) return; acc.current = 0;
@@ -91,7 +102,15 @@ export function Moradores() {
       if (Math.hypot(minhaPos.x - e.x, minhaPos.z - e.z) > PERTO) continue;
       if (agora - (ultimo.current[m.id] ?? 0) < INTERVALO_CUMPRIMENTO) continue;
       ultimo.current[m.id] = agora;
-      st.falar(m.id, cumprimentoDePassagem(m, r, seg));
+      let fala = cumprimentoDePassagem(m, r, seg);
+      const eu = p.meu;
+      if (eu) {
+        const vs = (vistos.current ??= lerVistos()), visual = `${eu.boneco}|${eu.roupa}|${(eu.acessorios ?? []).join(",")}`;
+        const nota = tomDaAfinidade(r.afinidade) === "desconfiado" ? null : comentarioDoVisual(vs[m.id], visual, eu.acessorios ?? []);
+        if (nota) fala = `${fala} ${nota}`;
+        if (vs[m.id] !== visual) { vs[m.id] = visual; try { window.localStorage.setItem(CHAVE_VISTOS, JSON.stringify(vs)); } catch { /* sem armazenamento: só não lembra */ } }
+      }
+      st.falar(m.id, fala);
     }
   });
   // testes e prévias (?medir=1): posição viva, rotina em qualquer hora e onde cada um está na tela

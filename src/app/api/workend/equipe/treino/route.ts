@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const u = await usuarioAtual(); if (!u) return erro("Entre na sua conta do WorkEnd.", 401);
-    const d = await corpo<{ lote?: string; membro?: string; mensagemId?: string; avaliacao?: 1 | -1 | null; correcao?: string; removerRegra?: string }>(req);
+    // 20/11/2026: { listar: true } devolve o treino do agente; { novaRegra: { tipo, texto } } grava regra, exemplo, "não faça" ou frase fixa
+    const d = await corpo<{ lote?: string; membro?: string; mensagemId?: string; avaliacao?: 1 | -1 | null; correcao?: string; removerRegra?: string; listar?: boolean; novaRegra?: { tipo?: string; texto?: string } }>(req);
     return ok(await treinarMembro(u, d.lote ?? null, d.membro ?? "", d));
   } catch (e) { return erro(e, statusDe(e)); }
 }

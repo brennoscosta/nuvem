@@ -4,6 +4,9 @@
 // (origem no centro do lote, frente = -z; a cena gira pela rua mais próxima).
 import { BONECOS } from "./bonecos";
 import { KIT_ANDARES, ehKit, medidasKit, type KitId } from "./predios";
+import { sortearPersonalidades, aleatorioDe, falaDe } from "./personalidades";
+import { LARG_PORTAO, type Catraca } from "./plantaSede";
+import { MODELO, MODELO_INICIAL, ehModelo, modeloDe, type IdModelo } from "./modelos";
 
 // Prédios gerados no Higgsfield (imagem → 3D), em public/modelos/escritorio-*.glb. Todos têm um quadro escuro em
 // branco acima da entrada: é onde entra o letreiro com o nome e a logo da empresa (posição em `letreiro`).
@@ -29,6 +32,14 @@ export const LAYOUTS: LayoutInfo[] = [
     ["coworking", "Coworking de tijolinho", "Estúdio criativo de tijolo aparente com janelões de ferro, marquise metálica e escada externa."],
     ["cafeteria", "Café com varanda", "Telhado de barro, portas de vidro abertas para a varanda com pérgola, mesinhas e plantas."],
     ["consultorio", "Clínica", "Toda clara, com rampa de acesso, marquise, jardim na frente e brises nas janelas."],
+    // 20/11/2026: tipos novos do catálogo de modelos (data/modelos.ts)
+    ["basico", "Escritório básico", "Dois andares de salas, recepção de vidro e marquise na porta."],
+    ["varanda", "Moderno com varanda", "Térreo de vidro e varandas de vidro com deck de madeira em cada andar."],
+    ["estudio", "Estúdio de vídeo e lives", "Caixa escura com telão de LED na fachada e entrada de estúdio."],
+    ["auditorio", "Auditório de eventos", "Salão alto com foyer de vidro e marquise de cinema na entrada."],
+    ["mercado", "Mercadinho com bancas", "Portas de enrolar abertas, toldo e bancas de frutas na calçada."],
+    ["galeria", "Galeria e showroom", "Vitrine de pé-direito duplo numa moldura branca, com peças em pedestais."],
+    ["escola", "Escola de cursos", "Salas com faixas coloridas, escadaria, marquise e bicicletário."],
   ] as [KitId, string, string][]).map(([id, nome, descricao]): LayoutInfo => {
     const m = medidasKit(id, KIT_ANDARES[id].base, false);
     return { id, nome, descricao, altura: m.altura, andares: KIT_ANDARES[id].base, modelo: "", letreiro: { y: m.letreiro.y, z: m.letreiro.z, largura: m.letreiro.largura }, kit: true };
@@ -57,8 +68,11 @@ export interface Treino { descricao: string; saudacao: string } // o que a pesso
 // Hierarquia (16/11/2026, sede da Social RP): nível do cargo e chefe direto. Opcionais: lojas comuns continuam como antes
 // (todos respondem ao CEO). Com chefeId, quem é chefe pode passar partes de uma tarefa para a sua equipe.
 export type NivelMembro = "ceo" | "diretor" | "gerente" | "analista" | "assistente";
-export interface Membro { id: string; nome: string; cargo: string; papel: PapelMembro; setorId: string | null; boneco: string; camisa: string; treino?: Treino; catalogoId?: string; nivel?: NivelMembro; chefeId?: string | null }
-export interface Escritorio { layout: LayoutId; setores: Setor[]; equipe: Membro[]; trocasLayout?: number; creditosLayout?: number; decor?: Decoracao }
+// personalidadeId e escopo (20/11/2026, frente "creditos"): quem é e o que faz cada agente; o servidor controla os dois
+export interface Membro { id: string; nome: string; cargo: string; papel: PapelMembro; setorId: string | null; boneco: string; camisa: string; treino?: Treino; catalogoId?: string; nivel?: NivelMembro; chefeId?: string | null; personalidadeId?: string; escopo?: { foco: string | null; faz: string[] } }
+// modelo (20/11/2026, frente predios): o modelo do catálogo (data/modelos.ts); o layout passa a ser o tipo do kit desse modelo.
+// modelosComprados: os modelos pagos que a empresa comprou (o servidor grava; o painel não mexe)
+export interface Escritorio { layout: LayoutId; setores: Setor[]; equipe: Membro[]; trocasLayout?: number; creditosLayout?: number; decor?: Decoracao; modelo?: IdModelo; modelosComprados?: IdModelo[] }
 
 // ---- Decoração do lote (11/11/2026: "novas formas de personalização de prédios" e "girar para outras posições") ----
 // giro: quartos de volta a partir da frente para a rua (0 = rua principal). Tudo opcional; o padrão é o lote de sempre.
@@ -211,6 +225,8 @@ export const DIM_LAYOUT: Record<LayoutId, { largura: number; prof: number }> = {
   // kit: largura do corpo e profundidade da frente mais avançada (anexo) até os fundos
   comercial: { largura: 15, prof: 12.2 }, torre: { largura: 13, prof: 12.8 }, esquina: { largura: 15, prof: 12.2 }, logistico: { largura: 18, prof: 14.4 },
   industrial: { largura: 17, prof: 14.6 }, coworking: { largura: 15, prof: 12.2 }, cafeteria: { largura: 14, prof: 12.2 }, consultorio: { largura: 15, prof: 11.6 },
+  basico: { largura: 13, prof: 11.2 }, varanda: { largura: 14, prof: 12.8 }, estudio: { largura: 15, prof: 13.6 }, auditorio: { largura: 16, prof: 15.0 },
+  mercado: { largura: 15, prof: 14.0 }, galeria: { largura: 16, prof: 12.5 }, escola: { largura: 16, prof: 14.2 },
 };
 // altura de cada andar a mais: proporcional ao modelo (os modelos têm pé-direito alto), entre 3,4 e 4,4 m
 export const andarAltura = (layout: LayoutId) => Math.max(3.4, Math.min(4.4, (LAYOUT[layout].altura / LAYOUT[layout].andares) * 0.55));
@@ -246,12 +262,15 @@ export function escritorioPadrao(empresaNome: string, cor: string, nomes: { ceo?
   const h = hash(empresaNome + cor);
   const ceo = (nomes.ceo ?? "").trim().slice(0, 24) || NOMES_CEO[h % NOMES_CEO.length];
   const atendente = (nomes.atendente ?? "").trim().slice(0, 24) || NOMES_ATENDENTE[(h >> 3) % NOMES_ATENDENTE.length];
+  // personalidades diferentes para o CEO e a atendente (sorteio fixo por empresa: a mesma reserva dá o mesmo par)
+  const [pCeo, pAtendente] = sortearPersonalidades([], 2, [], aleatorioDe(`${empresaNome}|${cor}`));
   return {
-    layout: "moderno",
+    // 20/11/2026: toda empresa nova começa com um modelo do catálogo (o escritório básico, grátis)
+    layout: MODELO[MODELO_INICIAL].base, modelo: MODELO_INICIAL,
     setores: [{ id: "atendimento", nome: "Atendimento", cor: CORES_SETOR[0], mesas: 2 }],
     equipe: [
-      { id: "atendente", nome: atendente, cargo: "Atendente", papel: "atendente", setorId: null, boneco: BONECOS_ATENDENTE[(h >> 5) % BONECOS_ATENDENTE.length], camisa: cor, treino: { descricao: `Atende quem chega na ${empresaNome}: explica o que a empresa faz, tira dúvidas e anota o contato de quem quer orçamento.`, saudacao: `Olá! Bem-vindo à ${empresaNome}. Em que posso ajudar?` } },
-      { id: "ceo", nome: ceo, cargo: `CEO da ${empresaNome}`.slice(0, 40), papel: "ceo", setorId: null, boneco: BONECOS_CEO[(h >> 7) % BONECOS_CEO.length], camisa: "#1F2630", treino: { descricao: `Comanda a ${empresaNome}: decide prioridades, fecha negócios maiores e cuida da equipe.`, saudacao: "" } },
+      { id: "atendente", nome: atendente, cargo: "Atendente", papel: "atendente", setorId: null, boneco: BONECOS_ATENDENTE[(h >> 5) % BONECOS_ATENDENTE.length], camisa: cor, treino: { descricao: `Atende quem chega na ${empresaNome}: explica o que a empresa faz, tira dúvidas e anota o contato de quem quer orçamento.`, saudacao: falaDe(pAtendente, "saudacao", { nome: atendente, empresa: empresaNome }).slice(0, 160) }, personalidadeId: pAtendente.id },
+      { id: "ceo", nome: ceo, cargo: `CEO da ${empresaNome}`.slice(0, 40), papel: "ceo", setorId: null, boneco: BONECOS_CEO[(h >> 7) % BONECOS_CEO.length], camisa: "#1F2630", treino: { descricao: `Comanda a ${empresaNome}: decide prioridades, fecha negócios maiores e cuida da equipe.`, saudacao: "" }, personalidadeId: pCeo.id },
     ],
   };
 }
@@ -263,7 +282,9 @@ const texto = (t: unknown, max: number, padrao = "") => (typeof t === "string" ?
 // Limpa o que veio do cliente: tamanhos, limites e referências. Nunca lança; devolve algo válido.
 export function normalizarEscritorio(x: unknown, base: Escritorio): Escritorio {
   const o = (x && typeof x === "object" ? x : {}) as Partial<Record<keyof Escritorio, unknown>>;
-  const layout = (LAYOUTS.some((l) => l.id === o.layout) ? o.layout : base.layout) as LayoutId;
+  // modelo do catálogo (20/11/2026): quando vem, ele manda no tipo do prédio; sem ele (painel antigo), vale o layout
+  const modelo: IdModelo | null = ehModelo(o.modelo) ? o.modelo : o.layout !== undefined && o.layout !== base.layout ? null : modeloDe(base);
+  const layout = (modelo ? MODELO[modelo].base : LAYOUTS.some((l) => l.id === o.layout) ? o.layout : base.layout) as LayoutId;
   const setoresIn = Array.isArray(o.setores) ? (o.setores as unknown[]) : base.setores;
   const setores: Setor[] = [];
   for (const s of setoresIn.slice(0, MAX_SETORES)) {
@@ -294,9 +315,18 @@ export function normalizarEscritorio(x: unknown, base: Escritorio): Escritorio {
   }
   // a atendente e o CEO são obrigatórios: se sumiram, voltam os do padrão
   for (const p of ["atendente", "ceo"] as const) if (!equipe.some((e) => e.papel === p)) equipe.unshift(base.equipe.find((e) => e.papel === p) ?? escritorioPadrao("Empresa", "#1D4ED8").equipe.find((e) => e.papel === p)!);
+  // personalidade e escopo são do servidor (compra e troca paga): o que vier do cliente não vale, o da base continua
+  for (const m of equipe) {
+    const b = base.equipe.find((x) => x.id === m.id);
+    delete m.personalidadeId; delete m.escopo;
+    if (b?.personalidadeId) m.personalidadeId = b.personalidadeId;
+    if (b?.escopo) m.escopo = b.escopo;
+  }
   equipe.sort((a, b) => ordem(a.papel) - ordem(b.papel));
   // contadores de troca de layout são do servidor: o cliente não mexe neles
-  return { layout, setores, equipe, trocasLayout: base.trocasLayout ?? 0, creditosLayout: base.creditosLayout ?? 0, decor: limparDecor(o.decor, base.decor ?? DECOR_PADRAO) };
+  const modeloFinal = modelo ?? modeloDe({ layout });
+  return { layout, setores, equipe, trocasLayout: base.trocasLayout ?? 0, creditosLayout: base.creditosLayout ?? 0, decor: limparDecor(o.decor, base.decor ?? DECOR_PADRAO),
+    ...(modeloFinal ? { modelo: modeloFinal } : {}), modelosComprados: [...(base.modelosComprados ?? [])] };
 }
 const ordem = (p: PapelMembro) => (p === "atendente" ? 0 : p === "ceo" ? 1 : 2);
 
@@ -351,6 +381,21 @@ export function plantaCliente(e: Escritorio): PlantaCliente {
     }
   }
   return { salas, porta, balcao, lugares };
+}
+
+// Catracas da loja (20/11/2026, data/recepcao.ts): uma atravessando o hall (a porta da rua dá na frente dele; atrás ficam a
+// porta da sala do CEO e a do setor do meio) e, quando um setor abre a porta na parede do fundo da recepção (lojas com 2 a
+// 4 setores), outra nessa porta, sem vidro dos lados (o portão ocupa a porta inteira)
+export const Z_CATRACA_CLIENTE = -4.6;
+export function catracasCliente(pl: PlantaCliente): Catraca[] {
+  const zMeio = pl.salas[0].z1;
+  const out: Catraca[] = [{ id: "hall", x0: -2.14, x1: 2.14, z: Z_CATRACA_CLIENTE, g0: -LARG_PORTAO / 2, g1: LARG_PORTAO / 2 }];
+  for (const s of pl.salas) {
+    if (s.tipo !== "setor" || s.z0 !== zMeio) continue;
+    const c = (s.x0 + s.x1) / 2;
+    if (c < -2.2) out.push({ id: s.id, x0: c - 0.8, x1: c + 0.8, z: zMeio - 0.22, g0: c - 0.8, g1: c + 0.8 });
+  }
+  return out;
 }
 
 export const vagasLivres = (e: Escritorio) => e.setores.reduce((n, s) => n + s.mesas, 0) - e.equipe.filter((m) => m.papel === "profissional").length;

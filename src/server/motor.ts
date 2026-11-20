@@ -2,6 +2,7 @@
 import OpenAI from "openai";
 import { fichaCompleta, gravarMensagem, listarMensagens, registrarUso, gastoHoje, gravarEvento, salvarFalaPublica, type SkillDB } from "./agentes";
 import { NIVEL, AREAS, type Nivel, type AreaId } from "@/office/data/org";
+import { contextoEquipeIA } from "./escopoEquipe";
 
 // Preço aproximado em R$ por 1M tokens (entrada / saída). Ajustável.
 const PRECO_BRL: Record<string, [number, number]> = {
@@ -120,7 +121,7 @@ export async function conversar(agenteId: string, texto: string, autor = "admin"
   if (gasto >= teto) {
     if (interno) await gravarEvento(f.agente.empresaId, agenteId, "expediente_encerrado", `Teto diário de R$ ${teto.toFixed(2)} atingido`);
     throw new Error(opts.tetoMes
-      ? `A equipe já usou os R$ ${teto.toFixed(2).replace(".", ",")} de IA deste mês. Ela volta a responder no dia 1º.`
+      ? "As unidades de IA da empresa acabaram. Compre unidades em Créditos para a equipe voltar a responder agora, ou espere a mensalidade do mês que vem."
       : `Teto diário de gasto atingido (R$ ${gasto.toFixed(2)} de R$ ${teto.toFixed(2)}). Aumente o teto na ficha do agente pra continuar.`);
   }
   const visitanteId = opts.visitanteId ?? null;
@@ -128,7 +129,9 @@ export async function conversar(agenteId: string, texto: string, autor = "admin"
   if (interno) await gravarEvento(f.agente.empresaId, agenteId, "tarefa_recebida", "Recebi uma mensagem, já estou vendo.");
   const historico = await listarMensagens(agenteId, modo === "visitante" ? 20 : 40, visitanteId);
   const quem = interno ? "do admin" : "do dono";
-  const sistema = montarSistema(f, modo) + (opts.contexto ? `\n\n${opts.contexto}` : "");
+  // equipe do cliente (20/11/2026): o mapa de quem faz o quê, para cada um ficar no seu escopo e passar o resto adiante
+  const mapa = interno ? "" : await contextoEquipeIA(f.agente.empresaId, agenteId).catch(() => "");
+  const sistema = montarSistema(f, modo) + (mapa ? `\n\n${mapa}` : "") + (opts.contexto ? `\n\n${opts.contexto}` : "");
   const msgs: OpenAI.Chat.ChatCompletionMessageParam[] = [{ role: "system", content: sistema }];
   for (const m of historico) {
     if (m.id === pergunta.id) continue;

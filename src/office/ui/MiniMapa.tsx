@@ -19,6 +19,8 @@ import { projetar, noChao, PROPORCAO, miniMapa, useVersaoMiniMapa } from "../min
 import { Icone } from "./Icone";
 import { abrirSede } from "./CartaoOneState";
 import { SEDES, centroTorre, alturaSede, frenteDaSede, sedeNoPonto } from "../data/sedes";
+import { QUIOSQUES, QUIOSQUE_POR_CHAVE, PRECO_QUIOSQUE } from "../data/quiosques";
+import { numeroDaLoja, rotuloLoja } from "../data/numeroLoja";
 
 const semAssinatura = () => () => {};
 const assinarLargura = (f: () => void) => { const m = window.matchMedia("(min-width: 640px)"); m.addEventListener("change", f); return () => m.removeEventListener("change", f); };
@@ -62,6 +64,7 @@ function poligono(x0: number, z0: number, x1: number, z1: number) {
 }
 // centro e altura do prédio de uma loja (lote duplo: no meio dos dois terrenos)
 function ondeFica(t: Terreno, terrenos: Record<string, Terreno>) {
+  const qk = QUIOSQUE_POR_CHAVE[t.chave]; if (qk) return { x: qk.pos[0], z: qk.pos[1], h: 3 }; // quiosque (20/11/2026)
   const l = LOTE_POR_CHAVE[t.chave]; if (!l) return null;
   const anexo = Object.values(terrenos).find((x) => x.anexoDe === t.chave && x.status === "ativo");
   const la = anexo ? LOTE_POR_CHAVE[anexo.chave] : null;
@@ -192,7 +195,7 @@ export function MiniMapa() {
     const area = t.nicho ?? "negocios";
     const apagado = nicho === "__promo" ? !promo : nicho.startsWith("bairro:") ? bairroDoLote(t.chave)?.id !== nicho.slice(7) : !!nicho && (!ativo || area !== nicho);
     const destaque = !!nicho && !apagado;
-    return { t, ...o, ativo, promo, apagado, destaque, contratando: ativo && (vagas[t.chave] ?? 0) > 0, numero: LOTE_POR_CHAVE[t.chave]?.numero ?? 0 };
+    return { t, ...o, ativo, promo, apagado, destaque, contratando: ativo && (vagas[t.chave] ?? 0) > 0, numero: numeroDaLoja(t) ?? LOTE_POR_CHAVE[t.chave]?.numero ?? 0 };
   }).filter(Boolean) as { t: Terreno; x: number; z: number; h: number; ativo: boolean; promo: { texto: string } | null; apagado: boolean; destaque: boolean; contratando: boolean; numero: number }[];
   const algumaPromo = lojas.some((x) => x.promo);
   const praca2 = LOTE_POR_CHAVE[PRACA_CHAVE];
@@ -255,7 +258,7 @@ export function MiniMapa() {
               <button key={x.t.chave} onClick={(e) => { e.stopPropagation(); ir(x.t.chave); }} title={`${x.t.empresaNome} · em obras`} className={`mm-e absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-sm bg-[#E0A91B] ring-2 ring-[#111418] ${x.apagado ? "opacity-25" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }} />
             );
             return (
-              <button key={x.t.chave} onClick={(e) => { e.stopPropagation(); ir(x.t.chave); }} title={`${x.t.empresaNome} · Lote ${x.numero} · ${nomeNicho(x.t.nicho ?? "negocios")}${x.promo ? ` · promoção: ${x.promo.texto}` : ""}${x.contratando ? " · contratando" : ""}`}
+              <button key={x.t.chave} onClick={(e) => { e.stopPropagation(); ir(x.t.chave); }} title={`${x.t.empresaNome} · ${rotuloLoja(x.numero)} · ${nomeNicho(x.t.nicho ?? "negocios")}${x.promo ? ` · promoção: ${x.promo.texto}` : ""}${x.contratando ? " · contratando" : ""}`}
                 className={`mm-e mm-pino absolute flex -translate-x-1/2 -translate-y-full flex-col items-center transition-opacity ${x.apagado ? "opacity-25" : ""} ${x.destaque ? "z-[2] scale-110" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }}>
                 <span className={`relative block rounded-full p-[2px] shadow-md ${selecionada ? "ring-2 ring-white" : eMeu ? "ring-2 ring-[#93C5FD]" : ""}`} style={{ background: cor }}>
                   <span className="grid h-[18px] w-[18px] place-items-center overflow-hidden rounded-full bg-white text-[7px] font-black" style={{ color: cor }}>
@@ -268,6 +271,11 @@ export function MiniMapa() {
               </button>
             );
           })}
+          {/* quiosques livres (20/11/2026): quadradinho verde-água; tocar abre o cartão */}
+          {QUIOSQUES.filter((q) => !terrenos[q.chave]).map((q) => { const p = projetar(q.pos[0], 1, q.pos[1]); return (
+            <button key={q.chave} onClick={(e) => { e.stopPropagation(); ir(q.chave); }} title={`Quiosque ${q.numero} · disponível · R$ ${PRECO_QUIOSQUE}/mês`} aria-label={`Quiosque ${q.numero} disponível`}
+              className={`mm-e absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[3px] bg-[#2DD4BF] ring-2 ${sel === q.chave ? "ring-white" : "ring-[#111418]"} ${nicho ? "opacity-30" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }} />
+          ); })}
           {dica && largo && <span className="pointer-events-none absolute z-[3] -translate-x-1/2 -translate-y-[130%] whitespace-nowrap rounded-md bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#1D2128] shadow" style={{ left: pct(dica.u), top: pct(dica.v) }}>{dica.texto}</span>}
         </div>
         <label className="hud-filtro">
@@ -284,6 +292,7 @@ export function MiniMapa() {
           <span><i className="bg-white ring-2 ring-[#5B9DFF]" />loja aberta</span>
           <span><i className="!rounded-sm bg-[#E0A91B]" />em obras</span>
           <span><i className="bg-[#FACC15]" />contratando</span>
+          <span><i className="!rounded-[3px] bg-[#2DD4BF]" />quiosque livre</span>
           {algumaPromo && <span><i className="bg-[#E11D48]" />promoção</span>}
         </div>
         <p className="mt-2 px-1 text-[11px] leading-snug text-white/45">Toque numa loja para abrir ou em qualquer ponto para ir até lá.</p>

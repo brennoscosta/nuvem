@@ -7,7 +7,7 @@
 import { LOTES, frenteDoLote, LOTE_POR_CHAVE, type ModeloCasa } from "./mundo";
 import { DIM_LAYOUT, alturaPredio, andaresDoPredio, type Escritorio } from "./escritorio";
 import { ehKit, medidasKit } from "./predios";
-import { SEDES, alturaSede, degrausEstudio, type EstiloSede } from "./sedes";
+import { SEDES, alturaSede, degrausEstudio, logosModeloSede, type EstiloSede } from "./sedes";
 import { SEDE } from "./onestate";
 import { LANCH } from "./lanchonete";
 import { PREDIO } from "./layout";
@@ -26,9 +26,10 @@ function girada(cx: number, cz: number, rot: number, lx0: number, lx1: number, l
 }
 
 // casas dos lotes à venda (scene/Lotes.tsx): altura de cada modelo e o lado maior da base (medido nos GLB), na escala do lote
+// (20/11/2026: casas desenhadas em código, scene/KitPredio.tsx › CasasDesenhadas; com beirais)
 const CASA: Record<ModeloCasa, { altura: number; lado: number }> = {
-  casaVelha: { altura: 5.2, lado: 7.6 }, casaTerrea: { altura: 5.0, lado: 8.9 }, casaSobrado: { altura: 7.6, lado: 11.2 },
-  casaColonial: { altura: 7.8, lado: 8.3 }, casaModerna: { altura: 4.6, lado: 10.3 },
+  casaVelha: { altura: 5.0, lado: 9.6 }, casaTerrea: { altura: 5.0, lado: 9.6 }, casaSobrado: { altura: 7.8, lado: 9.2 },
+  casaColonial: { altura: 7.8, lado: 9.2 }, casaModerna: { altura: 4.6, lado: 10.6 },
 };
 // largura da logo do alto, na frente, de cada estilo de sede (scene/SedeEstilos.tsx › logosBase, antes da escala)
 const LOGO_ALTO: Record<EstiloSede, number> = { classica: 15, tech: 14, festa: 13, estudio: 11 };
@@ -48,6 +49,15 @@ export function caixasDaCidade(terrenos: Record<string, TerrenoCaixa>): Caixa[] 
   for (const sd of SEDES) {
     const H = alturaSede(sd), g = (lx0: number, lx1: number, lz0: number, lz1: number, y0: number, y1: number): Caixa => ({ ...girada(sd.x, sd.z, sd.rot, lx0, lx1, lz0, lz1, y1), y0 });
     const S = SEDE.z + SEDE.d / 2, N = SEDE.z - SEDE.d / 2, O = SEDE.x - SEDE.w / 2, L = SEDE.x + SEDE.w / 2;
+    // 20/11/2026: sede com modelo do catálogo (scene/SedeModelo.tsx): o prédio do kit na planta da sede e as logos do alto
+    // (a da frente na beirada e a do lado da rua). No desenho do kit a frente é -z e o x é espelhado (meia volta)
+    if (sd.modelo) {
+      const lg = logosModeloSede(sd), topoLogo = lg.base + Math.max(lg.frente.h, lg.lado.h);
+      out.push(g(O - 0.4, L + 0.4, N - 0.4, S + 0.4, 0, lg.m.altura));
+      out.push(g(O + 0.6, L - 0.6, S - 1.2, S - 0.4, lg.topo, topoLogo));
+      out.push(sd.lado === "oeste" ? g(O + 0.3, O + 1.1, N, S, lg.topo, topoLogo) : g(L - 1.1, L - 0.3, N, S, lg.topo, topoLogo));
+      continue;
+    }
     const borda = sd.estilo === "festa" ? 1.5 : 0.4; // as sacadas do bday.fm saem 1,4 m para fora
     out.push(g(O - borda, L + borda, N - borda, S + borda, 0, H + 1.3));
     const degraus = sd.estilo === "estudio" ? degrausEstudio(sd.andares) : 0, rf = 3 * degraus, rl = 2 * degraus;
@@ -69,7 +79,9 @@ export function caixasDaCidade(terrenos: Record<string, TerrenoCaixa>): Caixa[] 
     const h = alturaPredio(t.escritorio, duplo), lay = t.escritorio.layout;
     if (ehKit(lay)) {
       const m = medidasKit(lay, andaresDoPredio(t.escritorio), duplo, (t.escritorio.decor?.cobertura ?? "nenhuma") !== "nenhuma");
-      out.push(girada(cx, cz, rot, -m.w / 2, m.w / 2, m.z0, m.z1, h));
+      // Sede corporativa nos dois lotes: duas torres de 13 m com os centros a ±8,4 m (scene/EscritorioCliente.tsx › TorresGemeas)
+      const wk = t.escritorio.modelo === "sede" && duplo ? 2 * 8.4 + 13 : m.w;
+      out.push(girada(cx, cz, rot, -wk / 2, wk / 2, m.z0, m.z1, h));
       if (m.anexo) out.push(girada(cx, cz, rot, m.anexo.x0, m.anexo.x1, m.anexo.z0, m.anexo.z1, m.anexo.h));
     } else {
       const dim = DIM_LAYOUT[lay], w = dim.largura * (duplo ? 1.6 : 1);

@@ -106,7 +106,7 @@ Responda SÓ um JSON com: {"titulo": string (máx. 90 caracteres, sem aspas), "d
     ],
   });
   const tin = r.usage?.prompt_tokens ?? 0, tout = r.usage?.completion_tokens ?? 0;
-  await registrarUso({ agenteId: f.agente.id, modelo, tokensIn: tin, tokensOut: tout, custoBrl: custoBRL(modelo, tin, tout) });
+  await registrarUso({ agenteId: f.agente.id, modelo, tokensIn: tin, tokensOut: tout, custoBrl: custoBRL(modelo, tin, tout), categoria: "tarefa" });
   try {
     const j = JSON.parse(r.choices[0]?.message?.content ?? "{}");
     return { ...base, titulo: String(j.titulo || base.titulo).slice(0, 100), descricao: String(j.descricao || base.descricao).slice(0, 5000), tags: Array.isArray(j.tags) ? j.tags.map(String).slice(0, 12) : [], resumo: String(j.resumo || base.resumo) };
@@ -191,7 +191,7 @@ Responda SÓ um JSON com: {"titulo": string (nome curto da peça, máx. 60 carac
     ],
   });
   const tin = r.usage?.prompt_tokens ?? 0, tout = r.usage?.completion_tokens ?? 0;
-  await registrarUso({ agenteId: f.agente.id, modelo, tokensIn: tin, tokensOut: tout, custoBrl: custoBRL(modelo, tin, tout) });
+  await registrarUso({ agenteId: f.agente.id, modelo, tokensIn: tin, tokensOut: tout, custoBrl: custoBRL(modelo, tin, tout), categoria: "tarefa" });
   try {
     const j = JSON.parse(r.choices[0]?.message?.content ?? "{}");
     return { ...base, titulo: String(j.titulo || base.titulo).slice(0, 80), prompt: String(j.prompt || base.prompt).slice(0, 4000), resumo: String(j.resumo || base.resumo) };

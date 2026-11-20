@@ -2,12 +2,24 @@
 // - Bonecos com `arquivo` usam o modelo 3D gerado no Higgsfield (já com esqueleto, ver scripts/bonecos).
 // - Bonecos sem arquivo usam o boneco provisório desenhado em código (mesmo esqueleto e mesmas animações).
 
-// estilos de cabelo (16/11/2026: + cacheado, rabo de cavalo, topete e moicano)
-export type Cabelo = "curto" | "coque" | "longo" | "careca" | "cacheado" | "rabo" | "topete" | "moicano";
-export type Barba = "nenhuma" | "rala" | "cheia" | "bigode";
+// estilos de cabelo (16/11/2026: + cacheado, rabo de cavalo, topete e moicano; 20/11/2026: + crespo, black power,
+// tranças e raspado — "careca" continua sendo a cabeça lisa)
+export type Cabelo = "curto" | "coque" | "longo" | "careca" | "cacheado" | "rabo" | "topete" | "moicano" | "crespo" | "blackpower" | "trancas" | "raspado";
+export type Barba = "nenhuma" | "rala" | "cheia" | "bigode" | "cavanhaque";
 
-// roupas: camisa (padrão), blazer, moletom, jaqueta, regata e vestido; semCamisa/biquini/saida = gente de praia
-export type Traje = "camisa" | "semCamisa" | "biquini" | "saida" | "blazer" | "moletom" | "jaqueta" | "regata" | "vestido";
+// roupas: camisa (padrão), blazer, moletom, jaqueta, regata e vestido; semCamisa/biquini/saida = gente de praia.
+// 20/11/2026 (editor completo): camisa social, polo, blusa e terno; ternoGrife e jaquetaCouro são itens pagos
+export type Traje = "camisa" | "semCamisa" | "biquini" | "saida" | "blazer" | "moletom" | "jaqueta" | "regata" | "vestido" | "social" | "polo" | "blusa" | "terno" | "ternoGrife" | "jaquetaCouro";
+// editor completo (20/11/2026): corpo, rosto, parte de baixo e sapatos. Sem o campo, o boneco sai como sempre saiu.
+export type Altura = "baixa" | "media" | "alta";
+export type Biotipo = "magro" | "medio" | "forte";
+export type Olhos = "redondos" | "amendoados" | "grandes" | "sonolentos" | "felizes";
+export type Sobrancelha = "normal" | "finas" | "grossas" | "arqueadas";
+export type Boca = "sorriso" | "risada" | "neutra" | "deLado";
+export type Marcas = "nenhuma" | "sardas" | "pinta" | "rosadas";
+export type ModeloOculos = "redondo" | "quadrado" | "gatinho";
+export type Baixo = "calca" | "jeans" | "bermuda" | "saia"; // o vestido é o traje "vestido" (cobre a parte de cima também)
+export type Sapato = "tenis" | "social" | "sandalia" | "tenisGrife"; // tenisGrife é item pago
 export interface Boneco {
   id: string;
   nome: string;
@@ -23,6 +35,11 @@ export interface Boneco {
   tenis?: string; // cor de destaque do tênis (sola escura e listra nessa cor); sem isso, tênis branco liso
   calcado?: string; // cor do tênis (a parte de cima); padrão branco
   barba?: Barba; // padrão: nenhuma (a cor é a do cabelo)
+  // editor completo (20/11/2026); sem o campo vale o padrão de sempre (média, médio, redondos…)
+  altura?: Altura; biotipo?: Biotipo;
+  olhos?: Olhos; corOlhos?: string; sobrancelha?: Sobrancelha; boca?: Boca; marcas?: Marcas; oculosModelo?: ModeloOculos;
+  baixo?: Baixo; sapato?: Sapato;
+  uniforme?: string; // chave do lote da empresa: a logo dela vai no peito
 }
 
 export const BONECOS: Boneco[] = [
@@ -79,51 +96,94 @@ export const TIPOS_AVATAR: TipoAvatar[] = [
   { id: "neutro-1", nome: "Neutro", genero: "neutro", estilo: "casual", boneco: "suporte-1", roupa: "#64748B" },
 ];
 
-// ---------- personagem personalizável (16/11/2026) ----------
-// O visual escolhido no painel (pele, cabelo, roupa, calça, tênis, barba) vira um "id de boneco" codificado, v1:…,
-// gravado na coluna boneco do personagem. Assim ele chega a todo lugar que já recebe o boneco (mapa, amigos, busca,
-// conversas, avisos) sem mudar nenhuma rota. A coluna personagem.visual guarda o mesmo visual em JSON (fonte do painel).
-export interface Visual { pele?: string; cabelo?: string; estiloCabelo?: Cabelo; barba?: Barba; traje?: Traje; roupa?: string; calca?: string; calcado?: string; tenis?: string; oculos?: boolean }
+// ---------- personagem personalizável (16/11/2026; editor completo em 20/11/2026) ----------
+// O visual escolhido no painel vira um "id de boneco" codificado, v1:…, gravado na coluna boneco do personagem. Assim ele
+// chega a todo lugar que já recebe o boneco (mapa, amigos, busca, conversas, avisos) sem mudar nenhuma rota. A coluna
+// personagem.visual guarda o mesmo visual em JSON (fonte do painel).
+// Editor completo (20/11/2026): corpo, rosto, parte de baixo, sapatos e uniforme vão num 11º pedaço do código
+// ("al=alta;ol=felizes;…"), só com o que foge do padrão. Quem nunca mexeu nisso continua com o mesmo código de antes,
+// letra por letra (os moradores e os personagens antigos não mudam).
+export interface Visual {
+  pele?: string; cabelo?: string; estiloCabelo?: Cabelo; barba?: Barba; traje?: Traje; roupa?: string; calca?: string; calcado?: string; tenis?: string; oculos?: boolean;
+  altura?: Altura; biotipo?: Biotipo; olhos?: Olhos; corOlhos?: string; sobrancelha?: Sobrancelha; boca?: Boca; marcas?: Marcas; oculosModelo?: ModeloOculos;
+  baixo?: Baixo; sapato?: Sapato; uniforme?: string;
+}
 export const ESTILOS_CABELO: { id: Cabelo; nome: string }[] = [
-  { id: "curto", nome: "Curto com franja" }, { id: "topete", nome: "Topete" }, { id: "moicano", nome: "Moicano" }, { id: "cacheado", nome: "Cacheado" },
-  { id: "coque", nome: "Coque" }, { id: "rabo", nome: "Rabo de cavalo" }, { id: "longo", nome: "Longo" }, { id: "careca", nome: "Raspado" },
+  { id: "curto", nome: "Curto" }, { id: "topete", nome: "Topete" }, { id: "moicano", nome: "Moicano" }, { id: "raspado", nome: "Raspado" },
+  { id: "careca", nome: "Careca" }, { id: "crespo", nome: "Crespo" }, { id: "blackpower", nome: "Black power" }, { id: "cacheado", nome: "Cacheado" },
+  { id: "coque", nome: "Coque" }, { id: "rabo", nome: "Rabo de cavalo" }, { id: "trancas", nome: "Tranças" }, { id: "longo", nome: "Longo" },
 ];
-export const BARBAS: { id: Barba; nome: string }[] = [{ id: "nenhuma", nome: "Sem barba" }, { id: "rala", nome: "Rala" }, { id: "cheia", nome: "Cheia" }, { id: "bigode", nome: "Bigode" }];
-export const TRAJES_ESCOLHA: { id: Traje; nome: string }[] = [
-  { id: "camisa", nome: "Camiseta" }, { id: "blazer", nome: "Blazer" }, { id: "jaqueta", nome: "Jaqueta" },
-  { id: "moletom", nome: "Moletom" }, { id: "regata", nome: "Regata" }, { id: "vestido", nome: "Vestido" },
+export const BARBAS: { id: Barba; nome: string }[] = [{ id: "nenhuma", nome: "Sem barba" }, { id: "rala", nome: "Rala" }, { id: "cheia", nome: "Cheia" }, { id: "cavanhaque", nome: "Cavanhaque" }, { id: "bigode", nome: "Bigode" }];
+// parte de cima (o vestido fica na lista da parte de baixo, porque cobre as duas)
+export const TRAJES_CIMA: { id: Traje; nome: string }[] = [
+  { id: "camisa", nome: "Camiseta" }, { id: "social", nome: "Camisa social" }, { id: "polo", nome: "Polo" }, { id: "blusa", nome: "Blusa" },
+  { id: "regata", nome: "Regata" }, { id: "moletom", nome: "Moletom" }, { id: "jaqueta", nome: "Jaqueta" }, { id: "blazer", nome: "Blazer" },
+  { id: "terno", nome: "Terno" }, { id: "jaquetaCouro", nome: "Jaqueta de couro" }, { id: "ternoGrife", nome: "Terno de grife" },
 ];
+export const TRAJES_ESCOLHA = TRAJES_CIMA; // nome antigo
+export const BAIXOS: { id: Baixo | "vestido"; nome: string }[] = [{ id: "calca", nome: "Calça" }, { id: "jeans", nome: "Jeans" }, { id: "bermuda", nome: "Bermuda" }, { id: "saia", nome: "Saia" }, { id: "vestido", nome: "Vestido" }];
+export const SAPATOS: { id: Sapato; nome: string }[] = [{ id: "tenis", nome: "Tênis" }, { id: "social", nome: "Sapato social" }, { id: "sandalia", nome: "Sandália" }, { id: "tenisGrife", nome: "Tênis de grife" }];
+export const ALTURAS: { id: Altura; nome: string }[] = [{ id: "baixa", nome: "Baixa" }, { id: "media", nome: "Média" }, { id: "alta", nome: "Alta" }];
+export const BIOTIPOS: { id: Biotipo; nome: string }[] = [{ id: "magro", nome: "Magro" }, { id: "medio", nome: "Médio" }, { id: "forte", nome: "Forte" }];
+export const OLHOS: { id: Olhos; nome: string }[] = [{ id: "redondos", nome: "Redondos" }, { id: "amendoados", nome: "Amendoados" }, { id: "grandes", nome: "Grandes" }, { id: "sonolentos", nome: "Sonolentos" }, { id: "felizes", nome: "Sorrindo" }];
+export const SOBRANCELHAS: { id: Sobrancelha; nome: string }[] = [{ id: "normal", nome: "Natural" }, { id: "finas", nome: "Finas" }, { id: "grossas", nome: "Grossas" }, { id: "arqueadas", nome: "Arqueadas" }];
+export const BOCAS: { id: Boca; nome: string }[] = [{ id: "sorriso", nome: "Sorriso" }, { id: "risada", nome: "Risada" }, { id: "neutra", nome: "Séria" }, { id: "deLado", nome: "De lado" }];
+export const MARCAS: { id: Marcas; nome: string }[] = [{ id: "nenhuma", nome: "Nenhuma" }, { id: "sardas", nome: "Sardas" }, { id: "pinta", nome: "Pinta" }, { id: "rosadas", nome: "Bochecha rosada" }];
+export const MODELOS_OCULOS: { id: ModeloOculos; nome: string }[] = [{ id: "redondo", nome: "Redondo" }, { id: "quadrado", nome: "Quadrado" }, { id: "gatinho", nome: "Gatinho" }];
 export const PELES = ["#FBE3D0", "#F5D6BC", "#F1C9A5", "#E7B48C", "#D9A072", "#C98E68", "#A86E4A", "#8D5B3E", "#6E4329", "#4A2C1C"];
 export const CORES_CABELO = ["#14110F", "#2A1E19", "#4A3121", "#7A4E2D", "#B5532D", "#D9A45B", "#EBD08B", "#9A9A9A", "#E8E8E8", "#3B5BDB", "#D6336C", "#7C3AED"];
+export const CORES_OLHOS = ["#2B1D16", "#14110F", "#6B4423", "#A0742E", "#3F7D4E", "#3A6EA5", "#6B7280"];
 export const CORES_ROUPA = ["#F4F4F0", "#1F2329", "#1E3A5F", "#2563EB", "#0EA5A4", "#16A34A", "#84CC16", "#FACC15", "#F59E0B", "#E11D48", "#DB2777", "#7C3AED", "#6B2737", "#8B5E3C", "#64748B"];
 export const CORES_CALCA = ["#1F2329", "#2C3E50", "#3B5B8C", "#5B7DB1", "#6B7280", "#C8B79A", "#8B5E3C", "#F4F4F0", "#14532D", "#7F1D1D"];
 export const CORES_CALCADO = ["#F4F4F4", "#1F2227", "#9CA3AF", "#E11D48", "#2563EB", "#16A34A", "#FACC15", "#F59E0B", "#7C3AED", "#8B5E3C"];
+export const COR_JEANS = "#3B5B8C";
 const HEX = /^#[0-9a-fA-F]{6}$/;
-const ESTILOS_OK = new Set<string>(ESTILOS_CABELO.map((e) => e.id));
-const BARBAS_OK = new Set<string>(BARBAS.map((b) => b.id));
-const TRAJES_OK = new Set<string>(["camisa", "blazer", "moletom", "jaqueta", "regata", "vestido", "semCamisa", "biquini", "saida"]);
+const CHAVE_LOTE = /^-?\d{1,3},-?\d{1,3},-?\d{1,3}$/;
+const conjunto = (l: { id: string }[]) => new Set<string>(l.map((x) => x.id));
+const ESTILOS_OK = conjunto(ESTILOS_CABELO), BARBAS_OK = conjunto(BARBAS);
+const TRAJES_OK = new Set<string>([...TRAJES_CIMA.map((t) => t.id), "vestido", "semCamisa", "biquini", "saida"]);
+const EXTRAS_OK: Record<string, Set<string>> = { altura: conjunto(ALTURAS), biotipo: conjunto(BIOTIPOS), olhos: conjunto(OLHOS), sobrancelha: conjunto(SOBRANCELHAS), boca: conjunto(BOCAS), marcas: conjunto(MARCAS), oculosModelo: conjunto(MODELOS_OCULOS), baixo: new Set(["calca", "jeans", "bermuda", "saia"]), sapato: conjunto(SAPATOS) };
 // limpa o que veio de fora (cliente, banco): só cores #RRGGBB e opções conhecidas
 export function limparVisual(x: unknown): Visual {
   const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
   const cor = (k: string) => (typeof o[k] === "string" && HEX.test(o[k] as string) ? (o[k] as string).toUpperCase() : undefined);
-  const v: Visual = { pele: cor("pele"), cabelo: cor("cabelo"), roupa: cor("roupa"), calca: cor("calca"), calcado: cor("calcado"), tenis: o.tenis === "" ? "" : cor("tenis") }; // tenis "" = tênis liso, sem listra
+  const v: Visual = { pele: cor("pele"), cabelo: cor("cabelo"), roupa: cor("roupa"), calca: cor("calca"), calcado: cor("calcado"), tenis: o.tenis === "" ? "" : cor("tenis"), corOlhos: cor("corOlhos") }; // tenis "" = tênis liso, sem listra
   if (typeof o.estiloCabelo === "string" && ESTILOS_OK.has(o.estiloCabelo)) v.estiloCabelo = o.estiloCabelo as Cabelo;
   if (typeof o.barba === "string" && BARBAS_OK.has(o.barba)) v.barba = o.barba as Barba;
   if (typeof o.traje === "string" && TRAJES_OK.has(o.traje)) v.traje = o.traje as Traje;
   if (typeof o.oculos === "boolean") v.oculos = o.oculos;
+  for (const [k, ok] of Object.entries(EXTRAS_OK)) if (typeof o[k] === "string" && ok.has(o[k] as string)) (v as Record<string, unknown>)[k] = o[k];
+  if (typeof o.uniforme === "string" && CHAVE_LOTE.test(o.uniforme)) v.uniforme = o.uniforme;
   for (const k of Object.keys(v) as (keyof Visual)[]) if (v[k] === undefined) delete v[k];
   return v;
 }
+export interface VisualCompleto {
+  pele: string; cabelo: string; estiloCabelo: Cabelo; barba: Barba; traje: Traje; roupa: string; calca: string; calcado: string; tenis: string; oculos: boolean;
+  altura: Altura; biotipo: Biotipo; olhos: Olhos; corOlhos: string; sobrancelha: Sobrancelha; boca: Boca; marcas: Marcas; oculosModelo: ModeloOculos; baixo: Baixo; sapato: Sapato; uniforme: string;
+}
+// o padrão de cada campo novo: é como o boneco sempre foi desenhado
+export const PADRAO_EXTRA = { altura: "media", biotipo: "medio", olhos: "redondos", corOlhos: "#2B1D16", sobrancelha: "normal", boca: "sorriso", marcas: "nenhuma", oculosModelo: "redondo", baixo: "calca", sapato: "tenis", uniforme: "" } as const;
 // visual completo a partir de um boneco base (o tipo pronto) e do que a pessoa trocou
-export function visualCompleto(base: Boneco, roupa: string, v: Visual): Required<Omit<Visual, "tenis">> & { tenis: string } {
+export function visualCompleto(base: Boneco, roupa: string, v: Visual): VisualCompleto {
   return { pele: v.pele ?? base.pele, cabelo: v.cabelo ?? base.cabelo, estiloCabelo: v.estiloCabelo ?? base.estiloCabelo, barba: v.barba ?? base.barba ?? "nenhuma",
-    traje: v.traje ?? base.traje ?? "camisa", roupa: v.roupa ?? roupa, calca: v.calca ?? base.calca, calcado: v.calcado ?? base.calcado ?? "#F4F4F4", tenis: v.tenis ?? base.tenis ?? "", oculos: v.oculos ?? !!base.oculos };
+    traje: v.traje ?? base.traje ?? "camisa", roupa: v.roupa ?? roupa, calca: v.calca ?? base.calca, calcado: v.calcado ?? base.calcado ?? "#F4F4F4", tenis: v.tenis ?? base.tenis ?? "", oculos: v.oculos ?? !!base.oculos,
+    altura: v.altura ?? base.altura ?? PADRAO_EXTRA.altura, biotipo: v.biotipo ?? base.biotipo ?? PADRAO_EXTRA.biotipo, olhos: v.olhos ?? base.olhos ?? PADRAO_EXTRA.olhos,
+    corOlhos: v.corOlhos ?? base.corOlhos ?? PADRAO_EXTRA.corOlhos, sobrancelha: v.sobrancelha ?? base.sobrancelha ?? PADRAO_EXTRA.sobrancelha, boca: v.boca ?? base.boca ?? PADRAO_EXTRA.boca,
+    marcas: v.marcas ?? base.marcas ?? PADRAO_EXTRA.marcas, oculosModelo: v.oculosModelo ?? base.oculosModelo ?? PADRAO_EXTRA.oculosModelo, baixo: v.baixo ?? base.baixo ?? PADRAO_EXTRA.baixo,
+    sapato: v.sapato ?? base.sapato ?? PADRAO_EXTRA.sapato, uniforme: v.uniforme ?? base.uniforme ?? PADRAO_EXTRA.uniforme };
 }
 const semCerquilha = (c: string) => c.replace("#", "");
+// os campos novos no 11º pedaço do código: chave curta = valor (cor sem #, lote com _ no lugar da vírgula)
+const EXTRAS: [keyof typeof PADRAO_EXTRA, string][] = [["altura", "al"], ["biotipo", "bi"], ["olhos", "ol"], ["corOlhos", "co"], ["sobrancelha", "so"], ["boca", "bo"], ["marcas", "ma"], ["oculosModelo", "om"], ["baixo", "ba"], ["sapato", "sa"], ["uniforme", "un"]];
+const CURTA_PARA_CAMPO = Object.fromEntries(EXTRAS.map(([c, k]) => [k, c])) as Record<string, keyof typeof PADRAO_EXTRA>;
 // id do boneco com o visual dentro (a roupa vai na coluna roupa, como sempre). O boneco base (opcional) entra no fim
 // só para manter os extras dele que não são escolha do painel (prancha e chapéu de praia).
-export function codificarVisual(v: ReturnType<typeof visualCompleto>, baseId = "") {
-  return "v1:" + [semCerquilha(v.pele), semCerquilha(v.cabelo), v.estiloCabelo, v.barba, v.traje, semCerquilha(v.calca), semCerquilha(v.calcado), semCerquilha(v.tenis), v.oculos ? "o" : "", TODOS_BONECOS[baseId] ? baseId : ""].join("~");
+export function codificarVisual(v: VisualCompleto, baseId = "") {
+  const partes = [semCerquilha(v.pele), semCerquilha(v.cabelo), v.estiloCabelo, v.barba, v.traje, semCerquilha(v.calca), semCerquilha(v.calcado), semCerquilha(v.tenis), v.oculos ? "o" : "", TODOS_BONECOS[baseId] ? baseId : ""];
+  const extras = EXTRAS.filter(([c]) => (v[c] ?? PADRAO_EXTRA[c]).toString().toUpperCase() !== PADRAO_EXTRA[c].toUpperCase())
+    .map(([c, k]) => `${k}=${c === "corOlhos" ? semCerquilha(v[c]) : c === "uniforme" ? v[c].replace(/,/g, "_") : v[c]}`);
+  if (extras.length) partes.push(extras.join(";"));
+  return "v1:" + partes.join("~");
 }
 const decodificados = new Map<string, Boneco>();
 function decodificar(id: string): Boneco | null {
@@ -135,6 +195,13 @@ function decodificar(id: string): Boneco | null {
   const base = p[9] ? TODOS_BONECOS[p[9]] : undefined;
   const b: Boneco = { id, nome: "Personalizado", arquivo: null, pele, cabelo, estiloCabelo: p[2] as Cabelo, barba: p[3] as Barba, traje: p[4] as Traje, calca, calcado, tenis: c(p[7]) ?? undefined,
     oculos: p[8] === "o", prancha: base?.prancha, chapeu: base?.chapeu };
+  // campos do editor completo (o que não vier, ou vier estranho, fica no padrão)
+  for (const par of (p[10] ?? "").split(";")) {
+    const [k, val] = par.split("="); const campo = CURTA_PARA_CAMPO[k]; if (!campo || !val) continue;
+    if (campo === "corOlhos") { const cc = c(val); if (cc) b.corOlhos = cc; }
+    else if (campo === "uniforme") { const ch = val.replace(/_/g, ","); if (CHAVE_LOTE.test(ch)) b.uniforme = ch; }
+    else if (EXTRAS_OK[campo]?.has(val)) (b as unknown as Record<string, string>)[campo] = val;
+  }
   decodificados.set(id, b); return b;
 }
 // o boneco de um id: os do catálogo ou um visual codificado (v1:…). Sempre devolve um boneco válido.
@@ -142,4 +209,22 @@ function decodificar(id: string): Boneco | null {
 export function bonecoDe(id: string | null | undefined, padrao: Boneco = BONECOS[1]): Boneco {
   if (!id) return padrao;
   return TODOS_BONECOS[id] ?? (id.startsWith("v1:") ? decodificar(id) : null) ?? padrao;
+}
+// escala do boneco inteiro pela altura (o esqueleto e as animações são os mesmos; a bicicleta acompanha)
+export const ESCALA_ALTURA: Record<Altura, number> = { baixa: 0.93, media: 1, alta: 1.07 };
+export const escalaDoBoneco = (b: Pick<Boneco, "altura">) => ESCALA_ALTURA[b.altura ?? "media"] ?? 1;
+
+// O que um morador repara quando você passa com o visual diferente da última vez que ele te viu (sem IA)
+const DO_TRAJE: Partial<Record<Traje, string>> = { social: "da camisa social", polo: "da polo", blusa: "da blusa", moletom: "do moletom", jaqueta: "da jaqueta", blazer: "do blazer", terno: "do terno", ternoGrife: "do terno de grife", jaquetaCouro: "da jaqueta de couro", vestido: "do vestido", regata: "da regata", camisa: "da camiseta" };
+export function novidadeNoVisual(antes: Boneco, agora: Boneco, extra: { roupaAntes: string; roupaAgora: string; acessoriosAntes: string[]; acessoriosAgora: string[]; nomeAcessorio: (id: string) => string | null }): string | null {
+  if (!antes.uniforme && agora.uniforme) return "De uniforme da empresa! Ficou bonito.";
+  const novo = extra.acessoriosAgora.find((a) => !extra.acessoriosAntes.includes(a)); const nomeNovo = novo ? extra.nomeAcessorio(novo) : null;
+  if (nomeNovo) return `Gostei do visual! ${nomeNovo} é novidade?`;
+  if (antes.estiloCabelo !== agora.estiloCabelo) return "Mudou o cabelo? Ficou ótimo!";
+  const tr = agora.traje ?? "camisa";
+  if ((antes.traje ?? "camisa") !== tr) return DO_TRAJE[tr] ? `Gostei ${DO_TRAJE[tr]}!` : "Roupa nova? Ficou bem em você!";
+  if ((antes.barba ?? "nenhuma") !== (agora.barba ?? "nenhuma")) return "Mudou a barba, hein? Ficou bom.";
+  if (antes.cabelo !== agora.cabelo) return "Pintou o cabelo? Ficou lindo!";
+  if (extra.roupaAntes !== extra.roupaAgora || antes.calca !== agora.calca || (antes.sapato ?? "tenis") !== (agora.sapato ?? "tenis")) return "Roupa nova? Ficou bem em você!";
+  return null;
 }

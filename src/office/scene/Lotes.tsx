@@ -1,5 +1,7 @@
 "use client";
-// Lotes à venda: casas (modelos do Higgsfield, instanciados por modelo) e terrenos vazios. Desde 18/11/2026 cada lote
+// Lotes à venda: casas e terrenos vazios. 20/11/2026 (pedido do dono: "parece casas abandonadas"): as casas deixaram de
+// ser os modelos GLB do Higgsfield (textura com mancha e rachadura) e são desenhadas em código, limpas e sentadas num
+// embasamento acima do quintal (scene/KitPredio.tsx › CasasDesenhadas). Desde 18/11/2026 cada lote
 // livre é um "ponto disponível" (scene/PontoDisponivel.tsx): divisa com mureta ou meio-fio, quintal bem acabado, número
 // do lote e a placa "Ponto disponível · Lote N", acesa à noite. As peças fixas são juntadas num <Estatico>.
 import { Icone } from "../ui/Icone";
@@ -10,14 +12,13 @@ import { Obra, LOTES_EM_OBRA_VISTOS } from "./ObraFesta";
 import { alturaPredio } from "../data/escritorio";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
-import { caixa, cilindro, mat, plano } from "./geo";
-import { ComFallback, type ItemInstancia } from "./Modelos";
-import { ModeloInstanciadoNoite } from "./PredioMaterial";
+import { caixa, mat, plano } from "./geo";
+import { CasasDesenhadas, type CasaLote } from "./KitPredio";
 import { ArvoresInstanciadas } from "./Arvores";
 import { Estatico } from "./Estatico";
-import { CASA, CASA_RECUO, QuintaisEstaticos, LuzesQuintais, detalhesDosQuintais, noLote, type Quintal } from "./PontoDisponivel";
+import { QuintaisEstaticos, LuzesQuintais, detalhesDosQuintais, type Quintal } from "./PontoDisponivel";
 import { GramadoLotes, TufosFlores } from "./Gramado";
-import { frenteDoLote, LOTE, nomeNicho, type ModeloCasa } from "../data/mundo";
+import { frenteDoLote, LOTE, nomeNicho } from "../data/mundo";
 import { useMundo, LOTES, LOTE_POR_CHAVE, useAgora, promocaoAtiva, type Rascunho } from "../mundoStore";
 import { useDestaque } from "../destaque";
 import { usePersonagem } from "../personagemStore";
@@ -37,16 +38,10 @@ export function Lotes() {
   const comEscritorio = useLotesComEscritorio();
   const terrenosMundo = useMundo((s) => s.terrenos);
   const chavesObra = Object.values(terrenosMundo).filter((t) => t.status === "reservado").map((t) => t.chave).sort().join("|");
-  const { quintais, detalhes, porModelo } = useMemo(() => {
+  const { quintais, detalhes, casas } = useMemo(() => {
     const quintais = listar(comEscritorio, new Set(chavesObra ? chavesObra.split("|") : []));
-    const m = new Map<ModeloCasa, ItemInstancia[]>();
-    for (const q of quintais) {
-      if (!q.casa) continue;
-      const info = CASA[q.casa.modelo], [x, z] = noLote(q.l, 0, -CASA_RECUO);
-      const lista = m.get(q.casa.modelo) ?? []; m.set(q.casa.modelo, lista);
-      lista.push({ pos: [x, 0, z], rot: frenteDoLote(q.l.k) + info.frente, altura: info.altura * q.casa.escala });
-    }
-    return { quintais, detalhes: detalhesDosQuintais(quintais), porModelo: [...m.entries()] };
+    const casas: CasaLote[] = quintais.filter((q) => q.casa).map((q) => ({ chave: q.l.chave, x: q.l.centro[0], z: q.l.centro[1], rot: frenteDoLote(q.l.k), modelo: q.casa!.modelo, escala: q.casa!.escala, numero: q.l.numero }));
+    return { quintais, detalhes: detalhesDosQuintais(quintais), casas };
   }, [comEscritorio, chavesObra]);
   const reservados = useMundo((s) => s.terrenos);
   const selecionado = useMundo((s) => s.loteSelecionado);
@@ -72,11 +67,7 @@ export function Lotes() {
       <TufosFlores tufos={detalhes.tufos} flores={detalhes.flores} />
       <ArvoresInstanciadas especie="azaleia" itens={detalhes.azaleias} />
       <LuzesQuintais varandas={detalhes.varandas} lampioes={detalhes.lampioes} pocas={detalhes.pocas} />
-      {porModelo.map(([modelo, itens]) => (
-        <ComFallback key={modelo} fallback={<Estatico>{itens.map((it, i) => <CasaProcedural key={i} pos={it.pos} rot={it.rot ?? 0} altura={it.altura ?? 5} />)}</Estatico>}>
-          <ModeloInstanciadoNoite nome={modelo} itens={itens} />
-        </ComFallback>
-      ))}
+      <CasasDesenhadas casas={casas} />
       {/* lotes reservados: tapume e placa da empresa; o rascunho do painel aparece ao vivo */}
       {LOTES.map((l) => {
         const t = reservados[l.chave];
@@ -219,13 +210,4 @@ function LoteReservado({ chave, nome, cor, logo, nicho, ativo = false, comEscrit
   );
 }
 
-// Se o GLB faltar: caixinha com telhado
-function CasaProcedural({ pos, rot, altura }: { pos: [number, number, number]; rot: number; altura: number }) {
-  const h = altura * 0.6;
-  return (
-    <group position={pos} rotation={[0, rot, 0]}>
-      <mesh geometry={caixa(8, h, 7)} material={mat("#EADFC8")} position={[0, h / 2, 0]} castShadow />
-      <mesh geometry={cilindro(0, 6.2, altura * 0.4, 4)} material={mat("#B5552F")} position={[0, h + altura * 0.2, 0]} rotation={[0, Math.PI / 4, 0]} castShadow />
-    </group>
-  );
-}
+

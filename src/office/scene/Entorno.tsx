@@ -147,8 +147,9 @@ export function Entorno() {
     <group>
       <Estatico><EntornoFixo /></Estatico>
       <Balao position={[0, 11, 0]} nome="Nuvem" cor="#1D4ED8" logo="/brand/nuvem-branco.png" subtitulo="Tecnologia" />
-      {/* árvores da quadra da Nuvem (v63): oitis, frondosas e um ipê amarelo, em código; bancos do Higgsfield */}
-      <ArvoresMistas itens={poucos ? ARVORES.slice(0, 9) : ARVORES} mistura={MISTURA_NUVEM} />
+      {/* árvores da quadra da Nuvem (v63): oitis, frondosas e um ipê amarelo, em código; bancos do Higgsfield. São as da praça
+          da Nuvem: ficaram todas quando a cidade perdeu metade das árvores (20/11/2026) */}
+      <ArvoresMistas itens={poucos ? ARVORES.slice(0, 9) : ARVORES} mistura={MISTURA_NUVEM} grupo="praca-nuvem" />
       <ComFallback fallback={<Estatico>{BANCOS.map((b, i) => <Banco key={i} position={b.pos} rotation={b.rot} />)}</Estatico>}>
         <ModeloInstanciado nome="banco" itens={BANCOS} />
       </ComFallback>

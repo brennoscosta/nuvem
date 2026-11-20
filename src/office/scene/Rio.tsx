@@ -96,6 +96,12 @@ function Agua() {
 
 // ---------- pontes ----------
 // tabuleiro em arco: segmentos inclinados que seguem y = base + subida·sen(π·t)
+// medidas das pontes (o Natal estende fios de luz nos guarda-corpos, scene/Natal.tsx): meia largura até o guarda-corpo,
+// altura do topo dele sobre o tabuleiro e a subida do arco; o arco vai de Z0 a Z1
+export const PONTE_DADOS = { pedra: { meia: 2.35, topo: 1.03, subida: 1.5 }, madeira: { meia: 1.32, topo: 0.95, subida: 0.85 }, z0: CZ1 + 0.6, z1: RZ1 - 1.4 };
+// os postes clássicos do calçadão (os mesmos de itensCalcadao), para os fios de luz de Natal
+let POSTES_CALCADAO: ItemInstancia[] | null = null;
+export const postesDoCalcadao = () => (POSTES_CALCADAO ??= itensCalcadao().postes);
 function arco(x: number, largura: number, subida: number, n: number) {
   const z0 = CZ1 + 0.6, z1 = RZ1 - 1.4, comp = z0 - z1, out: { x: number; y: number; z: number; inc: number; len: number }[] = [];
   for (let i = 0; i < n; i++) {
@@ -167,7 +173,8 @@ function itensCalcadao() {
   const arvores: ItemInstancia[] = [], bancos: ItemInstancia[] = [], postes: ItemInstancia[] = [];
   const passo = leve() ? 18 : 12; let n = 0;
   for (let x = X_OESTE + 6; x <= X_LESTE - 4; x += passo) {
-    if (livre(x, 5)) arvores.push({ pos: [x, 0, CZ0 - 2.6], rot: (n * 1.7) % 6.28, altura: 5.2 + (n % 3) * 0.5 });
+    // 20/11/2026 (metade da arborização): uma árvore sim, outra não; os bancos e os postes continuam no mesmo passo
+    if (n % 2 === 0 && livre(x, 5)) arvores.push({ pos: [x, 0, CZ0 - 2.6], rot: (n * 1.7) % 6.28, altura: 5.2 + (n % 3) * 0.5 });
     const xb = x + passo / 2; if (livre(xb, 4.5)) bancos.push({ pos: [xb, 0, CZ1 + 1.25], rot: Math.PI, altura: 0.95 });
     n++;
   }
@@ -213,7 +220,7 @@ export function Rio() {
       <Agua />
       <Barquinho />
       {/* árvores do calçadão (v63): espécies em código, com ipês na beira do rio */}
-      <ArvoresMistas itens={arvores} mistura={MISTURA_BEIRA_RIO} />
+      <ArvoresMistas itens={arvores} mistura={MISTURA_BEIRA_RIO} grupo="calcadao" />
       <ComFallback fallback={null}><ModeloInstanciado nome="banco" itens={bancos} /></ComFallback>
       <PostesClassicos itens={postes} />
       <HalosPostes postes={halos} />

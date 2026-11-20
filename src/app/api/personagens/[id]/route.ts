@@ -4,6 +4,7 @@ import { personagemPublico } from "@/server/personagens";
 import { relacao } from "@/server/rede";
 import { selosDe } from "@/server/cidade";
 import { ok, erro } from "@/server/http";
+import { apelidoPublico } from "@/server/perfis";
 export const dynamic = "force-dynamic";
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -11,6 +12,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     if (!p) return erro("Personagem não encontrado.", 404);
     const rel = u && u.id !== id ? await relacao(u.id, id) : { status: "nenhuma", id: null };
     const selos = (await selosDe([id]).catch(() => ({} as Record<string, string[]>)))[id] ?? [];
-    return ok({ ...p, relacao: rel, selos });
+    const perfilPublico = await apelidoPublico(id).catch(() => null); // perfil do cadastro (20/11/2026)
+    return ok({ ...p, relacao: rel, selos, perfilPublico });
   } catch (e) { return erro(e); }
 }

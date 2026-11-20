@@ -46,21 +46,26 @@ export function Estrelas({ media, n }: { media: number | null; n: number }) {
   return <span className="text-[12px] font-semibold text-[#7A5A00]"><EstrelaMedia />{media.toFixed(1).replace(".", ",")} <span className="font-normal text-[#5B6472]">({n} {n === 1 ? "avaliação" : "avaliações"})</span></span>;
 }
 
-export function ChatLoja({ loja, logado, linkEntrar, alto = 320 }: { loja: LojaInfo; logado: boolean; linkEntrar: string; alto?: number }) {
-  const [conv, setConv] = useState<{ numero: number; msgs: Msg[] } | null>(null);
-  const msgs = !logado ? [] : conv?.numero === loja.numero ? conv.msgs : null;
-  const setMsgs = (f: (m: Msg[] | null) => Msg[]) => setConv((c) => ({ numero: loja.numero, msgs: f(c?.numero === loja.numero ? c.msgs : null) }));
+// pessoa (20/11/2026, recepção que encaminha): a conversa é com o responsável de um setor (ui/Recepcao.tsx › NoSetor), não
+// com a atendente; a saudação dele já vem gravada na conversa, com o que o visitante disse na recepção
+export type PessoaSetor = { membroId: string; nome: string; cargo: string; camisa: string };
+export function ChatLoja({ loja, logado, linkEntrar, alto = 320, pessoa = null }: { loja: LojaInfo; logado: boolean; linkEntrar: string; alto?: number; pessoa?: PessoaSetor | null }) {
+  const chave = pessoa ? `${loja.numero}:${pessoa.membroId}` : String(loja.numero);
+  const [conv, setConv] = useState<{ chave: string; msgs: Msg[] } | null>(null);
+  const msgs = !logado ? [] : conv?.chave === chave ? conv.msgs : null;
+  const setMsgs = (f: (m: Msg[] | null) => Msg[]) => setConv((c) => ({ chave, msgs: f(c?.chave === chave ? c.msgs : null) }));
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const fim = useRef<HTMLDivElement>(null);
-  const at = loja.atendente;
+  const at = pessoa ? { nome: pessoa.nome, cargo: pessoa.cargo, camisa: pessoa.camisa, saudacao: "" } : loja.atendente;
+  const membroId = pessoa?.membroId ?? null;
   useEffect(() => {
     if (!logado) return;
-    let vivo = true; const numero = loja.numero;
-    fetch(`/api/workend/loja/${numero}/conversa`, { cache: "no-store" }).then((r) => r.json()).then((j) => vivo && setConv({ numero, msgs: Array.isArray(j) ? j : [] })).catch(() => vivo && setConv({ numero, msgs: [] }));
+    let vivo = true; const numero = loja.numero, k = chave;
+    fetch(`/api/workend/loja/${numero}/conversa${membroId ? `?membro=${encodeURIComponent(membroId)}` : ""}`, { cache: "no-store" }).then((r) => r.json()).then((j) => vivo && setConv({ chave: k, msgs: Array.isArray(j) ? j : [] })).catch(() => vivo && setConv({ chave: k, msgs: [] }));
     return () => { vivo = false; };
-  }, [loja.numero, logado]);
+  }, [loja.numero, logado, chave, membroId]);
   useEffect(() => { const el = fim.current?.parentElement; if (el) el.scrollTop = el.scrollHeight; }, [msgs, enviando]);
   if (!at) return null;
   const enviar = async () => {
@@ -68,7 +73,7 @@ export function ChatLoja({ loja, logado, linkEntrar, alto = 320 }: { loja: LojaI
     setEnviando(true); setErro(null); setTexto("");
     setMsgs((m) => [...(m ?? []), { id: `tmp-${Date.now()}`, papel: "user", conteudo: t, em: new Date().toISOString() }]);
     try {
-      const r = await fetch(`/api/workend/loja/${loja.numero}/conversa`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ texto: t }) });
+      const r = await fetch(`/api/workend/loja/${loja.numero}/conversa`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ texto: t, ...(membroId ? { membroId } : {}) }) });
       const j = await r.json();
       if (!r.ok) throw new Error((j as { erro?: string }).erro ?? "Não deu para enviar.");
       setMsgs((m) => [...(m ?? []), j as Msg]);
@@ -79,11 +84,12 @@ export function ChatLoja({ loja, logado, linkEntrar, alto = 320 }: { loja: LojaI
     <div className="flex flex-col overflow-hidden rounded-2xl border border-black/10 bg-white">
       <div className="flex items-center gap-2 border-b border-black/5 px-3 py-2">
         <span className="grid h-8 w-8 place-items-center rounded-full text-sm font-bold text-white" style={{ background: at.camisa }}>{at.nome.slice(0, 1)}</span>
-        <div className="min-w-0 leading-tight"><div className="truncate text-sm font-bold text-[#1D2128]">{at.nome}</div><div className="flex items-center gap-1 text-[12px] text-[#15803D]"><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" />{at.cargo} · responde na hora</div></div>
+        <div className="min-w-0 leading-tight"><div className="truncate text-sm font-bold text-[#1D2128]">{at.nome}</div><div className="flex items-center gap-1 text-[12px] text-[#15803D]"><span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#16A34A]" /><span className="truncate">{at.cargo} · responde na hora</span></div></div>
       </div>
       {/* com pedido na conversa (página da loja), a área cresce para o cartão caber inteiro */}
       <div className="space-y-2 overflow-y-auto p-3" style={{ maxHeight: alto >= 300 && msgs?.some((m) => m.pedido) ? Math.max(alto, 500) : alto, minHeight: Math.min(alto, 160) }}>
-        <div className="max-w-[88%] rounded-2xl rounded-tl-md bg-[#F1F3F6] px-3 py-2 text-[13px] text-[#1D2128]">{at.saudacao}</div>
+        {at.saudacao && <div className="max-w-[88%] rounded-2xl rounded-tl-md bg-[#F1F3F6] px-3 py-2 text-[13px] text-[#1D2128]">{at.saudacao}</div>}
+        {pessoa && msgs === null && <div className="text-[12px] text-[#5B6472]">Abrindo a conversa…</div>}
         {msgs?.map((m) => (
           <div key={m.id} className="space-y-2">
             <div className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-[13px] ${m.papel === "user" ? "ml-auto rounded-br-md bg-[#1D4ED8] text-white" : "rounded-tl-md bg-[#F1F3F6] text-[#1D2128]"}`}>{m.conteudo}</div>
@@ -96,7 +102,7 @@ export function ChatLoja({ loja, logado, linkEntrar, alto = 320 }: { loja: LojaI
       {erro && <div className="px-3 pb-1 text-[12px] font-semibold text-[#E2575B]">{erro}</div>}
       {logado ? (
         <form onSubmit={(e) => { e.preventDefault(); void enviar(); }} className="flex gap-1.5 border-t border-black/5 p-2">
-          <input value={texto} onChange={(e) => setTexto(e.target.value.slice(0, 800))} placeholder={`Escreva para ${at.nome}…`} className="min-w-0 flex-1 rounded-xl border border-black/10 px-3 py-2 text-sm text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
+          <input value={texto} onChange={(e) => setTexto(e.target.value.slice(0, 800))} placeholder={`Escreva para ${at.nome}…`} aria-label={`Mensagem para ${at.nome}`} className="min-w-0 flex-1 rounded-xl border border-black/10 px-3 py-2 text-base text-[#1D2128] outline-none focus:border-[#1D4ED8] sm:text-sm" />
           <button type="submit" disabled={!texto.trim() || enviando} className="rounded-xl bg-[#1D4ED8] px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Enviar</button>
         </form>
       ) : (

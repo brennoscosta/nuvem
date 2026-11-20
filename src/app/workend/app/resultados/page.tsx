@@ -164,13 +164,13 @@ export default async function Resultados({ searchParams }: Props) {
         <div className="rounded-2xl bg-[#EAF2FF] p-6 sm:p-7">
           <span className="text-[13px] font-semibold text-[var(--azul)]">Indique um vizinho</span>
           <h2 className="mt-1 !text-[1.7rem]">Traga outra empresa para a cidade e pague menos</h2>
-          <p className="mt-2 max-w-[62ch] text-[var(--tinta-2)]">Quem chega pelo seu link tem 10% no 1º mês. Quando a empresa pagar, você ganha <b className="text-[var(--tinta)]">{brl(CREDITO_INDICACAO)} de desconto</b> na sua mensalidade (até metade de cada pagamento; o que sobrar fica para a próxima).{!ativo && " O link vale quando a sua loja estiver aberta no mapa."}</p>
+          <p className="mt-2 max-w-[62ch] text-[var(--tinta-2)]">Quem chega pelo seu link tem 10% no 1º mês. Quando a empresa pagar, você ganha <b className="text-[var(--tinta)]">{CREDITO_INDICACAO} créditos de bônus</b> na sua carteira (1 crédito = R$ 1,00), que pagam a mensalidade e o que mais o WorkEnd vende.{!ativo && " O link vale quando a sua loja estiver aberta no mapa."}</p>
           {codigo && ativo && <CompartilharIndicacao link={`https://workend.online/?ind=${codigo}`} codigo={codigo} />}
           <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr]">
             <div className="rounded-2xl bg-white px-5 py-4">
-              <div className="text-[13px] text-[var(--tinta-2)]">Desconto acumulado</div>
-              <div className="text-[1.8rem] font-bold tabular-nums">{brl(ind.credito)}</div>
-              <div className="text-[12px] text-[var(--tinta-2)]">entra no próximo Pix do lote</div>
+              <div className="text-[13px] text-[var(--tinta-2)]">Saldo de créditos</div>
+              <div className="text-[1.8rem] font-bold tabular-nums">{ind.credito.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-[12px] text-[var(--tinta-2)]"><a href="/app/creditos" className="underline">usar em Créditos</a>: paga o lote, agentes e mais</div>
             </div>
             <div className="rounded-2xl bg-white px-5 py-4">
               <div className="text-[13px] font-semibold">Quem chegou pelo seu link</div>

@@ -434,7 +434,8 @@ function encher(im: THREE.InstancedMesh | null, inst: Instancias, chao = false) 
 function Vento() { useFrame(({ clock }) => { VENTO.uTempo.value = clock.elapsedTime; }); return null; }
 
 // Árvores de uma espécie (troca direta do <ModeloInstanciado nome="arvore" itens={...} />): uma malha só (madeira e folhas)
-export function ArvoresInstanciadas({ especie, itens, sombra = true }: { especie: Especie; itens: ItemInstancia[]; sombra?: boolean }) {
+// grupo (20/11/2026): só um nome na malha ("arvores:<grupo>:<espécie>"), para os testes contarem as árvores por origem
+export function ArvoresInstanciadas({ especie, itens, sombra = true, grupo = "outras" }: { especie: Especie; itens: ItemInstancia[]; sombra?: boolean; grupo?: string }) {
   const kit = useMemo(() => kitDaEspecie(especie), [especie]);
   const inst = useMemo(() => montarInstancias(especie, itens), [especie, itens]);
   const refArvore = useCallback((im: THREE.InstancedMesh | null) => encher(im, inst), [inst]);
@@ -444,7 +445,7 @@ export function ArvoresInstanciadas({ especie, itens, sombra = true }: { especie
   return (
     <group>
       <Vento />
-      <instancedMesh ref={refArvore} args={[kit.geo, kit.mat, n]} castShadow={s} customDepthMaterial={kit.profundidade} />
+      <instancedMesh ref={refArvore} name={`arvores:${grupo}:${especie}`} args={[kit.geo, kit.mat, n]} castShadow={s} customDepthMaterial={kit.profundidade} />
       {kit.chao && kit.matChao && <instancedMesh ref={refChao} args={[kit.chao, kit.matChao, n]} receiveShadow={s} />}
     </group>
   );
@@ -460,13 +461,13 @@ export function especieDaPosicao(x: number, z: number, mistura: Mistura): Especi
   for (const [e, p] of entradas) { if ((v -= p) <= 0) return e; }
   return entradas[entradas.length - 1][0];
 }
-export function ArvoresMistas({ itens, mistura = MISTURA_RUA, sombra = true }: { itens: ItemInstancia[]; mistura?: Mistura; sombra?: boolean }) {
+export function ArvoresMistas({ itens, mistura = MISTURA_RUA, sombra = true, grupo }: { itens: ItemInstancia[]; mistura?: Mistura; sombra?: boolean; grupo?: string }) {
   const grupos = useMemo(() => {
     const g = new Map<Especie, ItemInstancia[]>();
     for (const it of itens) { const e = especieDaPosicao(it.pos[0], it.pos[2], mistura); let l = g.get(e); if (!l) { l = []; g.set(e, l); } l.push(it); }
     return [...g.entries()];
   }, [itens, mistura]);
-  return <group>{grupos.map(([e, l]) => <ArvoresInstanciadas key={e} especie={e} itens={l} sombra={sombra} />)}</group>;
+  return <group>{grupos.map(([e, l]) => <ArvoresInstanciadas key={e} especie={e} itens={l} sombra={sombra} grupo={grupo} />)}</group>;
 }
 
 // Uma árvore avulsa (decoração do lote do cliente, praça): a mesma geometria e o mesmo material, sem instância
@@ -478,7 +479,7 @@ export function ArvoreAvulsa({ position, altura = 4.5, especie, giro }: { positi
   return (
     <group position={position} rotation={[0, giro ?? hz * 6.28, 0]} scale={[xz, altura, Math.abs(xz)]}>
       <Vento />
-      <mesh geometry={kit.geo} material={kit.mat} castShadow={kit.sombra} customDepthMaterial={kit.profundidade} />
+      <mesh name={`arvore:avulsa:${esp}`} geometry={kit.geo} material={kit.mat} castShadow={kit.sombra} customDepthMaterial={kit.profundidade} />
       {kit.chao && kit.matChao && <mesh geometry={kit.chao} material={kit.matChao} />}
     </group>
   );

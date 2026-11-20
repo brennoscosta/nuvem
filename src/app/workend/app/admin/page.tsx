@@ -12,6 +12,9 @@ import { EmailsAdmin } from "./_emails";
 import { CatalogoAdmin, AtividadeAdmin } from "./_catalogo";
 import { PersonagensAdmin } from "./_personagens";
 import { EvolucaoAdmin } from "./_evolucao";
+import { CreditosAdmin } from "./_creditos";
+import { AnunciosPracaAdmin } from "./_praca";
+import { CadastrosAdmin } from "./_cadastros"; // o que cada conta contou no cadastro (20/11/2026)
 import { meta } from "../../seo";
 
 export const metadata = meta({ titulo: "Admin — WorkEnd", caminho: "/app/admin", indexar: false });
@@ -36,6 +39,9 @@ export default async function Admin() {
             <p className="mt-2 max-w-[70ch] text-[var(--tinta-2)]">Logado como <b>{u!.email}</b>. Tudo que acontece no mundo: lotes reservados e pagos, pagamentos do Mercado Pago e usuários. Clique no número do lote pra abrir o mapa nele.</p>
           </section>
           <PainelAdmin config={{ preco: PRECO_LOTE, precoAdmin: precoPara(u), minutosReserva: MINUTOS_RESERVA, diasMes: DIAS_MES, diasTolerancia: DIAS_TOLERANCIA, pagamento: pagamentoLigado(), adminEmail: ADMIN_EMAIL, eu: u!.email }} />
+          <CreditosAdmin />
+          <AnunciosPracaAdmin />
+          <CadastrosAdmin />
           <AtividadeAdmin />
           <CatalogoAdmin />
           <EvolucaoAdmin />

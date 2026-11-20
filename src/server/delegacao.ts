@@ -11,6 +11,7 @@ import { sql, id, migrar } from "./db";
 import { conversar } from "./motor";
 import { gravarEvento, gravarMensagem, type AgenteDB, type MensagemDB } from "./agentes";
 import { avisar, dadosParaAgente } from "./conectores";
+import { pedidoAbertoParecido } from "./escopoEquipe";
 
 export const PEDIDOS_POR_NIVEL = 4;
 export const PROFUNDIDADE_MAX = 2;
@@ -64,22 +65,47 @@ function extrair(texto: string, subs: AgenteDB[], limite: number) {
   return { limpo, pedidos };
 }
 
+// colegas de quem não tem equipe própria (20/11/2026): pode passar UM pedido que é do escopo de outra pessoa
+async function colegasDe(eu: AgenteDB) {
+  return sql<AgenteDB[]>`SELECT * FROM agente WHERE empresa_id = ${eu.empresaId} AND empresa_id <> 'emp_nuvem' AND ativo AND id <> ${eu.id} ORDER BY nivel DESC, criado_em`;
+}
+function instrucoesColegas(eu: AgenteDB, colegas: AgenteDB[]) {
+  return [
+    "Se o pedido (ou parte dele) for do escopo de um colega, não faça essa parte: passe para a pessoa certa.",
+    "Colegas (use exatamente estes ids):",
+    ...colegas.map((s) => `- ${membroDe(s)}: ${s.nome}, ${s.funcao}`),
+    "Como passar: no fim da sua resposta, uma linha só, assim:",
+    "[[PEDIR id_da_pessoa: o que ela precisa fazer, com o contexto]]",
+    "Regras: no máximo 1 pedido; só passe o que é mesmo do escopo do colega; o que é seu, faça você. Antes da marcação, diga ao dono em 1 linha com quem ficou (por exemplo: \"Isso é com a Fulana, do Financeiro; já passei para ela\").",
+    `Você é ${eu.nome}.`,
+  ].join("\n");
+}
+// grava o pedido interno; se já existe um igual ou parecido aberto nos últimos dias (com qualquer pessoa), junta nele
 async function registrar(ctx: Contexto, chefe: AgenteDB, sub: AgenteDB, tarefa: string) {
+  const ja = await pedidoAbertoParecido(ctx.empId, tarefa).catch(() => null);
+  if (ja) {
+    await sql`UPDATE conversa_interna SET pedido = ${`${ja.pedido}\n\n(Pedido parecido de ${chefe.nome} juntado aqui): ${tarefa.slice(0, 800)}`} WHERE id = ${ja.id}`;
+    return { cid: ja.id, juntou: true, paraNome: ja.nome };
+  }
   const cid = id("ci");
   await sql`INSERT INTO conversa_interna (id, empresa_id, de_agente, para_agente, origem_agente, origem_mensagem, pedido)
     VALUES (${cid}, ${ctx.empId}, ${chefe.id}, ${sub.id}, ${ctx.origemAgente}, ${ctx.origemMensagem}, ${tarefa})`;
   await gravarEvento(ctx.empId, chefe.id, "delegou", resumo(tarefa), { de: membroDe(chefe), para: membroDe(sub), resumo: resumo(tarefa) }).catch(() => {});
-  return cid;
+  return { cid, juntou: false, paraNome: sub.nome };
 }
 
 // o chefe recebe o texto e talvez peça partes para a equipe. Devolve a mensagem gravada (sem marcações) e os pedidos feitos.
 async function primeiraPassada(ctx: Contexto, chefe: AgenteDB, texto: string, autor: string, profundidade: number, contextoExtra?: string) {
-  const subs = profundidade < PROFUNDIDADE_MAX ? await subordinadosDe(chefe.id) : [];
-  const restante = PEDIDOS_POR_TAREFA - ctx.total.n;
+  const proprios = profundidade < PROFUNDIDADE_MAX ? await subordinadosDe(chefe.id) : [];
+  // sem equipe própria: os colegas (para passar o que não é do seu escopo, no máximo 1 pedido)
+  const colegas = !proprios.length && profundidade === 0 ? await colegasDe(chefe) : [];
+  const passar = !proprios.length && colegas.length > 0;
+  const subs = proprios.length ? proprios : colegas;
+  const restante = passar ? Math.min(1, PEDIDOS_POR_TAREFA - ctx.total.n) : PEDIDOS_POR_TAREFA - ctx.total.n;
   const comEquipe = subs.length > 0 && restante > 0;
   // conectores (17/11/2026): dados reais das fontes da empresa que esta pessoa lê (erro numa fonte não para a conversa)
   const dados = await dadosParaAgente(ctx.empId, chefe).catch(() => null);
-  const contexto = [contextoExtra, dados, comEquipe ? instrucoes(chefe, subs, restante) : ""].filter(Boolean).join("\n\n");
+  const contexto = [contextoExtra, dados, comEquipe ? (passar ? instrucoesColegas(chefe, subs) : instrucoes(chefe, subs, restante)) : ""].filter(Boolean).join("\n\n");
   const r = await conversar(chefe.id, texto, autor, { modo: "dono", contexto: contexto || undefined, tetoMes: await ctx.teto(), maxTokens: profundidade === 0 ? 1600 : 1200 });
   if (!comEquipe) return { mensagem: r.mensagem, pedidos: [] as { sub: AgenteDB; tarefa: string; cid: string }[] };
   const { limpo, pedidos } = extrair(r.mensagem.conteudo, subs, Math.min(PEDIDOS_POR_NIVEL, restante));
@@ -88,11 +114,12 @@ async function primeiraPassada(ctx: Contexto, chefe: AgenteDB, texto: string, au
     return { mensagem: { ...r.mensagem, conteudo: limpo || r.mensagem.conteudo }, pedidos: [] };
   }
   ctx.total.n += pedidos.length;
-  const lista = pedidos.map((p) => `- ${p.sub.nome} (${p.sub.funcao})`).join("\n");
-  const texto1 = `${limpo || "Vou acionar a equipe."}\n\nPedi para:\n${lista}`;
-  await sql`UPDATE mensagem SET conteudo = ${texto1} WHERE id = ${r.mensagem.id}`;
   const comId: { sub: AgenteDB; tarefa: string; cid: string }[] = [];
-  for (const p of pedidos) comId.push({ ...p, cid: await registrar(ctx, chefe, p.sub, p.tarefa) });
+  const juntados: string[] = [];
+  for (const p of pedidos) { const g = await registrar(ctx, chefe, p.sub, p.tarefa); if (g.juntou) juntados.push(`- ${g.paraNome}: já tinha um pedido parecido aberto, juntei nele`); else comId.push({ ...p, cid: g.cid }); }
+  const lista = comId.map((p) => `- ${p.sub.nome} (${p.sub.funcao})`).join("\n");
+  const texto1 = `${limpo || "Vou acionar a equipe."}${lista ? `\n\n${passar ? "Passei para" : "Pedi para"}:\n${lista}` : ""}${juntados.length ? `\n\nSem repetir trabalho:\n${juntados.join("\n")}` : ""}`;
+  await sql`UPDATE mensagem SET conteudo = ${texto1} WHERE id = ${r.mensagem.id}`;
   return { mensagem: { ...r.mensagem, conteudo: texto1 } as MensagemDB, pedidos: comId };
 }
 

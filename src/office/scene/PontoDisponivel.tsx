@@ -18,24 +18,27 @@ import { leve } from "./qualidade";
 import { ceu, texturaLuz } from "./CicloDia";
 import { sorteio, type AreaGramado, type Flor, type Tufo } from "./Gramado";
 import type { ItemInstancia } from "./Modelos";
-import { LOTES, frenteDoLote, type LoteInfo, type ModeloCasa } from "../data/mundo";
+import { LOTES, frenteDoLote, arvoreDoTerrenoFica, type LoteInfo, type ModeloCasa } from "../data/mundo";
 
 // Altura real (m) e para onde o modelo olha (rotação que leva a frente do GLB para +z)
+// 20/11/2026: as casas são desenhadas em código (scene/KitPredio.tsx › CasasDesenhadas); a casinha antiga e o sobrado
+// moderno (fora do mapa hoje) usam o desenho da térrea e do colonial, com as mesmas medidas
 export const CASA: Record<ModeloCasa, { altura: number; frente: number }> = {
-  casaVelha: { altura: 5.2, frente: -Math.PI / 2 },
+  casaVelha: { altura: 5.0, frente: -Math.PI / 2 },
   casaTerrea: { altura: 5.0, frente: -Math.PI / 2 },
-  casaSobrado: { altura: 7.6, frente: -Math.PI / 2 },
+  casaSobrado: { altura: 7.8, frente: -Math.PI / 2 },
   casaColonial: { altura: 7.8, frente: -Math.PI / 2 },
   casaModerna: { altura: 4.6, frente: -Math.PI / 2 },
 };
 // Porta de cada modelo, em frações da altura (medido nos GLB em 18/11/2026, olhando da rua): x = deslocamento da porta
 // para a direita de quem olha; frente = o ponto mais à frente (degrau, cerca ou jardim do próprio modelo);
 // parede = a parede da porta; luz = altura da luz da varanda.
+// (20/11/2026: medidas das casas desenhadas em código; o colonial ganhou os degraus da porta)
 const PORTA: Record<ModeloCasa, { x: number; frente: number; parede: number; luz: number }> = {
-  casaVelha: { x: 0.19, frente: 0.67, parede: 0.42, luz: 0.48 },
+  casaVelha: { x: 0.225, frente: 0.89, parede: 0.5, luz: 0.46 },
   casaTerrea: { x: 0.225, frente: 0.89, parede: 0.5, luz: 0.46 },
-  casaSobrado: { x: 0.2, frente: 0.74, parede: 0.38, luz: 0.42 },
-  casaColonial: { x: 0, frente: 0.535, parede: 0.53, luz: 0.36 },
+  casaSobrado: { x: 0, frente: 0.606, parede: 0.53, luz: 0.36 },
+  casaColonial: { x: 0, frente: 0.606, parede: 0.53, luz: 0.36 },
   casaModerna: { x: 0, frente: 1.05, parede: 0.62, luz: 0.5 },
 };
 export const CASA_RECUO = 1.2; // a casa fica 1,2 m para o fundo do lote
@@ -54,6 +57,7 @@ const GRAMA = 9.5; // até onde vai a grama aparada
 const ESTACAS = { x: 6, z0: -6.6, z1: 5.2 }; // onde cabe o prédio no terreno vazio
 // a árvore do terreno vazio fica no canto do fundo, do lado da esquina (antes ficava no meio, onde vai o prédio)
 export const ARVORE_TERRENO = (k: number): [number, number] => [ladoFora(k) * 7.4, -7.4];
+export { arvoreDoTerrenoFica }; // data/mundo.ts (20/11/2026)
 const CANTEIRO = { z0: 8.84, z1: 9.69 };
 
 // medidas de cada lote (portão, porta, placa)
@@ -269,8 +273,9 @@ export function detalhesDosQuintais(quintais: Quintal[]): Detalhes {
     const T = (lx: number, lz: number, s: number) => { const [x, z] = P(lx, lz); d.tufos.push({ x, z, s }); };
     const F = (lx: number, lz: number, s: number, cor: string) => { const [x, z] = P(lx, lz); d.flores.push({ x, z, s, cor }); };
     d.areas.push({ x0: l.centro[0] - GRAMA, x1: l.centro[0] + GRAMA, z0: l.centro[1] - GRAMA, z1: l.centro[1] + GRAMA });
-    // árvores do quintal (as mesmas posições de Mundo.tsx): tufos em volta do tronco
-    const arvores: [number, number][] = q.casa ? [[-7 * sinal(l.k), -7], [7.5 * sinal(l.k), -6]] : q.arvore ? [ARVORE_TERRENO(l.k)] : [];
+    // árvores do quintal (as mesmas posições de Mundo.tsx): tufos em volta do tronco. Desde 20/11/2026 cada casa tem só a
+    // árvore do fundo e metade dos terrenos vazios tem a sua (arvoreDoTerrenoFica)
+    const arvores: [number, number][] = q.casa ? [[-7 * sinal(l.k), -7]] : q.arvore && arvoreDoTerrenoFica(l) ? [ARVORE_TERRENO(l.k)] : [];
     if (!poucos) {
       // capim junto do meio-fio (por dentro) e na faixa de grama entre os lotes
       for (let z = -9.2; z < 8.4; z += 0.5) for (const s of [-1, 1]) { if (r() < 0.4) T(s * (BORDA - 0.2 - r() * 0.08), z + (r() - 0.5) * 0.2, 0.5 + r() * 0.35); if (r() < 0.15) T(s * (BORDA + 0.16), z + (r() - 0.5) * 0.4, 0.45 + r() * 0.3); }

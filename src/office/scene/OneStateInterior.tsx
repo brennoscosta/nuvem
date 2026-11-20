@@ -28,7 +28,8 @@ import { usePersonagem } from "../personagemStore";
 import { aparenciaAgente, hash } from "../data/aparenciaAgente";
 import type { Sede } from "../data/sedes";
 import type { Escritorio, Membro } from "../data/escritorio";
-import { W, D, X0, Z0, X1, Z1, CORREDOR, ZC, POR_FILEIRA, LARG, cx, zDentro, montarSalas, paredesDaSede, lugaresDaSala, BALCAO_SEDE, MOVEIS_SEDE, CAFE_SEDE, Z_RECEPCAO, type Sala, type LugarSede } from "../data/plantaSede";
+import { W, D, X0, Z0, X1, Z1, CORREDOR, ZC, POR_FILEIRA, LARG, cx, zDentro, montarSalas, paredesDaSede, lugaresDaSala, catracasDaSede, BALCAO_SEDE, MOVEIS_SEDE, CAFE_SEDE, Z_RECEPCAO, type Sala, type LugarSede } from "../data/plantaSede";
+import { Catracas } from "./Catraca";
 
 // ---------- planta (salas em src/office/data/plantaSede.ts) ----------
 const ALT = 1.15;
@@ -228,7 +229,12 @@ function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: Re
   useAnimacao(h, () => plano.current.pose, fase, HIPS.procedural.base);
   const [hover, setHover] = useState(false);
   // a recepcionista fala com quem chega na recepção (17/11/2026, ui/Recepcao.tsx)
-  const falaRec = usePersonagem((s) => (m.papel === "atendente" && s.falaRecepcao?.chave === ctx.sede.chave ? s.falaRecepcao.texto : null));
+  // 20/11/2026: com membroId, quem fala é a pessoa do setor para onde a recepção mandou o visitante
+  const falaRec = usePersonagem((s) => { const f = s.falaRecepcao; return f && f.chave === ctx.sede.chave && (f.membroId ? f.membroId === m.id : m.papel === "atendente") ? f.texto : null; });
+  // atendendo um visitante encaminhado pela recepção: volta para a mesa e não sai passeando enquanto ele estiver ali
+  const atendendo = usePersonagem((s) => s.predio?.chave === ctx.sede.chave && s.predio.liberado?.membroId === m.id);
+  const atendendoRef = useRef(atendendo);
+  useEffect(() => { atendendoRef.current = atendendo; }, [atendendo]);
 
   // escolhe o próximo passeio: colega (chefe ou alguém da equipe), reunião ou café; volta para a mesa depois
   const novoPasseio = (agora: number, pedido?: Aviso) => {
@@ -260,6 +266,7 @@ function Agente({ m, ctx, avisos, dono }: { m: Membro; ctx: Contexto; avisos: Re
     const g = corpo.current; if (!g) return;
     const t = estado.clock.elapsedTime, p = plano.current;
     if (!proxima.current) proxima.current = t + 8 + (hash(m.id) % 30);
+    if (atendendoRef.current) { if (p.fim === "parado" && p.pose !== "walk") p.ate = 0; if (p.fim === "sentar") proxima.current = Math.max(proxima.current, t + 20); }
     // pedido de verdade (dono): este agente vai até quem recebeu a tarefa
     const real = avisos.current?.get(m.id);
     if (real && p.fim === "sentar") { avisos.current?.delete(m.id); novoPasseio(t, real); return; }
@@ -362,6 +369,7 @@ export function InteriorSede({ sede }: { sede: Sede }) {
     const ordem = e.equipe.filter((m) => lugarDe[m.id]);
     return { sede, salas, hall: salas.find((s) => s.tipo === "hall"), salaDe, lugarDe, ordem, porId: Object.fromEntries(ordem.map((m) => [m.id, m])), lugares, posNaSala };
   }, [e, sede]);
+  const catracas = useMemo(() => (ctx ? catracasDaSede(ctx.salas) : []), [ctx]);
   if (!e || !ctx) return null;
   // gráficos leves: duas pessoas por sala (o chefe e mais uma), também andando, só que com menos frequência
   const mostrar = poucos ? ctx.ordem.filter((m) => (ctx.posNaSala[m.id] ?? 0) < 2) : ctx.ordem;
@@ -370,6 +378,7 @@ export function InteriorSede({ sede }: { sede: Sede }) {
   return (
     <group>
       <Estatico><Fixos salas={ctx.salas} lugares={ctx.lugares} sede={sede} /></Estatico>
+      <Catracas chave={sede.chave} lista={catracas} dentro={-1} />
       <LuzDasLuminarias />
       {ctx.salas.map((s) => <NomeSala key={s.id} s={s} />)}
       {mostrar.map((m) => <Agente key={m.id} m={m} ctx={ctx} avisos={avisos} dono={dono} />)}

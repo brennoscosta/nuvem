@@ -5,22 +5,24 @@
 // cartões usam o mundoStore, que não depende da cena). Arrastar move, a roda ou o pinçar aproximam.
 import { useEffect, useRef, useState } from "react";
 import { useMundo, LOTES, useAgora, promocaoAtiva, type Terreno } from "../mundoStore";
-import { QUARTEIROES, centroQuarteirao, EIXOS_RUA, RUA, MEIO_Q, BORDA_CALCADA, PASSO, N, EIXO_RUA, LOTE, nomeNicho, type LoteInfo } from "../data/mundo";
+import { QUARTEIROES, centroQuarteirao, EIXOS_RUA, RUA, MEIO_Q, BORDA_CALCADA, PASSO, N, EIXO_RUA, LOTE, nomeNicho, arvoreDoTerrenoFica, type LoteInfo } from "../data/mundo";
 import { PRACA_CHAVE } from "../data/praca";
 import { escolherMapa } from "../scene/qualidade";
 import { abrirSede } from "./CartaoOneState";
 import { SEDES, paraMundoSede, type Sede } from "../data/sedes";
 import { SEDE } from "../data/onestate";
+import { Quiosques2D, RealceExpansao2D } from "./Quiosque";
 
 const L = N * PASSO + EIXO_RUA + 12; // metade do lado desenhado (m)
 const ASFALTO = "#545962", FAIXA = "#F3EEDF", CALCADA = "#E4DFD4", GRAMA = "#9ACB78", GRAMA_Q = "#B2DA93";
 const ESC_MIN = 0.9, ESC_MAX = 4.5;
 
-// árvores de rua: uma a cada 8 m nas calçadas, com uma variação fixa (o mesmo desenho sempre)
+// árvores de rua: uma a cada 16 m nas calçadas (até 19/11/2026 eram a cada 8 m; o dono pediu metade da arborização),
+// com uma variação fixa (o mesmo desenho sempre)
 const ARVORES: [number, number, number][] = [];
 for (const q of QUARTEIROES) {
   const [cx, cz] = centroQuarteirao(q.i, q.j), B = MEIO_Q + 1.2;
-  for (let d = -16; d <= 16; d += 8) for (const [x, z] of [[cx + d, cz - B], [cx + d, cz + B], [cx - B, cz + d], [cx + B, cz + d]]) ARVORES.push([x, z, 1.5 + ((Math.abs(x * 7 + z * 13) % 10) / 10) * 0.6]);
+  for (let d = -16; d <= 16; d += 16) for (const [x, z] of [[cx + d, cz - B], [cx + d, cz + B], [cx - B, cz + d], [cx + B, cz + d]]) ARVORES.push([x, z, 1.5 + ((Math.abs(x * 7 + z * 13) % 10) / 10) * 0.6]);
 }
 
 function Arvore({ x, z, r }: { x: number; z: number; r: number }) {
@@ -113,7 +115,7 @@ function Lote2D({ l, t, principal, anexoMeio, sel, vagas, promo, vivo }: { l: Lo
   return (
     <g className="cursor-pointer" onClick={abrir} role="button" aria-label={`Lote ${l.numero} à venda`}>
       <rect x={x - s / 2} y={z - s / 2} width={s} height={s} rx={2} fill={GRAMA_Q} />
-      {l.lote.tipo === "casa" ? <Casa x={x} z={z - 1} cor={({ casaVelha: "#9C6B4E", casaTerrea: "#C0623A", casaSobrado: "#8A8F98", casaColonial: "#B5552F", casaModerna: "#6B7280" } as Record<string, string>)[l.lote.modelo] ?? "#C0623A"} /> : l.lote.tipo === "vazio" && l.lote.arvore ? <Arvore x={x + 3} z={z - 2} r={2.6} /> : null}
+      {l.lote.tipo === "casa" ? <Casa x={x} z={z - 1} cor={({ casaVelha: "#9C6B4E", casaTerrea: "#C0623A", casaSobrado: "#8A8F98", casaColonial: "#B5552F", casaModerna: "#6B7280" } as Record<string, string>)[l.lote.modelo] ?? "#C0623A"} /> : l.lote.tipo === "vazio" && l.lote.arvore && arvoreDoTerrenoFica(l) ? <Arvore x={x + 3} z={z - 2} r={2.6} /> : null}
       <g style={{ pointerEvents: "none" }}>
         <rect x={x - (13 + String(l.numero).length * 1.3) / 2} y={z + 4.4} width={13 + String(l.numero).length * 1.3} height={3.4} rx={0.6} fill="#FFFFFF" stroke="#1D4ED8" strokeWidth={0.3} />
         {/* 18/11/2026: o lote livre é um "ponto disponível" (mesmo nome da placa no mapa 3D) */}
@@ -251,6 +253,9 @@ export function Mapa2D() {
         {/* sedes (data/sedes.ts; desde 19/11/2026 cada uma num lote de esquina virado para o centro): torre escura com a
             cor da marca, o pátio de entrada do lado da rua da frente; depois dos lotes, para o nome ficar por cima */}
         {SEDES.map((sd) => <Sede2D key={sd.id} sd={sd} />)}
+        {/* quiosques e o realce do vizinho ao expandir o terreno (20/11/2026) */}
+        <RealceExpansao2D />
+        <Quiosques2D />
       </svg>
       {/* aproximar, afastar e voltar ao 3D */}
       <div className="pointer-events-auto absolute bottom-14 left-3 z-10 flex items-center gap-1 rounded-2xl bg-[#111418]/75 p-1 text-white shadow-xl backdrop-blur">

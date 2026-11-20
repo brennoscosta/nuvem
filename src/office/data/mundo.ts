@@ -115,7 +115,10 @@ export const vizinhoDoLado = (l: LoteInfo): LoteInfo | null => loteNaPosicao(l.i
 export const NOME_CONSTRUCAO: Record<string, string> = {
   vazio: "terreno vazio", casaVelha: "casinha antiga pra reformar", casaTerrea: "casinha térrea", casaSobrado: "sobrado moderno", casaColonial: "sobrado colonial", casaModerna: "casa moderna",
 };
-export const descricaoLote = (l: LoteInfo) => (l.lote.tipo === "praca" ? "praça de eventos e feira de sábado" : l.lote.tipo === "vazio" ? (l.lote.arvore ? "terreno vazio com uma árvore" : "terreno vazio") : NOME_CONSTRUCAO[l.lote.modelo]);
+// metade da arborização (20/11/2026, pedido do dono: "50% a menos de arborização"): dos terrenos vazios marcados com
+// árvore, só os de número par continuam com ela (o desenho, os tufos do quintal, o mapa 2D e a descrição seguem esta regra)
+export const arvoreDoTerrenoFica = (l: { numero: number }) => l.numero % 2 === 0;
+export const descricaoLote = (l: LoteInfo) => (l.lote.tipo === "praca" ? "praça de eventos e feira de sábado" : l.lote.tipo === "vazio" ? (l.lote.arvore && arvoreDoTerrenoFica(l) ? "terreno vazio com uma árvore" : "terreno vazio") : NOME_CONSTRUCAO[l.lote.modelo]);
 
 // Nicho da empresa (vai no balão em cima do lote). O dono escolhe ao montar a marca.
 export const NICHOS: { id: string; nome: string }[] = [

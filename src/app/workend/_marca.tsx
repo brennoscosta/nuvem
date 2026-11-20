@@ -13,3 +13,9 @@ export function Logotipo({ altura = 22, claro = false, className = "" }: { altur
     </svg>
   );
 }
+
+// Logotipo do topo das páginas (20/11/2026): o mesmo logotipo, com o sininho de Natal pendurado na ponta (só aparece com a
+// classe we-natal no <html>, de 20/11 a 6/1; CSS em app/globals.css). O desenho do logotipo não muda.
+export function MarcaTopo({ altura = 22, claro = false }: { altura?: number; claro?: boolean }) {
+  return <span className="we-marca"><Logotipo altura={altura} claro={claro} /><span className="we-sino" aria-hidden="true"><i /></span></span>;
+}

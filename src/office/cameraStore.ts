@@ -28,6 +28,13 @@ export const ATALHOS: [string, string][] = [
 // joystick da tela no celular (modo andar): direção de -1 a 1, escrita pela interface e lida pela cena a cada quadro
 export const joystick = { x: 0, y: 0 };
 
+// para onde a câmera olha (alvo no chão e direção): escrito pelo CameraMundo a cada quadro, lido pelo mini-mapa e pela névoa
+export const cameraInfo = { x: 0, z: 0, ang: 0, pronto: false };
+// Até onde a câmera do mapa se afasta (20/11/2026, pedido do dono: "quero poder diminuir mais o zoom para poder ver melhor
+// a cidade de cima, algo em torno de 30% de zoom menos"): 119 → 155 m no computador e 138 → 180 m no celular em pé.
+// Vale para a roda do mouse, a pinça, os botões e o teclado. A câmera de seguir o personagem não muda.
+export const RAIO_MAXIMO = typeof window !== "undefined" && window.innerWidth < window.innerHeight ? 180 : 155;
+
 // Hora do mapa (12/11/2026): automática (horário de Brasília), sempre dia ou sempre noite. Lembrada só neste navegador.
 export type ModoHora = "auto" | "dia" | "noite";
 const CHAVE_HORA = "workend-hora";

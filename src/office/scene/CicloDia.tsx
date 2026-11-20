@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useHora } from "../cameraStore";
+import { useHora, cameraInfo } from "../cameraStore";
 import { clima, iniciarClima, passoClima } from "../clima";
 import { leve } from "./qualidade";
 import { useEscritorio } from "../store";
@@ -115,7 +115,12 @@ export function registrarHorizonte(m: THREE.MeshBasicMaterial) {
 interface Luzes { hemi: React.RefObject<THREE.HemisphereLight | null>; sol: React.RefObject<THREE.DirectionalLight | null>; preench: React.RefObject<THREE.DirectionalLight | null> }
 
 const DIST_LUZ = new THREE.Vector3();
-function atualizar(scene: THREE.Scene, gl: THREE.WebGLRenderer, l: Luzes, dt: number, t: number) {
+// distância da câmera até o ponto do chão que ela olha (cameraInfo, do CameraMundo); sem ele, até o centro da cidade
+function distanciaOlhada(cam: THREE.Camera) {
+  const p = cam.position;
+  return cameraInfo.pronto ? Math.hypot(p.x - cameraInfo.x, p.y, p.z - cameraInfo.z) : p.length();
+}
+function atualizar(scene: THREE.Scene, gl: THREE.WebGLRenderer, l: Luzes, dt: number, t: number, cam: THREE.Camera) {
   const modo = useHora.getState().modo;
   const hora = HORA_FIXA != null ? HORA_FIXA : modo === "auto" ? horaAgora(t) : null; // "sempre dia/noite": sem hora (nada de neblina da manhã)
   const alvo = hora != null ? noiteDaHora(hora) : modo === "noite" ? 1 : 0;
@@ -141,8 +146,11 @@ function atualizar(scene: THREE.Scene, gl: THREE.WebGLRenderer, l: Luzes, dt: nu
     fog.color.copy(corNevoa);
     // neblina: o alcance cai depressa (0,55 da manhã ≈ 115 m; 0,9 ≈ 55 m) e começa bem perto da câmera.
     // 18/11/2026: com tempo limpo ela começa a 115 m (antes 140): um véu leve no meio da distância dá profundidade
-    const far = 360 * Math.pow(45 / 360, neb) * (1 - clima.chuva * 0.3);
-    fog.far = far; fog.near = THREE.MathUtils.lerp(115 * (1 - clima.chuva * 0.25), far * 0.06, Math.min(1, neb * 2.2));
+    // 20/11/2026 (a câmera afasta 30% mais): passando de 110 m do ponto olhado, a névoa recua junto (o centro da cidade não
+    // fica lavado de branco lá de cima) e o horizonte continua sumindo nela, antes do limite de desenho da câmera (560 m)
+    const afastou = Math.max(0, distanciaOlhada(cam) - 110);
+    const far = 360 * Math.pow(45 / 360, neb) * (1 - clima.chuva * 0.3) + afastou * (1 - neb * 0.6) * 1.15;
+    fog.far = far; fog.near = THREE.MathUtils.lerp(115 * (1 - clima.chuva * 0.25) + afastou, far * 0.06, Math.min(1, neb * 2.2));
   }
   // curva de tom: exposição pela hora (só um número; não recompila)
   gl.toneMappingExposure = THREE.MathUtils.lerp(EXPOSICAO_DIA, EXPOSICAO_NOITE, n);
@@ -172,7 +180,7 @@ function atualizar(scene: THREE.Scene, gl: THREE.WebGLRenderer, l: Luzes, dt: nu
 export function CicloDia({ luzes }: { luzes: Luzes }) {
   const scene = useThree((s) => s.scene), gl = useThree((s) => s.gl);
   useEffect(() => { iniciarClima(); }, []);
-  useFrame(({ clock }, dt) => atualizar(scene, gl, luzes, Math.min(dt, 0.1), clock.elapsedTime));
+  useFrame(({ clock, camera }, dt) => atualizar(scene, gl, luzes, Math.min(dt, 0.1), clock.elapsedTime, camera));
   return <><Cupula /><Estrelas /><Lua /></>;
 }
 

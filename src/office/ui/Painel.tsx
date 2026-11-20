@@ -19,6 +19,7 @@ import { ModalLogin, CartaoPublico } from "./Login";
 import { CartaoLote, PainelEmpresa, ContaWorkend, MenuConta, AvisoPagamento } from "./Lote";
 import { Icone } from "./Icone";
 import { CartaoPraca, AvisoEventos } from "./Praca";
+import { CartaoQuiosque } from "./Quiosque";
 import { MiniMapa } from "./MiniMapa";
 import { CartaoOneState } from "./CartaoOneState";
 import { ChatEquipe } from "./ChatEquipe";
@@ -29,7 +30,10 @@ import { VisitaGuiada } from "./VisitaGuiada";
 import { BotaoSom } from "./Som";
 import { useMundo, modoMundo } from "../mundoStore";
 import Link from "next/link";
-import { Logotipo } from "@/app/workend/_marca";
+import { SaldoCreditos } from "./SaldoCreditos";
+import { MarcaTopo } from "@/app/workend/_marca";
+import { ContadorCidade } from "./PessoasOnline";
+import { ClasseNatal } from "@/app/workend/_natal";
 
 // Estamos no mapa do WorkEnd (workend.online/mundo)? Só dá pra saber no navegador (sem erro de hidratação).
 const semAssinatura = () => () => {};
@@ -65,10 +69,16 @@ export function BarraTopo() {
   // No celular as ações que não cabem rolam de lado; o som e os ajustes ficam na barra de baixo.
   if (mundo) return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-2 sm:p-3">
-      <div className="hud-ilha pointer-events-auto flex shrink-0 items-center gap-3 px-3.5 py-2.5">
-        <Link href="/" aria-label="WorkEnd, início" className="py-0.5"><Logotipo altura={18} claro /></Link>
-        <span className="hud-sep hidden lg:block" aria-hidden="true" />
-        {!temLote && <span className="hidden text-[12px] leading-tight text-white/60 lg:block">Clique num lote à venda<br />para reservar o seu</span>}
+      {/* 20/11/2026: ao lado da marca (no celular, logo abaixo dela), quantas pessoas estão na cidade agora (ui/PessoasOnline) */}
+      <div className="pointer-events-none flex shrink-0 flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+        <div className="hud-ilha pointer-events-auto flex shrink-0 items-center gap-3 px-3.5 py-2.5">
+          <Link href="/" aria-label="WorkEnd, início" className="py-0.5"><MarcaTopo altura={18} claro /></Link>
+          <span className="hud-sep hidden lg:block" aria-hidden="true" />
+          {!temLote && <span className="hidden text-[12px] leading-tight text-white/60 lg:block">Clique num lote à venda<br />para reservar o seu</span>}
+        </div>
+        <ContadorCidade />
+        {/* o mapa é a página da raiz (fora do layout do WorkEnd): o sininho de Natal do logotipo depende desta classe */}
+        <ClasseNatal />
       </div>
       <div className="hud-ilha pointer-events-auto flex min-w-0 items-center gap-1 p-1.5">
         <div className="sem-barra flex min-w-0 items-center gap-1 overflow-x-auto">
@@ -85,6 +95,7 @@ export function BarraTopo() {
           <span className="hud-sep hud-so-pc" aria-hidden="true" />
           <ContaWorkend />
         </div>
+        <SaldoCreditos tema="escuro" />
         <Sino tema="escuro" />
         <MenuConta />
       </div>
@@ -288,6 +299,7 @@ export function Painel() {
       <PainelOuCartao />
       <CartaoLote />
       <CartaoPraca />
+      <CartaoQuiosque />
       <CartaoOutdoor />
       <CartaoOneState />
       <ChatEquipe />

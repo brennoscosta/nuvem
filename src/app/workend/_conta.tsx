@@ -44,7 +44,7 @@ export function FormCadastro() {
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault(); setErro(null); setOcupado(true);
-    try { await api("/api/workend/cadastro", f); window.location.href = destino(); } catch (x) { setErro((x as Error).message); setOcupado(false); }
+    try { await api("/api/workend/cadastro", f); window.location.href = `/app/perfil/comecar?depois=${encodeURIComponent(destino())}`; } catch (x) { setErro((x as Error).message); setOcupado(false); }
   };
   return (
     <form onSubmit={enviar} className="flex flex-col gap-4">

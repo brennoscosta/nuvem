@@ -25,6 +25,7 @@ import { useMundo, modoMundo } from "../mundoStore";
 import { MESA } from "../data/layout";
 import type { Evento } from "../data/eventos";
 import { useCartaoAberto } from "../ui/cartaoAberto";
+import { RAIO_MAXIMO } from "../cameraStore";
 
 // Entrega os eventos da fila pros agentes
 function Despachante() {
@@ -150,7 +151,8 @@ const S = { centro: new THREE.Vector3(), frente: new THREE.Vector3(), dir: new T
 const CIMA = new THREE.Vector3(0, 1, 0);
 // fora do componente: a luz e a câmera são objetos do three.js, não estado do React. Diz se a área de sombra mudou.
 function encaixarSombra(l: THREE.DirectionalLight, camera: THREE.Camera, alvo: THREE.Vector3, forcar: boolean) {
-  const meia = THREE.MathUtils.clamp(camera.position.distanceTo(alvo) * 0.62, 20, 85);
+  // 20/11/2026: com a câmera até 155 m, a área vai até ±100 m (texel de ~10 cm, do tamanho de um pixel no chão lá de cima)
+  const meia = THREE.MathUtils.clamp(camera.position.distanceTo(alvo) * 0.62, 20, 100);
   S.frente.set(alvo.x - camera.position.x, 0, alvo.z - camera.position.z);
   const fl = S.frente.length(); if (fl > 1e-3) S.frente.multiplyScalar((meia * 0.3) / fl);
   S.centro.set(alvo.x, 0, alvo.z).add(S.frente);
@@ -330,7 +332,8 @@ export function Cena3D() {
       dpr={dpr}
       frameloop={leve ? "never" : "always"}
       shadows={leveInicial ? false : { enabled: true, type: THREE.PCFShadowMap }}
-      camera={{ position: cam.pos, fov: FOV, near: 0.5, far: 420 }}
+      // 20/11/2026: longe 420 → 560 m (a câmera vai 30% mais longe; a névoa do CicloDia some com tudo antes disso)
+      camera={{ position: cam.pos, fov: FOV, near: 0.5, far: 560 }}
       // curva de tom própria no mapa da cidade (Acabamento; a exposição o CicloDia ajusta pela hora)
       gl={{ antialias: true, powerPreference: "high-performance", toneMapping: TOM_PROPRIO && modoMundo() ? THREE.CustomToneMapping : THREE.ACESFilmicToneMapping }}
       onPointerMissed={() => { useEscritorio.getState().selecionar(null); if (!useMundo.getState().painelEmpresa) useMundo.getState().selecionarLote(null); }}>
@@ -357,7 +360,7 @@ export function Cena3D() {
       <Suspense fallback={null}>{ordem.map((id) => agentes[id] && <Agente key={id} def={agentes[id]} />)}</Suspense>
       <Despachante />
       {MEDIR && <Medidor />}
-      <MapControls ref={controles} target={cam.alvo} minDistance={4} maxDistance={RETRATO ? 138 : 119} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
+      <MapControls ref={controles} target={cam.alvo} minDistance={4} maxDistance={RAIO_MAXIMO} minPolarAngle={0.35} maxPolarAngle={1.25} dampingFactor={0.08} enableDamping />
       <FocoCamera controles={controles} />
       {modoMundo() && <CameraMundo controles={controles} inicio={CAM_MUNDO} />}
       {modoMundo() && <MiniMapaRender />}

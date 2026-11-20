@@ -171,7 +171,7 @@ type Papel = "liso" | "fosco" | "metal" | "reboco" | "pintura" | "concreto" | "t
 const TILE: Partial<Record<Papel, number>> = { reboco: 3, pintura: 3, concreto: 2.4, tijolo: 1.2, madeira: 1.2, chapa: 0.9, telha: 1.1, enrolar: 1.2, pastilha: 0.6, espelho: 3.2 };
 type MatKit = THREE.MeshStandardMaterial | THREE.MeshLambertMaterial;
 const MATS = new Map<string, MatKit>();
-const LUZES_KIT = { acesos: [] as MatKit[], lampadas: [] as MatKit[] };
+const LUZES_KIT = { acesos: [] as MatKit[], lampadas: [] as MatKit[], vidros: [] as MatKit[] };
 // no modo leve o mesmo material sai em Lambert (sem rugosidade nem metal)
 function criar(o: THREE.MeshStandardMaterialParameters): MatKit {
   if (!leve()) return new THREE.MeshStandardMaterial(o);
@@ -192,7 +192,7 @@ function material(p: Papel): MatKit {
   else if (p === "telha") m = criar({ vertexColors: true, map: texTelha(), roughness: 0.9 });
   else if (p === "enrolar") m = criar({ vertexColors: true, map: texEnrolar(), roughness: 0.45, metalness: 0.5 });
   else if (p === "pastilha") m = criar({ vertexColors: true, map: texPastilha(), roughness: 0.35 });
-  else if (p === "vidro") m = criar({ color: "#6E8FA6", roughness: 0.05, metalness: 0.6, transparent: true, opacity: 0.42, depthWrite: false });
+  else if (p === "vidro") { m = criar({ color: "#6E8FA6", roughness: 0.05, metalness: 0.6, transparent: true, opacity: 0.42, depthWrite: false }); LUZES_KIT.vidros.push(m); }
   else if (p === "espelho") m = criar({ vertexColors: true, map: texEspelho(), roughness: 0.06, metalness: 0.75 });
   else if (p === "luz") { m = criar({ color: "#FFF1D6", emissive: "#FFD9A0", emissiveIntensity: 0.15, roughness: 0.4 }); LUZES_KIT.lampadas.push(m); }
   else {
@@ -214,8 +214,11 @@ function materialPintura(cor: string): MatKit {
 export function RelogioKit() {
   useFrame(() => {
     const n = ceu.noite;
-    for (const m of LUZES_KIT.acesos) m.emissiveIntensity = n * 0.95;
+    // (20/11/2026: 0,95 → 1,3; as janelas acesas chegavam a 145 de 255 e o prédio corporativo ficava apagado à noite)
+    for (const m of LUZES_KIT.acesos) m.emissiveIntensity = n * 1.3;
     for (const m of LUZES_KIT.lampadas) m.emissiveIntensity = 0.15 + n * 2.4;
+    // à noite o vidro reflete menos e as salas acesas aparecem (20/11/2026: os prédios ficavam apagados à noite)
+    for (const m of LUZES_KIT.vidros) m.opacity = 0.42 - 0.26 * n;
   });
   return null;
 }
@@ -228,13 +231,17 @@ const M4 = new THREE.Matrix4(), RM = new THREE.Matrix4(), EU = new THREE.Euler()
 interface Face { cx: number; cz: number; th: number }
 interface Parte { geo: THREE.BufferGeometry; mat: MatKit; sombra: boolean; papel: Papel }
 const fazSombra = (p: Papel) => p !== "vidro" && p !== "luz" && !p.startsWith("int:");
-class Montador {
+const M4O = new THREE.Matrix4();
+export class Montador {
   lotes = new Map<Papel, THREE.BufferGeometry[]>();
   detalhe = !leve();
+  // origem (20/11/2026, casas dos lotes): todas as peças passam por esta matriz antes; assim várias casas, cada uma no seu
+  // lote e girada para a rua, saem juntas em poucas malhas (uma por material)
+  origem: THREE.Matrix4 | null = null;
   private add(geo: THREE.BufferGeometry, p: Papel, m: THREE.Matrix4, cor: string | undefined, uvProprio = false) {
     const g = geo.index ? geo.toNonIndexed() : geo.clone();
     geo.dispose();
-    g.applyMatrix4(m);
+    g.applyMatrix4(this.origem ? M4O.multiplyMatrices(this.origem, m) : m);
     const pos = g.attributes.position as THREE.BufferAttribute, nor = g.attributes.normal as THREE.BufferAttribute, n = pos.count;
     if (!uvProprio) {
       // projeção em metros pela normal dominante
@@ -369,7 +376,8 @@ function janela(M: Montador, F: Face, s: Estilo, u: number, y0: number, w: numbe
 function vitrine(M: Montador, F: Face, s: Estilo, o: { u0: number; u1: number; y0: number; y1: number; portas: [number, number][]; n?: number; int?: IntTipo; passo?: number; corCaixilho?: string; livres?: number[] }) {
   const n = o.n ?? -0.2, cx = o.corCaixilho ?? s.caixilho, int = o.int ?? s.int;
   const w = o.u1 - o.u0, h = o.y1 - o.y0, uc = (o.u0 + o.u1) / 2, off = hash(s.seed, o.u0, 7) * 0.5;
-  M.fp(F, `int:${int}:1`, uc, o.y0 + h / 2, n - 1.3, w + 0.4, h + 0.3, undefined, [off, 0.02, off + Math.min(1, w / 6), Math.min(1, 0.02 + h / 3)]);
+  // (20/11/2026: o fundo de dentro começa no piso; antes descia 15 cm abaixo do chão, escondido atrás do rodapé)
+  M.fp(F, `int:${int}:1`, uc, o.y0 + (h + 0.15) / 2, n - 1.3, w + 0.4, h + 0.15, undefined, [off, 0.02, off + Math.min(1, w / 6), Math.min(1, 0.02 + h / 3)]);
   M.fp(F, "vidro", uc, o.y0 + h / 2, n, w, h);
   M.fc(F, "metal", uc, o.y0 + 0.11, n - 0.02, w, 0.22, 0.12, cx); // rodapé
   M.fc(F, "metal", uc, o.y1 - 0.05, n - 0.02, w, 0.1, 0.14, cx);
@@ -454,7 +462,7 @@ function paredeDe(material: MaterialFachada, padrao: { parede: Papel; cor: strin
 }
 
 // ---------------------------------------------------------------- os 8 tipos
-interface Opcoes { id: KitId; n: number; duplo: boolean; material: MaterialFachada; corMarca: string; seed: number; plana: boolean }
+interface Opcoes { id: KitId; n: number; duplo: boolean; material: MaterialFachada; corMarca: string; seed: number; plana: boolean; sede?: boolean }
 type Plantas = { arbusto: ItemInstancia[]; azaleia: ItemInstancia[]; topiaria: ItemInstancia[] };
 interface Feito { M: Montador; plantas: Plantas }
 const novo = (): Feito => ({ M: new Montador(), plantas: { arbusto: [], azaleia: [], topiaria: [] } });
@@ -499,7 +507,8 @@ function comercial(o: Opcoes, m: MedidasKit): Feito {
   lajeTopo(M, retangulo(w, z0, z1), topo);
   if (!o.plana) { platibanda(M, s, retangulo(w, z0, z1), topo, 0.9); equipamentos(M, s, 0, topo, (z0 + z1) / 2 + 0.4, w); }
   // canteiros na frente
-  for (const sx of [-1, 1]) { M.caixa("concreto", 2.6, 0.45, 0.8, sx * (w / 2 - 1.6), 0.22, z0 - 1.0, "#BDB7AC"); M.caixa("fosco", 2.4, 0.02, 0.6, sx * (w / 2 - 1.6), 0.45, z0 - 1.0, "#5A4632"); plantas.arbusto.push({ pos: [sx * (w / 2 - 2.3), 0.45, z0 - 1.0], altura: 0.9 }, { pos: [sx * (w / 2 - 1.0), 0.45, z0 - 1.0], altura: 0.8 }); }
+  // (na sede o jardim da frente é o do lote da sede, SedeEstilos › JardimSede: os enfeites da frente do kit não entram)
+  if (!o.sede) for (const sx of [-1, 1]) { M.caixa("concreto", 2.6, 0.45, 0.8, sx * (w / 2 - 1.6), 0.22, z0 - 1.0, "#BDB7AC"); M.caixa("fosco", 2.4, 0.02, 0.6, sx * (w / 2 - 1.6), 0.45, z0 - 1.0, "#5A4632"); plantas.arbusto.push({ pos: [sx * (w / 2 - 2.3), 0.45, z0 - 1.0], altura: 0.9 }, { pos: [sx * (w / 2 - 1.0), 0.45, z0 - 1.0], altura: 0.8 }); }
   return { M, plantas };
 }
 
@@ -524,7 +533,10 @@ function torre(o: Opcoes, m: MedidasKit): Feito {
   for (const sg of [-1, 1]) M.cil("metal", 0.08, 0.08, 4.3, sg * (mw / 2 - 0.2), 2.15, z0 - 1.45, "#2E343B", 10);
   if (M.detalhe) for (const x of [-2, 0, 2]) M.caixa("luz", 0.5, 0.02, 0.5, x, 4.2, z0 - 0.6);
   // miolo escuro (núcleo de elevadores): pela pele de vidro nunca se vê o outro lado vazio
-  if (n > 1) M.caixa("fosco", w - 2.0, topo - terreo, d - 2.0, 0, terreo + (topo - terreo) / 2, 0, "#2B3036");
+  // (20/11/2026: tudo pelo centro de verdade, cz: na sede o prédio vai de -4,8 a 8,2 e o núcleo em z = 0 saía na frente
+  // da fachada e tapava as janelas acesas)
+  const cz = (z0 + z1) / 2;
+  if (n > 1) M.caixa("fosco", w - 2.0, topo - terreo, d - 2.0, 0, terreo + (topo - terreo) / 2, cz, "#2B3036");
   // andares: faixa opaca na altura da laje + vidro de visão, montantes a cada ~1,5 m
   const esp = 0.85;
   for (let a = 1; a < n; a++) {
@@ -544,17 +556,19 @@ function torre(o: Opcoes, m: MedidasKit): Feito {
   // pilares de canto em concreto claro até a coroa
   const hp = topo + (o.plana ? 0.3 : 2.6) - terreo;
   for (const [x, z] of [[-w / 2, z0], [w / 2, z0], [-w / 2, z1], [w / 2, z1]]) M.caixa("concreto", 0.7, hp, 0.7, x, terreo + hp / 2, z, "#D9D6CF");
-  M.caixa("concreto", w + 0.4, 0.3, d + 0.4, 0, topo - 0.15, 0, "#C9C6BF");
+  M.caixa("concreto", w + 0.4, 0.3, d + 0.4, 0, topo - 0.15, cz, "#C9C6BF");
   if (!o.plana) {
     // coroa de vidro escuro com uma linha de luz, equipamentos e heliponto
-    for (const [cw, cd, x, z] of [[w + 0.2, 0.2, 0, z0], [w + 0.2, 0.2, 0, z1], [0.2, d, w / 2, 0], [0.2, d, -w / 2, 0]] as [number, number, number, number][]) M.caixa("espelho", cw, 2.6, cd, x, topo + 1.3, z, "#7E97AC");
+    for (const [cw, cd, x, z] of [[w + 0.2, 0.2, 0, z0], [w + 0.2, 0.2, 0, z1], [0.2, d, w / 2, cz], [0.2, d, -w / 2, cz]] as [number, number, number, number][]) M.caixa("espelho", cw, 2.6, cd, x, topo + 1.3, z, "#7E97AC");
     M.caixa("luz", w + 0.24, 0.06, 0.06, 0, topo + 2.5, z0 - 0.1);
-    equipamentos(M, s, 0, topo, 0.5, w);
-    if (M.detalhe) { M.cil("liso", 2.2, 2.2, 0.05, 0, topo + 0.03, -1.6, "#3C4148", 24); M.caixa("liso", 0.25, 0.02, 1.6, -0.5, topo + 0.07, -1.6, "#F2C230"); M.caixa("liso", 0.25, 0.02, 1.6, 0.5, topo + 0.07, -1.6, "#F2C230"); M.caixa("liso", 1.0, 0.02, 0.25, 0, topo + 0.07, -1.6, "#F2C230"); }
+    equipamentos(M, s, 0, topo, cz + 0.5, w);
+    if (M.detalhe) { M.cil("liso", 2.2, 2.2, 0.05, 0, topo + 0.03, cz - 1.6, "#3C4148", 24); M.caixa("liso", 0.25, 0.02, 1.6, -0.5, topo + 0.07, cz - 1.6, "#F2C230"); M.caixa("liso", 0.25, 0.02, 1.6, 0.5, topo + 0.07, cz - 1.6, "#F2C230"); M.caixa("liso", 1.0, 0.02, 0.25, 0, topo + 0.07, cz - 1.6, "#F2C230"); }
   }
   // espelho d'água e topiarias na frente do saguão
-  M.caixa("concreto", 3.6, 0.35, 1.0, -w / 2 + 2.2, 0.17, z0 - 1.1, "#B5B0A6"); M.caixa("vidro", 3.4, 0.02, 0.8, -w / 2 + 2.2, 0.34, z0 - 1.1);
-  plantas.topiaria.push({ pos: [w / 2 - 1.2, 0.08, z0 - 1.0], altura: 1.6 }, { pos: [w / 2 - 2.6, 0.08, z0 - 1.0], altura: 1.4 });
+  if (!o.sede) {
+    M.caixa("concreto", 3.6, 0.35, 1.0, -w / 2 + 2.2, 0.17, z0 - 1.1, "#B5B0A6"); M.caixa("vidro", 3.4, 0.02, 0.8, -w / 2 + 2.2, 0.34, z0 - 1.1);
+    plantas.topiaria.push({ pos: [w / 2 - 1.2, 0.08, z0 - 1.0], altura: 1.6 }, { pos: [w / 2 - 2.6, 0.08, z0 - 1.0], altura: 1.4 });
+  }
   return { M, plantas };
 }
 
@@ -888,7 +902,297 @@ function consultorio(o: Opcoes, m: MedidasKit): Feito {
   return { M, plantas };
 }
 
-const CONSTRUTORES: Record<KitId, (o: Opcoes, m: MedidasKit) => Feito> = { comercial, torre, esquina, logistico, industrial, coworking, cafeteria, consultorio };
+// ---------------------------------------------------------------- 20/11/2026: tipos novos do catálogo (data/modelos.ts)
+// embasamento: faixa de pedra de 45 cm em volta da base, um pouco para fora da parede. O prédio fica "sentado" na
+// calçada (pedido do dono: "prédios afundados"), e a pedra esconde a junta da parede com o chão.
+function embasamento(M: Montador, w: number, z0: number, z1: number, cor = "#B9B4AA", pula?: [number, number]) {
+  const h = 0.45, e = 0.08, y = h / 2 + 0.02;
+  if (pula) { const [a, b] = pula; M.caixa("concreto", a - -w / 2, h, e, (-w / 2 + a) / 2, y, z0 - e / 2 + 0.01, cor); M.caixa("concreto", w / 2 - b, h, e, (b + w / 2) / 2, y, z0 - e / 2 + 0.01, cor); }
+  else M.caixa("concreto", w + 2 * e, h, e, 0, y, z0 - e / 2 + 0.01, cor);
+  M.caixa("concreto", w + 2 * e, h, e, 0, y, z1 + e / 2 - 0.01, cor);
+  for (const sg of [-1, 1]) M.caixa("concreto", e, h, z1 - z0, sg * (w / 2 + e / 2 - 0.01), y, (z0 + z1) / 2, cor);
+}
+// canteiro baixo de concreto com terra e arbustos
+function canteiro(M: Montador, plantas: Plantas, x: number, z: number, w: number, d: number, tipo: "arbusto" | "azaleia" = "arbusto") {
+  M.caixa("concreto", w, 0.42, d, x, 0.21, z, "#C9C4BA"); M.caixa("fosco", w - 0.16, 0.02, d - 0.16, x, 0.42, z, "#5A4632");
+  const k = Math.max(1, Math.round(w / 1.1)); for (let i = 0; i < k; i++) plantas[tipo].push({ pos: [x - w / 2 + (i + 0.5) * (w / k), 0.42, z], altura: 0.8 });
+}
+
+function basico(o: Opcoes, m: MedidasKit): Feito {
+  const { M, plantas } = novo();
+  const { w, z0, z1, terreo, andar, n } = m, d = z1 - z0, topo = terreo + (n - 1) * andar;
+  const P = paredeDe(o.material, { parede: "reboco", cor: "#EDE9E1" });
+  const s: Estilo = { parede: P.parede, corParede: P.cor, caixilho: "#2F353C", peitoril: "#D9D4CA", int: "escritorio", seed: o.seed, e: 0.24 };
+  const F = faces(w, z0, z1), yv = 2.85;
+  calcada(M, w, z0, z1); embasamento(M, w, z0, z1, "#B9B4AA", [-1.1, 1.1]);
+  // térreo: vitrine com a porta no meio, paredes nas pontas e faixa em cima (onde a marquise encosta)
+  vitrine(M, F.frente, s, { u0: -w / 2 + 1.0, u1: w / 2 - 1.0, y0: 0.08, y1: yv, portas: [[0, 1.8]], n: -0.12, livres: livresFrente(m) });
+  for (const sg of [-1, 1]) M.fc(F.frente, s.parede, sg * (w / 2 - 0.5), terreo / 2, -0.12, 1.0, terreo, 0.24, s.corParede);
+  M.fc(F.frente, s.parede, 0, (yv + terreo) / 2, -0.12, w - 2.0, terreo - yv, 0.24, s.corParede);
+  for (const L of [F.esq, F.dir]) andarJanelas(M, L, s, { u0: -d / 2 + 0.24, u1: d / 2 - 0.24, y: 0, h: terreo, pe: 1.0, alt: 1.6, jan: distribuir(-d / 2 + 1, d / 2 - 1, 1.4, 2.8), montantes: 1, idx: 60 + L.th });
+  andarJanelas(M, F.fundos, s, { u0: -w / 2, u1: w / 2, y: 0, h: terreo, pe: 1.0, alt: 1.6, jan: distribuir(-w / 2 + 1, w / 2 - 1, 1.6, 2.8), montantes: 1, idx: 65 });
+  // andares: janelas em fita na frente e nos fundos, menores nos lados; friso de concreto em cada laje
+  for (let a = 1; a < n; a++) {
+    const y = terreo + (a - 1) * andar;
+    M.caixa("concreto", w + 0.2, 0.2, d + 0.2, 0, y, (z0 + z1) / 2, "#D9D4CB");
+    andarJanelas(M, F.frente, s, { u0: -w / 2, u1: w / 2, y, h: andar, pe: 0.9, alt: 1.6, jan: distribuir(-w / 2 + 0.5, w / 2 - 0.5, 2.0, 2.3), montantes: 1, idx: a * 10 });
+    andarJanelas(M, F.fundos, s, { u0: -w / 2, u1: w / 2, y, h: andar, pe: 0.9, alt: 1.5, jan: distribuir(-w / 2 + 0.6, w / 2 - 0.6, 1.8, 2.6), montantes: 1, idx: a * 10 + 1 });
+    for (const L of [F.esq, F.dir]) { andarJanelas(M, L, s, { u0: -d / 2 + 0.24, u1: d / 2 - 0.24, y, h: andar, pe: 1.0, alt: 1.4, jan: distribuir(-d / 2 + 1.2, d / 2 - 1.2, 1.3, 3.0), idx: a * 10 + 2 + L.th }); arCondicionado(M, L, -d / 2 + 2.4 + (a % 2) * 3, y + 0.6); }
+  }
+  // marquise com a faixa na cor da marca e luzes embaixo (o letreiro fica em cima dela)
+  const mw = m.letreiro.largura + 1.6;
+  M.caixa("concreto", mw, 0.2, 1.3, 0, 2.95, z0 - 0.65, "#F3F0EA"); M.caixa("liso", mw + 0.02, 0.09, 0.05, 0, 2.95, z0 - 1.31, o.corMarca);
+  if (M.detalhe) for (const x of [-2, 0, 2]) M.caixa("luz", 0.3, 0.02, 0.3, x, 2.84, z0 - 0.7);
+  condutor(M, F.esq, d / 2 - 0.4, 0, topo + 0.6);
+  lajeTopo(M, retangulo(w, z0, z1), topo);
+  if (!o.plana) { platibanda(M, s, retangulo(w, z0, z1), topo, 0.7); caixaDagua(M, w / 4, topo, (z0 + z1) / 2 + 1.2); }
+  for (const sx of [-1, 1]) canteiro(M, plantas, sx * (w / 2 - 1.5), z0 - 0.9, 2.4, 0.7);
+  return { M, plantas };
+}
+
+function varanda(o: Opcoes, m: MedidasKit): Feito {
+  const { M, plantas } = novo();
+  const { w, z0, z1, terreo, andar, n } = m, d = z1 - z0, topo = terreo + (n - 1) * andar, bal = 1.5;
+  const P = paredeDe(o.material, { parede: "reboco", cor: "#F4F2ED" });
+  const s: Estilo = { parede: P.parede, corParede: P.cor, caixilho: "#23282E", peitoril: "#E2DFD8", int: "escritorio", seed: o.seed, e: 0.24 };
+  const F = faces(w, z0, z1);
+  calcada(M, w, z0, z1); embasamento(M, w, z0, z1, "#BDB8AF", [-1.2, 1.2]);
+  // térreo: vidro do chão quase ao teto, porta no meio e as pontas em madeira
+  vitrine(M, F.frente, s, { u0: -w / 2 + 1.2, u1: w / 2 - 1.2, y0: 0.08, y1: terreo - 0.45, portas: [[0, 1.8]], n: -0.12, livres: livresFrente(m) });
+  for (const sg of [-1, 1]) M.fc(F.frente, "madeira", sg * (w / 2 - 0.6), terreo / 2, -0.12, 1.2, terreo, 0.24, "#FFFFFF");
+  M.fc(F.frente, s.parede, 0, terreo - 0.22, -0.12, w - 2.4, 0.45, 0.24, s.corParede);
+  for (const L of [F.esq, F.dir]) andarJanelas(M, L, s, { u0: -d / 2 + 0.24, u1: d / 2 - 0.24, y: 0, h: terreo, pe: 0.9, alt: 1.8, jan: distribuir(-d / 2 + 1, d / 2 - 1, 1.6, 3.0), montantes: 1, idx: 70 + L.th });
+  andarJanelas(M, F.fundos, s, { u0: -w / 2, u1: w / 2, y: 0, h: terreo, pe: 0.9, alt: 1.6, jan: distribuir(-w / 2 + 1, w / 2 - 1, 1.6, 3.0), montantes: 1, idx: 75 });
+  for (let a = 1; a < n; a++) {
+    const y = terreo + (a - 1) * andar;
+    // portas de correr do chão ao teto na frente; janelas nos outros lados
+    andarJanelas(M, F.frente, s, { u0: -w / 2, u1: w / 2, y, h: andar, pe: 0.12, alt: 2.55, jan: distribuir(-w / 2 + 0.5, w / 2 - 0.5, 2.6, 3.0), montantes: 2, idx: a * 10 });
+    andarJanelas(M, F.fundos, s, { u0: -w / 2, u1: w / 2, y, h: andar, pe: 0.9, alt: 1.6, jan: distribuir(-w / 2 + 0.6, w / 2 - 0.6, 1.8, 2.8), montantes: 1, idx: a * 10 + 1 });
+    for (const L of [F.esq, F.dir]) andarJanelas(M, L, s, { u0: -d / 2 + 0.24, u1: d / 2 - 0.24, y, h: andar, pe: 0.9, alt: 1.6, jan: distribuir(-d / 2 + 1.2, d / 2 - 1.2, 1.5, 3.0), montantes: 1, idx: a * 10 + 2 + L.th });
+    M.caixa("concreto", w + 0.16, 0.2, d + 0.16, 0, y, (z0 + z1) / 2, "#E6E3DC");
+    // varanda em balanço: laje branca, forro de madeira, guarda-corpo de vidro, fita na cor da marca e floreiras nas pontas
+    M.caixa("concreto", w - 0.3, 0.24, bal, 0, y + 0.02, z0 - bal / 2, "#F8F7F3");
+    M.caixa("madeira", w - 0.5, 0.03, bal - 0.15, 0, y - 0.115, z0 - bal / 2 + 0.05, "#FFFFFF");
+    M.caixa("liso", w - 0.28, 0.06, 0.05, 0, y - 0.04, z0 - bal - 0.01, o.corMarca);
+    if (M.detalhe) for (const x of [-w / 3, 0, w / 3]) M.caixa("luz", 0.26, 0.02, 0.26, x, y - 0.135, z0 - bal / 2);
+    guardaCorpo(M, -w / 2 + 0.2, z0 - bal + 0.06, w / 2 - 0.2, z0 - bal + 0.06, y + 0.14, y + 0.14, "#2B3036", true, 1.0);
+    for (const sg of [-1, 1]) { guardaCorpo(M, sg * (w / 2 - 0.2), z0 - bal + 0.06, sg * (w / 2 - 0.2), z0, y + 0.14, y + 0.14, "#2B3036", true, 1.0); M.caixa("concreto", 1.0, 0.45, 0.45, sg * (w / 2 - 0.85), y + 0.36, z0 - bal + 0.35, "#E6E3DC"); plantas.arbusto.push({ pos: [sg * (w / 2 - 0.85), y + 0.58, z0 - bal + 0.35], altura: 0.7 }); }
+  }
+  lajeTopo(M, retangulo(w, z0, z1), topo);
+  if (!o.plana) {
+    // terraço com guarda-corpo de vidro e pérgola de madeira atrás
+    M.caixa("concreto", w + 0.16, 0.3, d + 0.16, 0, topo + 0.05, (z0 + z1) / 2, "#E6E3DC");
+    guardaCorpo(M, -w / 2, z0, w / 2, z0, topo + 0.2, topo + 0.2, "#2B3036", true, 1.0);
+    const zp = z1 - 2.4; for (let i = 0; i < 4; i++) M.caixa("madeira", 0.16, 2.4, 0.16, -w / 4 + (i % 2) * (w / 2), topo + 1.4, zp + Math.floor(i / 2) * 1.8, "#FFFFFF");
+    for (let i = 0; i < 7; i++) M.caixa("madeira", w / 2 + 0.6, 0.12, 0.08, 0, topo + 2.62, zp - 0.2 + i * 0.37, "#FFFFFF");
+  }
+  condutor(M, F.dir, -d / 2 + 0.4, 0, topo + 0.4);
+  if (!o.sede) for (const sx of [-1, 1]) canteiro(M, plantas, sx * (w / 2 - 1.7), z0 - 0.95, 2.6, 0.7, sx > 0 ? "azaleia" : "arbusto");
+  return { M, plantas };
+}
+
+function estudio(o: Opcoes, m: MedidasKit): Feito {
+  const { M, plantas } = novo();
+  const { w, z0, z1, terreo, andar, n } = m, d = z1 - z0, topo = terreo + (n - 1) * andar, t = m.telao!;
+  const P = paredeDe(o.material, { parede: "reboco", cor: "#2C2E33" });
+  const s: Estilo = { parede: P.parede, corParede: P.cor, caixilho: "#15171A", peitoril: "#3A3D43", int: "cowork", seed: o.seed, e: 0.26 };
+  const F = faces(w, z0, z1), vp = 3.2;
+  calcada(M, w, z0, z1); embasamento(M, w, z0, z1, "#4A4D53", [-1.2, 1.2]);
+  // térreo: entrada de estúdio (vidro fumê com a porta no meio) e parede escura nas pontas
+  vitrine(M, F.frente, s, { u0: -vp, u1: vp, y0: 0.08, y1: 2.9, portas: [[0, 1.8]], n: -0.12, corCaixilho: "#111316", livres: livresFrente(m) });
+  for (const sg of [-1, 1]) M.fc(F.frente, s.parede, sg * (vp + (w / 2 - vp) / 2), terreo / 2, -0.13, w / 2 - vp, terreo, 0.26, s.corParede);
+  M.fc(F.frente, s.parede, 0, (2.9 + terreo) / 2, -0.13, 2 * vp, terreo - 2.9, 0.26, s.corParede);
+  // andares: a frente é toda parede (o telão fica nela); janelas estreitas nos lados e nos fundos
+  for (let a = 1; a < n; a++) {
+    const y = terreo + (a - 1) * andar;
+    M.fc(F.frente, s.parede, 0, y + andar / 2, -0.13, w, andar, 0.26, s.corParede);
+    andarJanelas(M, F.fundos, s, { u0: -w / 2, u1: w / 2, y, h: andar, pe: 1.0, alt: 1.5, jan: distribuir(-w / 2 + 1, w / 2 - 1, 1.2, 3.0), idx: a * 10 + 1 });
+    for (const L of [F.esq, F.dir]) { andarJanelas(M, L, s, { u0: -d / 2 + 0.26, u1: d / 2 - 0.26, y, h: andar, pe: 1.0, alt: 1.5, jan: distribuir(-d / 2 + 1.5, d / 2 - 1.5, 1.0, 3.4), idx: a * 10 + 2 + L.th }); arCondicionado(M, L, d / 2 - 2.2, y + 0.7); }
+  }
+  for (const L of [F.esq, F.dir]) andarJanelas(M, L, s, { u0: -d / 2 + 0.26, u1: d / 2 - 0.26, y: 0, h: terreo, pe: 1.6, alt: 1.0, jan: distribuir(-d / 2 + 1.5, d / 2 - 1.5, 1.6, 3.4), idx: 80 + L.th });
+  andarJanelas(M, F.fundos, s, { u0: -w / 2, u1: w / 2, y: 0, h: terreo, pe: 1.6, alt: 1.0, jan: [[w / 2 - 2, 1.4]], idx: 85, porta: [-w / 4, 1.2, 2.3] });
+  // frisos na cor da marca nas quinas e em cada laje
+  for (const sg of [-1, 1]) M.caixa("liso", 0.1, topo - 0.2, 0.1, sg * (w / 2 + 0.03), topo / 2, z0 - 0.03, o.corMarca);
+  for (let a = 0; a < n; a++) M.caixa("liso", w + 0.08, 0.07, 0.06, 0, terreo + a * andar - 0.05, z0 - 0.04, o.corMarca);
+  // moldura do telão (a tela acesa é desenhada em cima: scene/TelaoModelo.tsx) e, com 1 andar, os pés que a sobem acima da laje
+  const ty = (t.y0 + t.y1) / 2, th = t.y1 - t.y0;
+  M.caixa("liso", t.largura + 0.5, th + 0.5, 0.3, t.x, ty, z0 - 0.15, "#101114");
+  M.caixa("liso", t.largura + 0.56, 0.06, 0.06, t.x, t.y1 + 0.26, z0 - 0.31, o.corMarca); M.caixa("liso", t.largura + 0.56, 0.06, 0.06, t.x, t.y0 - 0.26, z0 - 0.31, o.corMarca);
+  if (t.y1 > topo) for (const sg of [-1, 1]) M.caixa("metal", 0.25, t.y1 - topo + 0.4, 0.25, sg * (t.largura / 2 - 0.4), topo + (t.y1 - topo) / 2, z0 + 0.25, "#202226");
+  // cobertura preta na entrada com a luz "no ar" vermelha
+  M.caixa("liso", 7.2, 0.3, 1.5, 0, 3.05, z0 - 0.75, "#16181B"); M.caixa("liso", 7.24, 0.06, 0.06, 0, 2.92, z0 - 1.5, o.corMarca);
+  for (const sg of [-1, 1]) M.caixa("metal", 0.14, 3.0, 0.14, sg * 3.4, 1.5, z0 - 1.4, "#16181B");
+  M.caixa("liso", 1.5, 0.42, 0.2, 2.6, 3.42, z0 - 1.45, "#C81E1E");
+  if (M.detalhe) { M.caixa("luz", 1.3, 0.28, 0.02, 2.6, 3.42, z0 - 1.56); for (const x of [-2, 0, 2]) M.caixa("luz", 0.3, 0.02, 0.3, x, 2.89, z0 - 0.75); }
+  lajeTopo(M, retangulo(w, z0, z1), topo);
+  if (!o.plana) {
+    platibanda(M, s, retangulo(w, z0, z1), topo, 0.6, "#25272B");
+    // mastro de antena e duas parabólicas simples
+    M.cil("metal", 0.06, 0.09, 6.5, -w / 2 + 2, topo + 3.25, z1 - 2, "#C9CED3", 8);
+    for (const [x, z, r] of [[w / 2 - 2.6, z1 - 2.4, 0.9], [w / 2 - 5, z1 - 2.0, 0.7]] as [number, number, number][]) { M.cil("metal", 0.06, 0.08, 1.2, x, topo + 0.6, z, "#8A9098", 6); M.cil("liso", r, r * 0.6, 0.18, x, topo + 1.3, z, "#E5E7EB", 16, 0.7); }
+  }
+  if (!o.sede) plantas.topiaria.push({ pos: [-w / 2 + 1.2, 0.08, z0 - 1.0], altura: 1.3 }, { pos: [w / 2 - 1.2, 0.08, z0 - 1.0], altura: 1.3 });
+  return { M, plantas };
+}
+
+function auditorio(o: Opcoes, m: MedidasKit): Feito {
+  const { M, plantas } = novo();
+  const { w, z0, z1, terreo, andar, n } = m, d = z1 - z0, topo = terreo + (n - 1) * andar;
+  const P = paredeDe(o.material, { parede: "concreto", cor: "#FFFFFF" });
+  const s: Estilo = { parede: P.parede, corParede: P.cor, caixilho: "#24282D", peitoril: "#C7C2B8", int: "loja", seed: o.seed, e: 0.3 };
+  const F = faces(w, z0, z1), fy = terreo - 1.2, lw = m.letreiro.largura;
+  calcada(M, w, z0, z1); embasamento(M, w, z0, z1, "#A9A49B", [-2.6, 2.6]);
+  // foyer: pano de vidro alto na frente (o salão fica atrás), faixa de concreto em cima
+  vitrine(M, F.frente, s, { u0: -w / 2 + 0.8, u1: w / 2 - 0.8, y0: 0.08, y1: fy, portas: [[-1.3, 1.8], [1.3, 1.8]], n: -0.15, passo: 1.6, int: "cafe", livres: livresFrente(m) });
+  for (const sg of [-1, 1]) M.fc(F.frente, s.parede, sg * (w / 2 - 0.4), topo / 2, -0.15, 0.8, topo, 0.3, s.corParede);
+  M.fc(F.frente, s.parede, 0, (fy + topo) / 2, -0.15, w - 1.6, topo - fy, 0.3, s.corParede);
+  M.fc(F.frente, "liso", 0, fy + 0.25, 0.02, w - 1.6, 0.08, 0.05, o.corMarca);
+  // salão: paredes cegas com nervuras verticais nos lados e nos fundos (saídas de emergência)
+  for (const [L, lw2] of [[F.esq, d], [F.dir, d], [F.fundos, w]] as [Face, number][]) {
+    M.fc(L, s.parede, 0, topo / 2, -0.15, lw2, topo, 0.3, s.corParede);
+    const k = Math.round(lw2 / 2.2); for (let i = 1; i < k; i++) M.fc(L, "concreto", -lw2 / 2 + (i * lw2) / k, topo / 2, 0.15, 0.35, topo - 0.4, 0.3, "#E6E2DA");
+  }
+  for (const L of [F.esq, F.dir]) { M.fc(L, "metal", d / 2 - 2.2, 1.15, 0.02, 1.6, 2.3, 0.08, "#4B5560"); M.fc(L, "liso", d / 2 - 2.2, 2.55, 0.04, 0.6, 0.22, 0.05, "#2E9D57"); }
+  // marquise de cinema: caixa escura em balanço com lâmpadas embaixo e colunas finas na frente (o letreiro vai na face dela)
+  const zm = z0 - 2.5;
+  M.caixa("liso", lw + 1.4, 1.5, z0 - zm, 0, 4.45, (z0 + zm) / 2, "#1E2126");
+  M.caixa("liso", lw + 1.46, 0.08, 0.08, 0, 3.7, zm - 0.02, o.corMarca); M.caixa("liso", lw + 1.46, 0.08, 0.08, 0, 5.2, zm - 0.02, o.corMarca);
+  for (const sg of [-1, 1]) M.cil("metal", 0.09, 0.09, 3.7, sg * (lw / 2 + 0.4), 1.85, zm + 0.3, "#1E2126", 10);
+  if (M.detalhe) for (let i = 0; i < 8; i++) for (let j = 0; j < 2; j++) M.caixa("luz", 0.16, 0.05, 0.16, -lw / 2 + (i + 0.5) * (lw / 8), 3.67, zm + 0.5 + j * 1.2);
+  // cartaz dos eventos nas duas pontas da frente
+  for (const sg of [-1, 1]) { M.caixa("metal", 1.5, 2.2, 0.12, sg * (w / 2 - 1.7), 1.5, z0 - 0.5, "#2B2F36"); M.caixa("liso", 1.3, 2.0, 0.02, sg * (w / 2 - 1.7), 1.5, z0 - 0.57, sg > 0 ? "#F2C230" : o.corMarca); }
+  // cobertura: laje, platibanda e a caixa de palco mais alta atrás
+  lajeTopo(M, retangulo(w, z0, z1), topo);
+  if (!o.plana) { platibanda(M, s, retangulo(w, z0, z1), topo, 0.7); M.caixa(s.parede, w * 0.62, 2.6, 4.2, 0, topo + 1.3, z1 - 2.4, s.corParede); M.caixa("metal", w * 0.62 + 0.1, 0.06, 4.3, 0, topo + 2.63, z1 - 2.4, "#A9AFB6"); }
+  for (const sx of [-1, 1]) canteiro(M, plantas, sx * (w / 2 - 1.6), z0 - 1.6, 2.2, 0.8, "azaleia");
+  return { M, plantas };
+}
+
+function mercado(o: Opcoes, m: MedidasKit): Feito {
+  const { M, plantas } = novo();
+  const { w, z0, z1, terreo, andar, n } = m, d = z1 - z0, topo = terreo + (n - 1) * andar;
+  const P = paredeDe(o.material, { parede: "reboco", cor: "#F3ECDF" });
+  const s: Estilo = { parede: P.parede, corParede: P.cor, caixilho: "#3A3F45", peitoril: "#E4DCCD", int: "loja", seed: o.seed, e: 0.24 };
+  const F = faces(w, z0, z1), ya = 3.2, vaos = 3, vw = (w - 1.2 - (vaos - 1) * 0.6) / vaos;
+  calcada(M, w, z0, z1); embasamento(M, w, z0, z1, "#B5AE9F", [-w / 2 + 0.6, w / 2 - 0.6]);
+  // frente: três vãos com a porta de enrolar recolhida no alto e o mercado aceso lá dentro
+  for (let i = 0; i < vaos; i++) {
+    const u = -w / 2 + 0.6 + vw / 2 + i * (vw + 0.6);
+    M.fp(F.frente, "int:loja:1", u, ya / 2 + 0.04, -1.2, vw + 0.3, ya, undefined, [0.05 + i * 0.25, 0.04, 0.3 + i * 0.25, 0.62]);
+    M.fc(F.frente, "enrolar", u, ya + 0.22, 0.05, vw + 0.1, 0.44, 0.3, "#B9C0C7"); // rolo da porta
+    if (i < vaos - 1) M.fc(F.frente, s.parede, u + vw / 2 + 0.3, ya / 2, -0.12, 0.6, ya, 0.24, s.corParede);
+  }
+  for (const sg of [-1, 1]) M.fc(F.frente, s.parede, sg * (w / 2 - 0.3), ya / 2, -0.12, 0.6, ya, 0.24, s.corParede);
+  M.fc(F.frente, s.parede, 0, (ya + topo + 0.9) / 2, -0.12, w, topo + 0.9 - ya, 0.24, s.corParede); // platibanda da frente (letreiro)
+  M.fc(F.frente, "liso", 0, ya + 0.1, 0.02, w, 0.1, 0.05, o.corMarca);
+  for (const L of [F.esq, F.dir]) andarJanelas(M, L, s, { u0: -d / 2 + 0.24, u1: d / 2 - 0.24, y: 0, h: terreo, pe: 1.8, alt: 1.1, jan: distribuir(-d / 2 + 1.5, d / 2 - 1.5, 1.4, 3.6), idx: 90 + L.th });
+  andarJanelas(M, F.fundos, s, { u0: -w / 2, u1: w / 2, y: 0, h: terreo, pe: 1.8, alt: 1.1, jan: [[-w / 2 + 2, 1.2]], idx: 95, porta: [w / 4, 1.4, 2.4] });
+  for (let a = 1; a < n; a++) {
+    const y = terreo + (a - 1) * andar;
+    M.caixa("concreto", w + 0.16, 0.2, d + 0.16, 0, y, (z0 + z1) / 2, "#E4DCCD");
+    for (const [L, lw2] of [[F.fundos, w], [F.esq, d], [F.dir, d]] as [Face, number][]) andarJanelas(M, L, s, { u0: -lw2 / 2 + (L === F.fundos ? 0 : 0.24), u1: lw2 / 2 - (L === F.fundos ? 0 : 0.24), y, h: andar, pe: 0.9, alt: 1.4, jan: distribuir(-lw2 / 2 + 1, lw2 / 2 - 1, 1.3, 2.8), montantes: 1, idx: a * 10 + L.th });
+  }
+  // toldo listrado na cor da marca (tiras inclinadas) com a sanefa na frente
+  const zt = 1.9, ang = Math.atan2(0.9, zt), k = Math.round(w / 0.7);
+  for (let i = 0; i < k; i++) {
+    const x = -w / 2 + (i + 0.5) * (w / k), cor = i % 2 ? "#FFFFFF" : o.corMarca;
+    M.caixa("liso", w / k + 0.005, 0.05, Math.hypot(zt, 0.9), x, ya - 0.45 + 0.04, z0 - zt / 2, cor, 0, -ang); // alto na parede, baixo na rua
+    M.caixa("liso", w / k + 0.005, 0.32, 0.04, x, ya - 1.06, z0 - zt - 0.02, cor);
+  }
+  for (const sg of [-1, 1]) M.barra("metal", sg * (w / 2 - 0.2), ya - 0.95, z0 - zt + 0.05, sg * (w / 2 - 0.2), ya + 0.05, z0, 0.05, "#3A3F45");
+  // bancas de madeira na calçada com caixotes de frutas e verduras
+  const cores = ["#E2483D", "#F59E0B", "#F2C230", "#4E9B47", "#7A3E8E", "#E86A2B"];
+  for (const bx of [-w / 2 + 2.2, -w / 2 + 5.0, w / 2 - 5.0, w / 2 - 2.2]) {
+    const zb = z0 - 2.55;
+    M.caixa("madeira", 2.2, 0.08, 1.0, bx, 0.82, zb, "#FFFFFF");
+    for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) M.caixa("madeira", 0.07, 0.8, 0.07, bx + lx * 1.0, 0.4, zb + lz * 0.42, "#FFFFFF");
+    for (let c = 0; c < 3; c++) { const cx = bx - 0.7 + c * 0.7, cor = cores[(Math.round(bx) + c * 2 + 12) % cores.length]; M.caixa("madeira", 0.6, 0.2, 0.7, cx, 0.96, zb, "#E8D2B0"); M.caixa("fosco", 0.5, 0.08, 0.6, cx, 1.08, zb, cor); }
+  }
+  lajeTopo(M, retangulo(w, z0, z1), topo);
+  if (!o.plana) { platibanda(M, s, retangulo(w, z0, z1), topo, 0.9); caixaDagua(M, -w / 4, topo, (z0 + z1) / 2 + 1.5); }
+  return { M, plantas };
+}
+
+function galeria(o: Opcoes, m: MedidasKit): Feito {
+  const { M, plantas } = novo();
+  const { w, z0, z1, terreo, andar, n } = m, d = z1 - z0, topo = terreo + (n - 1) * andar, rec = 0.45;
+  const P = paredeDe(o.material, { parede: "concreto", cor: "#FFFFFF" });
+  const s: Estilo = { parede: P.parede, corParede: P.cor, caixilho: "#1C1F23", peitoril: "#D7D3CB", int: "loja", seed: o.seed, e: 0.3 };
+  const F = faces(w, z0, z1), ft: Face = { cx: 0, cz: z0 + rec, th: Math.PI }, mol = 1.0, vw = w - 2 * mol, vh = terreo - 0.7;
+  calcada(M, w, z0, z1); embasamento(M, w, z0, z1, "#B8B3A9", [-vw / 2, vw / 2]);
+  // moldura branca grossa em volta da vitrine de pé-direito duplo (o vidro fica recuado)
+  const frenteTopo = Math.max(topo, 7.6);
+  for (const sg of [-1, 1]) M.caixa("liso", mol, frenteTopo, 0.6, sg * (w / 2 - mol / 2), frenteTopo / 2, z0 + 0.3, "#F7F6F2");
+  M.caixa("liso", w, frenteTopo - vh, 0.6, 0, (vh + frenteTopo) / 2, z0 + 0.3, "#F7F6F2");
+  for (const sg of [-1, 1]) M.caixa("liso", 0.05, vh, rec + 0.02, sg * (vw / 2 + 0.02), vh / 2, z0 + rec / 2, "#D9D6CF");
+  M.fp(ft, "vidro", 0, vh / 2 + 0.04, 0, vw, vh);
+  for (let i = 1; i < 4; i++) M.fc(ft, "metal", -vw / 2 + (i * vw) / 4, vh / 2, 0.02, 0.05, vh, 0.08, s.caixilho);
+  M.fc(ft, "metal", 0, 2.6, 0.02, vw, 0.05, 0.08, s.caixilho);
+  M.fc(ft, "metal", vw / 2 - 1.5, 1.15, 0.02, 1.6, 0.06, 0.08, s.caixilho);
+  // o showroom por dentro: parede branca no fundo, trilho de luz e peças em pedestais
+  M.caixa("liso", vw - 0.2, vh - 0.2, 0.1, 0, vh / 2, z0 + 4.2, "#F2F0EB");
+  M.caixa("liso", vw - 0.2, 0.1, 4.0, 0, vh + 0.02, z0 + 2.4, "#E9E6E0");
+  if (M.detalhe) for (let i = 0; i < 6; i++) M.caixa("luz", 0.18, 0.12, 0.18, -vw / 2 + 1 + i * ((vw - 2) / 5), vh - 0.1, z0 + 1.6);
+  const pecas: [number, number, string, "caixa" | "cil"][] = [[-4.2, 1.2, o.corMarca, "cil"], [-1.4, 1.9, "#2B2F36", "caixa"], [1.6, 1.4, "#D4A63A", "cil"], [4.4, 1.0, "#E2575B", "caixa"]];
+  for (const [x, h, cor, f] of pecas) {
+    const zp = z0 + 2.0 + (x > 0 ? 0.5 : 0);
+    M.caixa("liso", 0.9, 0.9, 0.9, x * (vw / 12), 0.45, zp, "#FFFFFF");
+    if (f === "cil") M.cil("liso", 0.3, 0.22, h, x * (vw / 12), 0.9 + h / 2, zp, cor, 14); else M.caixa("liso", 0.55, h, 0.55, x * (vw / 12), 0.9 + h / 2, zp, cor, 0.5);
+  }
+  // lados e fundos: concreto liso com uma fresta vertical de vidro; andares de cima com janelas em fita
+  for (const [L, lw2] of [[F.esq, d], [F.dir, d], [F.fundos, w]] as [Face, number][]) {
+    M.fc(L, s.parede, 0, terreo / 2, -0.15, lw2, terreo, 0.3, s.corParede);
+    M.fp(L, "vidro", lw2 / 2 - 1.6, terreo / 2, 0.01, 0.5, terreo - 1.4);
+    for (let a = 1; a < n; a++) andarJanelas(M, L, s, { u0: -lw2 / 2 + (L === F.fundos ? 0 : 0.3), u1: lw2 / 2 - (L === F.fundos ? 0 : 0.3), y: terreo + (a - 1) * andar, h: andar, pe: 0.9, alt: 1.5, jan: distribuir(-lw2 / 2 + 1, lw2 / 2 - 1, 2.2, 2.8), montantes: 1, idx: a * 10 + L.th });
+  }
+  for (let a = 1; a < n; a++) M.caixa("concreto", w + 0.1, 0.18, d - 0.6, 0, terreo + (a - 1) * andar, (z0 + z1) / 2 + 0.3, "#E2DED6");
+  M.caixa("liso", w + 0.04, 0.08, 0.05, 0, vh + 0.18, z0 - 0.02, o.corMarca);
+  lajeTopo(M, retangulo(w, z0, z1), topo);
+  if (!o.plana) platibanda(M, s, retangulo(w, z0 + 0.6, z1), topo, 0.6);
+  for (const sx of [-1, 1]) plantas.topiaria.push({ pos: [sx * (w / 2 - 0.5), 0.08, z0 - 0.55], altura: 1.5 });
+  return { M, plantas };
+}
+
+function escola(o: Opcoes, m: MedidasKit): Feito {
+  const { M, plantas } = novo();
+  const { w, z0, z1, terreo, andar, n } = m, d = z1 - z0, pod = 0.45, topo = pod + terreo + (n - 1) * andar;
+  const P = paredeDe(o.material, { parede: "reboco", cor: "#F1E9DA" });
+  const s: Estilo = { parede: P.parede, corParede: P.cor, caixilho: "#2E3A46", peitoril: "#E6DECF", int: "escritorio", seed: o.seed, e: 0.24 };
+  const F = faces(w, z0, z1), faixas = [o.corMarca, "#F2B134", "#3D8BD9", "#59B36A"];
+  // pódio, escadaria larga e marquise na entrada
+  M.caixa("concreto", w + 0.6, pod, d + 0.6, 0, pod / 2, (z0 + z1) / 2, "#DCD6CB");
+  calcada(M, w, z0 - 2.4, z0 - 0.3);
+  for (let k = 0; k < 3; k++) M.caixa("concreto", 5.2, pod - k * 0.15, 0.32, 0, (pod - k * 0.15) / 2, z0 - 0.45 - k * 0.32, "#D3CDC1");
+  guardaCorpo(M, -2.75, z0 - 1.4, -2.75, z0 - 0.3, 0.05, pod, "#3A4048", false, 0.9);
+  guardaCorpo(M, 2.75, z0 - 1.4, 2.75, z0 - 0.3, 0.05, pod, "#3A4048", false, 0.9);
+  vitrine(M, F.frente, s, { u0: -2.6, u1: 2.6, y0: pod, y1: pod + 2.9, portas: [[0, 2.0]], n: -0.1, livres: livresFrente(m) });
+  M.fc(F.frente, s.parede, 0, pod + (2.9 + terreo) / 2, -0.12, 5.2, terreo - 2.9, 0.24, s.corParede);
+  for (const [u0, u1] of [[-w / 2, -2.6], [2.6, w / 2]] as [number, number][]) andarJanelas(M, F.frente, s, { u0, u1, y: pod, h: terreo, pe: 0.9, alt: 1.7, jan: distribuir(u0 + 0.4, u1 - 0.4, 1.6, 2.2), montantes: 1, idx: 100 + u0 });
+  for (const L of [F.esq, F.dir]) andarJanelas(M, L, s, { u0: -d / 2 + 0.24, u1: d / 2 - 0.24, y: pod, h: terreo, pe: 0.9, alt: 1.6, jan: distribuir(-d / 2 + 1, d / 2 - 1, 1.6, 2.6), montantes: 1, idx: 110 + L.th });
+  andarJanelas(M, F.fundos, s, { u0: -w / 2, u1: w / 2, y: pod, h: terreo, pe: 0.9, alt: 1.6, jan: distribuir(-w / 2 + 1, w / 2 - 1, 1.6, 2.6), montantes: 1, idx: 115 });
+  M.caixa("concreto", 6.6, 0.22, 2.2, 0, pod + 3.0, z0 - 1.1, "#F7F3EA"); M.caixa("liso", 6.64, 0.1, 0.05, 0, pod + 3.0, z0 - 2.21, o.corMarca);
+  for (const sg of [-1, 1]) M.cil("metal", 0.08, 0.08, 3.0, sg * 3.1, pod / 2 + 1.5, z0 - 2.0, "#3A4048", 10);
+  if (M.detalhe) for (const x of [-2, 0, 2]) M.caixa("luz", 0.3, 0.02, 0.3, x, pod + 2.88, z0 - 1.1);
+  // andares de salas: janelas largas com a faixa colorida embaixo (uma cor por andar)
+  for (let a = 1; a < n; a++) {
+    const y = pod + terreo + (a - 1) * andar, cor = faixas[(a - 1) % faixas.length];
+    M.caixa("concreto", w + 0.2, 0.2, d + 0.2, 0, y, (z0 + z1) / 2, "#E2DACB");
+    for (const [L, lw2] of [[F.frente, w], [F.fundos, w], [F.esq, d], [F.dir, d]] as [Face, number][]) {
+      const lado = L === F.esq || L === F.dir;
+      andarJanelas(M, L, s, { u0: -lw2 / 2 + (lado ? 0.24 : 0), u1: lw2 / 2 - (lado ? 0.24 : 0), y, h: andar, pe: 0.95, alt: 1.6, jan: distribuir(-lw2 / 2 + 0.6, lw2 / 2 - 0.6, lado ? 1.6 : 2.2, lado ? 2.6 : 2.6), montantes: 1, idx: a * 10 + L.th });
+      M.fc(L, "liso", 0, y + 0.72, 0.03, lw2 - 0.2, 0.3, 0.05, cor);
+    }
+  }
+  lajeTopo(M, retangulo(w, z0, z1), topo);
+  if (!o.plana) { platibanda(M, s, retangulo(w, z0, z1), topo, 0.8); caixaDagua(M, w / 4, topo, (z0 + z1) / 2 + 1); }
+  // mastro com a bandeira na cor da marca e bicicletário do lado
+  M.cil("metal", 0.05, 0.06, 6.5, -w / 2 - 0.2, 3.25, z0 - 1.2, "#D9DDE3", 8); M.caixa("liso", 0.03, 0.8, 1.3, -w / 2 - 0.2, 6.0, z0 - 1.88, o.corMarca);
+  for (let i = 0; i < 4; i++) { const z = z0 + 1.2 + i * 0.7; M.barra("metal", w / 2 + 0.5, 0.0, z, w / 2 + 0.5, 0.75, z, 0.04, "#3A3F47"); M.barra("metal", w / 2 + 0.5, 0.75, z, w / 2 + 1.2, 0.75, z, 0.04, "#3A3F47"); M.barra("metal", w / 2 + 1.2, 0.75, z, w / 2 + 1.2, 0.0, z, 0.04, "#3A3F47"); }
+  for (const sx of [-1, 1]) canteiro(M, plantas, sx * (w / 2 - 2.2), z0 - 1.3, 2.4, 0.8, sx > 0 ? "azaleia" : "arbusto");
+  return { M, plantas };
+}
+
+const CONSTRUTORES: Record<KitId, (o: Opcoes, m: MedidasKit) => Feito> = { comercial, torre, esquina, logistico, industrial, coworking, cafeteria, consultorio, basico, varanda, estudio, auditorio, mercado, galeria, escola };
 const semente = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7);
 
 // ?medir=1: quantos prédios do kit foram montados e quanto tempo isso levou (window.__kit)
@@ -901,7 +1205,7 @@ const CACHE = new Map<string, { partes: Parte[]; plantas: Plantas }>();
 // ---------- guardado no aparelho (v67) ----------
 // cada prédio montado vira números (posição, normal, uv, cor, índices por material) no IndexedDB; na próxima visita, o
 // mesmo prédio (mesmas opções) é só remontado com esses números, sem refazer paredes, janelas e telhados
-const VERSAO_KIT = "v67-1", MAX_GUARDADOS = 60;
+const VERSAO_KIT = "v94-1", MAX_GUARDADOS = 60; // 20/11/2026: tipos novos e embasamento (o guardado antigo não vale mais)
 interface ParteCrua { papel: Papel; attrs: { nome: string; a: ArrayLike<number>; n: number; norm: boolean }[]; idx: ArrayLike<number> | null }
 interface PredioCru { partes: ParteCrua[]; plantas: Plantas }
 const GUARDADOS = new Map<string, PredioCru>();
@@ -918,12 +1222,12 @@ function deCru(c: ParteCrua): Parte {
   return { geo, mat: material(c.papel), sombra: fazSombra(c.papel), papel: c.papel };
 }
 function predio(o: Opcoes) {
-  const k = `${o.id}|${o.n}|${o.duplo}|${o.material}|${o.corMarca}|${o.seed}|${o.plana}|${leve()}`;
+  const k = `${o.id}|${o.n}|${o.duplo}|${o.material}|${o.corMarca}|${o.seed}|${o.plana}|${leve()}${o.sede ? "|sede" : ""}`;
   let c = CACHE.get(k); if (c) return c;
   const t0 = MEDIR ? performance.now() : 0;
   const chaveGuardada = `kit|${k}@${VERSAO_KIT}`, cru = GUARDADOS.get(chaveGuardada);
   if (cru) { c = { partes: cru.partes.map(deCru), plantas: cru.plantas }; contar("prédio do kit: do aparelho"); CACHE.set(k, c); return c; }
-  const f = CONSTRUTORES[o.id](o, medidasKit(o.id, o.n, o.duplo, o.plana));
+  const f = CONSTRUTORES[o.id](o, medidasKit(o.id, o.n, o.duplo, o.plana, !!o.sede));
   c = { partes: f.M.montar(), plantas: f.plantas };
   if (GUARDADOS.size < MAX_GUARDADOS) { const novo = { partes: c.partes.map(paraCru), plantas: c.plantas }; GUARDADOS.set(chaveGuardada, novo); guardar(chaveGuardada, novo); }
   if (MEDIR) { const ms = performance.now() - t0; MEDIDA.montados++; MEDIDA.ms += ms; MEDIDA.maiorMs = Math.max(MEDIDA.maiorMs, ms); }
@@ -935,13 +1239,165 @@ function predio(o: Opcoes) {
 
 // semente = a chave do lote: as janelas acesas à noite são sempre as mesmas naquele prédio (e digitar o nome da empresa
 // no painel não refaz a malha)
-export function PredioKit({ id, andares, duplo, material, corFachada, corMarca, semente: chave, plana }: { id: KitId; andares: number; duplo: boolean; material: MaterialFachada; corFachada: string; corMarca: string; semente: string; plana: boolean }) {
-  const p = useMemo(() => predio({ id, n: andares, duplo, material, corMarca, seed: semente(chave), plana }), [id, andares, duplo, material, corMarca, chave, plana]);
+// sede (20/11/2026): o mesmo modelo na planta da sede (data/predios.ts › PLANTA_SEDE)
+export function PredioKit({ id, andares, duplo, material, corFachada, corMarca, semente: chave, plana, sede = false }: { id: KitId; andares: number; duplo: boolean; material: MaterialFachada; corFachada: string; corMarca: string; semente: string; plana: boolean; sede?: boolean }) {
+  const p = useMemo(() => predio({ id, n: andares, duplo, material, corMarca, seed: semente(chave), plana, sede }), [id, andares, duplo, material, corMarca, chave, plana, sede]);
   const pintura = useMemo(() => materialPintura(corFachada), [corFachada]);
   const sombra = !leve();
   return (
     <group>
       {p.partes.map((x) => <mesh key={x.papel} geometry={x.geo} material={x.papel === "pintura" ? pintura : x.mat} castShadow={sombra && x.sombra} receiveShadow={x.papel !== "vidro"} renderOrder={x.papel === "vidro" ? 2 : 0} />)}
+      {p.plantas.arbusto.length > 0 && <ArvoresInstanciadas especie="arbusto" itens={p.plantas.arbusto} sombra={false} />}
+      {p.plantas.azaleia.length > 0 && <ArvoresInstanciadas especie="azaleia" itens={p.plantas.azaleia} sombra={false} />}
+      {p.plantas.topiaria.length > 0 && <ArvoresInstanciadas especie="topiaria" itens={p.plantas.topiaria} sombra={false} />}
+    </group>
+  );
+}
+
+// ================================================================ casas dos lotes (20/11/2026)
+// Pedido do dono: "mudar o detalhe dessas casas, parece casas abandonadas e prédios afundados" (a casa do Ponto
+// disponível no Lote 26 tinha parede manchada e rachada: era a textura do modelo GLB). No lugar dos GLB, casas desenhadas
+// aqui com o mesmo kit: pintura lisa e limpa (sem textura de mancha), telhado de telha inteiro com testeira branca,
+// janelas com moldura, peitoril e cortina (acende à noite), venezianas, floreiras e a casa sentada num embasamento de
+// 45 cm, acima do quintal, com degraus até a porta. Todas as casas do mapa saem juntas, poucas malhas (uma por material):
+// o Montador recebe a origem de cada lote (centro, giro para a rua e o recuo de 1,2 m: scene/PontoDisponivel.tsx).
+// As portas batem com scene/PontoDisponivel.tsx › PORTA (caminho do portão, luz da varanda).
+export type ModeloCasaKit = "casaVelha" | "casaTerrea" | "casaSobrado" | "casaColonial" | "casaModerna";
+export interface CasaLote { chave: string; x: number; z: number; rot: number; modelo: ModeloCasaKit; escala: number; numero: number }
+const TINTAS_CASA = ["#F3E7D1", "#E2ECEE", "#F2DCCB", "#E5ECDA", "#EEE5EB", "#F1EADB"];
+const DETALHES_CASA = ["#2F5D8A", "#3C6E47", "#8A3B33", "#5B4A8A", "#2E6E6E"];
+const BRANCO_CASA = "#FBFAF6", RECUO_CASA = 1.2;
+const P3 = new THREE.Vector3();
+// planta presa na casa: a posição passa pela origem do lote (as plantas são instanciadas no mundo)
+function plantaCasa(M: Montador, pl: Plantas, tipo: keyof Plantas, x: number, y: number, z: number, altura: number, esc: number) {
+  P3.set(x, y, z); if (M.origem) P3.applyMatrix4(M.origem); pl[tipo].push({ pos: [P3.x, P3.y, P3.z], altura: altura * esc });
+}
+function janelaCasa(M: Montador, F: Face, u: number, y0: number, w: number, h: number, venez: string | null, acesa: boolean) {
+  const yc = y0 + h / 2;
+  M.fc(F, "liso", u, yc, 0.03, w + 0.24, h + 0.24, 0.06, BRANCO_CASA); // moldura
+  M.fp(F, acesa ? "luz" : "liso", u, yc, 0.062, w, h, acesa ? undefined : "#D8D0BF"); // cortina (a "luz" acende à noite)
+  M.fp(F, "vidro", u, yc, 0.075, w, h);
+  if (M.detalhe) { M.fc(F, "liso", u, yc, 0.08, 0.05, h, 0.03, BRANCO_CASA); M.fc(F, "liso", u, y0 + h * 0.62, 0.08, w, 0.05, 0.03, BRANCO_CASA); }
+  M.fc(F, "liso", u, y0 - 0.07, 0.1, w + 0.36, 0.08, 0.22, BRANCO_CASA); // peitoril
+  if (venez) for (const sg of [-1, 1]) M.fc(F, "liso", u + sg * (w / 2 + 0.36), yc, 0.06, 0.5, h + 0.14, 0.05, venez);
+}
+function portaCasa(M: Montador, F: Face, u: number, y0: number, moldura = BRANCO_CASA, larg = 1.0, alt = 2.1) {
+  M.fc(F, "liso", u, y0 + alt / 2 + 0.06, 0.03, larg + 0.26, alt + 0.14, 0.06, moldura);
+  M.fc(F, "madeira", u, y0 + alt / 2, 0.065, larg, alt, 0.04, "#FFFFFF");
+  M.fc(F, "metal", u + larg / 2 - 0.16, y0 + 1.0, 0.095, 0.05, 0.16, 0.04, "#C2A35A");
+}
+// telhado de duas águas (cumeeira ao longo de x) com empenas na cor da parede, cumeeira e testeira branca
+function telhadoCasa(M: Montador, w: number, z0: number, z1: number, y: number, alt: number, beiral: number, corParede: string) {
+  const d = z1 - z0, cz = (z0 + z1) / 2, ang = Math.atan2(alt, d / 2), lz = d / 2 + beiral;
+  for (const sg of [-1, 1]) M.caixa("telha", w + 2 * beiral, 0.12, lz / Math.cos(ang), 0, y + alt - (lz / 2) * Math.tan(ang) + 0.08, cz + sg * (lz / 2), "#FFFFFF", 0, sg * ang);
+  for (const sg of [-1, 1]) M.prisma("liso", [[0, -d / 2], [0, d / 2], [alt, 0]], 0.2, sg * (w / 2 - 0.1), y, cz, corParede);
+  M.caixa("telha", w + 2 * beiral, 0.16, 0.32, 0, y + alt + 0.1, cz, "#D8CFC4");
+  const yb = y - beiral * Math.tan(ang) + 0.02;
+  for (const sg of [-1, 1]) M.caixa("liso", w + 2 * beiral, 0.18, 0.05, 0, yb, cz + sg * lz, BRANCO_CASA);
+}
+const acesa = (sem: number, i: number) => hash(sem, i, 5) > 0.45;
+
+// casinha térrea com varanda (porta 1,125 m para a direita de quem olha da rua)
+function casaTerreaKit(M: Montador, pl: Plantas, cor: string, det: string, sem: number, esc: number) {
+  const w = 9.4, z0 = -2.5, z1 = 4.5, d = z1 - z0, base = 0.45, pe = 2.9, topo = base + pe, dx = -1.125, cz = (z0 + z1) / 2;
+  const F = faces(w, z0, z1);
+  M.caixa("concreto", w + 0.3, base, d + 0.3, 0, base / 2, cz, "#D2CBBE"); M.caixa("concreto", w + 0.36, 0.06, d + 0.36, 0, base - 0.03, cz, "#E6E0D5");
+  for (const [L, lw] of [[F.frente, w], [F.fundos, w], [F.esq, d], [F.dir, d]] as [Face, number][]) M.fc(L, "liso", 0, base + pe / 2, -0.1, lw, pe, 0.2, cor);
+  for (const [x, z] of [[-w / 2, z0], [w / 2, z0], [-w / 2, z1], [w / 2, z1]]) M.caixa("liso", 0.24, pe, 0.24, x, base + pe / 2, z, BRANCO_CASA);
+  M.caixa("liso", w + 0.1, 0.16, d + 0.1, 0, topo - 0.08, cz, BRANCO_CASA); // cinta branca embaixo do beiral
+  // varanda: piso, degraus, dois pilares e o telhadinho
+  M.caixa("concreto", 4.4, base, 1.55, dx, base / 2, z0 - 0.775, "#DDD6C9");
+  M.caixa("concreto", 1.7, 0.3, 0.2, dx, 0.15, z0 - 1.65, "#D2CBBE"); M.caixa("concreto", 1.7, 0.15, 0.2, dx, 0.075, z0 - 1.85, "#D2CBBE");
+  for (const sg of [-1, 1]) M.caixa("liso", 0.16, topo - 0.2 - base, 0.16, dx + sg * 2.05, base + (topo - 0.2 - base) / 2, z0 - 1.42, BRANCO_CASA);
+  M.caixa("liso", 4.5, 0.16, 0.14, dx, topo - 0.2, z0 - 1.45, BRANCO_CASA);
+  M.caixa("telha", 4.9, 0.1, 1.9, dx, topo + 0.06, z0 - 0.8, "#FFFFFF", 0, -0.22);
+  portaCasa(M, F.frente, -dx, base);
+  janelaCasa(M, F.frente, 3.0, base + 0.95, 1.2, 1.25, det, acesa(sem, 1));
+  janelaCasa(M, F.frente, -2.9, base + 0.95, 1.5, 1.25, det, acesa(sem, 2));
+  M.fc(F.frente, "madeira", -2.9, base + 0.68, 0.24, 1.6, 0.26, 0.3, "#FFFFFF"); plantaCasa(M, pl, "azaleia", 2.9, base + 0.82, z0 - 0.26, 0.5, esc);
+  for (const L of [F.esq, F.dir]) for (const u of [-1.7, 1.7]) janelaCasa(M, L, u, base + 0.95, 1.2, 1.25, det, acesa(sem, 3 + u + L.th));
+  for (const u of [-2.4, 2.4]) janelaCasa(M, F.fundos, u, base + 1.05, 1.1, 1.1, null, acesa(sem, 9 + u));
+  telhadoCasa(M, w, z0, z1, topo, 1.65, 0.6, cor);
+  for (const sx of [-1, 1]) plantaCasa(M, pl, "arbusto", sx * (w / 2 - 0.45), 0, z1 + 0.55, 1.0, esc);
+  plantaCasa(M, pl, "arbusto", w / 2 - 0.5, 0, z0 - 0.55, 0.9, esc);
+}
+// sobrado colonial: parede branca, cunhais e cinta na cor de detalhe, porta no meio com frontão e sacada em cima
+function casaColonialKit(M: Montador, pl: Plantas, _cor: string, det: string, sem: number, esc: number) {
+  const w = 8.4, z0 = -4.13, z1 = 3.87, d = z1 - z0, base = 0.45, pe = 3.0, topo = base + 2 * pe, cz = (z0 + z1) / 2, parede = "#FAF6EE";
+  const F = faces(w, z0, z1);
+  M.caixa("concreto", w + 0.3, base, d + 0.3, 0, base / 2, cz, "#C9C1B2"); M.caixa("concreto", w + 0.36, 0.06, d + 0.36, 0, base - 0.03, cz, "#DDD6C9");
+  for (const [L, lw] of [[F.frente, w], [F.fundos, w], [F.esq, d], [F.dir, d]] as [Face, number][]) M.fc(L, "liso", 0, base + pe, -0.1, lw, 2 * pe, 0.2, parede);
+  for (const [x, z] of [[-w / 2, z0], [w / 2, z0], [-w / 2, z1], [w / 2, z1]]) M.caixa("liso", 0.32, 2 * pe, 0.32, x, base + pe, z, det);
+  M.caixa("liso", w + 0.16, 0.18, d + 0.16, 0, base + pe, cz, det); // cinta entre os andares
+  M.caixa("liso", w + 0.24, 0.22, d + 0.24, 0, topo - 0.11, cz, BRANCO_CASA); // cornija
+  // degraus, porta com frontão
+  for (let k = 0; k < 3; k++) M.caixa("concreto", 2.0 - k * 0.2, base - k * 0.15, 0.2, 0, (base - k * 0.15) / 2, z0 - 0.1 - k * 0.2, "#D2CBBE");
+  portaCasa(M, F.frente, 0, base, det, 1.2, 2.3);
+  M.prisma("liso", [[0, -0.9], [0, 0.9], [0.45, 0]], 0.18, 0, base + 2.55, z0 - 0.12, BRANCO_CASA, Math.PI / 2);
+  for (const u of [-2.6, 2.6]) { janelaCasa(M, F.frente, u, base + 0.85, 1.15, 1.6, det, acesa(sem, u)); M.fc(F.frente, "madeira", u, base + 0.58, 0.24, 1.3, 0.26, 0.3, "#FFFFFF"); plantaCasa(M, pl, "azaleia", -u, base + 0.72, z0 - 0.26, 0.45, esc); }
+  // andar de cima: janela-porta da sacada no meio e janelas dos lados
+  const y1 = base + pe;
+  for (const u of [-2.6, 2.6]) janelaCasa(M, F.frente, u, y1 + 0.7, 1.15, 1.6, det, acesa(sem, 4 + u));
+  janelaCasa(M, F.frente, 0, y1 + 0.12, 1.1, 2.2, det, acesa(sem, 7));
+  M.caixa("concreto", 2.3, 0.15, 0.75, 0, y1 + 0.05, z0 - 0.37, BRANCO_CASA);
+  guardaCorpo(M, -1.1, z0 - 0.7, 1.1, z0 - 0.7, y1 + 0.12, y1 + 0.12, "#2B2F36", false, 0.9);
+  for (const sg of [-1, 1]) guardaCorpo(M, sg * 1.1, z0 - 0.7, sg * 1.1, z0 - 0.05, y1 + 0.12, y1 + 0.12, "#2B2F36", false, 0.9);
+  for (const L of [F.esq, F.dir]) for (const yy of [base + 0.85, y1 + 0.7]) for (const u of [-1.9, 1.9]) janelaCasa(M, L, u, yy, 1.05, 1.5, det, acesa(sem, yy + u + L.th));
+  for (const yy of [base + 0.95, y1 + 0.8]) for (const u of [-2.2, 2.2]) janelaCasa(M, F.fundos, u, yy, 1.05, 1.3, null, acesa(sem, 20 + yy + u));
+  telhadoCasa(M, w, z0, z1, topo, 1.35, 0.55, parede);
+  for (const sx of [-1, 1]) plantaCasa(M, pl, "topiaria", sx * (w / 2 + 0.2), 0, z0 - 0.5, 1.2, esc);
+}
+// casa moderna: térrea de laje, pano de vidro, ripado de madeira, porta pivotante e deck na frente
+function casaModernaKit(M: Montador, pl: Plantas, _cor: string, _det: string, sem: number, esc: number) {
+  const w = 10.4, z0 = -2.85, z1 = 5.0, d = z1 - z0, base = 0.4, pe = 3.2, topo = base + pe, cz = (z0 + z1) / 2, parede = "#F5F4F0";
+  const F = faces(w, z0, z1);
+  M.caixa("concreto", w + 0.3, base, d + 0.3, 0, base / 2, cz, "#9A9C9E");
+  for (const [L, lw] of [[F.frente, w], [F.fundos, w], [F.esq, d], [F.dir, d]] as [Face, number][]) M.fc(L, "liso", 0, base + pe / 2, -0.1, lw, pe, 0.2, parede);
+  // pano de vidro (à esquerda de quem olha), ripado de madeira (à direita) e a porta no meio
+  M.fc(F.frente, "liso", -2.7, base + 1.35, 0.03, 3.9, 2.6, 0.06, "#23272C");
+  M.fp(F.frente, acesa(sem, 1) ? "luz" : "liso", -2.7, base + 1.35, 0.062, 3.7, 2.4, "#CFC8B8");
+  M.fp(F.frente, "vidro", -2.7, base + 1.35, 0.075, 3.7, 2.4);
+  if (M.detalhe) for (const du of [-0.62, 0.62]) M.fc(F.frente, "liso", -2.7 + du * 1.95, base + 1.35, 0.08, 0.05, 2.4, 0.04, "#23272C");
+  M.fc(F.frente, "madeira", 3.0, base + pe / 2, 0.05, 3.6, pe - 0.1, 0.08, "#FFFFFF");
+  portaCasa(M, F.frente, 0, base, "#23272C", 1.1, 2.4);
+  // laje com beiral grande na frente e a linha escura da borda
+  M.caixa("concreto", w + 0.5, 0.36, d + 1.4, 0, topo + 0.18, cz - 0.45, "#EDEBE6"); M.caixa("liso", w + 0.52, 0.06, d + 1.42, 0, topo + 0.02, cz - 0.45, "#2B2F36");
+  if (M.detalhe) for (const x of [-3, 0, 3]) M.caixa("luz", 0.3, 0.02, 0.3, x, topo - 0.01, z0 - 0.5);
+  // deck de madeira com degrau, floreiras de concreto
+  M.caixa("madeira", 5.6, base, 1.58, 0, base / 2, z0 - 0.79, "#FFFFFF"); M.caixa("madeira", 2.4, 0.2, 0.4, 0, 0.1, z0 - 1.78, "#FFFFFF");
+  for (const sg of [-1, 1]) { M.caixa("concreto", 0.9, 0.55, 0.9, sg * 2.2, base + 0.27, z0 - 1.0, "#BDB8AF"); plantaCasa(M, pl, "topiaria", sg * 2.2, base + 0.55, z0 - 1.0, 1.1, esc); }
+  // janelas em fita nos lados e nos fundos
+  for (const L of [F.esq, F.dir]) janelaCasa(M, L, 0, base + 1.7, 3.0, 0.8, null, acesa(sem, 3 + L.th));
+  for (const u of [-2.6, 2.6]) janelaCasa(M, F.fundos, u, base + 0.6, 2.2, 1.9, null, acesa(sem, 6 + u));
+  for (const sx of [-1, 1]) plantaCasa(M, pl, "arbusto", sx * (w / 2 + 0.3), 0, z1 - 0.8, 1.0, esc);
+}
+
+const CASAS_CACHE = new Map<string, { partes: Parte[]; plantas: Plantas }>();
+const RM_C = new THREE.Matrix4(), TM_C = new THREE.Matrix4(), MEIA = new THREE.Matrix4().makeRotationY(Math.PI), SM_C = new THREE.Matrix4();
+function montarCasas(lista: CasaLote[]) {
+  const k = lista.map((c) => `${c.chave}:${c.modelo}:${c.escala}`).join("|") + `|${leve()}`;
+  const pronta = CASAS_CACHE.get(k); if (pronta) return pronta;
+  const M = new Montador(), pl: Plantas = { arbusto: [], azaleia: [], topiaria: [] };
+  for (const c of lista) {
+    // centro do lote, giro para a rua, recuo de 1,2 m para o fundo, meia volta (a frente do kit é -z) e a escala
+    M.origem = new THREE.Matrix4().makeTranslation(c.x, 0, c.z).multiply(RM_C.makeRotationY(c.rot)).multiply(TM_C.makeTranslation(0, 0, -RECUO_CASA)).multiply(MEIA).multiply(SM_C.makeScale(c.escala, c.escala, c.escala));
+    const sem = c.numero * 7 + 3, cor = TINTAS_CASA[c.numero % TINTAS_CASA.length], det = DETALHES_CASA[c.numero % DETALHES_CASA.length];
+    const f = c.modelo === "casaColonial" || c.modelo === "casaSobrado" ? casaColonialKit : c.modelo === "casaModerna" ? casaModernaKit : casaTerreaKit;
+    f(M, pl, cor, det, sem, c.escala);
+  }
+  M.origem = null;
+  const r = { partes: M.montar(), plantas: pl };
+  if (CASAS_CACHE.size > 6) { for (const v of CASAS_CACHE.values()) v.partes.forEach((x) => x.geo.dispose()); CASAS_CACHE.clear(); }
+  CASAS_CACHE.set(k, r); return r;
+}
+export function CasasDesenhadas({ casas }: { casas: CasaLote[] }) {
+  const chave = casas.map((c) => `${c.chave}:${c.modelo}:${c.escala}`).join("|");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const p = useMemo(() => montarCasas(casas), [chave]);
+  const sombra = !leve();
+  return (
+    <group>
+      {p.partes.map((x) => <mesh key={x.papel} geometry={x.geo} material={x.mat} castShadow={sombra && x.sombra} receiveShadow={x.papel !== "vidro"} renderOrder={x.papel === "vidro" ? 2 : 0} />)}
       {p.plantas.arbusto.length > 0 && <ArvoresInstanciadas especie="arbusto" itens={p.plantas.arbusto} sombra={false} />}
       {p.plantas.azaleia.length > 0 && <ArvoresInstanciadas especie="azaleia" itens={p.plantas.azaleia} sombra={false} />}
       {p.plantas.topiaria.length > 0 && <ArvoresInstanciadas especie="topiaria" itens={p.plantas.topiaria} sombra={false} />}

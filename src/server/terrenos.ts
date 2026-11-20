@@ -8,9 +8,12 @@ import { sql, migrar } from "./db";
 import { nichoValido, vizinhoDoLado } from "@/office/data/mundo";
 import type { Usuario } from "./usuarios";
 import { escritorioPadrao, normalizarEscritorio, trocasRestantes, TROCAS_LAYOUT_GRATIS, PRECO_TROCA_LAYOUT, LAYOUT, type Escritorio } from "@/office/data/escritorio";
+import { MODELO, MODELO_INICIAL, modeloDe, temModelo, brlModelo } from "@/office/data/modelos";
+import { ehKit } from "@/office/data/predios";
 import { registrar } from "./eventos";
 import { enviarEmail, emailLigado, brl, dataBR } from "./email";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
+import { QUIOSQUE_POR_CHAVE, ehQuiosque, equipeDoQuiosque } from "@/office/data/quiosques";
 
 declare global {
   var __workendAvisoEm: number | undefined;
@@ -47,6 +50,7 @@ export const ehAdmin = (u: Usuario | null | undefined) => !!u && (u.papel === "a
 // Lotes que podem ser comprados: os da lista de lotes (não a Nuvem, a lanchonete nem o lote de uma sede). Pela chave na
 // lista, nunca pela posição dentro da chave (nos quarteirões das sedes elas não batem: data/mundo.ts › chaveDoLote)
 export function loteAVenda(chave: string) {
+  if (ehQuiosque(chave)) return !!QUIOSQUE_POR_CHAVE[chave]; // quiosques (20/11/2026, data/quiosques.ts)
   const l = LOTE_POR_CHAVE[chave];
   return !!l && l.lote.tipo !== "praca"; // a praça de eventos não está à venda
 }
@@ -132,7 +136,10 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
   }
   const admin = ehAdmin(u);
   // o escritório já nasce na reserva, com os nomes que o dono deu ao CEO e à atendente (editáveis depois)
-  const esc = escritorioPadrao(nome, cor, { ceo: d.ceoNome, atendente: d.atendenteNome });
+  // o quiosque (20/11/2026) vem só com a atendente
+  const quiosque = ehQuiosque(chave);
+  const esc0 = escritorioPadrao(nome, cor, { ceo: d.ceoNome, atendente: d.atendenteNome });
+  const esc = quiosque ? equipeDoQuiosque(esc0) : esc0;
   const escJson = sql.json(esc as unknown as Parameters<typeof sql.json>[0]);
   return sql.begin(async (tx) => {
     const [dono] = await tx<{ usuarioId: string; status: string; escritorio: Escritorio | null }[]>`SELECT usuario_id, status, escritorio FROM terreno WHERE chave = ${chave} FOR UPDATE`;
@@ -142,7 +149,7 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
       if (ativo) throw new Error("Você já tem um chão ativo. Nesta fase cada conta tem um lote.");
       // quem está com Pix aberto não troca de lote: o pagamento precisa encontrar a reserva dele
       const [pix] = await tx<{ terrenoChave: string }[]>`SELECT p.terreno_chave FROM pagamento p JOIN terreno t ON t.chave = p.terreno_chave AND t.usuario_id = p.usuario_id AND t.status = 'reservado'
-        WHERE p.usuario_id = ${u.id} AND p.terreno_chave <> ${chave} AND p.tipo = 'lote' AND p.status = 'pendente' AND p.criado_em > now() - interval '1 hour' LIMIT 1`;
+        WHERE p.usuario_id = ${u.id} AND p.terreno_chave <> ${chave} AND p.tipo IN ('lote', 'quiosque') AND p.status = 'pendente' AND p.criado_em > now() - interval '1 hour' LIMIT 1`;
       if (pix) throw new Error(ERRO_PIX_ABERTO);
       // libera uma reserva anterior (não paga) do mesmo usuário
       await tx`DELETE FROM terreno WHERE usuario_id = ${u.id} AND chave <> ${chave} AND status = 'reservado' AND anexo_de IS NULL`;
@@ -161,7 +168,10 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
       const [guardado] = await tx<{ logo: Uint8Array | null; logoTipo: string | null; escritorio: Escritorio | null }[]>`SELECT logo, logo_tipo, escritorio FROM terreno_arquivo WHERE usuario_id = ${u.id} ORDER BY arquivado_em DESC LIMIT 1`;
       const logoFinal = logo ?? (guardado?.logo ? Buffer.from(guardado.logo) : null);
       const tipoFinal = logo ? logoTipo : guardado?.logo ? guardado.logoTipo : null;
-      const escFinal = guardado?.escritorio ? sql.json(guardado.escritorio as unknown as Parameters<typeof sql.json>[0]) : escJson;
+      // o modelo de prédio comprado fica com a empresa só enquanto o lote está ativo (20/11/2026): quem volta do arquivo
+      // traz a equipe e a marca, mas o prédio pago volta para o escritório básico; o quiosque volta só com a atendente
+      const guardadoEsc = guardado?.escritorio ? semModeloPago(quiosque ? equipeDoQuiosque(guardado.escritorio) : guardado.escritorio) : null;
+      const escFinal = guardadoEsc ? sql.json(guardadoEsc as unknown as Parameters<typeof sql.json>[0]) : escJson;
       await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, status, reservado_ate, escritorio) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${nicho}, ${logoFinal}, ${tipoFinal}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${escFinal})`;
     }
     const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${chave}`;
@@ -172,7 +182,8 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
 
 export async function liberarTerreno(usuarioId: string, chave: string) {
   await migrar();
-  const [pix] = await sql`SELECT 1 FROM pagamento WHERE usuario_id = ${usuarioId} AND terreno_chave = ${chave} AND tipo = 'lote' AND status = 'pendente' AND criado_em > now() - interval '1 hour' LIMIT 1`;
+  // quiosque (20/11/2026) tem tipo próprio no pagamento; o lote extra é tipo 'expansao'
+  const [pix] = await sql`SELECT 1 FROM pagamento WHERE usuario_id = ${usuarioId} AND terreno_chave = ${chave} AND tipo IN ('lote', 'quiosque', 'expansao') AND status = 'pendente' AND criado_em > now() - interval '1 hour' LIMIT 1`;
   if (pix) throw new Error(ERRO_PIX_ABERTO);
   const r = await sql`DELETE FROM terreno WHERE chave = ${chave} AND usuario_id = ${usuarioId}`;
   return r.count > 0;
@@ -186,20 +197,29 @@ export async function ativarTerreno(chave: string, meses = 1, usuarioId: string 
     inaugurado_em = CASE WHEN status = 'reservado' THEN COALESCE(inaugurado_em, now()) ELSE inaugurado_em END,
     pago_ate = GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${DIAS_MES * meses}) WHERE chave = ${chave} AND (${usuarioId}::text IS NULL OR usuario_id = ${usuarioId})`;
   if (!r.count) return false;
+  await acompanharPrincipal(chave, db);
   await garantirEscritorio(chave, db);
   return true;
+}
+// Lote extra (20/11/2026, data/precosTerreno.ts): renova junto com o principal, então vence no mesmo dia que ele. Ao somar
+// dias nunca encurta; no estorno (encurtar) acompanha o principal para baixo.
+async function acompanharPrincipal(chave: string, db: Db = sql, encurtar = false) {
+  if (encurtar) await db`UPDATE terreno a SET pago_ate = p.pago_ate, atualizado_em = now() FROM terreno p WHERE p.chave = ${chave} AND a.anexo_de = p.chave AND a.status = 'ativo'`;
+  else await db`UPDATE terreno a SET pago_ate = GREATEST(a.pago_ate, p.pago_ate), avisado_em = NULL, atualizado_em = now() FROM terreno p WHERE p.chave = ${chave} AND a.anexo_de = p.chave AND a.status = 'ativo'`;
 }
 // Pagamento estornado: tira os dias pagos. Se não sobrar nada, o lote sai do mapa na próxima limpeza, sem tolerância.
 export async function reverterTerreno(chave: string, meses: number, usuarioId: string, db: Db = sql) {
   const dias = DIAS_MES * meses;
   await db`UPDATE terreno SET atualizado_em = now(), pago_ate = CASE WHEN pago_ate - make_interval(days => ${dias}) > now() THEN pago_ate - make_interval(days => ${dias}) ELSE now() - make_interval(days => ${DIAS_TOLERANCIA + 1}) END
     WHERE chave = ${chave} AND usuario_id = ${usuarioId} AND status = 'ativo'`;
+  await acompanharPrincipal(chave, db, true);
 }
 // Todo escritório nasce com atendente + CEO (nome do dono) e um setor de atendimento; só cria se ainda não tem
 export async function garantirEscritorio(chave: string, db: Db = sql) {
   const [t] = await db<{ empresaNome: string; cor: string; escritorio: Escritorio | null; anexoDe: string | null }[]>`SELECT t.empresa_nome, t.cor, t.escritorio, t.anexo_de FROM terreno t WHERE t.chave = ${chave}`;
   if (!t || t.escritorio || t.anexoDe) return t?.escritorio ?? null; // a ampliação usa o escritório do lote principal
-  const e = escritorioPadrao(t.empresaNome, t.cor);
+  // quiosque (20/11/2026): só a atendente; lote: CEO + recepcionista
+  const e = ehQuiosque(chave) ? equipeDoQuiosque(escritorioPadrao(t.empresaNome, t.cor)) : escritorioPadrao(t.empresaNome, t.cor);
   await db`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])} WHERE chave = ${chave}`;
   return e;
 }
@@ -212,27 +232,58 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
   if (t.status !== "ativo") throw new Error("Pague o 1º mês pra montar o escritório.");
   if (ehSede(chave)) throw new Error("A sede tem a equipe montada por departamento e não é montada pelo editor.");
   const base = t.escritorio ?? (await garantirEscritorio(chave)) ?? escritorioPadrao(t.empresaNome, t.cor);
-  const e = normalizarEscritorio(dados, base);
+  // o normalizar devolve o CEO obrigatório dos lotes; o quiosque continua só com a atendente (data/quiosques.ts)
+  const e = ehQuiosque(chave) ? equipeDoQuiosque(normalizarEscritorio(dados, base)) : normalizarEscritorio(dados, base);
   const detalhes: string[] = [];
+  // modelo do catálogo (20/11/2026, data/modelos.ts): só os grátis, os comprados e o prédio que a empresa já tinha; os
+  // prédios que saíram do catálogo (os antigos) não voltam depois de trocados. A compra é por src/server/modelos.ts.
+  const modeloAntes = modeloDe(base), modeloNovo = modeloDe(e), mudou = e.layout !== base.layout || modeloNovo !== modeloAntes;
+  if (mudou && !ehAdmin(u)) {
+    if (!modeloNovo || !ehKit(e.layout)) throw new Error("Esse prédio saiu do catálogo. Escolha um dos modelos da aba Prédio.");
+    if (!temModelo(base, modeloNovo)) throw new Error(`O modelo "${MODELO[modeloNovo].nome}" custa ${brlModelo(MODELO[modeloNovo].preco)}. Compre na aba Prédio para usar.`);
+    if (MODELO[modeloNovo].lotes === 2) {
+      const [anexo] = await sql`SELECT 1 FROM terreno WHERE anexo_de = ${chave} AND status = 'ativo' LIMIT 1`;
+      if (!anexo) throw new Error(`O modelo "${MODELO[modeloNovo].nome}" ocupa dois lotes: amplie o seu lote para o vizinho do lado antes.`);
+    }
+  }
   // troca de prédio: 3 grátis, depois cada uma custa R$ 9,90 (crédito comprado no Pix); admin não paga
-  if (e.layout !== base.layout) {
+  if (mudou) {
     if (!ehAdmin(u)) {
       if (trocasRestantes(base) <= 0) throw new Error(`Você já usou as ${TROCAS_LAYOUT_GRATIS} trocas de prédio grátis. Cada troca agora custa R$ ${PRECO_TROCA_LAYOUT.toFixed(2).replace(".", ",")}.`);
       if ((base.trocasLayout ?? 0) < TROCAS_LAYOUT_GRATIS) e.trocasLayout = (base.trocasLayout ?? 0) + 1;
       else e.creditosLayout = Math.max(0, (base.creditosLayout ?? 0) - 1);
     }
-    detalhes.push(`Prédio trocado para "${LAYOUT[e.layout].nome}".`);
+    detalhes.push(`Prédio trocado para "${modeloNovo ? MODELO[modeloNovo].nome : LAYOUT[e.layout].nome}".`);
   }
   const antes = new Set(base.equipe.map((m) => m.id));
   const novos = e.equipe.filter((m) => !antes.has(m.id));
+
+  // agentes à venda (20/11/2026): profissional novo só entra se foi comprado na vitrine (é a volta de quem saiu da
+  // equipe); as equipes que já existiam ficam como estão. O admin monta sem pagar, como na troca de prédio.
+  if (!ehAdmin(u) && novos.some((m) => m.papel === "profissional")) {
+    const { contratadosDoLote } = await import("./agentesVenda");
+    const contratados = await contratadosDoLote(chave);
+    if (novos.some((m) => m.papel === "profissional" && !contratados.has(m.id))) throw new Error("Agentes novos são contratados na vitrine “Contratar agente” (cada um tem um preço). Quem já está na equipe continua.");
+  }
+  // quem foi comprado e volta para a equipe volta com a mesma personalidade e o mesmo escopo (guardados no contrato)
+  if (novos.length) {
+    const { contratosDoLote } = await import("./agentesVenda");
+    const ctr = new Map((await contratosDoLote(chave)).map((c) => [c.membroId, c]));
+    for (const m of novos) { const c = ctr.get(m.id); if (c?.personalidadeId) m.personalidadeId = c.personalidadeId; if (c?.escopo) m.escopo = c.escopo; }
+  }
   const saidas = base.equipe.filter((m) => !e.equipe.some((x) => x.id === m.id));
   for (const m of novos) detalhes.push(`${m.nome} (${m.cargo}) entrou na equipe.`);
   for (const m of saidas) detalhes.push(`${m.nome} (${m.cargo}) saiu da equipe.`);
   if (e.setores.length !== base.setores.length) detalhes.push(`Setores: ${e.setores.map((s) => s.nome).join(", ")}.`);
   await sql`UPDATE terreno SET escritorio = ${sql.json(e as unknown as Parameters<typeof sql.json>[0])}, atualizado_em = now() WHERE chave = ${chave}`;
-  if (detalhes.length) void registrar(novos.length ? "contratacao" : e.layout !== base.layout ? "layout" : "escritorio", novos.length ? `Equipe atualizada (${novos.length} contratação${novos.length > 1 ? "ões" : ""})` : e.layout !== base.layout ? "Prédio trocado" : "Escritório atualizado", { usuarioId: u.id, terrenoChave: chave, dados: { detalhes: detalhes.join(" ") }, avisarDono: true });
+  if (detalhes.length) void registrar(novos.length ? "contratacao" : mudou ? "layout" : "escritorio", novos.length ? `Equipe atualizada (${novos.length} contratação${novos.length > 1 ? "ões" : ""})` : mudou ? "Prédio trocado" : "Escritório atualizado", { usuarioId: u.id, terrenoChave: chave, dados: { detalhes: detalhes.join(" ") }, avisarDono: true });
   else void registrar("escritorio", "Escritório editado", { usuarioId: u.id, terrenoChave: chave, dados: { detalhes: "Nomes, cargos, aparência ou treino da equipe." } });
   return e;
+}
+// lote que volta do arquivo: o modelo pago não vem junto (a compra valia enquanto o lote estava ativo)
+function semModeloPago(e: Escritorio): Escritorio {
+  const m = modeloDe(e), pago = !!e.modelo && !!m && MODELO[m].preco > 0;
+  return { ...e, modelosComprados: [], ...(pago ? { modelo: MODELO_INICIAL, layout: MODELO[MODELO_INICIAL].base } : {}) };
 }
 // Crédito de troca de prédio (R$ 9,90 no Pix): soma ao pagar e retira no estorno; só vale se o lote ainda for de quem pagou
 async function ajustarCreditoLayout(chave: string, usuarioId: string, delta: number, db: Db) {
@@ -270,6 +321,7 @@ export async function adminDias(chave: string, dias: number) {
   await sql`UPDATE terreno SET status = 'ativo', reservado_ate = NULL, atualizado_em = now(),
     inaugurado_em = CASE WHEN status = 'reservado' THEN COALESCE(inaugurado_em, now()) ELSE inaugurado_em END,
     pago_ate = GREATEST(now(), GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${d})) WHERE chave = ${chave}`;
+  await acompanharPrincipal(chave, sql, d < 0);
   await garantirEscritorio(chave);
 }
 // Admin edita a placa de qualquer lote (nome e cor); logo continua a do dono
@@ -346,6 +398,7 @@ export async function reservarAnexo(u: Usuario, anexo: string) {
   if (u.banidoEm) throw new Error("Conta suspensa.");
   const principal = await terrenoDoUsuario(u.id);
   if (!principal || principal.status !== "ativo") throw new Error("Para ampliar, o seu lote precisa estar ativo.");
+  if (ehQuiosque(principal.chave)) throw new Error("O quiosque tem tamanho fixo e não pode ser expandido.");
   if (!vizinhosDoLote(principal.chave).includes(anexo)) throw new Error("A ampliação precisa ser num lote vizinho do seu, no mesmo quarteirão.");
   return sql.begin(async (tx) => {
     const [ja] = await tx`SELECT chave FROM terreno WHERE anexo_de = ${principal.chave} AND chave <> ${anexo}`;

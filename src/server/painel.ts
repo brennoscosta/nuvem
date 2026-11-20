@@ -11,6 +11,7 @@ import { cuponsDoDono } from "./cupons";
 import { seguidoresDe } from "./seguir";
 import { meuCodigo, minhasIndicacoes, vagasFundador, primeiraVez, cotacaoLote, FUNDADOR, CREDITO_INDICACAO, INDICADO } from "./ofertas";
 import { empresaIdDe, gastoDoMes, especialistaDe, fotoDoEspecialista, TETO_IA_MES, type Contatos } from "./equipeCliente";
+import { medidorIA } from "./unidadesIA";
 import { diaDe, horaDe, rotuloDia } from "./agenda";
 import { LOTE_POR_CHAVE, bairroDoLote, nomeNicho } from "@/office/data/mundo";
 import { sedeDe } from "@/office/data/sedes";
@@ -66,6 +67,8 @@ export async function painelDoDono(u: Usuario, t: Terreno) {
     seguro(vendasDoMes(uid), null, "vendas"),
   ]);
 
+  // medidor "Unidades de IA" (20/11/2026): saldo, consumo do mês e estimativa em respostas (nunca em tokens)
+  const unidades = await seguro<{ saldo: number; inclusa: number; comprada: number; mes: number; usadas: number; respostas: number; aviso: boolean; esgotado: boolean; cobrada: boolean } | null>(medidorIA(empId).then((m) => ({ saldo: m.saldo.total, inclusa: m.saldo.inclusa, comprada: m.saldo.comprada, mes: m.saldo.baseMes, usadas: m.usadasMes, respostas: m.respostas, aviso: m.aviso, esgotado: m.esgotado, cobrada: m.saldo.cobrada })), null, "unidades");
   const info = LOTE_POR_CHAVE[t.chave];
   const bairro = bairroDoLote(t.chave);
   const agora = Date.now();
@@ -113,7 +116,7 @@ export async function painelDoDono(u: Usuario, t: Terreno) {
     cupons: { ativos: ativos.length, primeiro: ativos[0]?.titulo ?? null, regra: ativos[0]?.regra ?? null, pegos: cupons.reduce((s, c) => s + c.pegos, 0), usados: cupons.reduce((s, c) => s + c.usados, 0) },
     indicacao: { codigo, link: codigo && info?.numero ? `workend.online/loja/${info.numero}?ind=${codigo}` : codigo ? `workend.online/?ind=${codigo}` : null, credito: indicacoes.credito, pagas: ind.filter((x) => x.status === "liberada").length, esperando: ind.filter((x) => x.status === "pendente").length, porEmpresa: CREDITO_INDICACAO, descontoIndicado: Math.round(INDICADO.desconto * 100) },
     avisosNaoLidos: avisos[0]?.n ?? 0,
-    ia: { gasto, teto: TETO_IA_MES },
+    ia: { gasto, teto: TETO_IA_MES, unidades },
     vendasMes,
     visitantes24h: visitantes[0]?.n ?? 0,
     equipe, especialistas, contratados: equipe.map((m) => m.catalogoId).filter((x): x is string => !!x),

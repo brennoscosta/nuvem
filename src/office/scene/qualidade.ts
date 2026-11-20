@@ -21,6 +21,15 @@ export function qualidade(): Qualidade {
 
 export const leve = () => qualidade() === "leve";
 
+// Celular ou tablet (20/11/2026): tela de toque ou estreita. Só para cortes que valem no celular; o computador, mesmo nos
+// gráficos leves, não muda.
+let ehCelular: boolean | null = null;
+export function celular(): boolean {
+  if (ehCelular != null) return ehCelular;
+  if (typeof window === "undefined") return false;
+  return (ehCelular = !!window.matchMedia?.("(pointer: coarse)").matches || Math.min(window.innerWidth, window.innerHeight) < 600);
+}
+
 // Guarda a escolha no aparelho e recarrega (sombras e antisserrilhado só mudam ao criar a cena)
 export function escolherQualidade(q: Qualidade) {
   try { window.localStorage.setItem(CHAVE, q); window.localStorage.removeItem(CHAVE_AUTO); } catch { /* ignora */ }

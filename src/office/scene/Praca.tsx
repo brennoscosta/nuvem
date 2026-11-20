@@ -4,8 +4,8 @@
 // as 6 barracas da feira aparecem nas laterais com o nome de quem alugou; ?feira=1 liga a feira fora do sábado (prévias).
 import { useDestaque, type DestaqueSemana } from "../destaque";
 import * as THREE from "three";
-import { useEffect, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { caixa, cilindro, esfera, mat, plano } from "./geo";
 import { Arvore } from "./Entorno";
 import { Estatico } from "./Estatico";
@@ -14,6 +14,11 @@ import { ceu } from "./CicloDia";
 import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
 import { PRACA_CHAVE, TIPOS_BARRACA, feiraAberta, dataCurta } from "../data/praca";
 import { useMundo, type Praca as DadosPraca, type EventoPraca, type BarracaFeira } from "../mundoStore";
+import { useGradeTelao, telaoFixo } from "../telao";
+import { itemDoMomento, PRECO_PATROCINIO, type ItemGrade, type GradeTelao, type Patrocinio } from "../data/telao";
+import { desenharAnuncio, desenharEventoDestaque, desenharPatrocinio, desenharCasa, casaPorId, desenharFeira, desenharPlaca, imagemPronta, rodapeTelao } from "../telaoDesenho";
+import { natalAtivo } from "./Natal";
+import { leve } from "./qualidade";
 
 export const feiraVisivel = () => (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("feira") === "1") || feiraAberta();
 const hhmm = (d: Date) => d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
@@ -45,12 +50,14 @@ function logoPronto(url: string | null, aoCarregar: () => void) {
   if (!im) { im = new Image(); im.onload = aoCarregar; im.src = url; LOGOS.set(url, im); }
   return im.complete && im.naturalWidth ? im : null;
 }
-function desenharTelao(dados: DadosPraca | null, dq: DestaqueSemana | null = null, aoCarregarLogo: () => void = () => {}) {
+function desenharTelao(dados: DadosPraca | null, dq: DestaqueSemana | null = null, aoCarregarLogo: () => void = () => {}, item: ItemGrade | null = null, grade: GradeTelao | null = null) {
   const tex = texturaTelao(); if (!tex) return;
   const c = tex.image as HTMLCanvasElement, g = c.getContext("2d")!; const W = c.width, H = c.height;
   const { vivo, proximo } = eventosDoMomento(dados?.agenda ?? []);
+  // grade contínua (20/11/2026): anúncios pagos, destaques, patrocínio, feira e a propaganda do WorkEnd, 15 s cada
+  if (item && item.tipo !== "agenda" && item.tipo !== "semana") { desenharItem(g, W, H, item, dados, grade, aoCarregarLogo); tex.needsUpdate = true; return; }
   // sem evento ao vivo, o telão mostra a loja destaque da semana (13/11/2026); o próximo evento vira uma linha embaixo
-  if (!vivo && dq) { desenharDestaque(g, W, H, dq, proximo ?? null, logoPronto(dq.logo, aoCarregarLogo)); rodapeFeira(g, W, H, dados); tex.needsUpdate = true; return; }
+  if (!vivo && dq && (!item || item.tipo === "semana")) { desenharDestaque(g, W, H, dq, proximo ?? null, logoPronto(dq.logo, aoCarregarLogo)); rodapeFeira(g, W, H, dados); tex.needsUpdate = true; return; }
   const ev = vivo ?? proximo;
   const cor = ev?.empresa.cor ?? "#1D4ED8";
   const fundo = g.createLinearGradient(0, 0, W, H); fundo.addColorStop(0, "#0B1220"); fundo.addColorStop(1, cor); g.fillStyle = fundo; g.fillRect(0, 0, W, H);
@@ -75,6 +82,33 @@ function desenharTelao(dados: DadosPraca | null, dq: DestaqueSemana | null = nul
   }
   rodapeFeira(g, W, H, dados);
   tex.needsUpdate = true;
+}
+const textoFeira = (dados: DadosPraca | null) => { const pagas = dados?.feira.barracas.filter((b) => b.status === "paga").length ?? 0; return feiraAberta() ? `FEIRA DE SÁBADO ABERTA · ${pagas} barraca${pagas === 1 ? "" : "s"} · até as 18h` : `Feira de sábado ${dados ? dataCurta(dados.feira.dia) : ""} · 8h às 18h · barraca R$ 9,90`; };
+function desenharItem(g: CanvasRenderingContext2D, W: number, H: number, item: ItemGrade, dados: DadosPraca | null, grade: GradeTelao | null, redesenhar: () => void) {
+  if (item.tipo === "anuncio") desenharAnuncio(g, W, H, { nome: item.nome, cor: item.cor, frase: item.frase, numero: item.numero, formato: item.formato === "imagem" ? "imagem" : "modelo" }, imagemPronta(item.logo, redesenhar), item.formato === "imagem" ? imagemPronta(item.midia, redesenhar) : null);
+  else if (item.tipo === "destaque") { desenharEventoDestaque(g, W, H, item, imagemPronta(item.logo, redesenhar)); rodapeTelao(g, W, H, textoFeira(dados), 56); }
+  else if (item.tipo === "patrocinio" && grade?.patrocinio) desenharPatrocinio(g, W, H, grade.patrocinio, imagemPronta(grade.patrocinio.logo, redesenhar), natalAtivo());
+  else if (item.tipo === "feira") desenharFeira(g, W, H, { dia: dados?.feira.dia ?? "", pagas: dados?.feira.barracas.filter((b) => b.status === "paga").length ?? 0, aberta: feiraAberta() });
+  else if (item.tipo === "casa") { desenharCasa(g, W, H, casaPorId(item.id)); rodapeTelao(g, W, H, textoFeira(dados), 56); }
+}
+// a lista que roda no telão: a grade do servidor, sem a loja da semana quando não há; com evento ao vivo, o palco volta entre um item e outro
+function montarItens(grade: GradeTelao | null, temSemana: boolean, vivo: boolean): ItemGrade[] {
+  const base = (grade?.itens ?? []).filter((i) => (i.tipo !== "semana" || temSemana) && (i.tipo !== "patrocinio" || !!grade?.patrocinio));
+  if (!vivo) return base;
+  return base.filter((i) => i.tipo !== "agenda").flatMap((i) => [{ tipo: "agenda" } as ItemGrade, i]);
+}
+// vídeo de anúncio no telão: um elemento só, mudo; só toca com o telão na tela (no modo leve, o telão mostra o modelo)
+const videoTelao: { el: HTMLVideoElement | null; tex: THREE.VideoTexture | null; src: string | null; ativo: boolean } = { el: null, tex: null, src: null, ativo: false };
+const P_TELA = new THREE.Vector3(), M_TELA = new THREE.Matrix4(), FRUSTUM_TELA = new THREE.Frustum();
+function usarVideoTelao(item: ItemGrade | null) {
+  const tex = texturaTelao();
+  const src = item && (item.tipo === "anuncio" || item.tipo === "destaque") && item.formato === "video" && item.midia && !leve() ? item.midia : null;
+  videoTelao.ativo = !!src;
+  if (!src) { if (videoTelao.el) videoTelao.el.pause(); if (tex && MAT_TELA.map !== tex) { MAT_TELA.map = tex; MAT_TELA.needsUpdate = true; } return; }
+  if (!videoTelao.el) { const v = document.createElement("video"); v.muted = true; v.loop = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous"; videoTelao.el = v; videoTelao.tex = new THREE.VideoTexture(v); videoTelao.tex.colorSpace = THREE.SRGBColorSpace; }
+  const v = videoTelao.el!;
+  if (videoTelao.src !== src) { videoTelao.src = src; v.src = src; v.addEventListener("loadeddata", () => { if (videoTelao.src === src && videoTelao.tex) { MAT_TELA.map = videoTelao.tex; MAT_TELA.needsUpdate = true; } }, { once: true }); }
+  else if (v.readyState >= 2 && videoTelao.tex) { MAT_TELA.map = videoTelao.tex; MAT_TELA.needsUpdate = true; }
 }
 function desenharDestaque(g: CanvasRenderingContext2D, W: number, H: number, dq: DestaqueSemana, proximo: EventoPraca | null, logo: HTMLImageElement | null) {
   const fundo = g.createLinearGradient(0, 0, W, H); fundo.addColorStop(0, "#0B1220"); fundo.addColorStop(1, dq.cor); g.fillStyle = fundo; g.fillRect(0, 0, W, H);
@@ -174,6 +208,28 @@ function Barraca({ b, position, rot }: { b: BarracaFeira; position: [number, num
   );
 }
 
+// evento pago em destaque que ainda não acabou (o balão da praça fica dourado)
+function destaquePago(grade: GradeTelao | null) { const agora = Date.now(); return (grade?.destaques ?? []).find((d) => new Date(d.fim).getTime() > agora) ?? null; }
+function PlacaPraca({ p }: { p: Patrocinio | null }) {
+  const { tex, canvas } = useMemo(() => { const c = document.createElement("canvas"); c.width = 768; c.height = 320; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return { tex: t, canvas: c }; }, []);
+  const chave = p ? `${p.id}|${p.nome}|${p.logo}|${p.cor}` : "livre";
+  useEffect(() => {
+    const preco = `R$ ${PRECO_PATROCINIO.toFixed(2).replace(".", ",")}`;
+    const pintar = () => { desenharPlaca(canvas.getContext("2d")!, 768, 320, p, imagemPronta(p?.logo, pintar), preco); tex.needsUpdate = true; };
+    pintar();
+  }, [chave]); // eslint-disable-line react-hooks/exhaustive-deps
+  const metal = mat("#2B2F36", { metal: 0.4, rough: 0.5 });
+  return (
+    // no fundo do canteiro esquerdo da entrada (z -8,0): na frente dela, no Natal, fica o trenó (scene/Natal.tsx › NatalPraca)
+    <group position={[-7.8, 0.4, -8.0]} onClick={(e) => { e.stopPropagation(); useMundo.getState().selecionarLote(PRACA_CHAVE); }}>
+      {[-1.45, 1.45].map((x) => <mesh key={x} geometry={caixa(0.12, 2.6, 0.12)} material={metal} position={[x, 1.3, 0]} castShadow />)}
+      <mesh geometry={caixa(3.1, 1.36, 0.1)} material={mat("#1F2630", { rough: 0.7 })} position={[0, 2.0, 0]} castShadow />
+      <mesh geometry={plano(3.0, 1.25)} position={[0, 2.0, -0.06]} rotation={[0, Math.PI, 0]}><meshBasicMaterial map={tex} toneMapped={false} /></mesh>
+      <mesh geometry={plano(3.0, 1.25)} position={[0, 2.0, 0.06]}><meshBasicMaterial map={tex} toneMapped={false} /></mesh>
+    </group>
+  );
+}
+
 export function Praca() {
   const l = LOTE_POR_CHAVE[PRACA_CHAVE];
   const dados = useMundo((s) => s.praca);
@@ -181,23 +237,45 @@ export function Praca() {
   const carregar = useMundo((s) => s.carregarPraca);
   // a agenda chega pela API e é conferida a cada minuto (o telão e o aviso de "vai começar" usam a mesma)
   useEffect(() => { void carregar(); const t = setInterval(() => void carregar(), 60_000); return () => clearInterval(t); }, [carregar]);
+  // grade do telão (20/11/2026): o item no ar muda a cada 15 s, igual para todo mundo (?telao=N fixa um item)
+  const grade = useGradeTelao();
+  const vivoAgora = !!eventosDoMomento(dados?.agenda ?? []).vivo;
+  const itens = useMemo(() => montarItens(grade, !!destaqueSemana, vivoAgora), [grade, destaqueSemana, vivoAgora]);
+  const [indice, setIndice] = useState(-1);
   useEffect(() => {
-    const redesenhar = () => desenharTelao(dados, destaqueSemana, redesenhar);
+    const ver = () => { const f = telaoFixo(); setIndice(itemDoMomento(itens, Date.now(), typeof f === "string" ? itens.findIndex((i) => i.tipo === f) : f).indice); };
+    const t0 = setTimeout(ver, 0); const t = setInterval(ver, 1000); return () => { clearTimeout(t0); clearInterval(t); };
+  }, [itens]);
+  const item = indice >= 0 ? itens[indice] ?? null : null;
+  useEffect(() => {
+    const redesenhar = () => desenharTelao(dados, destaqueSemana, redesenhar, item, grade);
     redesenhar(); estado.vivo = !!eventosDoMomento(dados?.agenda ?? []).vivo;
+    usarVideoTelao(item);
+    if (new URLSearchParams(window.location.search).get("medir") === "1") (window as unknown as { __telao: unknown }).__telao = { indice, total: itens.length, item, patrocinio: grade?.patrocinio ?? null, destaques: grade?.destaques ?? [] };
     const t = setInterval(redesenhar, 30_000); return () => clearInterval(t);
-  }, [dados, destaqueSemana]);
-  useEffect(() => { const t = texturaTelao(); if (t) { MAT_TELA.map = t; MAT_TELA.needsUpdate = true; } }, []);
-  useFrame(acender);
+  }, [dados, destaqueSemana, item, grade, indice, itens.length]);
+  useEffect(() => { const t = texturaTelao(); if (t) { MAT_TELA.map = t; MAT_TELA.needsUpdate = true; } return () => { videoTelao.el?.pause(); videoTelao.ativo = false; }; }, []);
+  // o vídeo do anúncio só toca com o telão na tela (e a aba visível); fora dela, pausa
+  const tela = useRef<THREE.Mesh>(null); const camera = useThree((st) => st.camera); const passo = useRef(0);
+  useFrame((_, dt) => {
+    acender();
+    const v = videoTelao.el; if (!v || !videoTelao.ativo) return;
+    passo.current += dt; if (passo.current < 0.5) return; passo.current = 0;
+    let ve = false;
+    if (tela.current && !document.hidden) { tela.current.getWorldPosition(P_TELA); FRUSTUM_TELA.setFromProjectionMatrix(M_TELA.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)); ve = FRUSTUM_TELA.containsPoint(P_TELA) && camera.position.distanceTo(P_TELA) < 140; }
+    if (ve && v.paused) void v.play().catch(() => {}); else if (!ve && !v.paused) v.pause();
+  });
   const piso = useMemo(() => texturaPiso(), []);
   const feira = feiraVisivel();
   if (!l) return null;
   const [x, z] = l.centro; const rot = frenteDoLote(l.k) + Math.PI; // frente local = -z, como os escritórios
   const barracas = dados?.feira.barracas ?? Array.from({ length: 6 }, (_, i) => ({ vaga: i + 1, status: "livre" as const, meu: false, nome: "", descricao: "", cor: "", tipo: "", contato: {} }));
   const { vivo, proximo } = eventosDoMomento(dados?.agenda ?? []);
+  const dqPago = destaquePago(grade), patro = grade?.patrocinio ?? null;
   const madeira = mat("#8A5A33", { rough: 0.9 }), metal = mat("#2B2F36", { metal: 0.4, rough: 0.5 });
   return (
     <group position={[x, 0, z]}>
-      <Balao position={[0, 9.6, 0]} nome="Praça de Eventos" cor={vivo ? "#E11D48" : "#0F766E"} subtitulo={vivo ? `Ao vivo: ${vivo.titulo.slice(0, 26)}` : proximo ? `Próximo: ${diaSemana(new Date(proximo.inicio))} ${hhmm(new Date(proximo.inicio))}` : feira ? "Feira de sábado aberta" : "Lives e lançamentos"} onClick={() => useMundo.getState().selecionarLote(PRACA_CHAVE)} destaque={!!vivo} />
+      <Balao position={[0, 9.6, 0]} nome="Praça de Eventos" cor={vivo ? "#E11D48" : dqPago ? "#B7791F" : "#0F766E"} subtitulo={vivo ? `Ao vivo: ${vivo.titulo.slice(0, 26)}` : dqPago ? `Destaque: ${dqPago.titulo.slice(0, 24)}` : proximo ? `Próximo: ${diaSemana(new Date(proximo.inicio))} ${hhmm(new Date(proximo.inicio))}` : feira ? "Feira de sábado aberta" : patro ? `Patrocínio: ${patro.nome.slice(0, 22)}` : "Lives e lançamentos"} onClick={() => useMundo.getState().selecionarLote(PRACA_CHAVE)} destaque={!!vivo || !!dqPago} />
       <group rotation={[0, rot, 0]}>
         {piso && <mesh geometry={plano(19.2, 19.2)} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} receiveShadow><meshStandardMaterial map={piso} roughness={0.95} /></mesh>}
         <Estatico>
@@ -226,10 +304,12 @@ export function Praca() {
           {/* postes de luz */}
           {[[-8.9, -3], [8.9, -3], [-8.9, 3.5], [8.9, 3.5]].map(([px, pz]) => <mesh key={`${px},${pz}`} geometry={cilindro(0.06, 0.08, 4.2, 8)} material={metal} position={[px, 2.1, pz]} castShadow />)}
         </Estatico>
-        <mesh geometry={plano(8.2, 4.6)} material={MAT_TELA} position={[0, 3.75, 8.28]} rotation={[0, Math.PI, 0]} />
+        <mesh ref={tela} geometry={plano(8.2, 4.6)} material={MAT_TELA} position={[0, 3.75, 8.28]} rotation={[0, Math.PI, 0]} />
         {[-3.6, -1.2, 1.2, 3.6].map((rx) => <mesh key={rx} geometry={cilindro(0.18, 0.26, 0.4, 10)} material={MAT_REFLETOR} position={[rx, 6.25, 8.1]} rotation={[0.9, 0, 0]} />)}
         {[[-8.9, -3], [8.9, -3], [-8.9, 3.5], [8.9, 3.5]].map(([px, pz]) => <mesh key={`l${px},${pz}`} geometry={esfera(0.24, 10)} material={MAT_LAMP} position={[px, 4.3, pz]} />)}
         {[[-8.2, 8.6], [8.2, 8.6]].map(([ax, az]) => <Arvore key={ax} position={[ax, 0, az]} escala={1.25} />)}
+        {/* placa da praça no canteiro da entrada (20/11/2026): o nome do patrocinador, ou a vaga à venda */}
+        <PlacaPraca p={patro} />
         {/* feira de sábado: 3 barracas de cada lado, viradas para o corredor do meio */}
         {feira && barracas.map((b, i) => {
           const lado = i < 3 ? -1 : 1, fila = i % 3;

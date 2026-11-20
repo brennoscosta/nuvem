@@ -11,7 +11,9 @@ import { leve } from "./qualidade";
 import { ceu, texturaLuz } from "./CicloDia";
 import { type ItemInstancia } from "./Modelos";
 import { ArvoresInstanciadas, type Especie } from "./Arvores";
-import { BAIRROS, BAIRRO_DO_QUARTEIRAO, MEIO_Q, CALCADA, BORDA_CALCADA, PASSO, type Bairro, type PisoBairro } from "../data/mundo";
+import { BAIRROS, BAIRRO_DO_QUARTEIRAO, MEIO_Q, CALCADA, BORDA_CALCADA, PASSO, LOTE_POR_CHAVE, type Bairro, type PisoBairro } from "../data/mundo";
+import { PRACA_CHAVE } from "../data/praca";
+import { SEDES } from "../data/sedes";
 
 // ---------- texturas de piso (cada uma representa `metros` de chão e repete) ----------
 type Piso = PisoBairro | "ondas";
@@ -123,7 +125,32 @@ function posicoesArvores(): PosArvore[] {
     const cx = b.i * PASSO, cz = b.j * PASSO;
     for (const s of [-11, 11]) { const f = Math.sign(s) * 17; out.push({ x: cx + f, z: cz - off, b, n: n++ }, { x: cx + f, z: cz + off, b, n: n++ }, { x: cx - off, z: cz + s, b, n: n++ }, { x: cx + off, z: cz + s, b, n: n++ }); }
   }
-  return out;
+  return metadeDaRua(out);
+}
+// Metade das árvores de rua (20/11/2026, pedido do dono: "50% a menos de arborização"). Cada esquina do quarteirão fica com
+// uma das suas duas árvores, girando em volta do quarteirão (norte na esquina nordeste, leste na sudeste, sul na sudoeste,
+// oeste na noroeste): fica espalhado, sem uma calçada pelada e outra cheia. Na esquina de frente para uma sede (do outro
+// lado da rua) fica a árvore que emoldura a sede; na esquina da Praça de Eventos ficam as duas. A grade de ferro do pé
+// sai junto com a árvore.
+function metadeDaRua(todas: PosArvore[]): PosArvore[] {
+  const praca = LOTE_POR_CHAVE[PRACA_CHAVE]?.centro;
+  const emoldura = (p: PosArvore) => SEDES.some((sd) => Math.hypot(p.x - sd.x, p.z - sd.z) < 24);
+  const fica: PosArvore[] = [];
+  for (const b of BAIRROS) {
+    const cx = b.i * PASSO, cz = b.j * PASSO, off = BORDA_CALCADA - 0.6;
+    const cantos = new Map<string, PosArvore[]>();
+    for (const p of todas) if (p.b === b) { const k = `${Math.sign(p.x - cx)},${Math.sign(p.z - cz)}`; cantos.set(k, [...(cantos.get(k) ?? []), p]); }
+    for (const [k, lista] of cantos) {
+      const [sx, sz] = k.split(",").map(Number);
+      if (praca && Math.sign(praca[0] - cx) === sx && Math.sign(praca[1] - cz) === sz && Math.abs(praca[0] - cx) < PASSO / 2 && Math.abs(praca[1] - cz) < PASSO / 2) { fica.push(...lista); continue; }
+      const quadro = lista.find(emoldura);
+      // a da vez no giro: o lado norte (z = cz - off) no nordeste, o leste no sudeste, o sul no sudoeste e o oeste no noroeste
+      const daVez = lista.find((p) => (sx > 0 && sz < 0 ? Math.abs(p.z - (cz - off)) < 0.01 : sx > 0 ? Math.abs(p.x - (cx + off)) < 0.01 : sz > 0 ? Math.abs(p.z - (cz + off)) < 0.01 : Math.abs(p.x - (cx - off)) < 0.01));
+      const escolhida = quadro ?? daVez ?? lista[0];
+      if (escolhida) fica.push(escolhida);
+    }
+  }
+  return fica;
 }
 const MAT_GRADE = new THREE.MeshStandardMaterial({ color: "#3A3F47", roughness: 0.6, metalness: 0.3 });
 const GEO_GRADE = caixa(1.1, 0.06, 1.1);
@@ -149,7 +176,7 @@ export function ArvoresDeRua() {
   return (
     <group>
       <instancedMesh ref={refGrade} args={[GEO_GRADE, MAT_GRADE, grades.length]} receiveShadow />
-      {porEspecie.map(([e, itens]) => <ArvoresInstanciadas key={e} especie={e} itens={itens} />)}
+      {porEspecie.map(([e, itens]) => <ArvoresInstanciadas key={e} especie={e} itens={itens} grupo="rua" />)}
     </group>
   );
 }

@@ -3,8 +3,12 @@
 // cena (onde vai o letreiro, a vitrine, o topo da cobertura), pelo painel (andares possíveis) e pelo balão (altura).
 // Coordenadas locais do lote: centro (0, 0), frente para -z (rua), x positivo = esquerda de quem olha a fachada.
 // O lote tem 20 × 20 m: o prédio fica entre x ±9,2 e z de -7,6 a 9,2 (a calçada da frente é da decoração do lote).
-export type KitId = "comercial" | "torre" | "esquina" | "logistico" | "industrial" | "coworking" | "cafeteria" | "consultorio";
-export const KIT_IDS: KitId[] = ["comercial", "torre", "esquina", "logistico", "industrial", "coworking", "cafeteria", "consultorio"];
+// 20/11/2026 (pedido do dono: "padronizar visual de prédios de empresas, criar modelos padrões"): mais 7 tipos para o
+// catálogo de 15 modelos (data/modelos.ts): escritório básico, moderno com varanda, estúdio de vídeo, auditório,
+// mercadinho, galeria e escola.
+export type KitId = "comercial" | "torre" | "esquina" | "logistico" | "industrial" | "coworking" | "cafeteria" | "consultorio"
+  | "basico" | "varanda" | "estudio" | "auditorio" | "mercado" | "galeria" | "escola";
+export const KIT_IDS: KitId[] = ["comercial", "torre", "esquina", "logistico", "industrial", "coworking", "cafeteria", "consultorio", "basico", "varanda", "estudio", "auditorio", "mercado", "galeria", "escola"];
 export const ehKit = (id: string): id is KitId => (KIT_IDS as string[]).includes(id);
 
 // andares: base (como o tipo nasce), mínimo e máximo que o dono pode escolher (no galpão é o anexo de escritório)
@@ -12,6 +16,8 @@ export const KIT_ANDARES: Record<KitId, { base: number; min: number; max: number
   comercial: { base: 3, min: 3, max: 5 }, torre: { base: 8, min: 6, max: 12 }, esquina: { base: 2, min: 1, max: 3 },
   logistico: { base: 2, min: 1, max: 3 }, industrial: { base: 2, min: 1, max: 3 }, coworking: { base: 2, min: 1, max: 4 },
   cafeteria: { base: 1, min: 1, max: 2 }, consultorio: { base: 2, min: 1, max: 3 },
+  basico: { base: 2, min: 1, max: 3 }, varanda: { base: 3, min: 2, max: 5 }, estudio: { base: 2, min: 1, max: 3 }, auditorio: { base: 1, min: 1, max: 2 },
+  mercado: { base: 1, min: 1, max: 2 }, galeria: { base: 2, min: 1, max: 3 }, escola: { base: 2, min: 2, max: 4 },
 };
 
 export interface MedidasKit {
@@ -24,16 +30,29 @@ export interface MedidasKit {
   frenteZ: number; // o que mais avança na frente (marquise, deck, rampa): peça da área e inauguração ficam à frente disso
   vitrine: { x: number; y: number }[]; // onde os cartazes da vitrine ficam no vidro do térreo
   anexo?: { x0: number; x1: number; z0: number; z1: number; h: number }; // escritório na frente do galpão
+  telao?: { x: number; y0: number; y1: number; largura: number; z: number }; // telão de LED na fachada (estúdio de vídeo)
 }
 
 // toldo de lona embaixo do letreiro: só onde não há marquise, pérgola ou cobertura metálica na entrada
-export const KIT_TOLDO: Record<KitId, boolean> = { comercial: false, torre: false, esquina: false, logistico: true, industrial: true, coworking: false, cafeteria: true, consultorio: false };
+export const KIT_TOLDO: Record<KitId, boolean> = { comercial: false, torre: false, esquina: false, logistico: true, industrial: true, coworking: false, cafeteria: true, consultorio: false,
+  basico: true, varanda: false, estudio: false, auditorio: false, mercado: false, galeria: false, escola: false };
 
 const clampN = (id: KitId, n: number) => Math.max(KIT_ANDARES[id].min, Math.min(KIT_ANDARES[id].max, Math.round(n) || KIT_ANDARES[id].base));
 
 // cobertura: sem cobertura especial a café tem telhado de barro; com terraço, jardim etc. vira laje
-export function medidasKit(id: KitId, andares: number, duplo: boolean, coberturaPlana = false): MedidasKit {
-  const n = clampN(id, andares);
+// Sede (20/11/2026): as 4 sedes usam modelos do catálogo na planta delas (16 x 13 m; no desenho do kit a fachada da frente
+// fica em z = -4,8 e o grupo gira meia volta para a frente +z da sede: data/onestate.ts › SEDE). O prédio é o mesmo do
+// cliente, só com a largura e o fundo da sede; o que fica na frente (letreiro, vitrine, marquise) acompanha a fachada.
+export const PLANTA_SEDE = { w: 16, z0: -4.8, z1: 8.2 };
+// (na sede vale o número de andares da sede, sem os limites do tipo: a Social RP tem 4 andares na torre de vidro)
+export function medidasKit(id: KitId, andares: number, duplo: boolean, coberturaPlana = false, sede = false, semLimite = false): MedidasKit {
+  if (sede) {
+    const m = medidasKit(id, andares, false, coberturaPlana, false, true), P = PLANTA_SEDE, dz = P.z0 - m.z0, k = P.w / m.w;
+    return { ...m, w: P.w, z0: P.z0, z1: P.z1, topo: { ...m.topo, w: P.w - (m.w - m.topo.w), d: P.z1 - P.z0 - (m.z1 - m.z0 - m.topo.d), cz: (P.z0 + P.z1) / 2 },
+      letreiro: { ...m.letreiro, z: m.letreiro.z + dz }, vidroZ: m.vidroZ + dz, frenteZ: m.frenteZ + dz, vitrine: m.vitrine.map((v) => ({ x: v.x * k, y: v.y })),
+      telao: m.telao ? { ...m.telao, z: m.telao.z + dz, largura: m.telao.largura * k } : undefined };
+  }
+  const n = semLimite ? Math.max(1, Math.min(12, Math.round(andares) || 1)) : clampN(id, andares);
   const W = (s: number, d: number) => (duplo ? d : s);
   switch (id) {
     case "comercial": {
@@ -91,6 +110,66 @@ export function medidasKit(id: KitId, andares: number, duplo: boolean, cobertura
       return { w, z0, z1, terreo, andar, n, topo: { x: 0, y: topoY + 0.06, w: w - 1.2, d: z1 - z0 - 1.2, cz: (z0 + z1) / 2 }, altura: topoY + 1.6,
         letreiro: { x: 0, y: 4.3, z: -7.32, largura: duplo ? 8 : 6 }, vidroZ: -5.5, frenteZ: -7.95,
         vitrine: duplo ? [{ x: -3.0, y: 1.4 }, { x: -1.65, y: 1.4 }, { x: 1.65, y: 1.4 }, { x: 3.0, y: 1.4 }] : [{ x: -1.65, y: 1.4 }, { x: 1.65, y: 1.4 }] };
+    }
+    // ---- 20/11/2026: tipos novos do catálogo (data/modelos.ts) ----
+    case "basico": {
+      // caixa simples de 1 a 3 andares: térreo com vitrine e marquise, janelas em fita, platibanda
+      const w = W(13, 23), z0 = -5.6, z1 = 5.6, terreo = 3.7, andar = 3.2;
+      const topoY = terreo + (n - 1) * andar;
+      return { w, z0, z1, terreo, andar, n, topo: { x: 0, y: topoY + 0.06, w: w - 1.2, d: z1 - z0 - 1.2, cz: 0 }, altura: topoY + 1.2,
+        letreiro: { x: 0, y: 3.78, z: z0 - 0.62, largura: duplo ? 9 : 6.4 }, vidroZ: z0 - 0.12, frenteZ: z0 - 1.3,
+        vitrine: duplo ? [{ x: -8.5, y: 1.4 }, { x: -7.1, y: 1.4 }, { x: 7.1, y: 1.4 }, { x: 8.5, y: 1.4 }] : [{ x: -4.6, y: 1.4 }, { x: -3.2, y: 1.4 }, { x: 3.2, y: 1.4 }, { x: 4.6, y: 1.4 }] };
+    }
+    case "varanda": {
+      // moderno com varanda: térreo de vidro e varandas de vidro em balanço na frente de cada andar
+      const w = W(14, 24), z0 = -5.2, z1 = 6.0, terreo = 4.0, andar = 3.3;
+      const topoY = terreo + (n - 1) * andar;
+      return { w, z0, z1, terreo, andar, n, topo: { x: 0, y: topoY + 0.06, w: w - 1.2, d: z1 - z0 - 1.2, cz: (z0 + z1) / 2 }, altura: topoY + 1.4,
+        letreiro: { x: 0, y: 3.12, z: z0 - 1.5, largura: duplo ? 9 : 6.4 }, vidroZ: z0 - 0.15, frenteZ: z0 - 1.6,
+        vitrine: duplo ? [{ x: -8.6, y: 1.45 }, { x: -7.2, y: 1.45 }, { x: 7.2, y: 1.45 }, { x: 8.6, y: 1.45 }] : [{ x: -4.9, y: 1.45 }, { x: -3.5, y: 1.45 }, { x: 3.5, y: 1.45 }, { x: 4.9, y: 1.45 }] };
+    }
+    case "estudio": {
+      // estúdio de vídeo e lives: caixa escura com telão de LED na fachada (a marca e o selo AO VIVO)
+      const w = W(15, 25), z0 = -5.8, z1 = 6.2, terreo = 4.4, andar = 3.6;
+      const topoY = terreo + (n - 1) * andar, tw = duplo ? 15 : 10.4;
+      // telão: do alto do térreo até perto do topo (com 1 andar, sobe numa moldura acima da laje)
+      const ty0 = terreo + 0.25, ty1 = Math.max(topoY - 0.35, terreo + 4.2);
+      return { w, z0, z1, terreo, andar, n, topo: { x: 0, y: topoY + 0.06, w: w - 1.2, d: z1 - z0 - 1.2, cz: (z0 + z1) / 2 }, altura: Math.max(topoY, ty1) + 1.4,
+        letreiro: { x: 0, y: 3.62, z: z0 - 1.32, largura: duplo ? 9 : 6.6 }, vidroZ: z0 - 0.12, frenteZ: z0 - 1.6,
+        telao: { x: 0, y0: ty0, y1: ty1, largura: tw, z: z0 - 0.42 },
+        vitrine: duplo ? [{ x: -8.0, y: 1.45 }, { x: 8.0, y: 1.45 }] : [{ x: -4.6, y: 1.45 }, { x: 4.6, y: 1.45 }] };
+    }
+    case "auditorio": {
+      // auditório de eventos: salão alto com foyer de vidro e marquise de cinema na entrada (o letreiro vai nela)
+      const w = W(16, 26), z0 = -4.6, z1 = 7.8, terreo = 7.6, andar = 3.4;
+      const topoY = terreo + (n - 1) * andar;
+      return { w, z0, z1, terreo, andar, n, topo: { x: 0, y: topoY + 0.06, w: w - 1.2, d: z1 - z0 - 1.2, cz: (z0 + z1) / 2 }, altura: topoY + 1.6,
+        letreiro: { x: 0, y: 4.45, z: z0 - 2.62, largura: duplo ? 10 : 7.4 }, vidroZ: z0 - 0.12, frenteZ: z0 - 2.7,
+        vitrine: duplo ? [{ x: -9.6, y: 1.5 }, { x: -8.2, y: 1.5 }, { x: 8.2, y: 1.5 }, { x: 9.6, y: 1.5 }] : [{ x: -5.6, y: 1.5 }, { x: -4.2, y: 1.5 }, { x: 4.2, y: 1.5 }, { x: 5.6, y: 1.5 }] };
+    }
+    case "mercado": {
+      // mercadinho com bancas: portas de enrolar abertas, toldo na cor da marca e bancas de frutas na calçada
+      const w = W(15, 25), z0 = -4.4, z1 = 6.4, terreo = 4.6, andar = 3.2;
+      const topoY = terreo + (n - 1) * andar;
+      return { w, z0, z1, terreo, andar, n, topo: { x: 0, y: topoY + 0.06, w: w - 1.2, d: z1 - z0 - 1.2, cz: (z0 + z1) / 2 }, altura: topoY + 1.4,
+        letreiro: { x: 0, y: 4.0, z: z0 - 0.2, largura: duplo ? 10 : 7 }, vidroZ: z0 - 0.1, frenteZ: z0 - 3.2,
+        vitrine: duplo ? [{ x: -10.2, y: 1.5 }, { x: 10.2, y: 1.5 }] : [{ x: -6.1, y: 1.5 }, { x: 6.1, y: 1.5 }] };
+    }
+    case "galeria": {
+      // galeria e showroom: vitrine de pé-direito duplo numa moldura branca, peças em pedestais lá dentro
+      const w = W(16, 26), z0 = -5.6, z1 = 6.0, terreo = 6.0, andar = 3.4;
+      const topoY = terreo + (n - 1) * andar;
+      return { w, z0, z1, terreo, andar, n, topo: { x: 0, y: topoY + 0.06, w: w - 1.2, d: z1 - z0 - 1.2, cz: (z0 + z1) / 2 }, altura: topoY + 1.2,
+        letreiro: { x: 0, y: 6.75, z: z0 - 0.62, largura: duplo ? 10 : 7.2 }, vidroZ: z0 + 0.35, frenteZ: z0 - 0.9,
+        vitrine: duplo ? [{ x: -9.4, y: 1.6 }, { x: -8.0, y: 1.6 }, { x: 8.0, y: 1.6 }, { x: 9.4, y: 1.6 }] : [{ x: -5.4, y: 1.6 }, { x: -4.0, y: 1.6 }, { x: 4.0, y: 1.6 }, { x: 5.4, y: 1.6 }] };
+    }
+    case "escola": {
+      // escola de cursos: dois a quatro andares de salas com faixas coloridas, escadaria e marquise na entrada
+      const w = W(16, 26), z0 = -5.4, z1 = 6.2, terreo = 3.8, andar = 3.4, pod = 0.45;
+      const topoY = pod + terreo + (n - 1) * andar;
+      return { w, z0, z1, terreo, andar, n, topo: { x: 0, y: topoY + 0.06, w: w - 1.2, d: z1 - z0 - 1.2, cz: (z0 + z1) / 2 }, altura: topoY + 1.4,
+        letreiro: { x: 0, y: 4.0, z: z0 - 1.72, largura: duplo ? 9 : 6.8 }, vidroZ: z0 - 0.12, frenteZ: z0 - 2.6,
+        vitrine: duplo ? [{ x: -3.2, y: 1.85 }, { x: 3.2, y: 1.85 }] : [{ x: -1.9, y: 1.85 }, { x: 1.9, y: 1.85 }] };
     }
   }
 }

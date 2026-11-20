@@ -8,7 +8,11 @@ import { useMundo, LOTE_POR_CHAVE, type EventoPraca, type BarracaFeira } from ".
 import { PRACA_CHAVE, TIPOS_BARRACA, CORES_BARRACA, DURACOES_EVENTO, PRECO_BARRACA, FEIRA_ABRE, FEIRA_FECHA, dataCurta } from "../data/praca";
 import { eventosDoMomento } from "../scene/Praca";
 import { PixAberto } from "./Lote";
+import { BotaoCobrar } from "./Cobrar";
+import { novoIdem } from "../creditosStore";
 import { FLUTUANTE, LARGO } from "./estilo";
+import { useGradeTelao } from "../telao";
+import { PRECO_TELAO_DIA, PRECO_EVENTO_DESTAQUE, PRECO_PATROCINIO, DIAS_PATROCINIO, SEGUNDOS_SLOT } from "../data/telao";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const TZ = { timeZone: "America/Sao_Paulo" } as const;
@@ -34,6 +38,7 @@ export function CartaoPraca() {
   const pixPraca = useMundo((s) => !!s.pix && s.pix.lote === PRACA_CHAVE);
   const [aba, setAba] = useState<"agenda" | "feira">("agenda");
   const agora = useAgora();
+  const grade = useGradeTelao();
   if (chave !== PRACA_CHAVE) return null;
   const { vivo } = eventosDoMomento(praca?.agenda ?? [], agora);
   const fechar = () => useMundo.getState().selecionarLote(null);
@@ -44,6 +49,7 @@ export function CartaoPraca() {
           <div className="text-[12px] font-bold text-[#0F766E]">WorkEnd · praça da cidade</div>
           <div className="text-lg font-bold">Praça de Eventos</div>
           <div className="text-xs text-[#5B6472]">Palco para lives e lançamentos · feira aos sábados, das {FEIRA_ABRE}h às {FEIRA_FECHA}h</div>
+          {grade?.patrocinio && <div className="mt-0.5 text-[11px] font-semibold text-[#0F766E]">Patrocínio: {grade.patrocinio.nome}</div>}
         </div>
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5" aria-label="Fechar"><Icone nome="fechar" tamanho={16} /></button>
       </div>
@@ -55,6 +61,11 @@ export function CartaoPraca() {
       ) : (
         <Feira barracas={praca.feira.barracas} dia={praca.feira.dia} preco={praca.feira.preco ?? PRECO_BARRACA} logado={!!usuario} podeAlugar={!!usuario && (!loteAtivo || admin)} pixAberto={pixPraca} aoMudar={carregar} />
       )}
+      {/* o telão vende (20/11/2026): anúncio de 15 s, evento em destaque e patrocínio, comprados em /app/divulgar */}
+      <div data-anuncie-telao className="mt-3 rounded-2xl border border-[#0F766E]/20 bg-[#F0FAF8] px-3 py-2.5 text-[12px] text-[#134E4A]">
+        <b>Anuncie no telão da praça:</b> {SEGUNDOS_SLOT} s na rotação por {brl(PRECO_TELAO_DIA)} por dia · evento em destaque {brl(PRECO_EVENTO_DESTAQUE)} · patrocínio da praça {brl(PRECO_PATROCINIO)} por {DIAS_PATROCINIO} dias.
+        {loteAtivo ? <a href="/app/divulgar#praca" className="ml-1 font-bold text-[#0F766E] underline">Anunciar</a> : usuario ? <span className="ml-1">É para empresas com lote ativo no mapa.</span> : <a href="/cadastro?lote=0,1,1" className="ml-1 font-bold text-[#0F766E] underline">Criar conta</a>}
+      </div>
     </div>
   );
 }
@@ -89,7 +100,7 @@ function Agenda({ agenda, agora, podeMarcar, logado, temLote, aoMudar }: { agend
               <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: e.empresa.cor }} />
               <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-[#5B6472]">
                 <span>{aoVivo ? <span className="mr-1 rounded-full bg-[#E11D48] px-1.5 py-0.5 text-[12px] font-bold text-white">ao vivo</span> : null}{quando(e)}</span>
-                {e.meu ? <button onClick={() => cancelar(e.id)} className="text-[11px] font-semibold text-[#E2575B]">Cancelar</button>
+                {e.meu ? <span className="flex gap-3">{!aoVivo && <a href={`/app/divulgar?destaque=${encodeURIComponent(e.id)}#praca`} className="text-[11px] font-bold text-[#B7791F]">Destacar · {brl(PRECO_EVENTO_DESTAQUE)}</a>}<button onClick={() => cancelar(e.id)} className="text-[11px] font-semibold text-[#E2575B]">Cancelar</button></span>
                   : !aoVivo && logado && <button onClick={() => lembrar(e.id)} aria-pressed={lembretes.includes(e.id)} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${lembretes.includes(e.id) ? "bg-[#0F766E] text-white" : "bg-[#E6F4F1] text-[#0F766E]"}`}><Icone nome="sino" tamanho={13} className="mr-1 inline align-[-3px]" />{lembretes.includes(e.id) ? "Vou ser avisado" : "Me avise"}</button>}
               </div>
               <div className="mt-0.5 font-bold leading-snug">{e.titulo}</div>
@@ -211,13 +222,13 @@ function FormBarraca({ vaga, nomeInicial, aoMudar }: { vaga: number; nomeInicial
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const muda = (p: Partial<typeof f>) => setF((x) => ({ ...x, ...p }));
-  const enviar = async () => {
+  const enviar = async (creditos = false) => {
     setErro(null); setEnviando(true);
     try {
-      const r = await fetch("/api/workend/feira", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vaga, ...f }) });
+      const r = await fetch("/api/workend/feira", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vaga, ...f, creditos, idem: novoIdem() }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setErro(j.erro ?? `Erro ${r.status}`); await aoMudar(); return; }
-      useMundo.getState().abrirPix({ id: j.id, lote: PRACA_CHAVE, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: "pendente", tipo: "barraca" });
+      await useMundo.getState().abrirCobranca(j, PRACA_CHAVE, "barraca");
       await aoMudar();
     } catch (e) { setErro((e as Error).message); } finally { setEnviando(false); }
   };
@@ -236,7 +247,7 @@ function FormBarraca({ vaga, nomeInicial, aoMudar }: { vaga: number; nomeInicial
         <label className="block text-xs font-semibold text-[#5B6472]">Instagram<input value={f.instagram} onChange={(e) => muda({ instagram: e.target.value.slice(0, 40) })} placeholder="@sualoja" className={campo} /></label>
       </div>
       {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
-      <button onClick={enviar} disabled={enviando || f.nome.trim().length < 2} className="mt-3 w-full rounded-xl bg-[#16A34A] px-3 py-2.5 text-sm font-bold text-white hover:bg-[#15803d] disabled:opacity-50">{enviando ? "Gerando o Pix…" : `Reservar e pagar ${brl(PRECO_BARRACA)} no Pix`}</button>
+      <BotaoCobrar classe="mt-3" valor={PRECO_BARRACA} rotuloPix={`Reservar e pagar ${brl(PRECO_BARRACA)} no Pix`} rotuloCreditos="Reservar com créditos" pagando={enviando || f.nome.trim().length < 2} onPagar={(c) => void enviar(c)} />
       <div className="mt-1 text-center text-[10px] text-[#5B6472]">A vaga fica guardada por 1 hora enquanto você paga.</div>
     </div>
   );

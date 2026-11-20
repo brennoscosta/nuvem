@@ -41,7 +41,7 @@ export async function gerarImagem(d: { agenteId: string; prompt: string; formato
   }
   if (!b64) throw new Error("A OpenAI não devolveu a imagem.");
   const custoBrl = custoImagemBRL(d.formato, qualidade);
-  await registrarUso({ agenteId: d.agenteId, modelo: MODELO_IMAGEM, tokensIn: 0, tokensOut: 0, custoBrl });
+  await registrarUso({ agenteId: d.agenteId, modelo: MODELO_IMAGEM, tokensIn: 0, tokensOut: 0, custoBrl, categoria: "imagem" });
   // salva como arquivo da empresa (mesma tabela dos vídeos; servido em /api/arquivos/<id>/raw)
   fs.mkdirSync(DIR_UPLOADS, { recursive: true });
   const aid = id("arq");

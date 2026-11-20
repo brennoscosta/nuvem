@@ -5,8 +5,9 @@
 // Sem estado do React para posição e rolagem: a barra mexe direto no elemento (regra do React compiler).
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Logotipo } from "./_marca";
+import { MarcaTopo } from "./_marca";
 import { Sino } from "@/office/ui/Sino";
+import { SaldoCreditos } from "@/office/ui/SaldoCreditos";
 import { Icone, type NomeIcone } from "@/office/ui/Icone";
 
 export type AtualApp = "app" | "equipe" | "encontrar" | "rede" | "admin" | "mapa" | "resultados";
@@ -67,7 +68,7 @@ export function BarraApp({ atual, email, admin }: { atual: AtualApp; email?: str
   return (
     <header ref={barra} className="cab" data-menu={menu ? "" : undefined}>
       <div className="faixa cab-linha">
-        <Link href="/" aria-label="WorkEnd, início" className="cab-logo"><Logotipo altura={22} /></Link>
+        <Link href="/" aria-label="WorkEnd, início" className="cab-logo"><MarcaTopo altura={22} /></Link>
 
         <nav className="cab-nav" aria-label="Áreas do WorkEnd">
           <div ref={trilho} className="cab-trilho" onMouseLeave={voltar}>
@@ -81,6 +82,7 @@ export function BarraApp({ atual, email, admin }: { atual: AtualApp; email?: str
         </nav>
 
         <div className="cab-direita">
+          {email && <SaldoCreditos tema="claro" />}
           {email && <Sino tema="claro" />}
           {email ? (
             <div className="cab-conta-caixa relative">
@@ -95,6 +97,7 @@ export function BarraApp({ atual, email, admin }: { atual: AtualApp; email?: str
                   <Link role="menuitem" href="/app" className="cab-pop-item"><Icone nome="escritorio" tamanho={18} />Meu escritório</Link>
                   <Link role="menuitem" href="/app/vendas" className="cab-pop-item"><Icone nome="recibo" tamanho={18} />Vendas e pedidos</Link>
                   <Link role="menuitem" href="/app/rede" className="cab-pop-item"><Icone nome="rede" tamanho={18} />Minha rede e personagem</Link>
+                  <Link role="menuitem" href="/app/perfil" className="cab-pop-item"><Icone nome="perfil" tamanho={18} />Meu perfil</Link>
                   {admin && <Link role="menuitem" href="/app/admin" className="cab-pop-item"><Icone nome="admin" tamanho={18} />Administração</Link>}
                   <button role="menuitem" type="button" onClick={() => void sairDaConta()} className="cab-pop-item cab-pop-sair"><Icone nome="sair" tamanho={18} />Sair da conta</button>
                 </div>
@@ -128,6 +131,7 @@ export function BarraApp({ atual, email, admin }: { atual: AtualApp; email?: str
               <span className="cab-avatar" aria-hidden="true">{inicial}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-[var(--muted)]">{email}</span>
               <Link href="/app/vendas" className="cab-folha-mini" onClick={() => setMenu(false)}><Icone nome="recibo" tamanho={16} />Vendas</Link>
+              <Link href="/app/perfil" className="cab-folha-mini" onClick={() => setMenu(false)}><Icone nome="perfil" tamanho={16} />Perfil</Link>
               {admin && <Link href="/app/admin" className="cab-folha-mini" onClick={() => setMenu(false)}><Icone nome="admin" tamanho={16} />Admin</Link>}
               <button type="button" onClick={() => void sairDaConta()} className="cab-folha-mini"><Icone nome="sair" tamanho={16} />Sair</button>
             </div>

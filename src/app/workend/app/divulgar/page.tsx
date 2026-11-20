@@ -10,6 +10,7 @@ import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { meta } from "../../seo";
 import { Divulgar } from "./_divulgar";
+import { AnunciarNaPraca } from "./_anunciar";
 import { numeroDaLoja, temNumero } from "@/office/data/numeroLoja";
 import { Icone } from "@/office/ui/Icone";
 
@@ -34,6 +35,7 @@ export default async function PaginaDivulgar() {
         <span className="pg-rotulo"><Icone nome="placa" tamanho={15} />Divulgar a loja</span>
         <h1>Leve gente para a sua loja</h1>
         <p className="pg-sub">Poste a imagem nos Stories e cole o adesivo no balcão. O QR Code abre a página da sua loja; cada visita entra nos seus resultados, e quem abrir uma loja pelo seu código dá desconto na sua mensalidade.</p>
+        {t?.status === "ativo" && <p className="mt-2 text-[15px]"><a href="#praca" className="font-semibold text-[var(--azul)] underline">Anunciar na cidade</a>: telão da praça, evento em destaque, patrocínio da praça e outdoors.</p>}
         </div>
       </section>
       {t && temNumero(numero) && codigo ? (
@@ -41,6 +43,7 @@ export default async function PaginaDivulgar() {
       ) : (
         <section className="faixa mt-8"><p className="max-w-[60ch] rounded-2xl bg-[#FFF4DB] px-4 py-3 text-[#7A5200]">O material de divulgação aparece quando a sua loja estiver aberta no mapa. <Link prefetch={false} href="/mundo" className="font-semibold underline">Escolher meu lote</Link></p></section>
       )}
+      {t?.status === "ativo" && <AnunciarNaPraca marca={{ empresa: t.empresaNome, cor: t.cor, logo: t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null, numero: LOTE_POR_CHAVE[t.chave]?.numero ?? null }} />}
       <div className="h-16" />
       <Rodape />
     </>

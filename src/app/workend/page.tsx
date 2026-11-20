@@ -10,7 +10,9 @@ import { LAYOUTS, MAX_SETORES, type LayoutId } from "@/office/data/escritorio";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 import { AREAS } from "@/office/data/org";
 import { Rodape, SETORES, fotoEspecialista } from "./_partes";
-import { Logotipo } from "./_marca";
+import { PessoasNaCidade } from "./_online";
+import { resumoOnline } from "@/server/online";
+import { Logotipo, MarcaTopo } from "./_marca";
 import { TituloLiquido } from "./_inicio/TituloLiquido";
 import { GaleriaPredios } from "./_inicio/GaleriaPredios";
 import { VideoExplica } from "./_inicio/VideoExplica";
@@ -42,6 +44,9 @@ const CORES_PREDIO: Record<LayoutId, [string, string]> = {
   // kit modular (13/11/2026)
   comercial: ["#EEF0F3", "#AEB7C4"], torre: ["#DDEAF6", "#7FA4C9"], esquina: ["#FBF0D9", "#E2BE73"], logistico: ["#E6ECF1", "#9BAFC0"],
   industrial: ["#F6E3DA", "#D4937A"], coworking: ["#F4E1D8", "#C98468"], cafeteria: ["#F7EBDD", "#CFA27A"], consultorio: ["#E1F3EC", "#8CCFB6"],
+  // catálogo de modelos (20/11/2026)
+  basico: ["#EEF0F3", "#B4BCC8"], varanda: ["#F3F1EC", "#C9C2B4"], estudio: ["#E4E5E8", "#6B6F78"], auditorio: ["#ECE9E3", "#A8A196"],
+  mercado: ["#FBEEDC", "#E7B36A"], galeria: ["#F2F1EE", "#BDB8AE"], escola: ["#F6EEDB", "#E2B35A"],
 };
 const EXTENSO = ["", "Um", "Dois", "Três", "Quatro", "Cinco", "Seis", "Sete", "Oito", "Nove", "Dez", "Onze", "Doze", "Treze", "Catorze", "Quinze", "Dezesseis", "Dezessete", "Dezoito", "Dezenove", "Vinte"];
 const porExtenso = (n: number) => EXTENSO[n] ?? String(n);
@@ -61,7 +66,7 @@ function Cabecalho({ logado }: { logado: boolean }) {
   return (
     <header className="wi-topo">
       <div className="faixa wi-topo-linha">
-        <Link href="/" aria-label="WorkEnd, início" className="wi-logo"><Logotipo altura={24} /></Link>
+        <Link href="/" aria-label="WorkEnd, início" className="wi-logo"><MarcaTopo altura={24} /></Link>
         <nav className="wi-nav" aria-label="Seções da página">{links.map(([h, t]) => <a key={h} href={h}>{t}</a>)}</nav>
         <div className="wi-topo-acoes">
           {logado ? <Link href="/app" className="wi-btn wi-btn-tinta wi-btn-p">Meu escritório</Link> : <><Link href="/entrar" className="wi-entrar">Entrar</Link><Link href="/cadastro" className="wi-btn wi-btn-tinta wi-btn-p">Criar conta grátis</Link></>}
@@ -96,6 +101,8 @@ export default async function Inicio() {
   const restamFundador = temBanco() ? await vagasFundador().catch(() => 0) : 0;
   // loja destaque da semana (13/11/2026): a mais visitada na semana passada
   const destaque = temBanco() ? await lojaDestaque().catch(() => null) : null;
+  // pessoas na cidade agora (20/11/2026): o número já vem na página e o navegador atualiza (app/workend/_online.tsx)
+  const online = temBanco() ? await resumoOnline().catch(() => null) : null;
   const lote = livres.length ? LOTES.find((l) => l.chave === livres[0]) ?? null : null;
   const crachas = ESPECIALISTAS_IA.map((e) => ({ id: e.id, nome: e.nome, cargo: e.cargo, cor: AREAS[e.area].cor, skill: e.skills[0]?.nome ?? "" }));
   const filas = [crachas.filter((_, i) => i % 2 === 0), crachas.filter((_, i) => i % 2 === 1)];
@@ -124,6 +131,7 @@ export default async function Inicio() {
               </div>
             </div>
             <p className="wh-vivo"><i className="wi-vivo" aria-hidden /><b><Contador valor={livres.length} /></b> de {LOTES.length} lotes livres agora <span>·</span> R$ 99 por mês <span>·</span> Pix direto no mapa</p>
+            <PessoasNaCidade inicial={online?.total ?? null} />
           </div>
           <Rolagem className="faixa wh-video">
             <div className="wc-tela">

@@ -23,6 +23,7 @@ import { InteriorSede } from "./OneStateInterior";
 import { useEscritorio } from "../store";
 import { cameraInfo } from "./CameraMundo";
 import { PALETAS, PORTICO, SX, SZ, pisosDe, logosDe, brilhoEstilos, comAlfa, CascaEstilo, TelaoEstudio, JardimSede, type Paleta } from "./SedeEstilos";
+import { SedeModelo } from "./SedeModelo";
 
 // 17/11/2026: a mesma torre serve a todas as sedes do cadastro (data/sedes.ts): cor de destaque, logo, áreas e balão de
 // cada uma; desde 19/11/2026 é desenhada em coordenadas do lote e levada para o lote de cada sede (SedeHQ).
@@ -252,7 +253,12 @@ function Logos({ fora, sede }: { fora: boolean; sede: Sede }) {
 }
 
 const cursor = (v: string) => () => { document.body.style.cursor = v; };
-export function SedeHQ({ sede }: { sede: Sede }) {
+// ?sedesAntes=1 (conferência, 20/11/2026): desenha as cascas de antes do catálogo (a bday.fm no estilo "festa"), para as
+// fotos de antes e depois
+const SEDES_ANTES = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("sedesAntes");
+const comoAntes = (s: Sede): Sede => ({ ...s, estilo: s.id === "bday" ? "festa" : s.estilo, modelo: undefined as unknown as Sede["modelo"] });
+export function SedeHQ({ sede: s0 }: { sede: Sede }) {
+  const sede = SEDES_ANTES ? comoAntes(s0) : s0;
   useFrame(({ clock }) => brilho(clock.elapsedTime));
   // vista por dentro (o mesmo botão que abre as lojas): a torre some e aparece a planta com a equipe (OneStateInterior)
   const fora = useEscritorio((s) => s.vista === "fora");
@@ -278,13 +284,18 @@ export function SedeHQ({ sede }: { sede: Sede }) {
     <group position={[sede.x, 0, sede.z]} rotation={[0, sede.rot, 0]}>
       <group {...clique}>
         <Estatico><JardimSede sede={sede} /></Estatico>
-        {/* a casca do prédio e as fachadas pintadas, juntas em poucas malhas */}
-        <Estatico visivel={fora}>
-          {sede.estilo === "classica" ? <Estrutura sede={sede} /> : <CascaEstilo sede={sede} />}
-          <Fachadas sede={sede} />
-        </Estatico>
-        <ComFallback fallback={null}><Logos fora={fora} sede={sede} /></ComFallback>
-        {sede.estilo === "estudio" && <group visible={fora}><ComFallback fallback={null}><TelaoEstudio sede={sede} /></ComFallback></group>}
+        {/* 20/11/2026: o prédio é um modelo do catálogo (data/modelos.ts), na cor e com a logo da sede (scene/SedeModelo.tsx).
+            A casca própria de cada estilo (abaixo) só fica para uma sede sem modelo */}
+        {sede.modelo ? <group visible={fora}><SedeModelo sede={sede} /></group> : (
+          <>
+            <Estatico visivel={fora}>
+              {sede.estilo === "classica" ? <Estrutura sede={sede} /> : <CascaEstilo sede={sede} />}
+              <Fachadas sede={sede} />
+            </Estatico>
+            <ComFallback fallback={null}><Logos fora={fora} sede={sede} /></ComFallback>
+            {sede.estilo === "estudio" && <group visible={fora}><ComFallback fallback={null}><TelaoEstudio sede={sede} /></ComFallback></group>}
+          </>
+        )}
         {!fora && perto && <InteriorSede sede={sede} />}
         <Balao position={[SEDE.x, alturaSede(sede) + 10.5, SEDE.z]} nome={sede.nome} cor={sede.escura} logo={sede.icone} subtitulo={`${tipo} · ${sede.areas.length} áreas`} onClick={abrir} />
       </group>

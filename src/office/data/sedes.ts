@@ -9,6 +9,8 @@
 // chaveDoLote). A Social RP é só do Layon; as outras três são divididas (titular + sócio, terreno.socios, migração 0037).
 import { cantoParaOCentro, centroLote, frenteDoLote, kDaSede } from "./mundo";
 import { AREAS_ONESTATE, CHAVE_SEDE, SITE_ONESTATE, SEDE, Z_FRENTE_SEDE, type AreaOneState } from "./onestate";
+import { MODELO, type IdModelo } from "./modelos";
+import { medidasKit } from "./predios";
 
 export type AreaSede = AreaOneState;
 // prédio de cada sede (17/11/2026, pedido do dono: "quero prédios diferentes, visuais; estão todos iguais"): a planta
@@ -25,7 +27,11 @@ export interface Sede {
   site: string; dominio: string; areas: AreaSede[]; tipo: string; // "roleplay", "aplicativo"…
   resumo: string; numeroLoja: number; // número usado pela recepção para o atendimento do visitante (ui/Recepcao.tsx)
   nicho: string;
-  estilo: EstiloSede; andares: number; // casca do prédio e número de andares, com o térreo (SEDE.andar = 3,4 m cada)
+  estilo: EstiloSede; andares: number; // cores do jardim e das placas (estilo) e número de andares, com o térreo
+  // 20/11/2026 (pedido do dono: "padronizar visual de prédios de empresas" e a bday.fm "parecendo um circo"): cada sede usa
+  // um modelo do catálogo (data/modelos.ts), com a cor e a logo dela, desenhado na planta da sede (scene/SedeModelo.tsx).
+  // A planta, a porta, o interior e as chaves continuam os mesmos.
+  modelo: IdModelo;
 }
 
 const a = (id: string, nome: string, href: string, cor: string): AreaSede => ({ id, nome, href, cor });
@@ -35,7 +41,7 @@ export const SEDES: Sede[] = [
     id: "socialrp", nome: "Social RP", chave: CHAVE_SEDE, i: 1, j: 1, ...noLote(1, 1),
     cor: "#D4A63A", corClara: "#F7E7B4", escura: "#14110A", logo: "/socialrp/logo.png", icone: "/socialrp/icone.png", propLogo: 240 / 809,
     site: SITE_ONESTATE, dominio: "onestatebr.com.br", areas: AREAS_ONESTATE, tipo: "roleplay",
-    resumo: "A sede da Social RP na cidade. Lá dentro, cada departamento trabalha com a sua equipe de agentes de IA.", numeroLoja: 0, nicho: "conteudo", estilo: "classica", andares: 4,
+    resumo: "A sede da Social RP na cidade. Lá dentro, cada departamento trabalha com a sua equipe de agentes de IA.", numeroLoja: 0, nicho: "conteudo", estilo: "classica", andares: 4, modelo: "torre",
   },
   {
     id: "appzone", nome: "AppZone", chave: "-1,-1,0", i: -1, j: -1, ...noLote(-1, -1),
@@ -47,7 +53,7 @@ export const SEDES: Sede[] = [
       a("categorias", "Categorias", "/", "#FB923C"), a("perfil", "Perfil", "/profile", "#E5E7EB"), a("regras", "Regras", "/", "#94A3B8"),
       a("denuncias", "Denúncias", "/report", "#EF4444"), a("privacidade", "Privacidade", "/privacidade", "#CBD5E1"),
     ],
-    resumo: "A sede da AppZone na cidade. Lá dentro, engenharia, produto e atendimento trabalham com a equipe de agentes de IA.", numeroLoja: 901, nicho: "tecnologia", estilo: "tech", andares: 4,
+    resumo: "A sede da AppZone na cidade. Lá dentro, engenharia, produto e atendimento trabalham com a equipe de agentes de IA.", numeroLoja: 901, nicho: "tecnologia", estilo: "tech", andares: 4, modelo: "corporativo",
   },
   {
     id: "bday", nome: "bday.fm", chave: "-1,1,0", i: -1, j: 1, ...noLote(-1, 1),
@@ -59,7 +65,8 @@ export const SEDES: Sede[] = [
       a("como", "Como funciona", "/#como-funciona", "#38BDF8"), a("sobre", "Sobre", "/sobre", "#E5E7EB"), a("termos", "Termos de uso", "/termos", "#94A3B8"),
       a("privacidade", "Privacidade", "/privacidade", "#CBD5E1"),
     ],
-    resumo: "A sede do bday.fm na cidade. Lá dentro, presentes, lives e parceiros trabalham com a equipe de agentes de IA.", numeroLoja: 902, nicho: "conteudo", estilo: "festa", andares: 3,
+    // 20/11/2026: saiu o estilo "festa" (cilindros, varais, bolas e letreiro de lâmpadas): moderno com varanda, sóbrio
+    resumo: "A sede do bday.fm na cidade. Lá dentro, presentes, lives e parceiros trabalham com a equipe de agentes de IA.", numeroLoja: 902, nicho: "conteudo", estilo: "tech", andares: 3, modelo: "varanda",
   },
   {
     id: "nuvcam", nome: "NUVCAM", chave: "1,-1,0", i: 1, j: -1, ...noLote(1, -1),
@@ -70,7 +77,7 @@ export const SEDES: Sede[] = [
       a("perfil", "Perfil", "/home", "#E5E7EB"), a("seguranca", "Segurança", "/termos", "#22C55E"), a("moderacao", "Moderação", "/termos", "#FACC15"),
       a("suporte", "Suporte", "/", "#60A5FA"), a("termos", "Termos de uso", "/termos", "#94A3B8"), a("privacidade", "Privacidade", "/privacidade", "#CBD5E1"),
     ],
-    resumo: "A sede do NUVCAM na cidade. Lá dentro, vídeo ao vivo, segurança e atendimento trabalham com a equipe de agentes de IA.", numeroLoja: 903, nicho: "tecnologia", estilo: "estudio", andares: 4,
+    resumo: "A sede do NUVCAM na cidade. Lá dentro, vídeo ao vivo, segurança e atendimento trabalham com a equipe de agentes de IA.", numeroLoja: 903, nicho: "tecnologia", estilo: "estudio", andares: 4, modelo: "estudio",
   },
 ];
 // o lote da sede no quarteirão (data/mundo.ts: o `null` da lista de lotes), o centro dele e o giro para a rua da frente.
@@ -106,7 +113,35 @@ export const frenteDaSede = (s: Sede, d = 6): [number, number] => paraMundoSede(
 // a sede no ponto (x, z) do mundo? (dentro do lote dela)
 export const sedeNoPonto = (x: number, z: number): Sede | null => SEDES.find((s) => Math.abs(x - s.x) < 10 && Math.abs(z - s.z) < 10) ?? null;
 // altura da torre de cada sede (até a laje do terraço; balão, logos e mini-mapa seguem esta altura)
-export const alturaSede = (s: Sede) => SEDE.andar * s.andares;
+// (desde 20/11/2026 a altura é a do modelo do catálogo na planta da sede: a laje do topo, sem platibanda)
+export const medidasSede = (s: Sede) => medidasKit(MODELO[s.modelo].base, s.andares, false, false, true);
+export const alturaSede = (s: Sede) => (s.modelo ? medidasSede(s).topo.y - 0.06 : SEDE.andar * s.andares);
+// logos da sede no modelo (scene/SedeModelo.tsx): a do alto nasce acima da coroa/platibanda de cada tipo; a da frente e a
+// do lado da rua (sede.lado). Medidas no desenho do kit (frente -z); a caixa da câmera (data/obstaculos.ts) usa as mesmas
+const BASE_LOGO: Record<string, number> = { torre: 2.75, comercial: 1.05, varanda: 1.2, estudio: 0.8 };
+export function logosModeloSede(s: Sede) {
+  const m = medidasSede(s), topo = m.topo.y - 0.06, base = topo + (BASE_LOGO[MODELO[s.modelo].base] ?? 1), d = m.z1 - m.z0;
+  const wF = Math.min(m.w * 0.62, 10), wL = Math.min(d * 0.55, 7);
+  return { m, topo, base, frente: { w: wF, h: wF * s.propLogo }, lado: { w: wL, h: wL * s.propLogo } };
+}
+// As áreas do site na fachada do modelo (20/11/2026): uma faixa acesa no alto de cada andar, com uma placa por área, nas
+// faces que dão para a rua (a frente e o lado da esquina); no estúdio a frente é do telão, então vão os dois lados.
+// Cada faixa tem 5 placas na frente e no fundo (16 m) e 4 nos lados (13 m); andar por andar até caber todas as áreas.
+export interface FaixaSede { face: FaceSede; andar: number; salas: (AreaSede | null)[] }
+const FAIXAS_SEDE = new Map<string, FaixaSede[]>();
+export function faixasDaSede(s: Sede): FaixaSede[] {
+  let r = FAIXAS_SEDE.get(s.id); if (r) return r;
+  const faces: FaceSede[] = MODELO[s.modelo].base === "estudio" ? [s.lado, outroLado(s.lado), "norte"] : ["sul", s.lado, outroLado(s.lado), "norte"];
+  const porFace = (f: FaceSede) => (f === "sul" || f === "norte" ? 5 : 4);
+  const fila = [...s.areas]; r = [];
+  // primeiro as duas primeiras faces em todos os andares; só depois as outras
+  for (const grupo of [faces.slice(0, 2), faces.slice(2)]) for (let a = 1; a < s.andares && fila.length; a++) for (const f of grupo) {
+    if (!fila.length) break;
+    const salas = Array.from({ length: porFace(f) }, () => fila.shift() ?? null);
+    r.push({ face: f, andar: a, salas });
+  }
+  FAIXAS_SEDE.set(s.id, r); return r;
+}
 // NUVCAM: os andares de cima recuam em degraus (dois degraus a partir de 7 andares, um abaixo disso)
 export const degrausEstudio = (n: number) => (n >= 7 ? 2 : 1);
 
