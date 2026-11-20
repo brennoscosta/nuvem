@@ -7,6 +7,7 @@ import { avisarRecado } from "./avisos";
 import type { Usuario } from "./usuarios";
 import { registrar } from "./eventos";
 import { NICHOS, nomeNicho } from "@/office/data/mundo";
+import { corDaBicicleta, ehVeiculo, VEL_MAX_VEICULO, type IdVeiculo, type VeiculoPublico } from "@/office/data/veiculos";
 
 export const PRECO_PERSONAGEM = 5.9; // R$/mês (promoção)
 export const PRECO_PERSONAGEM_CHEIO = 19.9;
@@ -15,8 +16,17 @@ export const SEGUNDOS_ONLINE = 25;
 export interface Redes { instagram?: string; linkedin?: string; whatsapp?: string; site?: string }
 // Perfil profissional (11/11/2026): o que a pessoa faz, para quem procura profissionais na busca (/encontrar)
 export interface Perfil { profissao: string; nicho: string; servicos: string; preco: string; local: string; portfolio: { titulo: string; url: string }[]; disponivel: boolean }
-export interface Personagem extends Perfil { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: Date | null; x: number; z: number; rot: number; destX: number | null; destZ: number | null; vel: number; vistoEm: Date | null; criadoEm: Date; acessorios: string[]; visual: Visual }
-export interface PersonagemPublico { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino: [number, number] | null; vel: number; redes?: Redes; online: boolean; perfil?: Perfil | null; reputacao?: { media: number | null; n: number }; acessorios?: string[] }
+export interface Personagem extends Perfil { usuarioId: string; nome: string; tipo: string; boneco: string; roupa: string; bio: string; redes: Redes; mostrarRedes: boolean; pagoAte: Date | null; x: number; z: number; rot: number; destX: number | null; destZ: number | null; vel: number; vistoEm: Date | null; criadoEm: Date; acessorios: string[]; visual: Visual & { veiculo?: VeiculoSalvo } }
+export interface PersonagemPublico { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; x: number; z: number; rot: number; destino: [number, number] | null; vel: number; redes?: Redes; online: boolean; perfil?: Perfil | null; reputacao?: { media: number | null; n: number }; acessorios?: string[]; veiculo?: VeiculoPublico | null }
+// bicicleta (19/11/2026, data/veiculos.ts): guardada no JSON visual, na chave "veiculo" (sem migração). A cor vem do
+// painel (PUT /api/personagem/veiculo); "em" e "parada" vêm da batida
+export interface VeiculoSalvo { cor?: string; em?: IdVeiculo | null; parada?: number[] | null } // parada: [x, z, giro, vaga 0 ou 1]
+function veiculoPublico(v: VeiculoSalvo | undefined): VeiculoPublico | null {
+  if (!v) return null;
+  const montado = ehVeiculo(v.em), pr = Array.isArray(v.parada) && v.parada.length >= 3 ? v.parada : null;
+  if (!montado && !pr) return null;
+  return { id: montado ? (v.em as IdVeiculo) : "bicicleta", cor: corDaBicicleta(v.cor), montado, parada: pr ? [pr[0], pr[1], pr[2]] : null, vaga: !!pr?.[3] };
+}
 
 const CAMPOS = () => sql`usuario_id, nome, tipo, boneco, roupa, bio, redes, mostrar_redes, pago_ate, x, z, rot, dest_x, dest_z, vel, visto_em, criado_em, profissao, nicho, servicos, preco, local, portfolio, disponivel, acessorios, visual`;
 const texto = (t: unknown, max: number, padrao = "") => (typeof t === "string" ? t.trim().slice(0, max) : padrao) || padrao;
@@ -59,7 +69,8 @@ export async function salvarPersonagem(u: Usuario, d: { nome?: string; tipo?: st
     VALUES (${u.id}, ${nome}, ${tipo.id}, ${boneco}, ${roupa}, ${texto(d.bio, 200, atual?.bio ?? "")}, ${redes}, ${d.mostrarRedes ?? atual?.mostrarRedes ?? false},
             ${pf.profissao}, ${pf.nicho}, ${pf.servicos}, ${pf.preco}, ${pf.local}, ${sql.json(pf.portfolio as never)}, ${pf.disponivel}, ${sql.json(v as never)})
     ON CONFLICT (usuario_id) DO UPDATE SET nome = EXCLUDED.nome, tipo = EXCLUDED.tipo, boneco = EXCLUDED.boneco, roupa = EXCLUDED.roupa, bio = EXCLUDED.bio, redes = EXCLUDED.redes, mostrar_redes = EXCLUDED.mostrar_redes,
-      profissao = EXCLUDED.profissao, nicho = EXCLUDED.nicho, servicos = EXCLUDED.servicos, preco = EXCLUDED.preco, local = EXCLUDED.local, portfolio = EXCLUDED.portfolio, disponivel = EXCLUDED.disponivel, visual = EXCLUDED.visual, atualizado_em = now()
+      profissao = EXCLUDED.profissao, nicho = EXCLUDED.nicho, servicos = EXCLUDED.servicos, preco = EXCLUDED.preco, local = EXCLUDED.local, portfolio = EXCLUDED.portfolio, disponivel = EXCLUDED.disponivel,
+      visual = CASE WHEN personagem.visual ? 'veiculo' THEN EXCLUDED.visual || jsonb_build_object('veiculo', personagem.visual->'veiculo') ELSE EXCLUDED.visual END, atualizado_em = now()
     RETURNING ${CAMPOS()}`;
   if (!atual) void registrar("cadastro", `${u.nome} montou o personagem "${nome}"`, { usuarioId: u.id });
   return p;
@@ -74,19 +85,34 @@ export async function reverterPersonagem(usuarioId: string, dias: number, db: ty
   await db`UPDATE personagem SET pago_ate = pago_ate - make_interval(days => ${dias}), atualizado_em = now() WHERE usuario_id = ${usuarioId} AND pago_ate IS NOT NULL`;
 }
 // Batida de presença: grava posição e devolve quem mais está online (sem o próprio)
-export async function presenca(usuarioId: string, pos: { x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number }): Promise<PersonagemPublico[]> {
+export async function presenca(usuarioId: string, pos: { x: number; z: number; rot: number; destino?: [number, number] | null; vel?: number; veiculo?: unknown; parada?: unknown }): Promise<PersonagemPublico[]> {
   await migrar();
   const lim = (n: unknown) => Math.max(-100, Math.min(100, Number(n) || 0));
   const x = lim(pos.x), z = lim(pos.z), rot = Number(pos.rot) || 0;
   const d = Array.isArray(pos.destino) && pos.destino.length === 2 ? [lim(pos.destino[0]), lim(pos.destino[1])] : null;
-  const vel = Math.max(0, Math.min(5, Number(pos.vel) || 0));
-  await sql`UPDATE personagem SET x = ${x}, z = ${z}, rot = ${rot}, dest_x = ${d ? d[0] : null}, dest_z = ${d ? d[1] : null}, vel = ${vel}, visto_em = now() WHERE usuario_id = ${usuarioId}`;
+  // de bicicleta passa dos 5 m/s de antes (a velocidade só serve para os outros desenharem o boneco andando)
+  const vel = Math.max(0, Math.min(VEL_MAX_VEICULO + 1, Number(pos.vel) || 0));
+  // bicicleta: em que veículo está e onde a bicicleta ficou parada; só grava quando muda (quem nunca usou não ganha a chave)
+  const arred = (n: unknown) => Math.round(lim(n) * 100) / 100;
+  const pr = Array.isArray(pos.parada) && pos.parada.length >= 3 ? [arred(pos.parada[0]), arred(pos.parada[1]), Math.round((Number(pos.parada[2]) || 0) * 100) / 100, pos.parada[3] ? 1 : 0] : null;
+  const ve = { em: ehVeiculo(pos.veiculo) ? pos.veiculo : null, parada: pr };
+  await sql`UPDATE personagem SET x = ${x}, z = ${z}, rot = ${rot}, dest_x = ${d ? d[0] : null}, dest_z = ${d ? d[1] : null}, vel = ${vel}, visto_em = now(),
+    visual = CASE WHEN jsonb_build_object('em', COALESCE(visual->'veiculo'->'em', 'null'::jsonb), 'parada', COALESCE(visual->'veiculo'->'parada', 'null'::jsonb)) = ${sql.json(ve as never)}::jsonb THEN visual
+      ELSE jsonb_set(visual, '{veiculo}', COALESCE(visual->'veiculo', '{}'::jsonb) || ${sql.json(ve as never)}::jsonb) END
+    WHERE usuario_id = ${usuarioId}`;
   return outrosOnline(usuarioId);
+}
+// cor da bicicleta (uma das cores de data/veiculos.ts), guardada junto do visual
+export async function escolherCorVeiculo(usuarioId: string, cor: unknown) {
+  await migrar();
+  const c = corDaBicicleta(cor);
+  await sql`UPDATE personagem SET visual = jsonb_set(visual, '{veiculo}', COALESCE(visual->'veiculo', '{}'::jsonb) || jsonb_build_object('cor', ${c}::text)), atualizado_em = now() WHERE usuario_id = ${usuarioId}`;
+  return c;
 }
 export async function outrosOnline(excetoId: string | null): Promise<PersonagemPublico[]> {
   await migrar();
   const lista = await sql<(Personagem & { usuarioNome: string })[]>`SELECT ${CAMPOS()} FROM personagem WHERE visto_em > now() - make_interval(secs => ${SEGUNDOS_ONLINE}) AND (pago_ate > now() OR usuario_id IN (SELECT id FROM usuario WHERE papel = 'admin')) AND usuario_id <> ${excetoId ?? ""} ORDER BY visto_em DESC LIMIT 200`;
-  return lista.map((p) => ({ usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, destino: p.destX != null && p.destZ != null ? [p.destX, p.destZ] as [number, number] : null, vel: p.vel ?? 0, redes: p.mostrarRedes ? p.redes : undefined, online: true, acessorios: p.acessorios ?? [] }));
+  return lista.map((p) => ({ usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, destino: p.destX != null && p.destZ != null ? [p.destX, p.destZ] as [number, number] : null, vel: p.vel ?? 0, redes: p.mostrarRedes ? p.redes : undefined, online: true, acessorios: p.acessorios ?? [], veiculo: veiculoPublico(p.visual?.veiculo) }));
 }
 export async function personagemPublico(usuarioId: string, paraId: string | null): Promise<PersonagemPublico | null> {
   await migrar();

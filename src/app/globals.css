@@ -103,6 +103,13 @@ html, body { height: 100%; background: var(--background); color: var(--foregroun
 .hud-legenda span { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border-radius: 99px; background: rgba(255,255,255,.06); font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,.7); }
 .hud-legenda i { width: 7px; height: 7px; border-radius: 50%; }
 .hud-aviso-mover { animation: hud-sobe .4s cubic-bezier(.2,.9,.3,1) both; }
+/* bicicleta (19/11/2026): botão com nome na barra da câmera, bolinha da cor e as cores do quadro */
+.hud-dock .hud-btn.hud-btn-rotulo { width: auto; padding: 0 .75rem 0 .6rem; gap: .4rem; }
+.hud-cor-bici { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 2px 6px rgba(0,0,0,.4); }
+.hud-cores-bici { display: flex; gap: 10px; margin-top: .8rem; }
+.hud-cores-bici button { width: 34px; height: 34px; border: 0; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); transition: transform .15s ease, box-shadow .15s ease; }
+.hud-cores-bici button:hover { transform: scale(1.08); }
+.hud-cores-bici button[aria-pressed="true"] { box-shadow: 0 0 0 2px #0E1219, 0 0 0 4px #fff; }
 .hud-so-pc { display: none; }
 @media (min-width: 640px) { .hud-so-pc { display: inline-flex; } }
 @media (max-width: 639px) { .hud-rotulo { display: none; } .hud-preco { display: none; } }

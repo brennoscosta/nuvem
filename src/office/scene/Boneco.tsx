@@ -12,7 +12,7 @@ import { leve } from "./qualidade";
 import type { Boneco as BonecoDef } from "../data/bonecos";
 import { ACESSORIO_POR_ID, limparEquipados } from "../data/acessorios";
 
-export type Pose = "idle" | "walk" | "sit" | "type" | "celebrate" | "think" | "blocked" | "carry";
+export type Pose = "idle" | "walk" | "sit" | "type" | "celebrate" | "think" | "blocked" | "carry" | "pedal";
 
 const OSSOS = ["hips", "spine", "chest", "head", "upperArmL", "lowerArmL", "handL", "upperArmR", "lowerArmR", "handR", "upperLegL", "lowerLegL", "footL", "upperLegR", "lowerLegR", "footR"] as const;
 type Osso = (typeof OSSOS)[number];
@@ -23,6 +23,16 @@ export interface BonecoHandle { ossos: Ossos; raiz: THREE.Group | null }
 const D = Math.PI / 180;
 const tmpE = new THREE.Euler();
 
+// de bicicleta (19/11/2026): sentado no selim, tronco para a frente e as mãos no guidão. Não muda com o tempo (um objeto
+// só, nada criado por quadro). As pernas daqui são só o ponto de partida: scene/Bicicleta.tsx põe os pés nos pedais a
+// cada quadro (o giro dos pedais vem do quanto andou)
+const POSE_PEDAL: Partial<Record<Osso, [number, number, number]>> & { hipsY?: number } = {
+  hipsY: 0.035,
+  spine: [18, 0, 0], chest: [12, 0, 0], head: [-24, 0, 0],
+  upperArmL: [-56, 0, 2], lowerArmL: [-37, 0, 0], handL: [-12, 0, 0],
+  upperArmR: [-56, 0, -2], lowerArmR: [-37, 0, 0], handR: [-12, 0, 0],
+  upperLegL: [-60, 0, 0], lowerLegL: [70, 0, 0], upperLegR: [-60, 0, 0], lowerLegR: [70, 0, 0],
+};
 // Pose alvo (graus) por osso. Oscilações usam t (segundos).
 function alvo(pose: Pose, t: number, fase: number): Partial<Record<Osso, [number, number, number]>> & { hipsY?: number } {
   const s = (f: number, a: number, o = 0) => Math.sin(t * f + fase + o) * a;
@@ -61,6 +71,7 @@ function alvo(pose: Pose, t: number, fase: number): Partial<Record<Osso, [number
       return { upperArmR: [-72, -25, 20], lowerArmR: [-118, 0, 0], handR: [0, 0, -30], upperArmL: [0, 0, 8], head: [8 + s(1.3, 3), 14, 10], spine: [3, 0, 0] };
     case "blocked":
       return { upperArmL: [-30, 0, -40], upperArmR: [-30, 0, 40], lowerArmL: [-40, 0, -20], lowerArmR: [-40, 0, 20], head: [-6, s(5, 14), 0], spine: [2, 0, 0] };
+    case "pedal": return POSE_PEDAL;
     case "carry":
       return { upperArmL: [-70, 0, -8], upperArmR: [-70, 0, 8], lowerArmL: [-45, 0, 0], lowerArmR: [-45, 0, 0], spine: [-4, 0, 0], head: [6, 0, 0] };
     default: // idle

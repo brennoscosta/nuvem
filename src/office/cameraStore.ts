@@ -22,7 +22,7 @@ export const useCamera = create<EstadoCamera>((set) => ({
 export const ATALHOS: [string, string][] = [
   ["W A S D ou setas", "mover"], ["Q / E", "girar"], ["+ / −", "aproximar e afastar"], ["T", "ver de cima"], ["V", "ver da rua"],
   ["F", "seguir meu personagem"], ["P", "girar devagar"], ["O", "voo de drone pela cidade"], ["C", "andar pela rua (W A S D movem o personagem)"],
-  ["H", "voltar ao início"], ["duplo clique", "ir até o ponto"],
+  ["B", "subir ou descer da bicicleta"], ["H", "voltar ao início"], ["duplo clique", "ir até o ponto"],
 ];
 
 // joystick da tela no celular (modo andar): direção de -1 a 1, escrita pela interface e lida pela cena a cada quadro

@@ -3,6 +3,9 @@
 // (chegam na batida; deslizam até a posição nova). Todo personagem tem um balãozinho com o nome; clicar num outro
 // abre a ficha com as opções (conversa, chat ao vivo, negócios, redes sociais). Desde 12/11/2026 cada um aparece com as
 // roupas e acessórios que comprou (boné, óculos, mochila…), desenhados em scene/Boneco.tsx.
+// 19/11/2026: bicicleta (data/veiculos.ts e scene/Bicicleta.tsx). De bicicleta ele anda 2,5 vezes mais rápido, pelos
+// mesmos caminhos; ao entrar num prédio para na vaga ao lado da porta, desce e segue a pé; ao sair, passa pela vaga e sobe.
+// Os outros veem (o estado vai na batida) e aparecem pedalando para mim.
 import * as THREE from "three";
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -15,6 +18,8 @@ import { usePersonagem, minhaPos, type Outro } from "../personagemStore";
 import { modoMundo, useMundo } from "../mundoStore";
 import { useEscritorio } from "../store";
 import { sedeDe } from "../data/sedes";
+import { VEICULOS } from "../data/veiculos";
+import { Bicicleta, BicicletaParada, SombraAlongada, usePedalar, bicicletasNaCena, type BicicletaHandle } from "./Bicicleta";
 
 // entrar e sair dos prédios (17/11/2026): marcos do caminho (calçada da porta, porta e balcão), ver personagemStore.ts
 const perto = (a: readonly [number, number], b: readonly [number, number], r = 0.7) => Math.hypot(a[0] - b[0], a[1] - b[1]) < r;
@@ -66,35 +71,64 @@ function Meu() {
   const meu = usePersonagem((s) => s.meu);
   const ativo = usePersonagem((s) => s.ativo);
   const destino = usePersonagem((s) => s.destino);
+  const veiculo = usePersonagem((s) => s.veiculo);
+  const corBici = usePersonagem((s) => s.corBicicleta);
   const g = useRef<THREE.Group>(null);
+  const inclina = useRef<THREE.Group>(null); // boneco + bicicleta: deita um pouco nas curvas
   const h = useRef<BonecoHandle>(null);
+  const bike = useRef<BicicletaHandle>(null);
   const vel = useRef(0); // velocidade atual (m/s), acelera e freia
   const paradoDesde = useRef(0); // 0 = marca na primeira frame; passeia sozinho depois de um tempo parado
+  const pausaAte = useRef(0); // descendo ou subindo na bicicleta: fica parado um instante
   const fase = useMemo(() => 1.3, []);
-  useAnimacao(h, () => (vel.current > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base);
+  useAnimacao(h, () => (usePersonagem.getState().veiculo ? "pedal" : vel.current > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base);
+  usePedalar(h, g, inclina, bike, () => !!usePersonagem.getState().veiculo);
   // posição inicial: a salva no servidor (encostada na calçada, nunca no meio da rua)
   useEffect(() => { if (g.current && meu) { const [x, z] = pontoNaCalcada(meu.x, meu.z); g.current.position.set(x, 0, z); g.current.rotation.y = meu.rot; usePersonagem.getState().setPosicao(x, z, meu.rot); } }, [meu?.usuarioId, ativo]); // eslint-disable-line react-hooks/exhaustive-deps
   useFrame((_, dt) => {
     const o = g.current; if (!o) return; dt = Math.min(dt, CORRER > 1 ? 0.4 : 0.1);
     const st = usePersonagem.getState();
+    const vc = st.veiculo ? VEICULOS[st.veiculo] : null;
+    // dentro do prédio não tem bicicleta: se entrou montado por outro caminho, desce ali mesmo
+    if (vc && st.predio && st.predio.fase !== "indo") usePersonagem.setState({ veiculo: null, bicicletaParada: { x: o.position.x, z: o.position.z, rot: o.rotation.y, chave: st.predio.chave }, acaoNoPonto: null });
+    // longe da bicicleta parada (mais de 20 m, na rua): ela é guardada
+    const bp = st.bicicletaParada;
+    if (bp && !st.predio && Math.hypot(bp.x - o.position.x, bp.z - o.position.z) > 20) usePersonagem.setState({ bicicletaParada: null });
+    if (performance.now() < pausaAte.current) { vel.current = 0; minhaPos.vel = 0; return; }
     if (!destino) {
-      vel.current = Math.max(0, vel.current - 8 * dt);
+      vel.current = Math.max(0, vel.current - (vc ? vc.freio * CORRER : 8) * dt);
       if (!paradoDesde.current) paradoDesde.current = performance.now();
-      // como um pedestre comum: depois de um tempo parado, dá uma volta pela calçada (um clique no chão interrompe)
-      if (performance.now() - paradoDesde.current > PAUSA_PASSEIO * 1000 && st.painel !== "chat" && !st.predio) { paradoDesde.current = performance.now(); usePersonagem.setState({ destino: passeioNaCalcada(o.position.x, o.position.z), passeio: true }); st.avisarMovimento(); }
+      // como um pedestre comum: depois de um tempo parado, dá uma volta pela calçada (um clique no chão interrompe); de
+      // bicicleta não sai passeando sozinho
+      if (performance.now() - paradoDesde.current > PAUSA_PASSEIO * 1000 && st.painel !== "chat" && !st.predio && !vc) { paradoDesde.current = performance.now(); usePersonagem.setState({ destino: passeioNaCalcada(o.position.x, o.position.z), passeio: true }); st.avisarMovimento(); }
       minhaPos.vel = 0; return;
     }
     const dx = destino[0] - o.position.x, dz = destino[1] - o.position.z; const dist = Math.hypot(dx, dz);
-    const velMax = st.passeio ? VEL_PASSEIO : VEL;
-    // freia nos últimos 60 cm do caminho (nas esquinas do meio do caminho segue sem frear), acelera no resto
+    const velMax = st.passeio ? VEL_PASSEIO : vc ? vc.vel * CORRER : VEL;
+    const acel = vc ? vc.acel * CORRER : 6, freio = vc ? vc.freio * CORRER : 8;
+    // freia nos últimos 60 cm do caminho (nas esquinas do meio do caminho segue sem frear), acelera no resto. Também para
+    // no ponto de descer ou subir na bicicleta. De bicicleta a freada começa antes, a que dá para parar sem tranco.
     const ultimo = st.rota.length === 0;
-    const alvo = dist < 0.6 && ultimo ? Math.max(0.5, velMax * (dist / 0.6)) : velMax;
-    vel.current = vel.current < alvo ? Math.min(alvo, vel.current + 6 * dt) : Math.max(alvo, vel.current - 8 * dt);
+    const acao = st.acaoNoPonto, noPonto = !!acao && perto(destino, acao.ponto, 0.05);
+    const para = ultimo || noPonto;
+    const alvo = !para ? velMax : vc ? Math.max(0.4, Math.min(velMax, Math.sqrt(2 * freio * 0.8 * dist))) : dist < 0.6 ? Math.max(0.5, velMax * (dist / 0.6)) : velMax;
+    vel.current = vel.current < alvo ? Math.min(alvo, vel.current + acel * dt) : Math.max(alvo, vel.current - freio * dt);
     // chegou numa esquina do caminho: segue para o próximo ponto (data/caminhos.ts) sem parar
-    if (!ultimo && dist < 0.35) { passouPor(destino); const [prox, ...resto] = usePersonagem.getState().rota; usePersonagem.setState({ destino: prox, rota: resto }); st.avisarMovimento(); return; }
+    if (!para && dist < 0.35) { passouPor(destino); const [prox, ...resto] = usePersonagem.getState().rota; usePersonagem.setState({ destino: prox, rota: resto }); st.avisarMovimento(); return; }
     if (dist < 0.06) {
       o.position.set(destino[0], 0, destino[1]); vel.current = 0; minhaPos.vel = 0;
       passouPor(destino);
+      if (noPonto && acao) {
+        const agora = usePersonagem.getState();
+        if (acao.acao === "descer" && agora.veiculo) usePersonagem.setState({ veiculo: null, acaoNoPonto: null, bicicletaParada: { ...(acao.parada ?? { x: o.position.x, z: o.position.z, rot: o.rotation.y, chave: null }), de: [o.position.x, o.position.z, o.rotation.y] } });
+        else if (acao.acao === "subir" && !agora.veiculo && agora.bicicletaParada && Math.hypot(agora.bicicletaParada.x - o.position.x, agora.bicicletaParada.z - o.position.z) < 2.5) {
+          o.rotation.y = agora.bicicletaParada.rot; // pega a bicicleta como ela estava
+          usePersonagem.setState({ veiculo: "bicicleta", bicicletaParada: null, acaoNoPonto: null });
+        } else usePersonagem.setState({ acaoNoPonto: null });
+        pausaAte.current = performance.now() + 450;
+        // no meio do caminho: depois do instante parado, segue para o próximo ponto
+        if (!ultimo) { const [prox, ...resto] = usePersonagem.getState().rota; usePersonagem.setState({ destino: prox, rota: resto }); minhaPos.x = o.position.x; minhaPos.z = o.position.z; minhaPos.rot = o.rotation.y; st.avisarMovimento(); return; }
+      }
       const pd = usePersonagem.getState().predio;
       if (pd && (pd.fase === "entrando" || pd.fase === "indo") && perto(destino, pd.espera, 0.4)) { o.rotation.y = pd.olhar; chegouNoBalcao(); }
       else if (pd && pd.fase === "saindo" && perto(destino, pd.fora, 0.4)) usePersonagem.setState({ predio: null, falaRecepcao: null });
@@ -103,18 +137,29 @@ function Meu() {
       return;
     }
     const p = Math.min(dist, vel.current * dt); o.position.x += (dx / dist) * p; o.position.z += (dz / dist) * p;
-    const r = Math.atan2(dx, dz); let d = r - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.rotation.y += d * Math.min(1, dt * 12);
+    const r = Math.atan2(dx, dz); let d = r - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.rotation.y += d * Math.min(1, dt * (vc ? vc.giro : 12));
     minhaPos.x = o.position.x; minhaPos.z = o.position.z; minhaPos.rot = o.rotation.y; minhaPos.vel = vel.current;
   });
   if (!meu || !ativo) return null;
   const b = def(meu.boneco);
   return (
     <group ref={g}>{/* posição só via ref: passar position= aqui faria o boneco pular de volta a cada re-render */}
-      <BonecoProcedural ref={h} def={b} camisa={meu.roupa} cracha="#FFD166" acessorios={meu.acessorios} />
-      <SombraContato r={0.36} />
+      <group ref={inclina}>
+        <BonecoProcedural ref={h} def={b} camisa={meu.roupa} cracha="#FFD166" acessorios={meu.acessorios} />
+        {veiculo === "bicicleta" && <Bicicleta ref={bike} cor={corBici} quem="minha" />}
+      </group>
+      {veiculo ? <SombraAlongada /> : <SombraContato r={0.36} />}
       <Nome nome={meu.nome} cor={meu.roupa} eu />
     </group>
   );
+}
+// a minha bicicleta parada (na vaga da porta de um prédio, com paraciclo, ou onde desci)
+function MinhaBicicletaParada() {
+  const b = usePersonagem((s) => s.bicicletaParada);
+  const cor = usePersonagem((s) => s.corBicicleta);
+  const ativo = usePersonagem((s) => s.ativo);
+  if (!b || !ativo) return null;
+  return <BicicletaParada key={`${b.x.toFixed(2)},${b.z.toFixed(2)}`} x={b.x} z={b.z} rot={b.rot} de={b.de} cor={cor} paraciclo={!!b.chave} />;
 }
 
 // Outro personagem online: anda sozinho rumo ao destino que veio na batida, na velocidade dele (não fica parado
@@ -124,21 +169,29 @@ function OutroBoneco({ o }: { o: Outro }) {
   const h = useRef<BonecoHandle>(null);
   const srv = useRef({ x: o.x, z: o.z, rot: o.rot, destino: o.destino ?? null, vel: o.vel ?? 0 });
   const vel = useRef(0);
+  const inclina = useRef<THREE.Group>(null);
+  const bike = useRef<BicicletaHandle>(null);
   const fase = useMemo(() => (o.usuarioId.charCodeAt(o.usuarioId.length - 1) % 10) / 3, [o.usuarioId]);
+  const montado = !!o.veiculo?.montado;
+  const montadoRef = useRef(montado);
+  useEffect(() => { montadoRef.current = montado; }, [montado]);
   useEffect(() => { const g0 = g.current; if (g0) { g0.position.set(o.x, 0, o.z); g0.rotation.y = o.rot; } }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     srv.current = { x: o.x, z: o.z, rot: o.rot, destino: o.destino ?? null, vel: o.vel ?? 0 };
     // divergiu demais (teleporte, aba que ficou parada): pula pra posição do servidor
     const g0 = g.current; if (g0 && Math.hypot(o.x - g0.position.x, o.z - g0.position.z) > 6) { g0.position.set(o.x, 0, o.z); g0.rotation.y = o.rot; }
   }, [o.x, o.z, o.rot, o.destino, o.vel]);
-  useAnimacao(h, () => (vel.current > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base);
+  useAnimacao(h, () => (montadoRef.current ? "pedal" : vel.current > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base);
+  usePedalar(h, g, inclina, bike, () => montadoRef.current);
   useFrame((_, dt) => {
     const g0 = g.current; if (!g0) return; dt = Math.min(dt, 0.1);
     const s = srv.current;
     // alvo: o destino dele (se está andando) ou a posição que o servidor conhece
     const alvoX = s.destino ? s.destino[0] : s.x, alvoZ = s.destino ? s.destino[1] : s.z;
     const dx = alvoX - g0.position.x, dz = alvoZ - g0.position.z; const dist = Math.hypot(dx, dz);
-    const velMax = s.destino ? Math.max(0.6, s.vel || VEL) : Math.min(VEL, Math.max(0.8, dist / 1.5)); // sem destino: só corrige a diferença
+    // de bicicleta a correção também é mais rápida (sem isso ele ficava para trás e pulava)
+    const teto = montadoRef.current ? VEICULOS.bicicleta.vel * CORRER : VEL;
+    const velMax = s.destino ? Math.max(0.6, s.vel || teto) : Math.min(teto, Math.max(0.8, dist / 1.5)); // sem destino: só corrige a diferença
     const alvoV = dist < 0.05 ? 0 : dist < 0.6 ? Math.max(0.4, velMax * (dist / 0.6)) : velMax;
     vel.current = vel.current < alvoV ? Math.min(alvoV, vel.current + 6 * dt) : Math.max(alvoV, vel.current - 8 * dt);
     if (dist > 0.05) {
@@ -151,8 +204,11 @@ function OutroBoneco({ o }: { o: Outro }) {
   useEffect(() => { const w = window as unknown as { __outros?: () => number[] }; w.__outros = () => (g.current ? [g.current.position.x, g.current.position.z] : []); }, []);
   return (
     <group ref={g}>{/* posição só via ref (ver Meu) */}
-      <BonecoProcedural ref={h} def={def(o.boneco)} camisa={o.roupa} cracha="#B8C0CC" acessorios={o.acessorios} />
-      <SombraContato r={0.36} />
+      <group ref={inclina}>
+        <BonecoProcedural ref={h} def={def(o.boneco)} camisa={o.roupa} cracha="#B8C0CC" acessorios={o.acessorios} />
+        {montado && <Bicicleta ref={bike} cor={o.veiculo?.cor ?? VEICULOS.bicicleta.cores[0].cor} quem="outros" />}
+      </group>
+      {montado ? <SombraAlongada /> : <SombraContato r={0.36} />}
       {/* área de clique (invisível) em volta do boneco */}
       <mesh position={[0, 0.6, 0]} onClick={(e) => { e.stopPropagation(); selecionar(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = ""; }}>
         <cylinderGeometry args={[0.45, 0.45, 1.3, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -173,7 +229,29 @@ function ChaoClicavel() {
   );
 }
 
+// bicicletas que os outros deixaram paradas (na porta de um prédio ou onde desceram)
+function ParadasDosOutros({ outros }: { outros: Outro[] }) {
+  return <>{outros.map((o) => { const v = o.veiculo; if (!v || v.montado || !v.parada) return null; const p = v.parada; return <BicicletaParada key={`${o.usuarioId}|${p[0]},${p[1]}`} x={p[0]} z={p[1]} rot={p[2]} cor={v.cor} paraciclo={v.vaga} />; })}</>;
+}
+
+// tecla B: sobe ou desce da bicicleta (não vale digitando num campo nem com Ctrl/Cmd/Alt)
+function useTeclaBicicleta() {
+  useEffect(() => {
+    if (!modoMundo()) return;
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "b" || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      usePersonagem.getState().alternarBicicleta();
+    };
+    window.addEventListener("keydown", tecla);
+    if (new URLSearchParams(window.location.search).has("medir")) Object.assign(window, { __bicicletas: bicicletasNaCena });
+    return () => window.removeEventListener("keydown", tecla);
+  }, []);
+}
+
 export function Personagens() {
+  useTeclaBicicleta();
   const outros = usePersonagem((s) => s.outros);
   const carregar = usePersonagem((s) => s.carregar);
   const batida = usePersonagem((s) => s.batida);
@@ -191,7 +269,9 @@ export function Personagens() {
     <group>
       <ChaoClicavel />
       <Meu />
+      <MinhaBicicletaParada />
       {outros.map((o) => <OutroBoneco key={o.usuarioId} o={o} />)}
+      <ParadasDosOutros outros={outros} />
     </group>
   );
 }

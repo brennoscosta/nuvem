@@ -4,6 +4,7 @@
 // girar, aproximar/afastar, ver de cima, ver da rua, seguir meu personagem, girar devagar, drone, andar e voltar ao início.
 // "Ajustes" junta o que antes ficava espalhado: gráficos leves/completos, mapa 3D ou simples, hora do dia e som.
 // "Como mexer" mostra o mouse e os atalhos (a frase fixa embaixo virou um aviso que some sozinho).
+// 19/11/2026: botão "Bicicleta" (ui/BotaoBicicleta.tsx) logo depois de "Andar pela rua", no computador e no celular.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useCamera, useHora, ATALHOS, joystick, type ComandoCamera, type ModoHora } from "../cameraStore";
 import { usePersonagem } from "../personagemStore";
@@ -11,6 +12,7 @@ import { modoMundo } from "../mundoStore";
 import { usarMapa2D, qualidade, escolherQualidade, escolherMapa } from "../scene/qualidade";
 import { alternarSom, assinarSom, somLigado } from "../som";
 import { Icone, type NomeIcone } from "./Icone";
+import { BotaoBicicleta, AvisoBicicleta } from "./BotaoBicicleta";
 
 // modoMundo() lê o endereço do navegador: no servidor é sempre falso. Para não dar erro de hidratação, a barra só aparece
 // depois de montar no navegador.
@@ -57,6 +59,7 @@ export function ControlesCamera() {
     <>
       <ModoCamera />
       <AvisoMover />
+      <AvisoBicicleta />
       <div ref={caixa} data-tour="camera" className="hud-ilha hud-dock pointer-events-auto absolute bottom-4 left-3 z-10 hidden sm:flex" role="toolbar" aria-label="Câmera">
         <Botao tipo="girarEsq" rotulo="Girar para a esquerda" tecla="Q" />
         <Botao tipo="girarDir" rotulo="Girar para a direita" tecla="E" />
@@ -70,6 +73,7 @@ export function ControlesCamera() {
         <Botao tipo="passeio" rotulo="Girar devagar" tecla="P" ativo={passeio} />
         <Botao tipo="drone" rotulo="Voo de drone pela cidade" tecla="O" ativo={drone} />
         <Botao tipo="andar" rotulo={personagem ? "Andar pela rua" : "Andar pela rua (crie o seu personagem)"} tecla="C" ativo={andar} />
+        <BotaoBicicleta />
         <span className="hud-sep" aria-hidden="true" />
         <Botao tipo="inicio" rotulo="Voltar ao início" tecla="H" />
         <button type="button" onClick={() => setAberto(aberto === "ajustes" ? null : "ajustes")} aria-expanded={aberto === "ajustes"} aria-label="Ajustes do mapa" className="hud-btn hud-btn-icone">
@@ -151,7 +155,7 @@ function AvisoMover() {
   );
 }
 
-// No celular: girar, voltar ao início, drone, andar e os ajustes, no canto de baixo
+// No celular: girar, voltar ao início, drone, andar, bicicleta e os ajustes, no canto de baixo
 const ROTULO_CEL: Partial<Record<ComandoCamera, string>> = { inicio: "Voltar ao início", girarEsq: "Girar para a esquerda", girarDir: "Girar para a direita", drone: "Voo de drone pela cidade", andar: "Andar pela rua com o meu personagem" };
 export function ControlesCameraCelular() {
   const pedir = useCamera((s) => s.pedir);
@@ -169,6 +173,7 @@ export function ControlesCameraCelular() {
           <Icone nome={ICONE[t]} tamanho={18} />
         </button>
       ))}
+      <BotaoBicicleta celular />
       <button type="button" onClick={() => setAjustes(!ajustes)} aria-expanded={ajustes} aria-label="Ajustes do mapa" className="hud-btn hud-btn-icone !h-9 !w-9"><Icone nome="ajustes" tamanho={18} /></button>
       {ajustes && <PainelAjustes />}
     </span>

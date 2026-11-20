@@ -189,6 +189,12 @@ function irPara(x: Ctx, e: MouseEvent, el: HTMLElement) {
 }
 
 const frenteV = new THREE.Vector3(), ladoV = new THREE.Vector3(), mov = new THREE.Vector3();
+// de bicicleta: quanto a câmera mira à frente do boneco (velocidade × atraso da perseguição, que é 1/rapidez); a pé, nada
+const frente: [number, number] = [0, 0];
+function aFrente(atraso: number): [number, number] {
+  const v = usePersonagem.getState().veiculo ? Math.min(minhaPos.vel, 8) * atraso : 0;
+  frente[0] = Math.sin(minhaPos.rot) * v; frente[1] = Math.cos(minhaPos.rot) * v; return frente;
+}
 // para onde a câmera olha (alvo no chão e direção), lido pelo mini-mapa a cada quadro (12/11/2026)
 export const cameraInfo = { x: 0, z: 0, ang: 0, pronto: false };
 function quadroDrone(x: Ctx, dt: number) {
@@ -218,11 +224,12 @@ function quadroAndar(x: Ctx, dt: number) {
   const publico = !!pd && !mundo.meus.includes(pd.chave);
   const passo = (dx: number, dz: number) => (pl ? caminharDentro(pl, minhaPos.x, minhaPos.z, dx, dz, publico) : caminhar(minhaPos.x, minhaPos.z, dx, dz));
   if (mov.lengthSq() > 0.02 && !preso) {
-    // o boneco anda até um ponto 2,6 m à frente, renovado várias vezes por segundo (a cena dele faz o arranque e a freada)
-    mov.normalize().multiplyScalar(2.6);
+    // o boneco anda até um ponto 2,6 m à frente (4,5 m de bicicleta), renovado várias vezes por segundo (a cena dele faz
+    // o arranque e a freada)
+    mov.normalize().multiplyScalar(usePersonagem.getState().veiculo ? 4.5 : 2.6);
     if (agora - x.ultimoPasso > 160 || !x.andando) {
       const destino = passo(mov.x, mov.z);
-      usePersonagem.setState(dentro && pd ? { destino, rota: [], passeio: false, predio: { ...pd, fase: "dentro" } } : { destino, rota: [], passeio: false, predio: null }); x.ultimoPasso = agora; x.andando = true;
+      usePersonagem.setState(dentro && pd ? { destino, rota: [], passeio: false, predio: { ...pd, fase: "dentro" } } : { destino, rota: [], passeio: false, predio: null, acaoNoPonto: null }); x.ultimoPasso = agora; x.andando = true;
       if (agora - x.ultimaBatida > 1500) { usePersonagem.getState().avisarMovimento(); x.ultimaBatida = agora; }
     }
   } else if (x.andando) {
@@ -233,8 +240,10 @@ function quadroAndar(x: Ctx, dt: number) {
     // parado: um "cheguei" no próprio lugar não deixa o boneco sair passeando sozinho pela calçada
     usePersonagem.setState({ destino: [minhaPos.x, minhaPos.z], rota: [], passeio: false }); x.ultimoPasso = agora;
   }
-  // a câmera acompanha o boneco (o alvo é a altura do peito dele) e mantém o ângulo que a pessoa escolheu
-  mov.set(minhaPos.x - t.x, 1.3 - t.y, minhaPos.z - t.z).multiplyScalar(Math.min(1, dt * 6));
+  // a câmera acompanha o boneco (o alvo é a altura do peito dele) e mantém o ângulo que a pessoa escolheu; de bicicleta
+  // mira um pouco à frente (ver aFrente)
+  const af = aFrente(1 / 6);
+  mov.set(minhaPos.x + af[0] - t.x, 1.3 - t.y, minhaPos.z + af[1] - t.z).multiplyScalar(Math.min(1, dt * 6));
   t.add(mov); camera.position.add(mov);
   const giro = (ks.has("q") ? 1 : 0) - (ks.has("e") ? 1 : 0);
   if (giro) { const s = esferaDe(x); s.theta += giro * 1.6 * dt; camera.position.setFromSpherical(s).add(t); }
@@ -253,9 +262,12 @@ function quadro(x: Ctx, dt: number) {
     mudou = true; if (k >= 1) x.anim = null;
   }
   if (st.andar && !a) { quadroAndar(x, dt); atualizarInfo(x); return; }
-  // seguir o personagem: o alvo acompanha e a câmera vai junto, mantendo o ângulo
+  // seguir o personagem: o alvo acompanha e a câmera vai junto, mantendo o ângulo. De bicicleta (19/11/2026) ela segue um
+  // pouco mais macia e mira à frente do boneco, na direção em que ele vai: o atraso da perseguição e a mira se anulam e o
+  // boneco fica no meio da tela, sem tranco nas arrancadas e freadas (a velocidade dele muda suave)
   if (st.seguir && !x.interagindo && !a) {
-    mov.set(minhaPos.x - t.x, 0, minhaPos.z - t.z).multiplyScalar(Math.min(1, dt * 4));
+    const bici = !!usePersonagem.getState().veiculo, af = aFrente(bici ? 1 / 3 : 0);
+    mov.set(minhaPos.x + af[0] - t.x, 0, minhaPos.z + af[1] - t.z).multiplyScalar(Math.min(1, dt * (bici ? 3 : 4)));
     if (mov.lengthSq() > 1e-6) { t.add(mov); camera.position.add(mov); mudou = true; }
   }
   // teclado: anda na direção para onde a câmera olha

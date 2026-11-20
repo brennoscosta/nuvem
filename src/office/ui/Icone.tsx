@@ -54,6 +54,8 @@ const ICONES = {
   seguir: <><circle {...T} cx="12" cy="8.6" r="2.8" /><circle cx="12" cy="8.6" r="2.8" /><path d="M7 18.6c.5-2.7 2.6-4.5 5-4.5s4.5 1.8 5 4.5M3 7V4.6A1.6 1.6 0 0 1 4.6 3H7M17 3h2.4A1.6 1.6 0 0 1 21 4.6V7M21 17v2.4a1.6 1.6 0 0 1-1.6 1.6H17M7 21H4.6A1.6 1.6 0 0 1 3 19.4V17" /></>,
   orbita: <><circle {...T} cx="12" cy="12" r="2.6" /><circle cx="12" cy="12" r="2.6" /><ellipse cx="12" cy="12" rx="9" ry="4.2" /><circle cx="19.6" cy="9.8" r="1.4" fill="currentColor" stroke="none" /></>,
   drone: <><rect {...T} x="9" y="10" width="6" height="4" rx="1.3" /><rect x="9" y="10" width="6" height="4" rx="1.3" /><path d="M9 10L7 8M15 10l2-2M9 14l-2 2M15 14l2 2" /><ellipse cx="5.6" cy="6.6" rx="2.7" ry="1.1" /><ellipse cx="18.4" cy="6.6" rx="2.7" ry="1.1" /><ellipse cx="5.6" cy="17.4" rx="2.7" ry="1.1" /><ellipse cx="18.4" cy="17.4" rx="2.7" ry="1.1" /></>,
+  // bicicleta do personagem (19/11/2026): duas rodas, quadro, selim e guidão
+  bicicleta: <><circle {...T} cx="5.8" cy="15.6" r="3.9" /><circle {...T} cx="18.2" cy="15.6" r="3.9" /><circle cx="5.8" cy="15.6" r="3.9" /><circle cx="18.2" cy="15.6" r="3.9" /><path d="M5.8 15.6L9.6 9.2h6L12 15.6H5.8M12 15.6L9.1 7.6M7.7 7.4h3M15.6 9.2l2.6 6.4M15.6 9.2l-.9-2.7h2.5" /></>,
   andar: <><circle cx="13.6" cy="4.6" r="1.8" /><path d="M12.6 8.6l-2 5 3 2.4V21M10.6 13.6L8.2 21M12.6 8.6l3 3 2.6.6M12.6 8.6L9.2 10l-1.6 3" /></>,
   casa: <><path {...T} d="M5.5 9.6V20h13V9.6L12 4.4z" /><path d="M3.5 11L12 4l8.5 7M5.5 9.6V20h5v-5.4h3V20h5V9.6" /></>,
   sol: <><circle {...T} cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6L6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4" /></>,
