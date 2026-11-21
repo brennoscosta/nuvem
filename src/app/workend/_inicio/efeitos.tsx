@@ -16,17 +16,24 @@ export function Revelar({ children, className = "", como = "div", id, style }: {
   return <Tag ref={ref as never} id={id} style={style} className={`wi-revela ${visto ? "visto" : ""} ${className}`}>{children}</Tag>;
 }
 
+// WE-05 (21/11/2026, brief): o número final vem do servidor e fica desde o primeiro quadro. Antes, ao entrar na tela, o
+// contador voltava a 0 e subia, e no celular o herói abre à vista: a primeira coisa lida era "0 de 24 lotes livres" (e,
+// com o quadro adiantado, até "-2 de 24"). Agora só anima quem estava FORA da tela ao abrir (página aberta mais abaixo),
+// e a partir da metade do valor, trocado enquanto ninguém vê; nunca parte de 0.
 export function Contador({ valor, duracao = 1200 }: { valor: number; duracao?: number }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [n, setN] = useState(valor);
   useEffect(() => {
-    const el = ref.current; if (!el || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    let raf = 0;
+    const el = ref.current; if (!el || valor <= 0 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0, primeira = true;
+    const de = Math.ceil(valor / 2);
     const io = new IntersectionObserver(([e]) => {
+      // a primeira resposta diz onde ele estava ao abrir: à vista, fica o valor final e não anima
+      if (primeira) { primeira = false; if (e.isIntersecting) { io.disconnect(); setN(valor); } else setN(de); return; }
       if (!e.isIntersecting) return; io.disconnect();
       const t0 = performance.now();
-      const passo = (t: number) => { const p = Math.min(1, (t - t0) / duracao); setN(Math.round(valor * (1 - Math.pow(1 - p, 3)))); if (p < 1) raf = requestAnimationFrame(passo); };
-      setN(0); raf = requestAnimationFrame(passo);
+      const passo = (t: number) => { const p = Math.max(0, Math.min(1, (t - t0) / duracao)); setN(Math.round(de + (valor - de) * (1 - Math.pow(1 - p, 3)))); if (p < 1) raf = requestAnimationFrame(passo); };
+      raf = requestAnimationFrame(passo);
     }, { threshold: 0.6 });
     io.observe(el);
     return () => { io.disconnect(); cancelAnimationFrame(raf); };
