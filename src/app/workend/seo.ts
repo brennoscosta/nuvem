@@ -9,7 +9,7 @@ export const OG = { url: "/workend/marca/og-workend.jpg", width: 1200, height: 6
 
 // Metadados-base (herdados por todas as páginas do site). Cada página passa título/descrição/canonical próprios.
 // imagem: a de compartilhamento da página (logo da loja ou da sede); sem ela, a imagem do WorkEnd
-export function meta(d: { titulo?: string; descricao?: string; caminho: string; indexar?: boolean; imagem?: { url: string; width?: number; height?: number; alt?: string } }): Metadata {
+export function meta(d: { titulo?: string; descricao?: string; caminho: string; indexar?: boolean; imagem?: { url: string; width?: number; height?: number; alt?: string; type?: string } }): Metadata {
   const title = d.titulo ?? TITULO;
   const description = d.descricao ?? DESCRICAO;
   const url = `${SITE}${d.caminho}`;
@@ -29,7 +29,7 @@ export function meta(d: { titulo?: string; descricao?: string; caminho: string; 
       ? { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } }
       : { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
     openGraph: { type: "website", url, siteName: NOME, locale: "pt_BR", title, description, images: [d.imagem ?? OG] },
-    twitter: { card: d.imagem ? "summary" : "summary_large_image", title, description, images: [(d.imagem ?? OG).url] },
+    twitter: { card: d.imagem && (d.imagem.width ?? 0) < 600 ? "summary" : "summary_large_image", title, description, images: [(d.imagem ?? OG).url] },
     icons: { icon: [{ url: "/workend/marca/workend-favicon.svg", type: "image/svg+xml" }, { url: "/workend/marca/workend-icone-32.png", sizes: "32x32", type: "image/png" }], apple: [{ url: "/workend/marca/workend-icone-180.png", sizes: "180x180" }], shortcut: "/workend/marca/workend-icone-32.png" },
     manifest: "/workend/manifest.webmanifest",
     formatDetection: { telephone: false, email: false, address: false },
@@ -50,4 +50,39 @@ export function jsonLdLanding() {
   const pagina = { "@type": "WebPage", "@id": `${SITE}/#page`, url: SITE, name: TITULO, description: DESCRICAO, inLanguage: "pt-BR", isPartOf: { "@id": `${SITE}/#site` }, about: { "@id": `${SITE}/#app` }, primaryImageOfPage: `${SITE}${OG.url}` };
   const video = { "@type": "VideoObject", name: "Como funciona o WorkEnd, em 1 minuto", description: "Escolher o lote no mapa, pagar no Pix, pôr a marca na fachada, montar as salas e a equipe e fazer negócio com quem está do lado.", thumbnailUrl: `${SITE}/workend/como-funciona.jpg`, contentUrl: `${SITE}/workend/como-funciona.mp4`, uploadDate: "2026-11-11", duration: "PT1M7S", inLanguage: "pt-BR" };
   return { "@context": "https://schema.org", "@graph": [org, site, app, pagina, video] };
+}
+
+// ---------- página da loja (WE-11, 21/11/2026) ----------
+// JSON-LD LocalBusiness: o tipo pelo nicho (todos são tipos de LocalBusiness no schema.org), os contatos públicos, o horário
+// da agenda da loja (quando ligada), as redes em sameAs e a nota de quem já negociou pelo WorkEnd. Endereço físico não entra:
+// a loja tem endereço na cidade 3D, e o WorkEnd não pede o endereço de rua (TODO do dono: campo de endereço, se quiser).
+const TIPO_POR_NICHO: Record<string, string> = {
+  varejo: "Store", alimentacao: "FoodEstablishment", saude: "HealthAndBeautyBusiness", beleza: "BeautySalon", financas: "FinancialService",
+  juridico: "LegalService", imoveis: "RealEstateAgent", casa: "HomeAndConstructionBusiness", eventos: "EntertainmentBusiness", turismo: "TravelAgency",
+  automotivo: "AutomotiveBusiness", tecnologia: "ProfessionalService", marketing: "ProfessionalService", consultoria: "ProfessionalService",
+  servicos: "ProfessionalService", negocios: "ProfessionalService",
+};
+const DIAS_LD = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+export interface LojaLD {
+  nome: string; caminho: string; titulo: string; descricao: string; nichoId: string; logo: string | null; imagem: string;
+  contatos: { whatsapp?: string; instagram?: string; site?: string; email?: string };
+  horarios: { dia: number; abre: string; fecha: string }[]; avaliacao: { media: number | null; n: number };
+}
+const absoluta = (u: string) => (/^https?:\/\//.test(u) ? u : `${SITE}${u}`);
+export function jsonLdLoja(d: LojaLD) {
+  const url = `${SITE}${d.caminho}`;
+  const c = d.contatos;
+  const sameAs = [c.instagram ? `https://instagram.com/${c.instagram}` : null, c.site ?? null].filter((x): x is string => !!x);
+  const loja: Record<string, unknown> = {
+    "@type": TIPO_POR_NICHO[d.nichoId] ?? "LocalBusiness", "@id": `${url}#loja`, name: d.nome, url, description: d.descricao,
+    image: [absoluta(d.imagem), ...(d.logo ? [absoluta(d.logo)] : [])],
+  };
+  if (d.logo) loja.logo = absoluta(d.logo);
+  if (c.whatsapp) loja.telephone = c.whatsapp.length <= 11 ? `+55${c.whatsapp}` : `+${c.whatsapp}`;
+  if (c.email) loja.email = c.email;
+  if (sameAs.length) loja.sameAs = sameAs;
+  if (d.horarios.length) loja.openingHoursSpecification = d.horarios.map((h) => ({ "@type": "OpeningHoursSpecification", dayOfWeek: `https://schema.org/${DIAS_LD[h.dia]}`, opens: h.abre, closes: h.fecha }));
+  if (d.avaliacao.n > 0 && d.avaliacao.media != null) loja.aggregateRating = { "@type": "AggregateRating", ratingValue: Number(d.avaliacao.media.toFixed(1)), reviewCount: d.avaliacao.n, bestRating: 5, worstRating: 1 };
+  const pagina = { "@type": "WebPage", "@id": `${url}#pagina`, url, name: d.titulo, description: d.descricao, inLanguage: "pt-BR", about: { "@id": `${url}#loja` }, isPartOf: { "@id": `${SITE}/#site` }, primaryImageOfPage: { "@type": "ImageObject", url: absoluta(d.imagem) } };
+  return { "@context": "https://schema.org", "@graph": [loja, pagina] };
 }

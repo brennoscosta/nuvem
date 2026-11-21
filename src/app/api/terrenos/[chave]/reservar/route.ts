@@ -5,6 +5,7 @@ import { LOTE_POR_CHAVE, descricaoLote } from "@/office/data/mundo";
 import { QUIOSQUE_POR_CHAVE, PRECO_QUIOSQUE, descricaoQuiosque } from "@/office/data/quiosques";
 import { usuarioAtual } from "@/server/usuarios";
 import { ok, erro, corpo } from "@/server/http";
+import { reservarEndereco } from "@/server/enderecoLoja";
 
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ chave: string }> };
@@ -18,6 +19,8 @@ export async function POST(req: Request, { params }: Ctx) {
     const ch = decodeURIComponent(chave);
     const jaTinha = await obterTerreno(ch).then((t) => !!t && t.usuarioId === u.id).catch(() => false);
     const t = await reservarTerreno(u, ch, d);
+    // endereço próprio da loja (WE-11): fica reservado na reserva; antes de a loja ir ao ar, acompanha o nome da placa
+    await reservarEndereco(u, t.empresaNome, ch);
     // e-mail só na reserva nova (editar a placa não manda de novo)
     if (!jaTinha && t.status === "reservado") {
       const info = LOTE_POR_CHAVE[ch], qk = QUIOSQUE_POR_CHAVE[ch]; // quiosque (20/11/2026): número e preço dele

@@ -1,15 +1,23 @@
 // Página pública da loja (11/11/2026): o endereço da empresa no WorkEnd para divulgar (workend.online/loja/N). Mostra o
 // que a empresa faz, contatos, equipe, avaliações de quem já negociou e a conversa com a atendente de IA.
 // Desde 12/11/2026 mostra também as vagas abertas ("Estamos contratando", com candidatura).
+// WE-11 (21/11/2026): o endereço da loja é workend.online/<slug> (src/proxy.ts reescreve para cá; regras em
+// src/server/enderecoLoja.ts); /loja/N e os endereços antigos levam a ele com redirecionamento permanente. Cada loja tem
+// título, descrição, endereço canônico, a imagem da fachada para a prévia do link (api/workend/loja/[numero]/fachada) e o
+// JSON-LD LocalBusiness (seo.ts › jsonLdLoja). O botão de WhatsApp vai para o topo.
 // 17/11/2026 (frente acabamento): visual novo (topo escuro na cor da marca, cartões brancos, celular primeiro, conversa logo
 // depois do topo) e uma versão própria para as SEDES (números 0, 901, 902, 903 — data/sedes.ts): site oficial em destaque,
 // áreas do site e os departamentos da equipe (contagem e chefe de cada um, sem o treino). Estilos em ../loja.css (.lj-).
 import type { Metadata } from "next";
+import { cache } from "react";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { LOTES } from "@/office/data/mundo";
+import { LOTES, NICHOS } from "@/office/data/mundo";
 import { QUIOSQUE_POR_NUMERO } from "@/office/data/quiosques";
-import { SEDE_POR_NUMERO, type Sede } from "@/office/data/sedes";
+import { SEDE_POR_NUMERO, SEDE_POR_ID, type Sede } from "@/office/data/sedes";
+import { faixasDoDia, paraHHMM, agendaUsavel } from "@/office/data/agenda";
+import { configDe } from "@/server/agenda";
+import { lerEndereco, numeroDaEmpresa, enderecoDaLoja, versaoFachada } from "@/server/enderecoLoja";
 import { rotuloLoja } from "@/office/data/numeroLoja";
 import { NaoEncontrada } from "../../_nao-encontrada";
 import { usuarioAtual } from "@/server/usuarios";
@@ -18,7 +26,7 @@ import { avaliacoesRecebidas } from "@/server/rede";
 import { vagasAbertas } from "@/server/cidade";
 import { ListaVagas, type VagaLista } from "../../_vagas";
 import { Topo, Rodape } from "../../_partes";
-import { meta } from "../../seo";
+import { meta, jsonLdLoja } from "../../seo";
 import { ConversaDaLoja } from "./_conversa";
 import { headers } from "next/headers";
 import { registrarVisitaDia } from "@/server/resultados";
@@ -34,35 +42,66 @@ import type { Escritorio } from "@/office/data/escritorio";
 import "../loja.css";
 
 export const dynamic = "force-dynamic";
-type Props = { params: Promise<{ numero: string }> };
+type Props = { params: Promise<{ numero: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 type Loja = NonNullable<Awaited<ReturnType<typeof carregar>>>;
 
-async function carregar(numero: string) { return lojaPublica(Number(numero) | 0).catch(() => null); }
+// generateMetadata e a página leem a loja uma vez só por requisição
+const carregar = cache(async (numero: number) => lojaPublica(numero).catch(() => null));
+// o que o endereço pede: /loja/N chega com o número; workend.online/<slug>, com o slug (sede: o id dela). Endereço antigo
+// de uma empresa leva ao atual; endereço sem loja no ar dá null
+const ehNumero = (p: string) => /^\d{1,6}$/.test(p);
+const resolver = cache(async (p: string): Promise<{ antigo: false; numero: number } | { antigo: true; atual: string } | null> => {
+  if (ehNumero(p)) return { antigo: false, numero: Number(p) };
+  const sede = SEDE_POR_ID[p]; if (sede) return { antigo: false, numero: sede.numeroLoja };
+  const e = await lerEndereco(p).catch((x: Error) => { console.error("[loja] endereço:", x.message); return null; });
+  if (!e) return null;
+  if (e.atual !== p) return { antigo: true, atual: e.atual };
+  const numero = await numeroDaEmpresa(e.empresaId).catch((x: Error) => { console.error("[loja] endereço:", x.message); return null; });
+  return numero == null ? null : { antigo: false, numero };
+});
+const enderecoDe = cache(async (l: Loja) => enderecoDaLoja(l).catch((x: Error) => { console.error("[loja] endereço:", x.message); return null; }));
+// a busca do endereço (?ind= da indicação, por exemplo) segue no redirecionamento
+async function comBusca(caminho: string, sp: Props["searchParams"]) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(await sp)) for (const x of Array.isArray(v) ? v : v != null ? [v] : []) q.append(k, x);
+  const s = q.toString(); return s ? `${caminho}?${s}` : caminho;
+}
+const imagemDaFachada = (l: Loja, slug: string | null) => ({ url: `/api/workend/loja/${l.numero}/fachada?v=${versaoFachada({ ...l, slug })}`, width: 1200, height: 630, alt: `Fachada da ${l.nome} no WorkEnd`, type: "image/jpeg" });
+const linkZap = (z: string) => `https://wa.me/${z.length <= 11 ? `55${z}` : z}`;
 const primeiraLetra = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 // a primeira frase do "Sobre" (para o topo e o compartilhamento)
 const resumoDe = (t: string, max = 200) => { const s = t.replace(/\s+/g, " ").trim(); const p = s.match(/^.{20,}?[.!?](\s|$)/)?.[0] ?? s; return p.length > max ? `${p.slice(0, max - 1).trimEnd()}…` : p.trim(); };
 
+const tituloDe = (l: Loja, sede: Sede | null) => (sede ? `${l.nome} — sede no WorkEnd` : `${l.nome} · ${l.nicho} — WorkEnd`);
+const descricaoDe = (l: Loja, sede: Sede | null) => resumoDe(l.sobre || (sede ? sede.resumo : `${l.nome} tem endereço no WorkEnd, a cidade 3D das empresas. Converse com a equipe e peça seu orçamento.`), 155);
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { numero } = await params;
-  const l = await carregar(numero);
-  if (!l) return meta({ titulo: "Loja fechada — WorkEnd", caminho: `/loja/${numero}`, indexar: false });
-  const sede = SEDE_POR_NUMERO[l.numero];
-  if (sede) return meta({ titulo: `${l.nome} — sede no WorkEnd`, descricao: resumoDe(l.sobre || sede.resumo, 155), caminho: `/loja/${numero}`, imagem: { url: sede.icone, width: 256, height: 256, alt: `Logo da ${l.nome}` } });
-  const resumo = resumoDe(l.sobre || `${l.nome} tem endereço no WorkEnd, a cidade 3D das empresas. Converse com a equipe e peça seu orçamento.`, 155);
-  return meta({ titulo: `${l.nome} · ${l.nicho} — WorkEnd`, descricao: resumo, caminho: `/loja/${numero}`, ...(l.logo ? { imagem: { url: l.logo, alt: `Logo da ${l.nome}` } } : {}) });
+  const { numero: p } = await params;
+  const r = await resolver(p);
+  const l = r && !r.antigo ? await carregar(r.numero) : null;
+  if (!l) return meta({ titulo: "Loja fechada — WorkEnd", caminho: ehNumero(p) ? `/loja/${p}` : `/${p}`, indexar: false });
+  const slug = await enderecoDe(l);
+  const sede = SEDE_POR_NUMERO[l.numero] ?? null;
+  return meta({ titulo: tituloDe(l, sede), descricao: descricaoDe(l, sede), caminho: slug ? `/${slug}` : `/loja/${l.numero}`, imagem: imagemDaFachada(l, slug) });
 }
 
-export default async function Pagina({ params }: Props) {
-  const { numero } = await params;
-  const n = Number(numero) | 0;
+export default async function Pagina({ params, searchParams }: Props) {
+  const { numero: p } = await params;
+  const r = await resolver(p);
+  if (!r) notFound();
+  if (r.antigo) permanentRedirect(await comBusca(`/${r.atual}`, searchParams));
+  const n = r.numero;
   // quiosque (20/11/2026): endereço próprio a partir de 101, com a mesma página
   const quiosque = QUIOSQUE_POR_NUMERO[n] ?? null;
   const lote = LOTES.find((x) => x.numero === n) ?? (quiosque ? { chave: quiosque.chave } : null);
   // lote duplo: o número da ampliação leva ao número da loja principal (um número só por loja, 17/11/2026)
   const t0 = lote ? await obterTerreno(lote.chave).catch(() => null) : null;
   const principal = t0?.anexoDe ? LOTES.find((x) => x.chave === t0.anexoDe) : null;
-  if (principal) permanentRedirect(`/loja/${principal.numero}`);
-  const l = await carregar(numero);
+  if (principal) { // direto para o endereço da loja principal, sem passar por /loja/N de novo
+    const lp = await carregar(principal.numero), sp = lp ? await enderecoDe(lp) : null;
+    permanentRedirect(await comBusca(sp ? `/${sp}` : `/loja/${principal.numero}`, searchParams));
+  }
+  const l = await carregar(n);
   if (!l) {
     if (!lote) notFound();
     // a loja não está aberta: endereço livre (dá para reservar) ou empresa montando o escritório
@@ -71,14 +110,17 @@ export default async function Pagina({ params }: Props) {
       ? <NaoEncontrada livre chaveLote={lote.chave} titulo={quiosque ? `O quiosque ${n} está livre` : `O lote ${n} está livre`} texto={quiosque ? "Ninguém abriu este quiosque ainda. Reserve no mapa, ponha a marca da sua empresa no toldo e tenha a atendente de IA no balcão." : "Ninguém abriu loja neste endereço ainda. Reserve no mapa e ponha a marca da sua empresa na placa, com equipe de IA atendendo quem chega."} />
       : <NaoEncontrada chaveLote={lote.chave} titulo="Esta loja não está aberta agora" texto="A empresa deste endereço está montando o escritório ou com o aluguel em dia por pagar. Enquanto isso, passeie pela cidade e conheça as outras lojas." />;
   }
+  const slug = await enderecoDe(l);
+  if (ehNumero(p) && slug) permanentRedirect(await comBusca(`/${slug}`, searchParams)); // /loja/N leva ao endereço da loja
   const u = await usuarioAtual().catch(() => null);
   // painel de resultados do dono: uma visita por pessoa por dia (o próprio dono não conta)
   void registrarVisitaDia(await headers(), { chave: l.chave, donoId: l.donoId }, u?.id ?? null, "pagina");
   const sede = SEDE_POR_NUMERO[l.numero] ?? null;
-  const [avals, vagasBrutas, terreno] = await Promise.all([
+  const [avals, vagasBrutas, terreno, agenda] = await Promise.all([
     avaliacoesRecebidas(l.donoId, 6).catch(() => []),
     vagasAbertas({ donoId: l.donoId }).catch(() => []),
     obterTerreno(l.chave).catch(() => null),
+    sede ? null : configDe(l.donoId).catch(() => null), // horário de funcionamento do JSON-LD
   ]);
   // as vagas de quem é dono de várias empresas (sedes) não se misturam: só as desta
   const vagas: VagaLista[] = vagasBrutas.filter((v) => !("chave" in v) || (v as { chave?: string }).chave === l.chave).map((v) => ({ ...v, criadoEm: new Date(v.criadoEm).toISOString() }));
@@ -86,9 +128,15 @@ export default async function Pagina({ params }: Props) {
   const promo = terreno?.promocao ?? null; // promoção na fachada (12/11/2026)
   const cor = sede?.cor ?? l.cor;
   const linkMapa = sede ? `/mundo?sede=${sede.id}` : `/mundo?lote=${encodeURIComponent(l.chave)}`;
+  // botão de WhatsApp no topo só sem atendente: com ela, o WhatsApp fica no topo da conversa (WE-14, ChatLoja) e nos contatos
+  const zap = l.contatos.whatsapp && !l.atendente ? linkZap(l.contatos.whatsapp) : null;
+  const caminho = slug ? `/${slug}` : `/loja/${l.numero}`;
+  const horarios = agenda && agendaUsavel(agenda) ? [0, 1, 2, 3, 4, 5, 6].flatMap((dia) => faixasDoDia(agenda.horarios[String(dia)]).map(([a, b]) => ({ dia, abre: paraHHMM(a), fecha: paraHHMM(b) }))) : [];
+  const ld = jsonLdLoja({ nome: l.nome, caminho, titulo: tituloDe(l, sede), descricao: descricaoDe(l, sede), nichoId: NICHOS.find((x) => x.nome === l.nicho)?.id ?? "negocios", logo: sede ? sede.icone : l.logo, imagem: imagemDaFachada(l, slug).url, contatos: l.contatos, horarios, avaliacao: l.avaliacao });
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, "\\u003c") }} />
       <Topo logado={!!u} nome={u?.nome} />
       <main className="faixa mt-4">
         <section className="pg-topo lj-topo" style={{ "--marca": cor, background: sede ? `linear-gradient(160deg, ${sede.escura}, #0E1013 75%)` : undefined } as React.CSSProperties} aria-label={l.nome}>
@@ -107,8 +155,9 @@ export default async function Pagina({ params }: Props) {
             </div>
             <div className="pg-acoes mt-5">
               {sede && <a href={sede.site} target="_blank" rel="noopener" className="btn lj-btn-marca"><Icone nome="globo" tamanho={17} />Abrir {sede.dominio}</a>}
-              <Link prefetch={false} href={`${linkMapa}&entrar=1`} className={sede ? "btn btn-linha" : "btn lj-btn-marca"}><Icone nome="casa" tamanho={17} />{sede ? "Entrar na sede" : "Entrar no prédio"}</Link>
-              <Link prefetch={false} href={linkMapa} className="btn btn-linha"><Icone nome="mapa" tamanho={17} />Ver no mapa 3D</Link>
+              {zap && !sede && <LinkRastreado numero={l.numero} tipo="whatsapp" href={zap} target="_blank" rel="noreferrer nofollow" className="btn lj-btn-marca"><Icone nome="telefone" tamanho={17} />Chamar no WhatsApp</LinkRastreado>}
+              <Link prefetch={false} href={`${linkMapa}&entrar=1`} className={sede || zap ? "btn btn-linha" : "btn lj-btn-marca"}><Icone nome="casa" tamanho={17} />{sede ? "Entrar na sede" : "Entrar no prédio"}</Link>
+              <Link prefetch={false} href={linkMapa} className="btn btn-linha"><Icone nome="mapa" tamanho={17} />Ver a loja na cidade</Link>
               <BotaoSeguir numero={l.numero} claro />
               {vagas.length > 0 && <a href="#vagas" className="btn btn-linha"><Icone nome="candidato" tamanho={17} />Contratando · {vagas.length} {vagas.length === 1 ? "vaga" : "vagas"}</a>}
               {ehDono && <Link href={`/app/equipe?lote=${encodeURIComponent(l.chave)}`} className="btn btn-linha"><Icone nome="equipe" tamanho={17} />{sede ? "Esta sede é sua · equipe" : "Esta é a sua loja · equipe"}</Link>}
@@ -151,7 +200,7 @@ export default async function Pagina({ params }: Props) {
                   <h2>Estamos contratando</h2>
                   <span className="text-sm text-[var(--tinta-2)]">{vagas.length} {vagas.length === 1 ? "vaga aberta" : "vagas abertas"} · <a href="/encontrar?tipo=vagas" className="font-semibold text-[var(--azul)] hover:underline">ver vagas de outras empresas</a></span>
                 </div>
-                <ListaVagas vagas={vagas} logado={!!u} destino={`/loja/${l.numero}#vagas`} mostrarEmpresa={false} ehDono={ehDono} />
+                <ListaVagas vagas={vagas} logado={!!u} destino={`${caminho}#vagas`} mostrarEmpresa={false} ehDono={ehDono} />
               </section>
             )}
 
@@ -243,7 +292,7 @@ function Departamentos({ e, total }: { e: Escritorio; total: number }) {
 
 function Contatos({ c, numero, site }: { c: Loja["contatos"]; numero: number; site?: string }) {
   const itens = [
-    c.whatsapp && ["WhatsApp", `https://wa.me/${c.whatsapp.length <= 11 ? `55${c.whatsapp}` : c.whatsapp}`, c.whatsapp, "whatsapp"],
+    c.whatsapp && ["WhatsApp", linkZap(c.whatsapp), c.whatsapp, "whatsapp"],
     c.instagram && ["Instagram", `https://instagram.com/${c.instagram}`, `@${c.instagram}`, "instagram"],
     (c.site || site) && ["Site", (c.site || site) as string, ((c.site || site) as string).replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""), "site"],
     c.email && ["E-mail", `mailto:${c.email}`, c.email, "email"],

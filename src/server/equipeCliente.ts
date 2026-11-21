@@ -438,6 +438,7 @@ export async function lojaPublica(numero: number) {
   const atendente = t.escritorio?.equipe.find((m) => m.papel === "atendente") ?? null;
   return {
     numero, chave: t.chave, nome: t.empresaNome, cor: t.cor, nicho: nomeNicho(t.nicho), temLogo: t.temLogo, donoId: t.usuarioId,
+    empresaId: empId, predio: t.escritorio?.layout ?? null, // endereço próprio e imagem da fachada (WE-11)
     logo: t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null,
     sobre: emp?.sobre ?? "", contatos: emp?.contatos ?? {},
     atendente: atendente ? { nome: atendente.nome, cargo: atendente.cargo, boneco: atendente.boneco, camisa: atendente.camisa, saudacao: atendente.treino?.saudacao || `Olá! Bem-vindo à ${t.empresaNome}. Em que posso ajudar?` } : null,
