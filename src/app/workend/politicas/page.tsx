@@ -1,5 +1,9 @@
 // Políticas de uso do mundo WorkEnd (texto inicial; o Brenno ajusta quando quiser).
+// 21/11/2026 (WE-06, confiança): itens 6 a 8, com quem cuida dos dados (a controladora), os direitos pela LGPD e como pedir
+// a exclusão. Dados da empresa em ../_empresa.ts: o que ainda falta (endereço, e-mail, encarregado) não aparece na tela.
+// Sem cláusula de foro, por decisão do dono (21/11/2026).
 import { Topo, Rodape } from "../_partes";
+import { EMPRESA } from "../_empresa";
 import { meta } from "../seo";
 
 export const metadata = meta({ titulo: "Políticas de uso — WorkEnd", descricao: "O que pode e o que não pode no mundo WorkEnd.", caminho: "/politicas" });
@@ -16,8 +20,29 @@ export default function Politicas() {
           <p><b>2. Nome, logo e conteúdo.</b> Não é permitido usar marcas, nomes ou logotipos de terceiros sem autorização; conteúdo ofensivo, discriminatório, sexual ou violento; nem atividade ilegal, golpe ou promessa enganosa. A empresa precisa ser sua ou você precisa ter autorização para representá-la.</p>
           <p><b>3. Um chão por conta.</b> Nesta fase cada conta pode ter um lote. Reservar outro libera a reserva anterior.</p>
           <p><b>4. Banimento.</b> O administrador do WorkEnd pode retirar do mapa qualquer imóvel que descumpra estas regras e suspender a conta do dono, sem aviso prévio em casos graves. O motivo fica registrado na conta.</p>
-          <p><b>5. Dados.</b> Guardamos nome, e-mail, nome da empresa, logo e os registros de pagamento (feitos pelo Mercado Pago; não vemos nem guardamos dados de cartão). Para apagar sua conta, escreva para contato@workend.online.</p>
-          <p className="text-[var(--tinta-2)]">Versão de 07/11/2026. Mudanças serão avisadas no painel.</p>
+          <p><b>5. Dados.</b> Guardamos nome, e-mail, nome da empresa, logo e os registros de pagamento (feitos pelo Mercado Pago; não vemos nem guardamos dados de cartão). Nos itens 6 a 8 estão quem cuida dos seus dados, os seus direitos e como pedir a exclusão.</p>
+          <p><b>6. Quem cuida dos seus dados.</b> O WorkEnd é oferecido pela {EMPRESA.razaoSocial}, inscrita no CNPJ sob o nº {EMPRESA.cnpj}. Ela é a controladora dos dados pessoais tratados no WorkEnd, ou seja, quem decide como eles são usados, nos termos da Lei Geral de Proteção de Dados Pessoais (LGPD, Lei nº 13.709/2018).{EMPRESA.endereco && <> Endereço: {EMPRESA.endereco}.</>}{EMPRESA.encarregado && <> Encarregado pelo tratamento de dados pessoais: {EMPRESA.encarregado}.</>}</p>
+          <div>
+            <p><b>7. Seus direitos.</b> Pela LGPD (art. 18), você pode pedir, a qualquer momento:</p>
+            <ul className="mt-3 list-disc space-y-1.5 pl-6">
+              <li>a confirmação de que tratamos os seus dados e o acesso a eles;</li>
+              <li>a correção de dados incompletos, errados ou desatualizados;</li>
+              <li>a anonimização, o bloqueio ou a eliminação de dados desnecessários, em excesso ou tratados em desacordo com a lei;</li>
+              <li>a portabilidade dos dados para outro fornecedor;</li>
+              <li>a eliminação dos dados tratados com o seu consentimento;</li>
+              <li>a informação sobre com quem compartilhamos os seus dados;</li>
+              <li>a informação sobre a possibilidade de não dar o consentimento e o que acontece se você não der;</li>
+              <li>a revogação do consentimento.</li>
+            </ul>
+            <p className="mt-3">Você também pode se opor a um tratamento feito sem o seu consentimento quando ele descumprir a lei, pedir a revisão de decisões tomadas só de forma automática que afetem os seus interesses (art. 20) e reclamar na Autoridade Nacional de Proteção de Dados (ANPD), pelo site <a href="https://www.gov.br/anpd" className="font-semibold text-[var(--blue-dark)] underline underline-offset-2">gov.br/anpd</a>.</p>
+          </div>
+          {/* TODO(dono), PENDÊNCIA GRAVE (LGPD, art. 18): hoje não existe canal para pedir a exclusão nem para exercer os
+              direitos do item 7. Não há botão de apagar a conta no /app, e o contato@workend.online não recebe mensagens (o
+              domínio não tem e-mail). Quando EMPRESA.email for preenchido, a frase troca sozinha para o pedido por e-mail. */}
+          <p><b>8. Como pedir a exclusão.</b> Você pode pedir a exclusão da sua conta e dos seus dados pessoais. {EMPRESA.email
+            ? <>Para isso, ou para exercer qualquer dos direitos do item 7, escreva para <a href={`mailto:${EMPRESA.email}`} className="font-semibold text-[var(--blue-dark)] underline underline-offset-2">{EMPRESA.email}</a> a partir do e-mail da sua conta.</>
+            : <>Hoje o site ainda não tem um botão para apagar a conta nem um canal de atendimento para esse pedido.</>}</p>
+          <p className="text-[var(--tinta-2)]">Versão de 21/11/2026. Mudanças serão avisadas no painel.</p>
         </div>
       </section>
       <Rodape />

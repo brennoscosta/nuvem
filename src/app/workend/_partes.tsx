@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usuarioAtual } from "@/server/usuarios";
 import { Logotipo, MarcaTopo } from "./_marca";
+import { EMPRESA, identificacao } from "./_empresa";
 import { AREAS, AREAS_OPERACIONAIS, FUNCOES, type AreaId } from "@/office/data/org";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 
@@ -33,7 +34,7 @@ export async function Rodape() {
   const logado = !!(await usuarioAtual().catch(() => null)); // quem já entrou não vê "Criar conta" nem "Entrar" (17/11/2026)
   return (
     <footer className="rodape">
-      <div className="faixa flex flex-wrap items-start gap-x-16 gap-y-7 pb-14 pt-10 text-[15px] text-[var(--muted)]">
+      <div className="faixa flex flex-wrap items-start gap-x-16 gap-y-7 pb-9 pt-10 text-[15px] text-[var(--muted)]">
         <div className="min-w-[260px] flex-[1_1_280px]">
           <div className="mb-3 py-1"><Logotipo altura={24} /></div>
           <p className="max-w-[40ch]">O endereço da sua empresa numa cidade 3D aberta 24 horas.</p>
@@ -45,10 +46,13 @@ export async function Rodape() {
           <Link href="/politicas">Políticas de uso</Link>
         </nav>
         <div className="flex flex-col gap-[11px]">
-          <a href="mailto:contato@workend.online">contato@workend.online</a>
+          {/* e-mail só quando existir (./_empresa.ts): o contato@workend.online ainda não recebe mensagens (WE-06, 21/11/2026) */}
+          {EMPRESA.email && <a href={`mailto:${EMPRESA.email}`}>{EMPRESA.email}</a>}
           <span>&copy; {new Date().getFullYear()} WorkEnd</span>
         </div>
       </div>
+      {/* quem está por trás (WE-06, 21/11/2026): razão social e CNPJ em todas as páginas públicas; dados em ./_empresa.ts */}
+      <div className="faixa rodape-legal"><p>{identificacao()}</p></div>
     </footer>
   );
 }

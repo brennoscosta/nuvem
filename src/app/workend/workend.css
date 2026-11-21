@@ -83,6 +83,8 @@
 .we .fundo-cinza { background: var(--cinza); }
 .we .rodape { border-top: 1px solid var(--linha); }
 .we .rodape a:hover { color: var(--tinta); }
+/* identificação da empresa embaixo do rodapé (WE-06, 21/11/2026, ./_partes.tsx): razão social e CNPJ */
+.we .rodape-legal { padding-block: 1.1rem 1.6rem; border-top: 1px solid var(--linha); font-size: 13.5px; color: var(--muted); overflow-wrap: anywhere; }
 
 @media (prefers-reduced-motion: reduce) { .we * { animation: none !important; transition: none !important; } }
 
