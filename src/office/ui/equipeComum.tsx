@@ -2,13 +2,15 @@
 // departamento (chefe primeiro), a linha do tempo que mistura a conversa com os pedidos internos (quem pediu o quê a quem)
 // e o texto da IA. Usado pela página Minha equipe (src/app/workend/app/equipe/_equipe.tsx) e pelo painel do mapa
 // (src/office/ui/ChatEquipe.tsx). O servidor está em src/server/equipeCliente.ts e src/server/delegacao.ts.
+// Imagens (21/11/2026): a mensagem pode trazer o cartão da imagem pedida à equipe (src/office/ui/ImagemEquipe.tsx).
+import type { CartaoImagem } from "./ImagemEquipe";
 
 export type NivelMembro = "ceo" | "diretor" | "gerente" | "analista" | "assistente";
 export type RegraEquipe = { id: string; texto: string };
 export type MembroEquipe = {
   membroId: string; nome: string; cargo: string; papel: "atendente" | "ceo" | "profissional"; setor: string; setorId: string; setorCor: string;
   nivel: NivelMembro; chefeId: string | null; temEquipe: boolean; boneco: string; camisa: string;
-  foto: string | null; especialista: { cargo: string; habilidades: string[] } | null; saudacao: string; treino: string; atendeVisitantes: boolean;
+  foto: string | null; especialista: { cargo: string; habilidades: string[] } | null; imagem?: boolean; saudacao: string; treino: string; atendeVisitantes: boolean;
   ultima: { texto: string; deQuem: "voce" | "equipe"; em: string } | null; regras: RegraEquipe[];
 };
 export type Departamento = { id: string; nome: string; cor: string };
@@ -20,13 +22,13 @@ export type PainelEquipe = {
   visitantes: { total: number; ultimas24h: number }; ia: boolean;
 };
 // autor: "dono" (você), "agente" (a própria pessoa), "chefe" (pedido interno do chefe), "equipe" (respostas da equipe juntadas)
-export type MsgEquipe = { id: string; papel: string; autor: "dono" | "agente" | "chefe" | "equipe"; deNome: string | null; conteudo: string; avaliacao: number | null; correcao: string | null; em: string };
+export type MsgEquipe = { id: string; papel: string; autor: "dono" | "agente" | "chefe" | "equipe"; deNome: string | null; conteudo: string; avaliacao: number | null; correcao: string | null; em: string; imagem?: CartaoImagem | null };
 export type TrocaInterna = {
   id: string; de: string; deNome: string; deCargo: string; para: string; paraNome: string; paraCargo: string;
   pedido: string; resposta: string | null; status: "pedido" | "respondido" | "erro"; em: string; respondidoEm: string | null; origemAgente: string | null;
   origemMensagem: string | null; tarefa: string | null; // a mensagem do dono que começou a cadeia
 };
-export type ConversaEquipe = { mensagens: MsgEquipe[]; internas: TrocaInterna[]; trabalhando: boolean };
+export type ConversaEquipe = { mensagens: MsgEquipe[]; internas: TrocaInterna[]; trabalhando: boolean; gerandoImagem?: boolean };
 export type RespostaEnvio = { mensagem: MsgEquipe; delegados: { membroId: string; nome: string; cargo: string; tarefa: string }[]; gasto: { mes: number; teto: number } };
 
 export const NIVEL_ROTULO: Record<NivelMembro, string> = { ceo: "CEO", diretor: "Diretoria", gerente: "Gerente", analista: "Analista", assistente: "Assistente" };
@@ -115,6 +117,8 @@ export function sugestoesTarefa(m: MembroEquipe, empresa: string): string[] {
   if (m.nivel === "diretor") return ["Como estão as metas de cada departamento?", "Monte a pauta da reunião de segunda"];
   if (m.temEquipe) return [`Peça para a sua equipe um plano de 30 dias da área ${m.setor}`, "Quais são os problemas da sua área agora?", "Me mande as prioridades da semana da sua equipe"];
   if (m.papel === "atendente") return ["Como você responderia quem pede preço?", "Escreva a mensagem de boas-vindas da loja", "Quais perguntas os clientes mais fazem?"];
+  // quem faz imagem (designer, social media): um pedido de foto, que mostra o custo antes de gerar
+  if (m.imagem) return [`Faça uma foto de um produto da ${empresa} para o Instagram`, ...(m.especialista?.habilidades.slice(0, 2).map((h) => `${h} para a ${empresa}`) ?? [])];
   if (m.especialista) return m.especialista.habilidades.slice(0, 3).map((h) => `${h} para a ${empresa}`);
   return [`O que você pode fazer pela ${empresa}?`, `Faça a primeira entrega do seu trabalho como ${m.cargo.toLowerCase()}`];
 }

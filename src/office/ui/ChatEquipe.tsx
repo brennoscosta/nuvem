@@ -15,6 +15,7 @@ import { useSede } from "../sedeStore";
 import { FLUTUANTE } from "./estilo";
 import { Icone } from "./Icone";
 import { EnviarPara } from "./EnviarPara";
+import { CartaoImagemEquipe } from "./ImagemEquipe";
 import {
   NIVEL_COR, NIVEL_ROTULO, agruparPorDepartamento, agruparPorTarefa, andamento, apiEquipe, brl, linhaDoTempo, quando, resumoNiveis, sugestoesTarefa, TextoIA,
   type ConversaEquipe, type GrupoTarefa, type MembroEquipe, type PainelEquipe, type RespostaEnvio, type TrocaInterna,
@@ -246,7 +247,7 @@ function Conversa({ p, chave, membro }: { p: PainelEquipe; chave: string; membro
             <p className="mt-1 text-[12.5px] text-[#5B6472]">{subs.length ? `Dê uma tarefa como daria a um funcionário. ${membro.nome} divide o trabalho com a equipe (${subs.length} ${subs.length === 1 ? "pessoa" : "pessoas"}) e entrega tudo junto aqui.` : "Dê uma tarefa como daria a um funcionário: a resposta vem com o material pronto."}</p>
           </div>
         )}
-        {itens.map((it) => it.tipo === "msg" ? <Bolha key={it.msg.id} m={it.msg} membro={membro} lote={chave} /> : (
+        {itens.map((it) => it.tipo === "msg" ? <Bolha key={it.msg.id} m={it.msg} membro={membro} lote={chave} atualizar={() => { setVersao((v) => v + 1); void atualizarPainel(); }} /> : (
           <details key={it.grupo.chave} open className="painel-entra rounded-2xl border border-black/[.07] bg-[#EEF1F5] p-2">
             <summary className="cursor-pointer select-none px-1 text-[12px] font-bold text-[#3A414C]">Pedidos internos desta tarefa · {it.grupo.prontos} de {it.grupo.total} {it.grupo.total === 1 ? "respondido" : "respondidos"}</summary>
             <ListaGrupo g={it.grupo} p={p} />
@@ -255,7 +256,7 @@ function Conversa({ p, chave, membro }: { p: PainelEquipe; chave: string; membro
         {(enviando || trabalhando) && (
           <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-[12.5px] text-[#5B6472] shadow-sm">
             <Digitando />
-            {enviando ? `${membro.nome} está lendo e organizando o pedido…` : progresso ? `A equipe está trabalhando: ${progresso.prontos} de ${progresso.total} ${progresso.total === 1 ? "pedido pronto" : "pedidos prontos"}. A entrega final chega aqui.` : `${membro.nome} está juntando as respostas da equipe…`}
+            {enviando ? `${membro.nome} está lendo e organizando o pedido…` : conv?.gerandoImagem ? "A imagem está sendo criada. Costuma levar até um minuto." : progresso ? `A equipe está trabalhando: ${progresso.prontos} de ${progresso.total} ${progresso.total === 1 ? "pedido pronto" : "pedidos prontos"}. A entrega final chega aqui.` : `${membro.nome} está juntando as respostas da equipe…`}
           </div>
         )}
       </div>
@@ -280,7 +281,7 @@ function Conversa({ p, chave, membro }: { p: PainelEquipe; chave: string; membro
   );
 }
 
-function Bolha({ m, membro, lote }: { m: ConversaEquipe["mensagens"][number]; membro: MembroEquipe; lote: string }) {
+function Bolha({ m, membro, lote, atualizar }: { m: ConversaEquipe["mensagens"][number]; membro: MembroEquipe; lote: string; atualizar: () => void }) {
   const [copiado, setCopiado] = useState(false);
   if (m.autor === "dono") return <div className="painel-entra ml-auto max-w-[82%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-[#1D4ED8] px-3.5 py-2 text-[13.5px] text-white">{m.conteudo}</div>;
   if (m.autor === "chefe") return (
@@ -300,6 +301,7 @@ function Bolha({ m, membro, lote }: { m: ConversaEquipe["mensagens"][number]; me
       <Avatar m={membro} tamanho={26} />
       <div className="min-w-0 flex-1">
         <div className="rounded-2xl rounded-tl-md bg-white px-3.5 py-2.5 text-[13.5px] text-[#1D2128] shadow-sm"><TextoIA t={m.conteudo} /></div>
+        {m.imagem && <CartaoImagemEquipe c={m.imagem} lote={lote} atualizar={atualizar} />}
         <div className="mt-0.5 flex items-center gap-2 pl-1 text-[11px] text-[#7A828E]">
           <span>{quando(m.em)}</span>
           <button type="button" onClick={() => { void navigator.clipboard?.writeText(m.conteudo); setCopiado(true); setTimeout(() => setCopiado(false), 1500); }} className="font-semibold hover:text-[#1D4ED8]">{copiado ? "Copiado" : "Copiar"}</button>

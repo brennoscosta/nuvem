@@ -31,6 +31,7 @@ import { tetoDaEmpresa, MSG_SEM_UNIDADES, AVISO_UNIDADES } from "./unidadesIA";
 import { roteiroDono, roteiroVisitante } from "./escopoEquipe";
 import { PERSONALIDADE_POR_ID, personalidadeParaIA } from "@/office/data/personalidades";
 import { escopoDe } from "@/office/data/escopo";
+import { ehPedidoDeImagem, pedirImagem, cartoesDaConversa, gerandoImagem, acaoImagem, bytesDaImagem, fazImagem, type AcaoImagem } from "./imagemEquipe";
 
 export const TETO_IA_MES = 10; // R$ de IA por lote por mês
 export const AVISO_TETO = 0.8; // a partir de 80% o painel avisa
@@ -219,7 +220,7 @@ export async function painelEquipe(u: Usuario, chave?: string | null) {
       membroId: m.id, nome: m.nome, cargo: m.cargo, papel: m.papel, setor: setor?.nome ?? (m.papel === "ceo" ? "Diretoria" : "Recepção"),
       setorId: setor?.id ?? (m.papel === "ceo" ? "_diretoria" : "_recepcao"), setorCor: setor?.cor ?? (m.papel === "ceo" ? "#D4A63A" : "#9CA3AF"),
       nivel: nivelDoMembro(m), chefeId: chefeDoMembro(m, e), temEquipe: e.equipe.some((x) => x.id !== m.id && chefeDoMembro(x, e) === m.id),
-      boneco: m.boneco, camisa: m.camisa, foto: fotoDoEspecialista(esp), especialista: esp ? { cargo: esp.cargo, habilidades: esp.skills.map((s) => s.nome) } : null,
+      boneco: m.boneco, camisa: m.camisa, foto: fotoDoEspecialista(esp), especialista: esp ? { cargo: esp.cargo, habilidades: esp.skills.map((s) => s.nome) } : null, imagem: fazImagem({ funcao: m.cargo, config: { papel: m.papel, especialista: ag?.config?.especialista ?? null } }),
       saudacao: m.treino?.saudacao ?? "", treino: m.treino?.descricao ?? "", atendeVisitantes: m.papel === "atendente",
       ultima: ult ? { texto: ult.conteudo.slice(0, 140), deQuem: ult.papel === "user" ? "voce" : "equipe", em: ult.criadoEm } : null,
       regras: regras.filter((r) => r.agenteId === aid).map((r) => ({ id: r.id, texto: r.texto })),
@@ -253,6 +254,7 @@ export async function conversaDoDono(u: Usuario, chave: string | null, membroId:
   const t = await loteDoDono(u, chave);
   const empId = await garantirEmpresaDoLote(t);
   const a = await agenteDoMembro(empId, membroId);
+  const gerando = await gerandoImagem(a.id); // antes das mensagens: se a imagem ficar pronta no meio, a tela pede de novo
   const msgs = await listarMensagens(a.id, 80, null);
   // quem escreveu cada mensagem: o dono, o chefe (pedido interno) ou o sistema juntando as respostas da equipe
   const chefes = new Map((await sql<{ id: string; nome: string; funcao: string }[]>`SELECT id, nome, funcao FROM agente WHERE empresa_id = ${empId}`).map((x) => [x.id, x]));
@@ -262,7 +264,9 @@ export async function conversaDoDono(u: Usuario, chave: string | null, membroId:
     return { id: m.id, papel: m.papel, autor, deNome: c ? `${c.nome} (${c.funcao})` : null, conteudo: m.conteudo, avaliacao: m.avaliacao, correcao: m.correcao, em: m.criadoEm };
   });
   const internas = await trocasInternas(empId, { agenteId: a.id, limite: 40 });
-  return { mensagens, internas, trabalhando: trabalhando(a.id) || internas.some((x) => x.status === "pedido" && x.origemAgente === a.id) };
+  // imagens (21/11/2026, src/server/imagemEquipe.ts): o cartão do custo e a entrega ficam presos à mensagem
+  const cartoes = await cartoesDaConversa({ u, t, empId }, a.id, mensagens.map((m) => m.id));
+  return { mensagens: mensagens.map((m) => (cartoes.has(m.id) ? { ...m, imagem: cartoes.get(m.id) } : m)), internas, gerandoImagem: gerando, trabalhando: gerando || trabalhando(a.id) || internas.some((x) => x.status === "pedido" && x.origemAgente === a.id) };
 }
 export async function internasDoDono(u: Usuario, chave: string | null) {
   const t = await loteDoDono(u, chave);
@@ -284,6 +288,11 @@ export async function falarComMembro(u: Usuario, chave: string | null, membroId:
   contar(chaveLim, 60);
   const empId = await garantirEmpresaDoLote(t);
   const a = await agenteDoMembro(empId, membroId);
+  // pedido de imagem (21/11/2026, src/server/imagemEquipe.ts): o custo aparece antes e só gera quando o dono confirma
+  if (ehPedidoDeImagem(pedido)) {
+    const r = await pedirImagem({ u, t, empId }, a, pedido);
+    return { mensagem: r.mensagem, delegados: [], gasto: tetoParaTela(await tetoIA(empId)) };
+  }
   const { gasto, teto } = await tetoIA(empId);
   // sem IA (OpenAI fora ou sem unidades): o roteiro responde no jeito da personalidade e passa o pedido a quem faz
   const semIA = async (motivo: string) => {
@@ -308,6 +317,17 @@ export async function falarComMembro(u: Usuario, chave: string | null, membroId:
     console.error("[equipe] IA falhou, roteiro:", (e as Error).message);
     return semIA(`A IA não respondeu agora (${(e as Error).message.slice(0, 120)}): respondi pelo roteiro.`);
   }
+}
+
+// imagens da equipe (21/11/2026, src/server/imagemEquipe.ts): confirmar, cancelar e usar na vitrine; e os bytes da imagem
+export async function imagemDoDono(u: Usuario, chave: string | null, d: AcaoImagem) {
+  const t = await loteDoDono(u, chave);
+  const empId = await garantirEmpresaDoLote(t);
+  return acaoImagem({ u, t, empId, teto: async () => { const x = await tetoIA(empId); return { gasto: x.gasto, teto: x.teto }; } }, d);
+}
+export async function arquivoDaImagem(u: Usuario, chave: string | null, imagemId: string) {
+  const t = await loteDoDono(u, chave);
+  return bytesDaImagem(await garantirEmpresaDoLote(t), imagemId);
 }
 
 // 👍 / 👎 com correção: a correção vira uma regra permanente da pessoa (o mesmo treino do escritório interno)

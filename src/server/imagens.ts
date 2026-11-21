@@ -6,6 +6,7 @@ import OpenAI, { toFile } from "openai";
 import { sql, id } from "./db";
 import { EMPRESA_PADRAO, registrarUso } from "./agentes";
 import { DIR_UPLOADS, type Arquivo } from "./tarefas";
+import { unidadesDoCusto } from "./unidadesIA";
 
 export const MODELO_IMAGEM = process.env.OPENAI_MODELO_IMAGEM || "gpt-image-2";
 export type Formato = "quadrado" | "vertical" | "horizontal";
@@ -51,4 +52,25 @@ export async function gerarImagem(d: { agenteId: string; prompt: string; formato
   const nome = (d.nome || "arte").replace(/[^\p{L}\p{N} _-]/gu, "").trim().slice(0, 60) || "arte";
   const [arquivo] = await sql<Arquivo[]>`INSERT INTO arquivo (id, empresa_id, nome, mime, tamanho, caminho) VALUES (${aid}, ${EMPRESA_PADRAO.id}, ${nome + ".png"}, ${"image/png"}, ${buf.length}, ${caminho}) RETURNING id, nome, mime, tamanho, caminho, criado_em`;
   return { arquivo, custoBrl };
+}
+
+// ---------- equipe do cliente (21/11/2026, src/server/imagemEquipe.ts) ----------
+// Custo de uma imagem em unidades de IA: o mesmo preço em R$ de custoImagemBRL convertido como no débito
+// (unidadesIA.ts › unidadesDoCusto), para o número que o dono vê antes de gerar ser o que sai da carteira.
+export function custoImagemUnidades(formato: Formato, qualidade: Qualidade = "high") { return unidadesDoCusto(custoImagemBRL(formato, qualidade)); }
+// A mesma chamada de gerarImagem, mas com as referências em memória (logomarca e fotos da vitrine ficam no banco) e sem
+// gravar nada: quem chama guarda a imagem no banco e só então registra o uso (falha da OpenAI não desconta).
+export async function gerarImagemBytes(d: { prompt: string; formato: Formato; qualidade?: Qualidade; referencias?: { dados: Buffer; nome: string; mime: string }[] }) {
+  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurada no CapRover");
+  const cli = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 1, timeout: 180_000 });
+  const qualidade = d.qualidade ?? "high";
+  const size = FORMATOS[d.formato].size;
+  const refs = d.referencias ?? [];
+  const r = refs.length
+    ? await cli.images.edit({ model: MODELO_IMAGEM, image: await Promise.all(refs.map((x) => toFile(x.dados, x.nome, { type: x.mime }))), prompt: d.prompt, size, quality: qualidade, n: 1, output_format: "png" })
+    : await cli.images.generate({ model: MODELO_IMAGEM, prompt: d.prompt, size, quality: qualidade, n: 1, output_format: "png" });
+  const b64 = r.data?.[0]?.b64_json;
+  if (!b64) throw new Error("A OpenAI não devolveu a imagem.");
+  const uso = (r as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
+  return { png: Buffer.from(b64, "base64"), custoBrl: custoImagemBRL(d.formato, qualidade), tokensIn: uso?.input_tokens ?? 0, tokensOut: uso?.output_tokens ?? 0 };
 }

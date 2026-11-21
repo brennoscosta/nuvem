@@ -23,6 +23,7 @@ import { VagasDono } from "./_vagas-dono";
 import { Rosto, RostoSede } from "./_rosto";
 import { TopoEquipe, FaixaEquipe, ComoFunciona } from "./_topo";
 import { Conectores, EnviarPara } from "./_conectores";
+import { CartaoImagemEquipe } from "@/office/ui/ImagemEquipe";
 
 type Regra = RegraEquipe;
 type Membro = MembroEquipe;
@@ -267,11 +268,11 @@ function Conversas({ p, membro, q, selecionar, recarregar }: { p: Painel; membro
               <p className="mt-1 text-sm text-[var(--tinta-2)]">{subs.length ? `Peça uma tarefa como pediria a um funcionário. ${membro.nome} divide o trabalho com a própria equipe (${subs.length} ${subs.length === 1 ? "pessoa" : "pessoas"}) e entrega tudo junto aqui.` : "Peça uma tarefa como pediria a um funcionário. A resposta vem com o material pronto."}</p>
             </div>
           )}
-          {itens.map((it) => it.tipo === "msg" ? <Bolha key={it.msg.id} m={it.msg} membro={membro} lote={chave} mudou={recarregar} /> : <GrupoInternas key={it.grupo.chave} g={it.grupo} p={p} abrir={selecionar} />)}
+          {itens.map((it) => it.tipo === "msg" ? <Bolha key={it.msg.id} m={it.msg} membro={membro} lote={chave} mudou={recarregar} atualizar={() => setVersao((v) => v + 1)} /> : <GrupoInternas key={it.grupo.chave} g={it.grupo} p={p} abrir={selecionar} />)}
           {(enviando || trabalhando) && (
             <div className="flex items-center gap-2.5 rounded-xl bg-[var(--cinza)] px-3.5 py-2.5 text-sm text-[var(--tinta-2)]">
               <Avatar m={membro} tamanho={28} /><span className="equipe-digitando"><i /><i /><i /></span>
-              {enviando === "relatorio" ? `${membro.nome} está escrevendo o relatório…` : enviando ? `${membro.nome} está lendo e organizando o pedido…` : progresso ? `A equipe está trabalhando: ${progresso.prontos} de ${progresso.total} ${progresso.total === 1 ? "pedido pronto" : "pedidos prontos"}. A entrega final chega aqui.` : `${membro.nome} está juntando as respostas da equipe…`}
+              {enviando === "relatorio" ? `${membro.nome} está escrevendo o relatório…` : enviando ? `${membro.nome} está lendo e organizando o pedido…` : c?.gerandoImagem ? "A imagem está sendo criada. Costuma levar até um minuto e chega aqui na conversa." : progresso ? `A equipe está trabalhando: ${progresso.prontos} de ${progresso.total} ${progresso.total === 1 ? "pedido pronto" : "pedidos prontos"}. A entrega final chega aqui.` : `${membro.nome} está juntando as respostas da equipe…`}
             </div>
           )}
         </div>
@@ -397,7 +398,7 @@ function Internas({ p, q, abrir }: { p: Painel; q: string; abrir: (id: string) =
 
 // resposta da equipe com aprovar / corrigir (a correção vira regra permanente daquela pessoa). Os pedidos internos do chefe
 // e as respostas da equipe juntadas também aparecem, cada um com o seu formato.
-function Bolha({ m, membro, lote, mudou }: { m: Msg; membro: Membro; lote: string; mudou: () => Promise<void> }) {
+function Bolha({ m, membro, lote, mudou, atualizar }: { m: Msg; membro: Membro; lote: string; mudou: () => Promise<void>; atualizar: () => void }) {
   const [av, setAv] = useState(m.avaliacao);
   const [corrigindo, setCorrigindo] = useState(false);
   const [correcao, setCorrecao] = useState("");
@@ -431,6 +432,7 @@ function Bolha({ m, membro, lote, mudou }: { m: Msg; membro: Membro; lote: strin
       <Avatar m={membro} tamanho={32} />
       <div className="min-w-0 flex-1">
         <div className="rounded-2xl rounded-tl-md border border-[var(--linha)] bg-white px-4 py-3"><Texto t={m.conteudo} /></div>
+        {m.imagem && <CartaoImagemEquipe c={m.imagem} lote={lote} atualizar={() => { atualizar(); void mudou(); }} />}
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12px]">
           <button type="button" disabled={ocupado} onClick={() => treinar(1)} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${av === 1 ? "bg-[#E3F6EA] text-[#166534]" : "text-[var(--tinta-2)] hover:bg-[var(--cinza)]"}`}>{av === 1 && <Icone nome="check" tamanho={13} />}{av === 1 ? "Aprovado" : "Aprovar"}</button>
           <button type="button" disabled={ocupado} onClick={() => setCorrigindo((v) => !v)} className={`rounded-full px-2.5 py-1 font-semibold ${av === -1 ? "bg-[#FDECEC] text-[#9B1C1C]" : "text-[var(--tinta-2)] hover:bg-[var(--cinza)]"}`}>{av === -1 ? "Corrigido" : "Corrigir"}</button>

@@ -187,6 +187,8 @@ export const useMundo = create<Estado>((set, get) => ({
       if (sedePedida) get().selecionarLote(sedePedida.chave);
       const pedido = busca?.get("lote") ?? null;
       if (pedido && (LOTE_POR_CHAVE[pedido] || QUIOSQUE_POR_CHAVE[pedido]) && !get().loteSelecionado) { get().selecionarLote(pedido); if (u && u.id && !terrenos[pedido] && pedido !== PRACA_CHAVE && !busca?.get("pagamento")) get().abrirPainel(); }
+      // ?montar=contratar (21/11/2026): o botão "Contratar designer" da Minha equipe abre direto a vitrine de agentes do lote
+      if (pedido && busca?.get("montar") === "contratar" && terrenos[pedido]?.escritorio && u && u.id) get().abrirEscritorio("contratar");
     } catch (e) { console.warn("[mundo] sem servidor:", e); set({ carregado: true }); }
   },
 
