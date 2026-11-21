@@ -203,8 +203,15 @@ export async function ativarTerreno(chave: string, meses = 1, usuarioId: string 
     pago_ate = GREATEST(COALESCE(pago_ate, now()), now()) + make_interval(days => ${DIAS_MES * meses}) WHERE chave = ${chave} AND (${usuarioId}::text IS NULL OR usuario_id = ${usuarioId})`;
   if (!r.count) return false;
   await acompanharPrincipal(chave, db);
+  await semQuartosNoDuplo(chave, db);
   await garantirEscritorio(chave, db);
   return true;
+}
+// Lote em quartos (21/11/2026, data/quartosLote.ts): quando o lote extra do lado fica ativo, o lote vira duplo e o prédio
+// grande ocupa os dois terrenos, como sempre: os quartos do lote principal deixam de valer e saem
+export async function semQuartosNoDuplo(anexo: string, db: Db = sql) {
+  await db`UPDATE terreno p SET escritorio = p.escritorio #- '{decor,quartos}' FROM terreno a
+    WHERE a.chave = ${anexo} AND p.chave = a.anexo_de AND a.status = 'ativo' AND p.escritorio IS NOT NULL AND (p.escritorio->'decor') ? 'quartos'`;
 }
 // Lote extra (20/11/2026, data/precosTerreno.ts): renova junto com o principal, então vence no mesmo dia que ele. Ao somar
 // dias nunca encurta; no estorno (encurtar) acompanha o principal para baixo.
@@ -243,6 +250,10 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
   // modelo do catálogo (20/11/2026, data/modelos.ts): só os grátis, os comprados e o prédio que a empresa já tinha; os
   // prédios que saíram do catálogo (os antigos) não voltam depois de trocados. A compra é por src/server/modelos.ts.
   const modeloAntes = modeloDe(base), modeloNovo = modeloDe(e), mudou = e.layout !== base.layout || modeloNovo !== modeloAntes;
+  // lote em quartos (21/11/2026, data/quartosLote.ts): a troca só conta quando havia prédio e continua havendo (pôr o prédio
+  // médio num lote que só tinha quiosques, ou o quiosque no lugar do prédio, não gasta troca); o lote continua R$ 99
+  const qAntes = base.decor?.quartos ?? null, qNovo = e.decor?.quartos ?? null;
+  const contaTroca = mudou && (!qAntes || !!qAntes.predio) && (!qNovo || !!qNovo.predio);
   if (mudou && !ehAdmin(u)) {
     if (!modeloNovo || !ehKit(e.layout)) throw new Error("Esse prédio saiu do catálogo. Escolha um dos modelos da aba Prédio.");
     if (!temModelo(base, modeloNovo)) throw new Error(`O modelo "${MODELO[modeloNovo].nome}" custa ${brlModelo(MODELO[modeloNovo].preco)}. Compre na aba Prédio para usar.`);
@@ -252,17 +263,26 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
     }
   }
   // troca de prédio: 3 grátis, depois cada uma custa R$ 9,90 (crédito comprado no Pix); admin não paga
-  if (mudou) {
+  if (contaTroca) {
     if (!ehAdmin(u)) {
       if (trocasRestantes(base) <= 0) throw new Error(`Você já usou as ${TROCAS_LAYOUT_GRATIS} trocas de prédio grátis. Cada troca agora custa ${brl(PRECO_TROCA_LAYOUT)}.`);
       if ((base.trocasLayout ?? 0) < TROCAS_LAYOUT_GRATIS) e.trocasLayout = (base.trocasLayout ?? 0) + 1;
       else e.creditosLayout = Math.max(0, (base.creditosLayout ?? 0) - 1);
     }
     detalhes.push(`Prédio trocado para "${modeloNovo ? MODELO[modeloNovo].nome : LAYOUT[e.layout].nome}".`);
+  } else if (mudou) detalhes.push(`Prédio "${modeloNovo ? MODELO[modeloNovo].nome : LAYOUT[e.layout].nome}" (sem contar troca: o lote não tinha prédio).`);
+  // as posições do lote em quartos são conferidas de novo aqui (src/server/quartos.ts); com quartos, o prédio médio não tem
+  // deslocamento fino (encaixa na metade)
+  if (qNovo || qAntes) {
+    const { conferirQuartosNoServidor } = await import("./quartos");
+    const [ax] = await sql<{ chave: string }[]>`SELECT chave FROM terreno WHERE anexo_de = ${chave} AND status = 'ativo' LIMIT 1`;
+    const novoE = conferirQuartosNoServidor(chave, e, !!ax);
+    if (novoE.decor && e.decor) e.decor = novoE.decor;
+    if (JSON.stringify(qAntes) !== JSON.stringify(e.decor?.quartos ?? null)) { const { tamanhoDoLote, NOME_TAMANHO } = await import("@/office/data/quartosLote"); detalhes.push(`Lote: ${NOME_TAMANHO[tamanhoDoLote(e.decor?.quartos)].toLowerCase()}.`); }
   }
   // troca de modelo (21/11/2026, modo "Editar posição"): o giro fica e, se o prédio novo não couber onde estava, ele vai para
   // o lugar válido mais perto (src/server/posicao.ts › reposicionar, a mesma conta que a cena faz)
-  if (mudou && !ehQuiosque(chave)) {
+  if ((mudou || (qAntes && !qNovo)) && !qNovo && !ehQuiosque(chave)) {
     const { reposicionar } = await import("./posicao");
     const [ax] = await sql<{ chave: string }[]>`SELECT chave FROM terreno WHERE anexo_de = ${chave} AND status = 'ativo' LIMIT 1`;
     const r = reposicionar(chave, e, ax?.chave ?? null);

@@ -13,6 +13,7 @@ import { useEscritorio } from "../store";
 import { BotoesPersonagem } from "./BotoesPersonagem";
 import { Icone, type NomeIcone } from "./Icone";
 import { BotaoEditarPosicao } from "./EditorPosicao";
+import { EspacoDoLote } from "./EspacoLote";
 import { ehSede } from "../data/sedes";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 import { abrirChatEquipe } from "./ChatEquipe";
@@ -296,6 +297,8 @@ export function CartaoLote() {
               <button onClick={() => abrirEscritorio("predio")} className="block w-full rounded-xl bg-[#EEF3FF] px-3 py-2.5 text-center text-sm font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]"><Icone nome="escritorio" tamanho={17} className="mr-1 inline align-[-3px]" />Montar escritório</button>
               {/* 21/11/2026: girar e posicionar o prédio no lote (modo "Editar posição", ui/EditorPosicao.tsx) */}
               <BotaoEditarPosicao chave={chave} className="mt-2" />
+              {/* lote em quartos (21/11/2026, ui/EspacoLote.tsx): o que cada quarto tem e como crescer nos quartos livres */}
+              <EspacoDoLote chave={chave} />
               {/* expandir o terreno (20/11/2026): à vista, fora de "Mais opções" */}
               <ExpandirTerreno chave={chave} />
               <details className="group mt-2 rounded-2xl bg-[#F6F7F9] px-2.5 py-1.5">

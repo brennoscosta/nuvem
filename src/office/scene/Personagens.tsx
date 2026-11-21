@@ -32,7 +32,8 @@ function passouPor(ponto: [number, number]) {
   const p = usePersonagem.getState().predio; if (!p) return;
   // chegou na calçada da porta: a vista vira "por dentro" e a câmera vai até a recepção (numa sede, olhando pela frente
   // dela: 19/11/2026, cada sede num lote, de frente para a rua dela)
-  if (p.fase === "indo" && perto(ponto, p.fora)) { usePersonagem.setState({ predio: { ...p, fase: "entrando" } }); useEscritorio.getState().setVista("dentro"); useMundo.setState({ alvoCamera: [p.espera[0], 0.5, p.espera[1]], giroCamera: sedeDe(p.chave)?.rot ?? null }); }
+  // (no balcão do quiosque de um lote em quartos não há interior: a vista fica por fora)
+  if (p.fase === "indo" && perto(ponto, p.fora)) { usePersonagem.setState({ predio: { ...p, fase: "entrando" } }); if (!p.balcao) useEscritorio.getState().setVista("dentro"); useMundo.setState({ alvoCamera: [p.espera[0], 0.5, p.espera[1]], giroCamera: sedeDe(p.chave)?.rot ?? null }); }
   // saindo: passou pela porta, a vista volta para fora
   else if (p.fase === "saindo" && perto(ponto, p.porta)) useEscritorio.getState().setVista("fora");
   // saindo e passou pela calçada (tocou na rua estando dentro): a visita acaba aqui e ele segue pela rua
@@ -88,7 +89,7 @@ function andarDireto(o: THREE.Group, dt: number, vc: Veiculo | null, vel: { curr
   vel.current = vel.current < alvo ? Math.min(alvo, vel.current + acel * dt) : Math.max(alvo, vel.current - freio * dt);
   if (vel.current < 0.01) { vel.current = 0; minhaPos.prev = null; return; }
   const passo = vel.current * dt, ax = o.position.x, az = o.position.z;
-  const pd = st.predio, pl = pd && (pd.fase === "recepcao" || pd.fase === "dentro") ? plantaPorChave(pd.chave, useMundo.getState().terrenos) : null;
+  const pd = st.predio, pl = pd && !pd.balcao && (pd.fase === "recepcao" || pd.fase === "dentro") ? plantaPorChave(pd.chave, useMundo.getState().terrenos) : null;
   deslizar(ax, az, Math.sin(rumo.current) * passo, Math.cos(rumo.current) * passo, pl, pd ? acessoNoPredio(pd) : false, _p);
   const andou = Math.hypot(_p[0] - ax, _p[1] - az);
   // de cara na parede: fica parado, sem "andar no lugar" (e arranca de novo assim que a direção abrir)

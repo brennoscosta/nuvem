@@ -21,22 +21,25 @@ type Guardado = { mat: THREE.Material | THREE.Material[]; sombra: boolean };
 
 // O grupo do prédio em edição segue a pose do rascunho a cada quadro (sem desenhar de novo); fora da edição volta para a
 // pose de sempre (base). mapa: da pose do rascunho para [x, z, rot] do grupo (no lote, o grupo é relativo ao centro do lote).
-export function usePoseAoVivo(ref: React.RefObject<THREE.Object3D | null>, chave: string, base: [number, number, number], mapa: (p: PosePredio) => [number, number, number]) {
+// estrutura (lote em quartos, 21/11/2026): qual parte do lote este grupo desenha ("predio" ou o id do quiosque); fora do lote
+// em quartos fica null, e a edição do terreno vale para o prédio de sempre
+export const editandoEsta = (chave: string, estrutura: string | null) => { const s = useEdicao.getState(); return s.chave === chave && (s.estrutura ?? null) === estrutura; };
+export function usePoseAoVivo(ref: React.RefObject<THREE.Object3D | null>, chave: string, base: [number, number, number], mapa: (p: PosePredio) => [number, number, number], estrutura: string | null = null) {
   const ultimo = useRef<string>("");
   useFrame(() => {
     const g = ref.current; if (!g) return;
-    const s = useEdicao.getState(), v = s.chave === chave && s.pose ? mapa(s.pose) : base;
+    const s = useEdicao.getState(), v = editandoEsta(chave, estrutura) && s.pose ? mapa(s.pose) : base;
     const k = v.join(","); if (k === ultimo.current) return; ultimo.current = k;
     g.position.x = v[0]; g.position.z = v[1]; g.rotation.y = v[2];
   });
 }
 // O prédio em edição vira fantasma (todas as malhas com um material verde ou vermelho translúcido, sem sombra); ao sair da
 // edição o material de cada malha volta. Confere a cada 10 quadros (pega o que o prédio montar depois).
-export function useFantasma(ref: React.RefObject<THREE.Object3D | null>, chave: string) {
+export function useFantasma(ref: React.RefObject<THREE.Object3D | null>, chave: string, estrutura: string | null = null) {
   const n = useRef(0), aplicado = useRef(false), ultimo = useRef("");
   useFrame(() => {
     const g = ref.current; if (!g) return;
-    const s = useEdicao.getState(), ativo = s.chave === chave, estado = `${ativo}|${!!s.conf?.ok}`;
+    const s = useEdicao.getState(), ativo = editandoEsta(chave, estrutura), estado = `${ativo}|${!!s.conf?.ok}`;
     // na hora em que entra, sai ou troca de cor; e a cada 10 quadros, para pegar o que o prédio montar depois
     if (estado === ultimo.current && (n.current++ % 10) !== 0) return;
     ultimo.current = estado;
@@ -157,6 +160,14 @@ function Editor() {
     <group>
       <Grade ret={tr.ret} />
       <Contorno ret={tr.ret} cor="#FFFFFF" y={0.1} espessura={0.16} />
+      {/* lote em quartos (21/11/2026): a divisão em quatro quartos e o lugar onde a estrutura encaixa (amarelo) */}
+      {pose.estrutura && tr.limite && (
+        <>
+          <Contorno ret={{ x0: (tr.ret.x0 + tr.ret.x1) / 2 - 0.04, x1: (tr.ret.x0 + tr.ret.x1) / 2 + 0.04, z0: tr.ret.z0, z1: tr.ret.z1 }} cor="#FFFFFF" y={0.1} espessura={0.1} />
+          <Contorno ret={{ x0: tr.ret.x0, x1: tr.ret.x1, z0: (tr.ret.z0 + tr.ret.z1) / 2 - 0.04, z1: (tr.ret.z0 + tr.ret.z1) / 2 + 0.04 }} cor="#FFFFFF" y={0.1} espessura={0.1} />
+          <Contorno ret={tr.limite} cor="#FACC15" y={0.11} espessura={0.14} />
+        </>
+      )}
       <Contorno ret={pose.caixa} cor={conf?.ok ? VERDE : VERMELHO} y={0.12} espessura={0.12} preenche />
       <SetaPorta pose={pose} ok={!!conf?.ok} />
       {conf?.ok && conf.trilha.length > 1 && <Caminho pts={[...conf.trilha, ...(conf.fora ? [conf.fora] : [])]} />}

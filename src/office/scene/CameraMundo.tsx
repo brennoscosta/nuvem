@@ -111,7 +111,7 @@ function sairAndar(x: Ctx) {
   // andando: freia até um ponto logo à frente (pelo caminho de sempre), sem parar de uma vez
   const p = usePersonagem.getState();
   if (minhaPos.vel > 0.3 && !p.destino && p.ativo) {
-    const pd = p.predio, pl = pd && (pd.fase === "recepcao" || pd.fase === "dentro") ? plantaPorChave(pd.chave, useMundo.getState().terrenos) : null;
+    const pd = p.predio, pl = pd && !pd.balcao && (pd.fase === "recepcao" || pd.fase === "dentro") ? plantaPorChave(pd.chave, useMundo.getState().terrenos) : null;
     const d = (minhaPos.vel * minhaPos.vel) / (2 * (p.veiculo ? 4.2 : 8)) + 0.1, dx = Math.sin(minhaPos.rot) * d, dz = Math.cos(minhaPos.rot) * d;
     usePersonagem.setState({ destino: pl && pd ? caminharDentro(pl, minhaPos.x, minhaPos.z, dx, dz, acessoNoPredio(pd)) : caminhar(minhaPos.x, minhaPos.z, dx, dz), rota: [], passeio: false });
   }

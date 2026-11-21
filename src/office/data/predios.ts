@@ -44,8 +44,19 @@ const clampN = (id: KitId, n: number) => Math.max(KIT_ANDARES[id].min, Math.min(
 // fica em z = -4,8 e o grupo gira meia volta para a frente +z da sede: data/onestate.ts › SEDE). O prédio é o mesmo do
 // cliente, só com a largura e o fundo da sede; o que fica na frente (letreiro, vitrine, marquise) acompanha a fachada.
 export const PLANTA_SEDE = { w: 16, z0: -4.8, z1: 8.2 };
+// Prédio médio (21/11/2026, lote em quartos, data/quartosLote.ts): o mesmo modelo com a fundura reduzida para caber em meio
+// lote (20 × 10 m). A fachada da frente fica igual (largura, porta, vitrine, marquise e letreiro, que andam junto com a
+// frente); o corpo vai de z = -6,2 a 1,4 (7,6 m), na conta da planta de dentro compacta (data/escritorio.ts › PREDIO_MEDIO).
+// Só os modelos de frente rasa cabem assim (data/modelos.ts › MODELOS_MEDIO).
+export const PLANTA_MEDIO = { z0: -6.2, z1: 1.4 };
 // (na sede vale o número de andares da sede, sem os limites do tipo: a Social RP tem 4 andares na torre de vidro)
-export function medidasKit(id: KitId, andares: number, duplo: boolean, coberturaPlana = false, sede = false, semLimite = false): MedidasKit {
+export function medidasKit(id: KitId, andares: number, duplo: boolean, coberturaPlana = false, sede = false, semLimite = false, medio = false): MedidasKit {
+  if (medio && !sede && !duplo) {
+    const m = medidasKit(id, andares, false, coberturaPlana, false, semLimite), P = PLANTA_MEDIO, dz = P.z0 - m.z0;
+    return { ...m, z0: P.z0, z1: P.z1, topo: { ...m.topo, d: P.z1 - P.z0 - (m.z1 - m.z0 - m.topo.d), cz: (P.z0 + P.z1) / 2 },
+      letreiro: { ...m.letreiro, z: m.letreiro.z + dz }, vidroZ: m.vidroZ + dz, frenteZ: m.frenteZ + dz,
+      telao: m.telao ? { ...m.telao, z: m.telao.z + dz } : undefined, anexo: m.anexo ? { ...m.anexo, z0: m.anexo.z0 + dz, z1: m.anexo.z1 + dz } : undefined };
+  }
   if (sede) {
     const m = medidasKit(id, andares, false, coberturaPlana, false, true), P = PLANTA_SEDE, dz = P.z0 - m.z0, k = P.w / m.w;
     return { ...m, w: P.w, z0: P.z0, z1: P.z1, topo: { ...m.topo, w: P.w - (m.w - m.topo.w), d: P.z1 - P.z0 - (m.z1 - m.z0 - m.topo.d), cz: (P.z0 + P.z1) / 2 },

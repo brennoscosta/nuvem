@@ -107,6 +107,10 @@ export const ROTEIROS_MUNDO: Roteiro[] = [
         alvo: noCartaoSel("[data-editar-posicao]"), titulo: "Gire e posicione o prédio",
         texto: (c) => (c.celular ? "Em Editar posição você gira o prédio e arrasta dentro do lote. A porta precisa de caminho até a calçada; confirme para valer no mapa."
           : "Em Editar posição você gira (tecla R) e arrasta o prédio dentro do lote. A porta precisa de caminho até a calçada; Enter confirma.") },
+      // lote em quartos (21/11/2026, ui/EspacoLote.tsx): só aparece no lote dividido em quartos (quiosque ou prédio médio)
+      { id: "espaco", tipo: "manual", opcional: true, quando: (c) => c.fatos.loteAtivo, pularSe: () => !noCartaoSel('[data-guia="espaco-lote"]')(), antes: (pronto) => { if (m().loteSelecionado !== meuLote()) selecionar(meuLote()); pronto(); },
+        alvo: noCartaoSel('[data-guia="espaco-lote"]'), titulo: "Use o espaço livre do lote",
+        texto: "Os quartos livres ficam marcados no chão. Em Usar este espaço você põe mais um quiosque ou um prédio médio, sem pagar a mais pelo lote." },
       { id: "montar", tipo: "manual", auto: true, quando: (c) => c.fatos.loteAtivo, antes: (pronto) => { if (m().loteSelecionado !== meuLote()) selecionar(meuLote()); pronto(); },
         alvo: noCartao(/^Montar escritório$/), titulo: "Monte o escritório", texto: "Prédio, fachada, interior, setores e equipe. Toque em Montar escritório: o painel tem o próprio guia." },
       { id: "fim", tipo: "manual", ultimo: true, titulo: (c) => (c.fatos.loteAtivo ? "Sua empresa já tem endereço" : "Pronto para escolher?"),
@@ -122,6 +126,9 @@ export const ROTEIROS_MUNDO: Roteiro[] = [
         texto: "Cinco abas: prédio, fachada, interior, setores e equipe. O mapa mostra cada mudança na hora, mas ela só vale depois de Salvar." },
       { id: "predio", tipo: "manual", antes: (pronto) => { m().setAbaEscritorio("predio"); pronto(); }, alvo: () => primeiro("[data-modelo]")?.closest<HTMLElement>(".space-y-2") ?? null,
         titulo: `Prédio: ${MODELOS.length} modelos`, texto: `Cada modelo mostra a foto, a categoria e o preço. Você tem ${TROCAS_LAYOUT_GRATIS} trocas de prédio grátis; depois, cada troca custa ${brl(PRECO_TROCA_LAYOUT)}.` },
+      // lote em quartos (21/11/2026): quanto do lote usar (ui/EspacoLote.tsx › TamanhoNoLote)
+      { id: "tamanho", tipo: "manual", opcional: true, pularSe: () => !primeiro('[data-guia="tamanho-lote"]'), alvo: '[data-guia="tamanho-lote"]', titulo: "Quanto do lote usar",
+        texto: "Só um quiosque (1/4), um prédio médio (meio lote) ou o prédio grande. O que sobra fica livre para crescer depois, sem comprar outro lote." },
       { id: "fachada", tipo: "manual", alvo: abaEsc(/^Fachada$/), titulo: "Fachada", texto: "Cores, letreiro e altura da fachada, com a sua marca." },
       { id: "interior", tipo: "manual", alvo: abaEsc(/^Interior$/), titulo: "Interior", texto: "Móveis e decoração das salas. Ao abrir esta aba, a câmera entra no prédio." },
       { id: "setores", tipo: "manual", alvo: abaEsc(/^Setores/), titulo: "Setores", texto: "As salas da empresa, como vendas e marketing. Cada setor tem mesas para a equipe." },

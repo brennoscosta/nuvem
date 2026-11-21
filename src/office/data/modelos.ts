@@ -68,6 +68,13 @@ export const MODELO: Record<IdModelo, ModeloPadrao> = Object.fromEntries(MODELOS
 export const ehModelo = (id: unknown): id is IdModelo => typeof id === "string" && id in PRECO_MODELO;
 export const MODELO_INICIAL: IdModelo = "escritorio"; // quem monta a empresa começa com o escritório básico (grátis)
 export const MODELOS_GRATIS = MODELOS.filter((m) => m.preco === 0).map((m) => m.id);
+// Prédio médio (21/11/2026, lote em quartos, data/quartosLote.ts, pedido do dono: "os modelos de prédio atuais que
+// couberem em meio lote passam a ocupar 2/4"). Nenhum modelo cabia em 20 × 10 m do jeito que é; estes cabem com a fundura
+// reduzida (data/predios.ts › PLANTA_MEDIO), com a mesma fachada. Ficam só no lote inteiro os de frente funda (a pérgola do
+// café, as bancas do mercadinho, a marquise do auditório, a escadaria da escola, a rampa da clínica, a doca do galpão) e a
+// sede de dois lotes. O preço de cada modelo não muda. Conferência: testes/quartos/unidade.mjs.
+export const MODELOS_MEDIO: IdModelo[] = ["escritorio", "loja", "corporativo", "loft", "varanda", "torre", "galeria", "estudio"];
+export const cabeEmMeioLote = (id: IdModelo | null | undefined): boolean => !!id && MODELOS_MEDIO.includes(id);
 
 // Para o que já existia antes do catálogo: o tipo de prédio (layout) diz o modelo. Os 6 prédios antigos (GLB) e o
 // galpão industrial não estão no catálogo: quem já tem continua com ele, e ele não volta depois de trocar.

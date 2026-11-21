@@ -145,7 +145,8 @@ function PaginaFaltam({ numero, d }: { numero: number; d: Passaporte }) {
   const meus = useMundo((s) => s.meus);
   const fechar = usePassaporte((s) => s.fechar);
   const feitos = new Set(d.carimbos.map((c) => c.chave));
-  const faltam = entradasDaCidade(terrenos).filter((e) => !feitos.has(e.chave) && !meus.includes(e.chave) && terrenos[e.chave]?.escritorio?.equipe.some((m) => m.papel === "atendente"));
+  // um carimbo por empresa: no lote em quartos (várias entradas da mesma chave) a lista mostra a empresa uma vez só
+  const faltam = entradasDaCidade(terrenos).filter((e, i, todas) => todas.findIndex((x) => x.chave === e.chave) === i && !feitos.has(e.chave) && !meus.includes(e.chave) && terrenos[e.chave]?.escritorio?.equipe.some((m) => m.papel === "atendente"));
   const ir = (chave: string) => {
     const e = entradasDaCidade(useMundo.getState().terrenos).find((x) => x.chave === chave); if (!e) return;
     fechar(); usePersonagem.getState().entrarNoPredio(e);

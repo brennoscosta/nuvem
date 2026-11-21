@@ -7,7 +7,7 @@
 // que faltam até o vencimento do principal (proporcional, nunca abaixo de MINIMO_LOTE_EXTRA); depois disso a renovação do
 // principal já cobra os dois (ofertas.ts › cotacaoLote) e ativarTerreno() leva o extra junto.
 import { sql, migrar } from "./db";
-import { obterTerreno, ehAdmin, DIAS_MES, DIAS_TOLERANCIA, type Terreno } from "./terrenos";
+import { obterTerreno, ehAdmin, DIAS_MES, DIAS_TOLERANCIA, semQuartosNoDuplo, type Terreno } from "./terrenos";
 import type { Usuario } from "./usuarios";
 import type { Cotacao } from "./ofertas";
 import { PRECO_LOTE_EXTRA, MINIMO_LOTE_EXTRA } from "@/office/data/precosTerreno";
@@ -46,6 +46,7 @@ export async function liberarLoteExtra(chave: string, usuarioId: string, db: Db 
   const r = await db`UPDATE terreno a SET status = 'ativo', reservado_ate = NULL, avisado_em = NULL, atualizado_em = now(),
       inaugurado_em = COALESCE(a.inaugurado_em, now()), pago_ate = GREATEST(p.pago_ate, now() + interval '1 day')
     FROM terreno p WHERE a.chave = ${chave} AND a.usuario_id = ${usuarioId} AND p.chave = a.anexo_de AND p.status = 'ativo'`;
+  if (r.count > 0) await semQuartosNoDuplo(chave, db); // lote em quartos (21/11/2026): no lote duplo vale o prédio grande
   return r.count > 0;
 }
 // Estorno: o lote extra sai do mapa na próxima limpeza (sem tolerância); o prédio volta ao tamanho de um lote

@@ -3,7 +3,7 @@
 // sul e a leste como no 3D, as lojas na cor e com a logo de cada empresa, a praça com o palco). Para aparelho sem WebGL
 // ou fraco demais, ou para quem escolhe "Mapa simples". Tocar num lote abre o mesmo cartão do mapa 3D (o Painel e os
 // cartões usam o mundoStore, que não depende da cena). Arrastar move, a roda ou o pinçar aproximam.
-import { poseDoTerreno } from "../data/posicaoPredio";
+import { poseDoTerreno, posesDoTerreno } from "../data/posicaoPredio";
 import { useEffect, useRef, useState } from "react";
 import { useMundo, LOTES, useAgora, promocaoAtiva, type Terreno } from "../mundoStore";
 import { QUARTEIROES, centroQuarteirao, EIXOS_RUA, RUA, MEIO_Q, BORDA_CALCADA, PASSO, N, EIXO_RUA, LOTE, nomeNicho, arvoreDoTerrenoFica, type LoteInfo } from "../data/mundo";
@@ -88,6 +88,8 @@ function Lote2D({ l, t, principal, anexoMeio, sel, vagas, promo, vivo }: { l: Lo
     // prédio: no lote duplo ele ocupa o meio dos dois terrenos
     // 21/11/2026: o prédio onde a pose diz (giro e deslocamento do dono, data/posicaoPredio.ts), no tamanho dele
     const ps = t.escritorio ? poseDoTerreno(t.chave, useMundo.getState().terrenos) : null;
+    // lote em quartos (21/11/2026, data/quartosLote.ts): as outras estruturas do lote (os quiosques) também aparecem
+    const outras = t.escritorio?.decor?.quartos ? posesDoTerreno(t.chave, useMundo.getState().terrenos).slice(1) : [];
     const cx = ps ? (ps.caixa.x0 + ps.caixa.x1) / 2 : anexoMeio ?? x, zc = ps ? (ps.caixa.z0 + ps.caixa.z1) / 2 : z;
     const larg = ps ? ps.caixa.x1 - ps.caixa.x0 : anexoMeio != null ? 2 * LOTE - 8 : 12, prof = ps ? ps.caixa.z1 - ps.caixa.z0 : 12;
     const logo = t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null;
@@ -97,6 +99,7 @@ function Lote2D({ l, t, principal, anexoMeio, sel, vagas, promo, vivo }: { l: Lo
         <rect x={cx - larg / 2 + 1.1} y={zc - prof / 2 + 1.3} width={larg} height={prof} rx={1.4} fill="#000" opacity={0.18} />
         <rect x={cx - larg / 2} y={zc - prof / 2} width={larg} height={prof} rx={1.4} fill={t.cor} />
         <rect x={cx - larg / 2 + 1} y={zc - prof / 2 + 1} width={larg - 2} height={prof - 2} rx={1} fill="#FFFFFF" opacity={0.12} />
+        {outras.map((p) => <rect key={p.estrutura?.id} data-estrutura={p.estrutura?.id} x={p.caixa.x0} y={p.caixa.z0} width={p.caixa.x1 - p.caixa.x0} height={p.caixa.z1 - p.caixa.z0} rx={1} fill={t.cor} stroke="#FFFFFF" strokeWidth={0.5} />)}
         {logo ? <image href={logo} x={cx - 3.6} y={zc - 3.6} width={7.2} height={7.2} preserveAspectRatio="xMidYMid meet" style={{ pointerEvents: "none" }} /> : <text x={cx} y={zc + 1.6} textAnchor="middle" fontSize={4.4} fontWeight={900} fill="#fff" style={{ pointerEvents: "none" }}>{t.empresaNome.slice(0, 2).toUpperCase()}</text>}
         {t.escritorio && <IconePredio id={t.escritorio.layout} x={cx - larg / 2 + 2.4} z={zc - prof / 2 + 2.4} />}
         <Rotulo x={cx} z={zc - prof / 2 - 1.6} texto={t.empresaNome} sub={nomeNicho(t.nicho)} cor={t.cor} />

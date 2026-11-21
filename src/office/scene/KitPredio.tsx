@@ -462,7 +462,7 @@ function paredeDe(material: MaterialFachada, padrao: { parede: Papel; cor: strin
 }
 
 // ---------------------------------------------------------------- os 8 tipos
-interface Opcoes { id: KitId; n: number; duplo: boolean; material: MaterialFachada; corMarca: string; seed: number; plana: boolean; sede?: boolean }
+interface Opcoes { id: KitId; n: number; duplo: boolean; material: MaterialFachada; corMarca: string; seed: number; plana: boolean; sede?: boolean; medio?: boolean }
 type Plantas = { arbusto: ItemInstancia[]; azaleia: ItemInstancia[]; topiaria: ItemInstancia[] };
 interface Feito { M: Montador; plantas: Plantas }
 const novo = (): Feito => ({ M: new Montador(), plantas: { arbusto: [], azaleia: [], topiaria: [] } });
@@ -1222,12 +1222,12 @@ function deCru(c: ParteCrua): Parte {
   return { geo, mat: material(c.papel), sombra: fazSombra(c.papel), papel: c.papel };
 }
 function predio(o: Opcoes) {
-  const k = `${o.id}|${o.n}|${o.duplo}|${o.material}|${o.corMarca}|${o.seed}|${o.plana}|${leve()}${o.sede ? "|sede" : ""}`;
+  const k = `${o.id}|${o.n}|${o.duplo}|${o.material}|${o.corMarca}|${o.seed}|${o.plana}|${leve()}${o.sede ? "|sede" : ""}${o.medio ? "|medio" : ""}`;
   let c = CACHE.get(k); if (c) return c;
   const t0 = MEDIR ? performance.now() : 0;
   const chaveGuardada = `kit|${k}@${VERSAO_KIT}`, cru = GUARDADOS.get(chaveGuardada);
   if (cru) { c = { partes: cru.partes.map(deCru), plantas: cru.plantas }; contar("prédio do kit: do aparelho"); CACHE.set(k, c); return c; }
-  const f = CONSTRUTORES[o.id](o, medidasKit(o.id, o.n, o.duplo, o.plana, !!o.sede));
+  const f = CONSTRUTORES[o.id](o, medidasKit(o.id, o.n, o.duplo, o.plana, !!o.sede, false, !!o.medio));
   c = { partes: f.M.montar(), plantas: f.plantas };
   if (GUARDADOS.size < MAX_GUARDADOS) { const novo = { partes: c.partes.map(paraCru), plantas: c.plantas }; GUARDADOS.set(chaveGuardada, novo); guardar(chaveGuardada, novo); }
   if (MEDIR) { const ms = performance.now() - t0; MEDIDA.montados++; MEDIDA.ms += ms; MEDIDA.maiorMs = Math.max(MEDIDA.maiorMs, ms); }
@@ -1240,8 +1240,9 @@ function predio(o: Opcoes) {
 // semente = a chave do lote: as janelas acesas à noite são sempre as mesmas naquele prédio (e digitar o nome da empresa
 // no painel não refaz a malha)
 // sede (20/11/2026): o mesmo modelo na planta da sede (data/predios.ts › PLANTA_SEDE)
-export function PredioKit({ id, andares, duplo, material, corFachada, corMarca, semente: chave, plana, sede = false }: { id: KitId; andares: number; duplo: boolean; material: MaterialFachada; corFachada: string; corMarca: string; semente: string; plana: boolean; sede?: boolean }) {
-  const p = useMemo(() => predio({ id, n: andares, duplo, material, corMarca, seed: semente(chave), plana, sede }), [id, andares, duplo, material, corMarca, chave, plana, sede]);
+// medio (21/11/2026, lote em quartos): o mesmo modelo com a fundura reduzida para meio lote (data/predios.ts › PLANTA_MEDIO)
+export function PredioKit({ id, andares, duplo, material, corFachada, corMarca, semente: chave, plana, sede = false, medio = false }: { id: KitId; andares: number; duplo: boolean; material: MaterialFachada; corFachada: string; corMarca: string; semente: string; plana: boolean; sede?: boolean; medio?: boolean }) {
+  const p = useMemo(() => predio({ id, n: andares, duplo, material, corMarca, seed: semente(chave), plana, sede, medio }), [id, andares, duplo, material, corMarca, chave, plana, sede, medio]);
   const pintura = useMemo(() => materialPintura(corFachada), [corFachada]);
   const sombra = !leve();
   return (

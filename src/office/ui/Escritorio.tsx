@@ -9,6 +9,7 @@ import { BotaoCobrar } from "./Cobrar";
 import { VitrineAgentes, FichaAgente, LinhaPersonalidade } from "./VitrineAgentes";
 import { useMundo } from "../mundoStore";
 import { CatalogoModelos } from "./CatalogoModelos";
+import { TamanhoNoLote, EstiloDosQuiosques } from "./EspacoLote";
 import { modeloDe, modelosLiberados, type IdModelo } from "../data/modelos";
 import { CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, DECOR_PADRAO, ESTILOS_LETREIRO, PISOS, CERCAS, EXTRAS, CORES_TOLDO, INTERIOR_PADRAO, CORES_PAREDE, PISOS_INTERIOR, MOVEIS_INTERIOR, ITENS_DECORACAO, ESTILOS_INTERIOR, DECORACAO_DISCRETA, type ItemDecoracao, COBERTURAS, MATERIAIS, CORES_LED, LED_PADRAO, PECAS, PECA_POR_NICHO, andaresDoPredio, limitesAndares, type Led, type Escritorio, type Setor, type Membro, type Decoracao, type Interior } from "../data/escritorio";
 import { useEscritorio } from "../store";
@@ -127,8 +128,12 @@ export function PainelEscritorio() {
         {aba === "interior" && <AbaInterior e={e} set={set} temLogo={!!terrenoAtual?.temLogo} marca={terrenoAtual?.cor ?? "#1D4ED8"} />}
         {aba === "predio" && (
           <div className="space-y-2">
+            {/* lote em quartos (21/11/2026, ui/EspacoLote.tsx): só um quiosque (1/4), prédio médio (2/4) ou grande (o lote todo) */}
+            {LOTE_POR_CHAVE[vista] && <TamanhoNoLote chave={vista} e={e} set={set} duplo={duplo} />}
             {/* catálogo dos 15 modelos padrão (20/11/2026, data/modelos.ts): foto, categoria, preço e compra pelo Pix */}
-            <CatalogoModelos e={e} set={set} salvo={salvoEsc} duplo={duplo} comprar={(id, creditos) => void comprarModelo(id, creditos)} pagando={pagando} erro={erroModelo} />
+            {e.decor?.quartos && !e.decor.quartos.predio
+              ? <EstiloDosQuiosques e={e} set={set} />
+              : <CatalogoModelos e={e} set={set} salvo={salvoEsc} duplo={duplo} soMedio={!!e.decor?.quartos?.predio} comprar={(id, creditos) => void comprarModelo(id, creditos)} pagando={pagando} erro={erroModelo} />}
             {pix?.tipo === "modelo" && vista && <PixAberto chave={vista} />}
             <div className={`rounded-xl px-3 py-2 text-[11px] ${restantes > 0 ? "bg-[#F1F3F6] text-[#5B6472]" : "bg-[#FFF4D6] text-[#7A5A00]"}`}>
               {restantes > 0

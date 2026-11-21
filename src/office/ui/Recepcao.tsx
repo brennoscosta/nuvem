@@ -40,7 +40,7 @@ export function BotaoEntrar({ chave, escuro = false, className = "" }: { chave: 
   return (
     <button type="button" data-guia="entrar-predio" onClick={() => usePersonagem.getState().entrarNoPredio(entrada)} disabled={!!dentroDe} title={dentroDe ? "Saia do prédio em que você está primeiro" : undefined}
       className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-50 ${estilo} ${className}`}>
-      <Icone nome="casa" tamanho={16} />Entrar no prédio
+      <Icone nome="casa" tamanho={16} />{entrada.balcao ? "Ir ao balcão do quiosque" : "Entrar no prédio"}
     </button>
   );
 }
@@ -57,7 +57,7 @@ function PertoDaPorta() {
     const t = setInterval(() => {
       let melhor: Entrada | null = null, dm = 3.2;
       for (const e of entradas) { const d = Math.hypot(minhaPos.x - e.fora[0], minhaPos.z - e.fora[1]); if (d < dm) { dm = d; melhor = e; } }
-      setPerto((x) => (x?.chave === melhor?.chave ? x : melhor));
+      setPerto((x) => (x?.chave === melhor?.chave && x?.estrutura === melhor?.estrutura ? x : melhor));
     }, 400);
     return () => clearInterval(t);
   }, [ativo, entradas]);
@@ -65,7 +65,7 @@ function PertoDaPorta() {
   return (
     <div className={`${CAIXA} flex justify-center`}>
       <button type="button" onClick={() => usePersonagem.getState().entrarNoPredio(perto)} className="hud-ilha inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-bold text-white shadow-xl">
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-[#16A34A]"><Icone nome="casa" tamanho={15} /></span>Entrar em {perto.nome}
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-[#16A34A]"><Icone nome="casa" tamanho={15} /></span>{perto.balcao ? `Ir ao quiosque de ${perto.nome}` : `Entrar em ${perto.nome}`}
       </button>
     </div>
   );
@@ -96,6 +96,8 @@ function useEntrarPeloLink() {
 const primeiroNome = (n: string) => n.trim().split(/\s+/)[0] ?? n;
 function textoDaFase(p: PredioAtual, andando: boolean) {
   const l = p.liberado;
+  // quiosque de um lote em quartos (21/11/2026): atende no balcão, sem entrar
+  if (p.balcao) return p.fase === "indo" ? `A caminho do quiosque de ${p.nome}…` : p.fase === "entrando" ? `Chegando ao balcão de ${p.nome}…` : p.fase === "saindo" ? `Saindo do quiosque de ${p.nome}…` : `No balcão de ${p.nome}`;
   if (p.fase === "indo") return `A caminho de ${p.nome}…`;
   if (p.fase === "entrando") return p.atendido ? "Voltando à recepção…" : `Entrando em ${p.nome}…`;
   if (p.fase === "saindo") return `Saindo de ${p.nome}…`;
@@ -125,7 +127,7 @@ export function Recepcao() {
             {predio.fase === "dentro" && lib && !andando && <button type="button" onClick={() => st().encaminhar(lib)} className="shrink-0 whitespace-nowrap rounded-full bg-[#16A34A] px-3 py-1.5 text-[13px] hover:brightness-110">Falar com {primeiroNome(lib.nome)}</button>}
             {/* andando por dentro (data/plantaInterna.ts): toque no chão para ir a outro lugar; voltar ao balcão ou sair */}
             {predio.fase === "dentro" && <button type="button" onClick={() => st().voltarRecepcao()} className="shrink-0 whitespace-nowrap rounded-full bg-white/10 px-3 py-1.5 text-[13px] hover:bg-white/20">{lib ? "Recepção" : "Ir à recepção"}</button>}
-            {predio.fase !== "saindo" && <button type="button" onClick={() => st().sairDoPredio()} className="shrink-0 whitespace-nowrap rounded-full bg-white/10 px-3 py-1.5 text-[13px] hover:bg-white/20">{predio.fase === "indo" ? "Cancelar" : lib ? "Sair" : "Sair do prédio"}</button>}
+            {predio.fase !== "saindo" && <button type="button" onClick={() => st().sairDoPredio()} className="shrink-0 whitespace-nowrap rounded-full bg-white/10 px-3 py-1.5 text-[13px] hover:bg-white/20">{predio.fase === "indo" ? "Cancelar" : lib || predio.balcao ? "Sair" : "Sair do prédio"}</button>}
           </div>
         </div>
       </>
@@ -161,7 +163,8 @@ function Balcao() {
   const atendente = terreno?.escritorio?.equipe.find((m) => m.papel === "atendente") ?? null;
   const nomeAt = atendente?.nome ?? "A recepção";
   const equipe = terreno?.escritorio?.equipe.length ?? 0;
-  const destinos = useMemo(() => destinosDaRecepcao(terreno?.escritorio, !!sedeDe(predio.chave)), [terreno?.escritorio, predio.chave]);
+  // no balcão do quiosque de um lote em quartos não há setor para onde ir: a atendente atende ali mesmo, como na orla
+  const destinos = useMemo(() => (predio.balcao ? [] : destinosDaRecepcao(terreno?.escritorio, !!sedeDe(predio.chave))), [terreno?.escritorio, predio.chave, predio.balcao]);
   const saudacao = (() => { const s = atendente?.treino?.saudacao || `Olá! Sou ${nomeAt}, da recepção de ${predio.nome}. Em que posso ajudar?`; return s.includes("?") ? s : `${s} Em que posso ajudar?`; })();
   // visitante: espera a vez; quando chega, a atendente cumprimenta e a conversa abre (quem volta de um setor não espera)
   const [atendido, setAtendido] = useState(dono || !!predio.atendido);
@@ -175,15 +178,15 @@ function Balcao() {
   }, [dono, predio.atendido, predio.esperaMs, predio.chave, saudacao]);
   const sair = () => usePersonagem.getState().sairDoPredio();
   return (
-    <div className={CAIXA} role="dialog" aria-label={`Recepção de ${predio.nome}`}>
+    <div className={CAIXA} role="dialog" aria-label={`${predio.balcao ? "Quiosque" : "Recepção"} de ${predio.nome}`}>
       <div className="painel-entra overflow-hidden rounded-2xl bg-[#0E1013]/95 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur">
         <div className="flex items-center gap-3 px-4 pb-2 pt-3.5">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[15px] font-bold" style={{ background: atendente?.camisa ?? "#16A34A" }}>{nomeAt.slice(0, 1)}</span>
           <div className="min-w-0 flex-1">
-            <div className="text-[12px] font-semibold text-white/55">Recepção de {predio.nome}</div>
+            <div className="text-[12px] font-semibold text-white/55">{predio.balcao ? "Quiosque" : "Recepção"} de {predio.nome}</div>
             <div className="truncate text-[15px] font-bold">{nomeAt}{atendente?.cargo ? <span className="ml-1.5 text-[12px] font-medium text-white/55">{atendente.cargo}</span> : null}</div>
           </div>
-          <button type="button" onClick={sair} className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-white/20">Sair do prédio</button>
+          <button type="button" onClick={sair} className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-white/20">{predio.balcao ? "Sair" : "Sair do prédio"}</button>
         </div>
         {dono ? (
           <div className="px-4 pb-4">
@@ -196,7 +199,7 @@ function Balcao() {
         ) : !atendido ? (
           <div className="px-4 pb-4">
             <p className="rounded-2xl rounded-tl-md bg-white/[.07] px-3.5 py-2.5 text-[14px] leading-snug">
-              {predio.fila ? `${nomeAt} está terminando um atendimento. Você é o ${predio.fila + 1}º da fila; aguarde a sua vez.` : `Olá! Seja bem-vindo à recepção de ${predio.nome}. ${nomeAt} já vem te atender, aguarde um instante.`}
+              {predio.fila ? `${nomeAt} está terminando um atendimento. Você é o ${predio.fila + 1}º da fila; aguarde a sua vez.` : `Olá! Seja bem-vindo ${predio.balcao ? "ao quiosque" : "à recepção"} de ${predio.nome}. ${nomeAt} já vem te atender, aguarde um instante.`}
             </p>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden><i className="recepcao-espera block h-full rounded-full bg-[#16A34A]" style={{ animationDuration: `${predio.esperaMs}ms` }} /></div>
             <p className="mt-1.5 text-[12px] text-white/50">Aguardando atendimento…</p>

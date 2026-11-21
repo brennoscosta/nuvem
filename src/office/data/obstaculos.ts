@@ -5,7 +5,7 @@
 // contra estas caixas: umas poucas dezenas de testes de caixa, no lugar de um raio contra todas as malhas da cena.
 // Tudo aqui é função pura (sem three.js, sem React): testável com tsx.
 import { LOTES, LOTE_POR_CHAVE, type ModeloCasa } from "./mundo";
-import { poseConferida, posesDaCidade } from "./posicaoPredio"; // 21/11/2026: centro e giro de cada prédio (modo "Editar posição")
+import { poseConferida, posesDaCidade, quartosDoTerreno, conferirQuartos } from "./posicaoPredio"; // 21/11/2026: centro e giro de cada prédio (modo "Editar posição")
 import { DIM_LAYOUT, alturaPredio, andaresDoPredio, type Escritorio } from "./escritorio";
 import { ehKit, medidasKit } from "./predios";
 import { SEDES, alturaSede, degrausEstudio, logosModeloSede, type EstiloSede } from "./sedes";
@@ -74,6 +74,18 @@ export function caixasDaCidade(terrenos: Record<string, TerrenoCaixa>): Caixa[] 
     if (t.status !== "ativo" || !t.escritorio || t.anexoDe) continue;
     const l = LOTE_POR_CHAVE[t.chave]; if (!l) continue;
     const la = anexos[t.chave] ? LOTE_POR_CHAVE[anexos[t.chave]] : null, duplo = !!la;
+    // lote em quartos (21/11/2026, data/quartosLote.ts): uma caixa por estrutura (o quiosque como os da orla; o prédio médio
+    // com a fundura reduzida)
+    if (quartosDoTerreno(t, anexos[t.chave] ?? null)) {
+      const e = t.escritorio;
+      for (const p of conferirQuartos(t.chave, e).poses) {
+        if (p.estrutura?.tamanho === "quiosque") { out.push({ ...p.caixa, y0: 0, y1: 4.0 }); continue; }
+        if (!ehKit(e.layout)) continue;
+        const m = medidasKit(e.layout, andaresDoPredio(e), false, (e.decor?.cobertura ?? "nenhuma") !== "nenhuma", false, false, true);
+        out.push(girada(p.centro[0], p.centro[1], p.rot, -m.w / 2, m.w / 2, m.z0, m.z1, alturaPredio(e)));
+      }
+      continue;
+    }
     const pc = poseConferida(t, anexos[t.chave] ?? null); if (!pc) continue;
     const [cx, cz] = pc.pose.centro, rot = pc.pose.rot;
     const h = alturaPredio(t.escritorio, duplo), lay = t.escritorio.layout;

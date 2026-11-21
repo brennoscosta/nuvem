@@ -20,7 +20,7 @@ import { Restaurante } from "./Restaurante";
 import { SedeHQ } from "./OneStateHQ";
 import { SEDES } from "../data/sedes";
 import { Lotes } from "./Lotes";
-import { Quiosques } from "./Quiosques";
+import { Quiosques, QuiosquesDosLotes } from "./Quiosques";
 import { RealceExpansao } from "./RealceExpansao";
 import { RealceReserva } from "./RealceReserva"; // câmera e realce do terreno no formulário de reserva (WE-07)
 import { Horizonte } from "./Horizonte";
@@ -220,8 +220,8 @@ export function Mundo() {
       <Depois etapa={2}><SoDePerto nome="gente-praia"><GentePraia /></SoDePerto></Depois>
       <Depois etapa={1}><Personagens /></Depois>
       <Perto cx={0} cz={0} raio={raio + 100}><Isolado><Lotes /></Isolado>
-      {/* quiosques e o realce do vizinho ao expandir o terreno (20/11/2026); o do terreno em reserva (WE-07, 21/11/2026) */}
-      <Isolado><Quiosques /><RealceExpansao /><RealceReserva /></Isolado>
+      {/* quiosques, quiosques dos lotes em quartos, o realce do vizinho ao expandir o terreno (20/11/2026) e o do terreno em reserva (WE-07, 21/11/2026) */}
+      <Isolado><Quiosques /><QuiosquesDosLotes /><RealceExpansao /><RealceReserva /></Isolado>
       <Isolado><EscritoriosClientes /></Isolado>
       <Isolado><PortasPredios /></Isolado>
       <EditorPosicao3D />

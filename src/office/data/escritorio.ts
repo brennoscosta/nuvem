@@ -7,6 +7,7 @@ import { KIT_ANDARES, ehKit, medidasKit, type KitId } from "./predios";
 import { sortearPersonalidades, aleatorioDe, falaDe } from "./personalidades";
 import { LARG_PORTAO, type Catraca } from "./plantaSede";
 import { MODELO, MODELO_INICIAL, ehModelo, modeloDe, type IdModelo } from "./modelos";
+import { limparQuartos, type QuartosLote } from "./quartosLote";
 
 // Prédios gerados no Higgsfield (imagem → 3D), em public/modelos/escritorio-*.glb. Todos têm um quadro escuro em
 // branco acima da entrada: é onde entra o letreiro com o nome e a logo da empresa (posição em `letreiro`).
@@ -170,9 +171,12 @@ export const pecaEfetiva = (d: Decoracao | undefined, nicho: string | null | und
 // desloc (21/11/2026, modo "Editar posição", data/posicaoPredio.ts): quanto o prédio anda dentro do lote, [dx, dz] em metros
 // nos eixos do mundo, de 0,5 em 0,5 m. O giro e o deslocamento só mudam pela rota da posição (src/server/posicao.ts), que
 // confere limites e a porta; o painel do escritório não mexe neles.
+// quartos (21/11/2026, lote em quartos, data/quartosLote.ts): o que cada quarto do lote tem (quiosques e o prédio médio).
+// Sem o campo, o prédio é grande, no lote inteiro, como sempre.
 export interface Decoracao {
   giro: 0 | 1 | 2 | 3; desloc?: [number, number]; letreiro: EstiloLetreiro; toldo: string | null; piso: PisoLote; cerca: CercaLote; arvores: number; extras: ExtraLote[]; interior?: Interior;
   andares?: number; cobertura?: CoberturaId; material?: MaterialFachada; corFachada?: string | null; led?: Led; vitrineJanela?: boolean; peca?: PecaArea;
+  quartos?: QuartosLote | null;
 }
 export const DECOR_PADRAO: Decoracao = { giro: 0, letreiro: "painel", toldo: null, piso: "grama", cerca: "nenhuma", arvores: 0, extras: [] };
 export const ESTILOS_LETREIRO: { id: EstiloLetreiro; nome: string; desc: string }[] = [
@@ -209,10 +213,13 @@ export function limparDecor(x: unknown, base: Decoracao = DECOR_PADRAO): Decorac
   const dIn = Array.isArray(o.desloc) && o.desloc.length === 2 ? o.desloc.map(Number) : null;
   const encaixe = (v: number) => Math.max(-10, Math.min(10, Math.round(v * 2) / 2));
   const desloc: [number, number] = dIn && dIn.every(Number.isFinite) ? [encaixe(dIn[0]), encaixe(dIn[1])] : base.desloc ? [...base.desloc] : [0, 0];
+  // lote em quartos (21/11/2026): sem o campo, fica o que estava; null volta ao prédio grande (o servidor confere as posições)
+  const quartos = o.quartos === undefined ? base.quartos ?? null : limparQuartos(o.quartos);
   return {
     giro, desloc, letreiro: um(o.letreiro, ESTILOS_LETREIRO, base.letreiro), toldo, piso: um(o.piso, PISOS, base.piso), cerca: um(o.cerca, CERCAS, base.cerca), arvores: Math.max(0, Math.min(4, Math.round(Number(o.arvores ?? base.arvores)) || 0)), extras, interior: limparInterior(o.interior, base.interior ?? INTERIOR_PADRAO),
     andares, cobertura: um(o.cobertura, COBERTURAS, base.cobertura ?? "nenhuma"), material: um(o.material, MATERIAIS, base.material ?? "original"), corFachada,
     led: limparLed(o.led, base.led ?? LED_PADRAO), vitrineJanela: typeof o.vitrineJanela === "boolean" ? o.vitrineJanela : base.vitrineJanela ?? true, peca,
+    ...(quartos ? { quartos } : {}),
   };
 }
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -238,8 +245,10 @@ export const DIM_LAYOUT: Record<LayoutId, { largura: number; prof: number }> = {
 export const andarAltura = (layout: LayoutId) => Math.max(3.4, Math.min(4.4, (LAYOUT[layout].altura / LAYOUT[layout].andares) * 0.55));
 export const andaresDoPredio = (e: Escritorio) => { const lim = limitesAndares(e.layout); const a = e.decor?.andares ?? 0; return a ? Math.max(lim.min, Math.min(lim.max, a)) : lim.base; };
 // altura do topo do prédio (m), para o balão e a câmera
+export const ALTURA_QUIOSQUE_LOTE = 4.7; // lote só com quiosques (o chalé tem a placa até 4,7 m: scene/Quiosques.tsx)
 export function alturaPredio(e: Escritorio, duplo = false) {
   const cob = e.decor?.cobertura ?? "nenhuma";
+  if (!duplo && e.decor?.quartos && !e.decor.quartos.predio) return ALTURA_QUIOSQUE_LOTE;
   // kit: altura de verdade (andares, telhado e caixa d'água), sem esticar no lote duplo
   if (ehKit(e.layout)) return medidasKit(e.layout, andaresDoPredio(e), duplo, cob !== "nenhuma").altura + (cob === "letreiro" ? 3.2 : cob === "terraco" ? 2.6 : cob === "jardim" ? 1.6 : cob === "solar" ? 1.2 : 0);
   const L = LAYOUT[e.layout]; const extra = andaresDoPredio(e) - L.andares;
@@ -333,7 +342,11 @@ export function normalizarEscritorio(x: unknown, base: Escritorio): Escritorio {
   const modeloFinal = modelo ?? modeloDe({ layout });
   // a posição do prédio (giro e deslocamento) não muda por aqui: só pela rota da posição, que confere tudo (21/11/2026)
   const decor = limparDecor(o.decor, base.decor ?? DECOR_PADRAO);
-  decor.giro = base.decor?.giro ?? 0; decor.desloc = base.decor?.desloc ? [...base.decor.desloc] : [0, 0];
+  // exceção (21/11/2026, lote em quartos): quando o tamanho no lote muda no painel, o giro escolhido ali (de frente para a
+  // rua) vale; o servidor confere a posição de novo (src/server/quartos.ts) e acerta o giro se não houver passagem
+  const mudouQuartos = JSON.stringify(decor.quartos ?? null) !== JSON.stringify(base.decor?.quartos ?? null);
+  if (!mudouQuartos) { decor.giro = base.decor?.giro ?? 0; decor.desloc = base.decor?.desloc ? [...base.decor.desloc] : [0, 0]; }
+  else decor.desloc = [0, 0];
   return { layout, setores, equipe, trocasLayout: base.trocasLayout ?? 0, creditosLayout: base.creditosLayout ?? 0, decor,
     ...(modeloFinal ? { modelo: modeloFinal } : {}), modelosComprados: [...(base.modelosComprados ?? [])] };
 }
@@ -343,16 +356,21 @@ const ordem = (p: PapelMembro) => (p === "atendente" ? 0 : p === "ceo" ? 1 : 2);
 // Prédio de 16 (x) × 14 (z). Frente em z = -7 (rua). Faixa da frente: Recepção à esquerda, hall no meio, Sala do CEO à
 // direita. Fundo: os setores em 1, 2, 3 ou 4 salas. Mesa: rot 0 = quem senta fica em -z olhando pra +z (convenção de layout.ts).
 export const PREDIO_CLIENTE = { x0: -8, x1: 8, z0: -7, z1: 7 };
+// Prédio médio (21/11/2026, lote em quartos, data/quartosLote.ts): a mesma faixa da frente (recepção, hall e sala do CEO,
+// de z = -7 a -1,5, com o balcão, a catraca e os móveis nos mesmos lugares) e o fundo mais raso, com os setores lado a lado
+// numa fileira só (16 × 8,4 m no total, para caber em meio lote).
+export const PREDIO_MEDIO = { x0: -8, x1: 8, z0: -7, z1: 1.4 };
 export const ALT_PAREDE_CLIENTE = 1.15; // paredes baixas (cutaway) na vista por dentro
 export interface MesaCliente { pos: [number, number, number]; rot: number; tipo: "comum" | "ceo" }
 export interface SalaCliente { id: string; nome: string; tipo: "recepcao" | "hall" | "ceo" | "setor"; cor: string; x0: number; x1: number; z0: number; z1: number; mesas: MesaCliente[]; setor?: Setor }
 export interface Lugar { pos: [number, number, number]; rot: number; sala: string; emPe?: boolean }
-export interface PlantaCliente { salas: SalaCliente[]; porta: [number, number]; balcao: [number, number]; lugares: Record<string, Lugar> }
+export interface PlantaCliente { salas: SalaCliente[]; porta: [number, number]; balcao: [number, number]; lugares: Record<string, Lugar>; limites: { x0: number; x1: number; z0: number; z1: number } }
 
 const cadeiraDe = (m: MesaCliente): { pos: [number, number, number]; rot: number } => ({ pos: [m.pos[0] - Math.sin(m.rot) * 0.62, 0, m.pos[2] - Math.cos(m.rot) * 0.62], rot: m.rot });
 
 export function plantaCliente(e: Escritorio): PlantaCliente {
-  const { x0, x1, z0, z1 } = PREDIO_CLIENTE;
+  const medio = !!e.decor?.quartos?.predio; // prédio médio do lote em quartos: a planta compacta
+  const { x0, x1, z0, z1 } = medio ? PREDIO_MEDIO : PREDIO_CLIENTE;
   const zMeio = -1.5; // divisa entre a faixa da frente e o fundo
   const mesaCeo: MesaCliente = { pos: [5.4, 0, -3.6], rot: Math.PI, tipo: "ceo" }; // CEO sentado atrás, olhando pra rua
   const salas: SalaCliente[] = [
@@ -361,7 +379,7 @@ export function plantaCliente(e: Escritorio): PlantaCliente {
     { id: "ceo", nome: "Sala do CEO", tipo: "ceo", cor: "#F6EEDF", x0: 2.2, x1, z0, z1: zMeio, mesas: [mesaCeo] },
   ];
   const n = Math.max(1, Math.min(MAX_SETORES, e.setores.length));
-  const caixas: [number, number, number, number][] = n === 1 ? [[x0, x1, zMeio, z1]] : n === 2 ? [[x0, 0, zMeio, z1], [0, x1, zMeio, z1]] : n === 3 ? [[x0, 0, zMeio, z1], [0, x1, zMeio, 2.75], [0, x1, 2.75, z1]] : [[x0, 0, zMeio, 2.75], [0, x1, zMeio, 2.75], [x0, 0, 2.75, z1], [0, x1, 2.75, z1]];
+  const caixas: [number, number, number, number][] = medio ? Array.from({ length: n }, (_, i): [number, number, number, number] => [x0 + (i * (x1 - x0)) / n, x0 + ((i + 1) * (x1 - x0)) / n, zMeio, z1]) : n === 1 ? [[x0, x1, zMeio, z1]] : n === 2 ? [[x0, 0, zMeio, z1], [0, x1, zMeio, z1]] : n === 3 ? [[x0, 0, zMeio, z1], [0, x1, zMeio, 2.75], [0, x1, 2.75, z1]] : [[x0, 0, zMeio, 2.75], [0, x1, zMeio, 2.75], [x0, 0, 2.75, z1], [0, x1, 2.75, z1]];
   e.setores.slice(0, n).forEach((s, i) => {
     const [sx0, sx1, sz0, sz1] = caixas[i];
     const cx = (sx0 + sx1) / 2, cz = (sz0 + sz1) / 2, larg = sx1 - sx0, prof = sz1 - sz0;
@@ -389,7 +407,7 @@ export function plantaCliente(e: Escritorio): PlantaCliente {
       lugares[m.id] = { ...cadeiraDe(mesa), sala: sala.id };
     }
   }
-  return { salas, porta, balcao, lugares };
+  return { salas, porta, balcao, lugares, limites: { x0, x1, z0, z1 } };
 }
 
 // Catracas da loja (20/11/2026, data/recepcao.ts): uma atravessando o hall (a porta da rua dá na frente dele; atrás ficam a

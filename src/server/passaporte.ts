@@ -25,8 +25,8 @@ import { bloqueio, contar } from "./limite";
 import { chaveDaLoja, numeroDaLoja } from "@/office/data/numeroLoja";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
 import { QUIOSQUE_POR_CHAVE, ehQuiosque, balcaoDoQuiosque } from "@/office/data/quiosques";
-import { entradaDoPredio } from "@/office/data/entradas";
-import { poseDoTerreno } from "@/office/data/posicaoPredio";
+import { entradasDoLote } from "@/office/data/entradas";
+import { posesDoTerreno } from "@/office/data/posicaoPredio";
 import { epocaDeNatal } from "@/office/data/natal";
 import { MORADOR_POR_ID } from "@/office/data/moradores";
 import { ACESSORIO_POR_ID } from "@/office/data/acessorios";
@@ -60,16 +60,17 @@ async function lojaParaCarimbo(numero: number): Promise<LojaCarimbo | null> {
   const cor = /^#[0-9a-fA-F]{6}$/.test(t.cor) ? t.cor : "#1D4ED8", logo = t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null;
   // quiosque: o carimbo é pela chave (quiosque-1xx); o balcão sai de data/quiosques.ts na hora (se o quiosque mudar de
   // lugar, a conferência acompanha sem mudar nada aqui)
+  // lote em quartos (21/11/2026, data/quartosLote.ts): o carimbo é um por empresa e vale em qualquer estrutura do lote (o
+  // prédio médio e cada quiosque, com o balcão de cada um)
   const pontosDaPose = (anexo: string | null): [number, number][] => {
     const terrenos: Record<string, Terreno> = { [t!.chave]: t! };
-    const pose = poseDoTerreno(t!.chave, terrenos, anexo ? { [t!.chave]: anexo } : {});
-    return pose ? [pose.porta, pose.centro] : [];
+    return posesDoTerreno(t!.chave, terrenos, anexo ? { [t!.chave]: anexo } : {}).flatMap((pose) => [pose.porta, pose.centro]);
   };
   if (ehQuiosque(t.chave)) { const k = QUIOSQUE_POR_CHAVE[t.chave]; return { t, chave: t.chave, numero, nome: t.empresaNome, cor, donoId: t.usuarioId, logo, balcoes: [...pontosDaPose(null), ...(k ? [balcaoDoQuiosque(k)] : [])] }; }
   const [anexo] = await sql<{ chave: string }[]>`SELECT chave FROM terreno WHERE anexo_de = ${t.chave} AND status = 'ativo' LIMIT 1`;
-  const e = entradaDoPredio(t, anexo?.chave ?? null);
+  const es = entradasDoLote(t, anexo?.chave ?? null);
   const centro = LOTE_POR_CHAVE[t.chave]?.centro ?? null;
-  const balcoes: [number, number][] = [...(e ? [e.espera] : []), ...pontosDaPose(anexo?.chave ?? null)];
+  const balcoes: [number, number][] = [...es.map((e) => e.espera), ...pontosDaPose(anexo?.chave ?? null)];
   if (!balcoes.length && centro) balcoes.push([centro[0], centro[1]]);
   return { t, chave: t.chave, numero, nome: t.empresaNome, cor, donoId: t.usuarioId, logo, balcoes };
 }

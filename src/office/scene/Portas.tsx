@@ -42,5 +42,6 @@ export function PortasPredios() {
   const terrenos = useMundo((s) => s.terrenos);
   const entradas = useMemo(() => entradasDaCidade(terrenos), [terrenos]);
   useFrame(({ clock }) => { MAT.opacity = 0.32 + 0.3 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 2.4)); });
-  return <group>{entradas.map((e) => <Porta key={e.chave} e={e} />)}</group>;
+  // lote em quartos (21/11/2026): uma porta por estrutura (o tapete do quiosque fica na frente do balcão)
+  return <group>{entradas.map((e) => <Porta key={`${e.chave}|${e.estrutura ?? ""}`} e={e} />)}</group>;
 }

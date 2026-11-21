@@ -36,7 +36,8 @@ export function enquadramento(chave: string) {
   // centro e giro do prédio (21/11/2026, data/posicaoPredio.ts); sem escritório, o centro do lote virado para a rua
   const pc = t?.escritorio ? poseConferida(t, anexo?.chave ?? null) : null;
   const [cx, cz] = pc ? pc.pose.centro : [la ? (l.centro[0] + la.centro[0]) / 2 : l.centro[0], l.centro[1]];
-  const rot = pc ? pc.pose.rot : frenteDoLote(l.k) + Math.PI;
+  // (lote em quartos só com quiosques: a frente do quiosque é +z, meia volta da do prédio)
+  const rot = pc ? pc.pose.rot + (pc.pose.estrutura?.tamanho === "quiosque" ? Math.PI : 0) : frenteDoLote(l.k) + Math.PI;
   const e = t?.escritorio;
   const altura = e && ehKit(e.layout) ? alturaPredio(e, !!la) : (e ? LAYOUT[e.layout]?.altura ?? 9 : 7) * (la ? DUPLO_ALTURA : 1);
   // a frente local do prédio é -z: girada por rot, vira (-sen rot, -cos rot) no mapa; a foto vem de três quartos (28°)

@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { BotaoCobrar } from "./Cobrar";
 
-import { CATEGORIAS_MODELO, MODELOS, MODELO, USOS, brlModelo, modeloDe, modelosLiberados, type CategoriaModelo, type IdModelo } from "../data/modelos";
+import { CATEGORIAS_MODELO, MODELOS, MODELO, USOS, brlModelo, modeloDe, modelosLiberados, cabeEmMeioLote, type CategoriaModelo, type IdModelo } from "../data/modelos";
 import { LAYOUT, type Escritorio } from "../data/escritorio";
 
 function Foto({ id, layout }: { id: string; layout?: string }) {
@@ -17,9 +17,10 @@ function Foto({ id, layout }: { id: string; layout?: string }) {
   return <img src={src} alt="" loading="lazy" onError={() => (layout && src !== `/escritorios/${layout}.jpg` ? setSrc(`/escritorios/${layout}.jpg`) : setFalhou(true))} className="h-16 w-20 shrink-0 rounded-lg bg-[#E9ECF1] object-cover" />;
 }
 
-export function CatalogoModelos({ e, set, salvo, duplo, comprar, pagando, erro }: {
+// soMedio (21/11/2026, lote em quartos): com o prédio médio, só os modelos que cabem em meio lote (data/modelos.ts › MODELOS_MEDIO)
+export function CatalogoModelos({ e, set, salvo, duplo, comprar, pagando, erro, soMedio = false }: {
   e: Escritorio; set: (e: Escritorio) => void; salvo: Escritorio | null; duplo: boolean;
-  comprar: (id: IdModelo, creditos: boolean) => void; pagando: boolean; erro: string | null;
+  comprar: (id: IdModelo, creditos: boolean) => void; pagando: boolean; erro: string | null; soMedio?: boolean;
 }) {
   const [cat, setCat] = useState<CategoriaModelo | null>(null);
   const atual = modeloDe(e), doLote = salvo ? modeloDe(salvo) : null;
@@ -43,7 +44,13 @@ export function CatalogoModelos({ e, set, salvo, duplo, comprar, pagando, erro }
         </div>
       )}
       {lista.map((m) => {
-        const ativo = atual === m.id, seu = liberados.has(m.id), noLote = doLote === m.id, falta2 = m.lotes === 2 && !duplo;
+        const ativo = atual === m.id, seu = liberados.has(m.id), noLote = doLote === m.id, falta2 = m.lotes === 2 && !duplo, naoCabe = soMedio && !cabeEmMeioLote(m.id);
+        if (naoCabe) return (
+          <div key={m.id} data-modelo-grande={m.id} className="flex items-center gap-3 rounded-xl border-2 border-dashed border-black/10 p-2 opacity-60">
+            <Foto id={m.id} layout={m.base} />
+            <span className="min-w-0 flex-1"><span className="block text-sm font-bold">{m.nome}</span><span className="block text-[11px] leading-snug text-[#5B6472]">Só no prédio grande: a frente dele não cabe em meio lote.</span></span>
+          </div>
+        );
         const etiqueta = noLote ? "No seu lote" : m.preco === 0 ? "Grátis" : seu ? "Comprado" : brlModelo(m.preco);
         return (
           <div key={m.id} className={`rounded-xl border-2 ${ativo ? "border-[#1D4ED8] bg-[#EEF3FF]" : "border-black/10 hover:bg-black/[0.02]"}`}>

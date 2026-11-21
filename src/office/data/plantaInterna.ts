@@ -15,8 +15,8 @@
 //    sala do setor (liberarCaminho).
 // Tudo aqui é função pura (sem three.js, sem React): testável com tsx.
 import { LOTE_POR_CHAVE } from "./mundo";
-import { poseConferida } from "./posicaoPredio"; // centro e giro do prédio no lote (21/11/2026, modo "Editar posição")
-import { PREDIO_CLIENTE, plantaCliente, catracasCliente, Z_CATRACA_CLIENTE, DECORACAO_DISCRETA, type Escritorio } from "./escritorio";
+import { poseConferida, quartosDoTerreno } from "./posicaoPredio"; // centro e giro do prédio no lote (21/11/2026, modo "Editar posição")
+import { plantaCliente, catracasCliente, Z_CATRACA_CLIENTE, DECORACAO_DISCRETA, type Escritorio } from "./escritorio";
 import { sedeDe } from "./sedes";
 import { montarSalas, paredesDaSede, lugaresDaSala, catracasDaSede, cx, X0 as SX0, X1 as SX1, Z0 as SZ0, Z1 as SZ1, ZC, CORREDOR, ESP_PAREDE, MESA_COMPACTA, MOVEIS_SEDE, type Catraca } from "./plantaSede";
 import type { Ponto } from "./caminhos";
@@ -98,8 +98,8 @@ function plantaDaLoja(chave: string, nome: string, e: Escritorio, anexo: string 
   const l = LOTE_POR_CHAVE[chave]; if (!l) return null;
   const pc = poseConferida({ chave, status: "ativo", escritorio: e }, anexo); if (!pc) return null;
   const centro: Ponto = pc.pose.centro, rot = pc.pose.rot;
-  const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = PREDIO_CLIENTE;
   const pl = plantaCliente(e);
+  const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = pl.limites; // a planta de sempre ou a compacta do prédio médio (lote em quartos)
   const zMeio = pl.salas[0].z1;
   const b: Ret[] = [];
   b.push(...paredeComPorta([X0, Z0], [X1, Z0], 2.2), parede([X0, Z1], [X1, Z1]), parede([X0, Z0], [X0, Z1]), parede([X1, Z0], [X1, Z1]));
@@ -131,6 +131,8 @@ function plantaDaLoja(chave: string, nome: string, e: Escritorio, anexo: string 
 interface TerrenoPlanta { chave: string; empresaNome: string; status: string; escritorio: Escritorio | null; anexoDe?: string | null }
 export function plantaInterna(t: TerrenoPlanta | null | undefined, anexo: string | null = null): PlantaInterna | null {
   if (!t || t.status !== "ativo" || !t.escritorio || t.anexoDe) return null;
+  // lote em quartos só com quiosques: não há prédio para entrar (os quiosques atendem no balcão)
+  const q = quartosDoTerreno(t, anexo); if (q && !q.predio) return null;
   return sedeDe(t.chave) ? plantaDaSede(t.chave, t.empresaNome, t.escritorio) : plantaDaLoja(t.chave, t.empresaNome, t.escritorio, anexo);
 }
 // a planta do prédio `chave` a partir da lista de terrenos do mapa (acha a ampliação do lote duplo sozinha)

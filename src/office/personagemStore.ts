@@ -26,7 +26,8 @@ export type FasePredio = "indo" | "entrando" | "recepcao" | "dentro" | "saindo";
 // liberarCaminho), onde ele para (ponto) e quem atende (agente). `atendido`: a recepção já falou com ele nesta visita.
 export type Liberado = Destino & { acesso: AcessoLiberado; ponto: [number, number]; agente: [number, number]; chegou: boolean };
 // trilha (21/11/2026, modo "Editar posição"): o caminho pelo lote da frente da porta até a calçada (data/entradas.ts)
-export type PredioAtual = Pick<Entrada, "chave" | "nome" | "numero" | "fora" | "porta" | "espera" | "olhar" | "centro" | "trilha"> & { fase: FasePredio; visita: number; fila: number; esperaMs: number; atendido?: boolean; liberado?: Liberado | null };
+// balcao e estrutura (21/11/2026, lote em quartos): no quiosque do lote não há interior; a pessoa fica no balcão
+export type PredioAtual = Pick<Entrada, "chave" | "nome" | "numero" | "fora" | "porta" | "espera" | "olhar" | "centro" | "trilha" | "balcao" | "estrutura"> & { fase: FasePredio; visita: number; fila: number; esperaMs: number; atendido?: boolean; liberado?: Liberado | null };
 // o que o meu personagem pode usar por dentro deste prédio: dono e sócio, tudo; visitante, a recepção ou o caminho liberado
 export function acessoNoPredio(p: Pick<PredioAtual, "chave" | "liberado">): Acesso {
   if (useMundo.getState().meus.includes(p.chave)) return false;
@@ -201,9 +202,11 @@ export const usePersonagem = create<Estado>((set, get) => ({
   },
   entrarNoPredio: (e) => {
     const st = get(); if (!st.ativo) return;
-    if (st.predio && st.predio.fase !== "indo" && st.predio.chave !== e.chave) return; // primeiro sai do prédio em que está
-    if (st.predio?.chave === e.chave && st.predio.fase !== "indo") return;
-    const pl = plantaPorChave(e.chave, useMundo.getState().terrenos);
+    // lote em quartos: cada estrutura (o prédio e cada quiosque) é um lugar; primeiro sai do lugar em que está
+    const mesmo = !!st.predio && st.predio.chave === e.chave && (st.predio.estrutura ?? null) === (e.estrutura ?? null);
+    if (st.predio && st.predio.fase !== "indo" && !mesmo) return; // primeiro sai do prédio em que está
+    if (mesmo && st.predio!.fase !== "indo") return;
+    const pl = e.balcao ? null : plantaPorChave(e.chave, useMundo.getState().terrenos);
     const porDentro = pl ? [portaDentroMundo(pl), ...(rotaDentro(pl, portaDentroMundo(pl), e.espera, false) ?? [e.espera])] : [e.espera];
     const pelaTrilha = [...(e.trilha ?? [])].reverse(); // da calçada até a frente da porta, por dentro do lote
     const vaga = st.veiculo ? vagaNaPorta(e.chave, e.fora, pelaTrilha[0] ?? e.porta) : null;
@@ -211,7 +214,7 @@ export const usePersonagem = create<Estado>((set, get) => ({
     if (vaga) { const fim = ate[ate.length - 2]; vaga.x = fim[0]; vaga.z = fim[1]; }
     const [primeiro, ...resto] = [...ate, ...pelaTrilha, e.porta, ...porDentro];
     set({ destino: primeiro, rota: resto, passeio: false, falaRecepcao: null, acaoNoPonto: vaga ? { ponto: [vaga.x, vaga.z], acao: "descer", parada: vaga } : null,
-      predio: { chave: e.chave, nome: e.nome, numero: e.numero, fora: e.fora, porta: e.porta, espera: e.espera, olhar: e.olhar, centro: e.centro, trilha: e.trilha ?? [], fase: "indo", visita: (st.predio?.visita ?? 0) + 1, fila: 0, esperaMs: 0 } });
+      predio: { chave: e.chave, nome: e.nome, numero: e.numero, fora: e.fora, porta: e.porta, espera: e.espera, olhar: e.olhar, centro: e.centro, trilha: e.trilha ?? [], ...(e.balcao ? { balcao: true } : {}), ...(e.estrutura ? { estrutura: e.estrutura } : {}), fase: "indo", visita: (st.predio?.visita ?? 0) + 1, fila: 0, esperaMs: 0 } });
     useMundo.setState({ loteSelecionado: null, alvoCamera: [e.fora[0], 0.5, e.fora[1]] });
     useSede.setState({ aberto: false });
     get().avisarMovimento();
@@ -219,8 +222,8 @@ export const usePersonagem = create<Estado>((set, get) => ({
   sairDoPredio: () => {
     const p = get().predio; if (!p) return;
     if (p.fase === "indo") { set({ predio: null, destino: null, rota: [], falaRecepcao: null }); return; }
-    // de onde estiver por dentro até a porta, pelo caminho interno, e então para a calçada
-    const pl = plantaPorChave(p.chave, useMundo.getState().terrenos);
+    // de onde estiver por dentro até a porta, pelo caminho interno, e então para a calçada (no balcão do quiosque, direto)
+    const pl = p.balcao ? null : plantaPorChave(p.chave, useMundo.getState().terrenos);
     const ate = pl ? rotaDentro(pl, [minhaPos.x, minhaPos.z], portaDentroMundo(pl), acessoNoPredio(p)) ?? [portaDentroMundo(pl)] : [];
     const sb = subirNaSaida(p, get().bicicletaParada);
     const [primeiro, ...resto] = [...ate, p.porta, ...(p.trilha ?? []), p.fora, ...sb.pts];
@@ -229,6 +232,13 @@ export const usePersonagem = create<Estado>((set, get) => ({
   andarNoPredio: (x, z) => {
     const st = get(), p = st.predio; if (!p) return;
     const mundo = useMundo.getState();
+    // no balcão de um quiosque do lote (sem interior): tocar no chão sai pelo caminho do lote e segue até o ponto tocado
+    if (p.balcao) {
+      const sb = subirNaSaida(p, st.bicicletaParada);
+      const [primeiro, ...resto] = [p.porta, ...(p.trilha ?? []), p.fora, ...sb.pts, ...rota(sb.pts[0] ?? p.fora, [x, z])];
+      set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "saindo" }, falaRecepcao: null, acaoNoPonto: sb.acao });
+      get().avisarMovimento(); return;
+    }
     const pl = plantaPorChave(p.chave, mundo.terrenos); if (!pl) return;
     const publico = acessoNoPredio(p);
     const de: [number, number] = [minhaPos.x, minhaPos.z];

@@ -33,7 +33,8 @@ import { useEscritorio } from "../store";
 import { usePersonagem } from "../personagemStore";
 import { catracasCliente } from "../data/escritorio";
 import { Catracas } from "./Catraca";
-import { poseConferida, conferirComEnfeites, passagemNoPatio, rotDoPatio, type LadoPatio } from "../data/posicaoPredio";
+import { poseConferida, conferirComEnfeites, passagemNoPatio, rotDoPatio, quartosDoTerreno, conferirQuartos, patioDosQuartos, ID_PREDIO, type LadoPatio } from "../data/posicaoPredio";
+import { QuartosLivres } from "./QuartosLote";
 import { usePoseAoVivo, useFantasma } from "./EditorPosicao";
 import { useEdicao } from "../edicaoStore";
 
@@ -50,14 +51,16 @@ function ExteriorKit({ chave, e, cor, nome, logo, duplo = false, contratando = f
   const corF = d.corFachada ?? cor;
   const andares = ANDARES_TESTE ? Math.max(lim.min, Math.min(lim.max, ANDARES_TESTE)) : andaresDoPredio(e);
   const cobertura = COBERTURA_TESTE ?? d.cobertura ?? "nenhuma", plana = cobertura !== "nenhuma";
-  const m = medidasKit(id, andares, duplo, plana), lt = m.letreiro;
+  // prédio médio do lote em quartos (21/11/2026): o mesmo modelo com a fundura reduzida (data/predios.ts › PLANTA_MEDIO)
+  const medio = !duplo && !!e.decor?.quartos?.predio;
+  const m = medidasKit(id, andares, duplo, plana, false, false, medio), lt = m.letreiro;
   const led = LED_TESTE ?? d.led;
   // Sede corporativa (20/11/2026, data/modelos.ts › sede): nos dois lotes são duas torres de vidro gêmeas, com o saguão de
   // vidro entre elas e uma passarela no meio (num lote duplo qualquer modelo fica largo: a sede tem de ser diferente)
   const gemeas = e.modelo === "sede" && duplo;
   return (
     <group>
-      {gemeas ? <TorresGemeas chave={chave} andares={andares} material={material} corF={corF} cor={cor} /> : <PredioKit id={id} andares={andares} duplo={duplo} material={material} corFachada={corF} corMarca={cor} semente={chave} plana={plana} />}
+      {gemeas ? <TorresGemeas chave={chave} andares={andares} material={material} corF={corF} cor={cor} /> : <PredioKit id={id} andares={andares} duplo={duplo} material={material} corFachada={corF} corMarca={cor} semente={chave} plana={plana} medio={medio} />}
       {m.telao && <TelaoModelo nome={nome} cor={cor} logo={logo} telao={m.telao} />}
       {plana && !gemeas && <group position={[m.topo.x, 0, 0]}><Cobertura tipo={cobertura} w={m.topo.w} d={m.topo.d} y={m.topo.y} cz={m.topo.cz} nome={nome} cor={cor} logo={logo} /></group>}
       <group position={[lt.x, 0, 0]}>
@@ -270,6 +273,8 @@ function ParedeComPorta({ de, ate, vao = 1.6, cor }: { de: [number, number]; ate
 export function InteriorFixo({ e, cor, logo = null }: { e: Escritorio; cor: string; logo?: string | null }) {
   const planta = useMemo(() => plantaCliente(e), [e]);
   const zMeio = planta.salas[0].z1;
+  // os limites da planta (a de sempre, 16 × 14 m, ou a compacta do prédio médio do lote em quartos, 16 × 8,4 m)
+  const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = planta.limites, LARG = X1 - X0, PROF = Z1 - Z0;
   // interior personalizável (12/11/2026): cor das paredes, piso único, tampo das mesas e plantas
   const it = e.decor?.interior ?? INTERIOR_PADRAO;
   const pisoUnico = PISOS_INTERIOR.find((p) => p.id === it.piso)?.cor ?? null;
@@ -282,7 +287,7 @@ export function InteriorFixo({ e, cor, logo = null }: { e: Escritorio; cor: stri
       {planta.salas.map((s) => (
         <mesh key={s.id} geometry={plano(s.x1 - s.x0, s.z1 - s.z0)} material={mat(pisoUnico ?? s.cor, { rough: it.piso === "porcelanato" ? 0.45 : 0.95 })} position={[(s.x0 + s.x1) / 2, 0.06, (s.z0 + s.z1) / 2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow />
       ))}
-      <mesh geometry={caixa(LARG + 0.6, 0.1, PROF + 0.6)} material={mat("#D8D4CC", { rough: 0.95 })} position={[0, 0, 0]} receiveShadow />
+      <mesh geometry={caixa(LARG + 0.6, 0.1, PROF + 0.6)} material={mat("#D8D4CC", { rough: 0.95 })} position={[(X0 + X1) / 2, 0, (Z0 + Z1) / 2]} receiveShadow />
       {/* paredes externas (frente com a porta) */}
       {PP({ de: [X0, Z0], ate: [X1, Z0], vao: 2.2 })}
       {P({ de: [X0, Z1], ate: [X1, Z1] })}
@@ -333,6 +338,7 @@ const clara = (hex: string) => { const n = parseInt(hex.slice(1), 16); return (0
 // tapete do setor: do tamanho do grupo de mesas (o piso aparece em volta); cor de setor muito clara vira um tom mais escuro
 const corTapete = (c: string) => (clara(c) ? escurecerCli(c, 0.35) : clarearCli(c, 0.38));
 function DecoracaoCliente({ planta, it, cor, logo }: { planta: PlantaCliente; it: Interior; cor: string; logo: string | null }) {
+  const { x1: X1, z1: Z1 } = planta.limites; // a planta de sempre ou a compacta do prédio médio
   const tem = new Set(it.decoracao ?? DECORACAO_DISCRETA);
   const marca = corValida(cor, "#1D4ED8");
   const setores = planta.salas.filter((s) => s.tipo === "setor");
@@ -465,19 +471,26 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
   const grupo = useRef<THREE.Group>(null);
   const pc = poseConferida({ chave, status: "ativo", escritorio: e }, anexo);
   const pose = pc?.pose ?? null, tc = pose?.terreno.centro ?? [0, 0];
-  const poseEd = useEdicao((s) => (s.chave === chave ? s.pose : null)), confEd = useEdicao((s) => (s.chave === chave ? s.conf : null));
-  const confBase = useMemo(() => (pose ? conferirComEnfeites(pose, e.decor) : null), [pose, e.decor]);
+  // lote em quartos (21/11/2026, data/quartosLote.ts): o prédio médio é a estrutura "predio" (a principal, quando existe);
+  // os quiosques do lote são desenhados em scene/Quiosques.tsx › QuiosquesDosLotes. O pátio fica virado para a rua da
+  // frente, os enfeites saem de cima de qualquer estrutura e a cerca abre na saída de cada uma.
+  const q = quartosDoTerreno({ chave, status: "ativo", escritorio: e }, anexo);
+  const temPredio = !q || !!q.predio, idEd = q ? ID_PREDIO : null;
+  const patioQ = useMemo(() => (q ? patioDosQuartos(conferirQuartos(chave, e), e.decor) : null), [q, chave, e]);
+  const poseEd = useEdicao((s) => (s.chave === chave && (s.estrutura ?? null) === idEd ? s.pose : null)), confEd = useEdicao((s) => (s.chave === chave && (s.estrutura ?? null) === idEd ? s.conf : null));
+  const confBase = useMemo(() => (pose && !q ? conferirComEnfeites(pose, e.decor) : null), [pose, e.decor, q]);
   // decoração gravada só com a posição (giro e deslocamento): o resto vem do padrão
   const decorCompleta = useMemo(() => ({ ...DECOR_PADRAO, ...(e.decor ?? {}) }), [e.decor]);
-  usePoseAoVivo(grupo, chave, pose ? [pose.centro[0] - tc[0], pose.centro[1] - tc[1], pose.rot] : [0, 0, 0], (p) => [p.centro[0] - tc[0], p.centro[1] - tc[1], p.rot]);
-  useFantasma(grupo, chave);
+  usePoseAoVivo(grupo, chave, pose ? [pose.centro[0] - tc[0], pose.centro[1] - tc[1], pose.rot] : [0, 0, 0], (p) => [p.centro[0] - tc[0], p.centro[1] - tc[1], p.rot], idEd);
+  useFantasma(grupo, chave, idEd);
   const l = LOTE_POR_CHAVE[chave]; if (!l || !pose) return null;
   // lote duplo: o prédio vai para o meio dos dois terrenos (o vizinho do lado, mesma rua)
   const la = anexo ? LOTE_POR_CHAVE[anexo] : null; const dx = la ? (la.centro[0] - l.centro[0]) / 2 : 0;
   const [x, z] = tc;
   // nossa frente local é -z (a pose já soma a frente do lote, o giro do dono e a meia volta do lote duplo)
   const rot = pose.rot;
-  const pPatio = poseEd ?? pose, confPatio = confEd ?? confBase, rotPatio = rotDoPatio(pPatio), passagem = passagemNoPatio(pPatio, confPatio);
+  const pPatio = q ? pose : poseEd ?? pose, confPatio = confEd ?? confBase, rotPatio = rotDoPatio(pPatio);
+  const passagens = patioQ ? patioQ.passagens : [passagemNoPatio(pPatio, confPatio)], escondidos = patioQ ? patioQ.escondidos : confPatio?.escondidos;
   const it = e.decor?.interior;
   const planta = plantaCliente(e);
   const assinatura = JSON.stringify(e) + cor + nome + (logo ?? "");
@@ -485,16 +498,17 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
   const placa = (e.decor?.extras ?? []).includes("placa");
   const peca = pecaEfetiva(e.decor, nicho);
   // onde fica a fachada (peça da área, inauguração): nos tipos do kit vem das medidas de cada um
-  const mk = ehKit(e.layout) ? medidasKit(e.layout, andaresDoPredio(e), !!la, (e.decor?.cobertura ?? "nenhuma") !== "nenhuma") : null;
+  const mk = ehKit(e.layout) ? medidasKit(e.layout, andaresDoPredio(e), !!la, (e.decor?.cobertura ?? "nenhuma") !== "nenhuma", false, false, !!q?.predio) : null;
   const zFrente = mk?.frenteZ ?? FRENTE_Z[e.layout] ?? -DIM_LAYOUT[e.layout].prof / 2, zVidro = mk?.vidroZ ?? FACHADA_Z[e.layout];
   return (
     <group position={[x, 0, z]}>
     {placa && <group position={[-dx, 0, 0]}><PlacaEsquina d={{ nome, cor, nicho: nomeNicho(nicho), numero: l.numero, logo }} sx={l.k % 2 ? 1 : -1} sz={l.k >= 2 ? 1 : -1} /></group>}
     <group rotation={[0, rotPatio, 0]}>
-      <DecorLote d={decorCompleta} cor={cor} logo={logo} duplo={!!la} escondidos={confPatio?.escondidos} passagem={passagem} />
+      <DecorLote d={decorCompleta} cor={cor} logo={logo} duplo={!!la} escondidos={escondidos} passagens={passagens} />
       {promo && <FaixaPromo texto={promo} duplo={!!la} />}
     </group>
-    <group ref={grupo} position={[pose.centro[0] - x, 0, pose.centro[1] - z]} rotation={[0, rot, 0]}>
+    {q && <QuartosLivres chave={chave} q={q} />}
+    {temPredio && <group ref={grupo} name={`predio-lote:${chave}${q ? ":medio" : ""}`} position={[pose.centro[0] - x, 0, pose.centro[1] - z]} rotation={[0, rot, 0]}>
       <group ref={sobe}><group visible={fora}>{mk ? <ExteriorKit chave={chave} e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} numero={l.numero} promo={promo} /> : <Exterior e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} numero={l.numero} promo={promo} />}</group></group>
       {peca && <PecaArea tipo={peca} cor={cor} zf={zFrente} zw={zVidro} sx={la ? DUPLO.x : 1} />}
       {(festa || INAUGURAR_TESTE === chave) && <Inauguracao cor={cor} zf={zFrente} sx={la ? DUPLO.x : 1} topo={alturaPredio(e, !!la)} />}
@@ -507,7 +521,7 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
           {e.equipe.map((m) => { const lugar = planta.lugares[m.id]; return lugar ? <MembroCena key={m.id} m={m} lugar={lugar} chave={chave} /> : null; })}
         </>
       )}
-    </group>
+    </group>}
     </group>
   );
 }
@@ -617,8 +631,9 @@ function Toldo({ cor, y, z, largura }: { cor: string; y: number; z: number; larg
 
 // Piso, cerca, árvores e itens da frente. Coordenadas locais do lote: frente da loja para -z; lote de 20 × 20.
 // escondidos (21/11/2026): enfeites que encostam no prédio ou ficam no caminho da porta depois de o dono mover o prédio
-// (data/posicaoPredio.ts › enfeitesDoLote, os mesmos ids); passagem: onde a cerca abre (onde o caminho da porta sai do lote)
-export function DecorLote({ d, cor, logo, duplo = false, escondidos, passagem }: { d: Decoracao; cor: string; logo: string | null; duplo?: boolean; escondidos?: string[]; passagem?: { lado: LadoPatio; c: number } }) {
+// (data/posicaoPredio.ts › enfeitesDoLote, os mesmos ids); passagens: onde a cerca abre (onde o caminho da porta sai do lote;
+// no lote em quartos, uma por estrutura)
+export function DecorLote({ d, cor, logo, duplo = false, escondidos, passagens }: { d: Decoracao; cor: string; logo: string | null; duplo?: boolean; escondidos?: string[]; passagens?: { lado: LadoPatio; c: number }[] }) {
   const H = 9.62; // meio lado do lote (menos o meio-fio)
   // lote duplo: o piso e a cerca cobrem os dois terrenos (40 × 20) e o que fica na frente da porta abre junto com o prédio
   const hx = duplo ? H + 10 : H, sx = duplo ? DUPLO.x : 1;
@@ -630,12 +645,19 @@ export function DecorLote({ d, cor, logo, duplo = false, escondidos, passagem }:
   // árvores: primeiro nos fundos, depois na frente
   const arvores: [number, number][] = ([[-hx + 1.12, 8.5], [hx - 1.12, 8.5], [-hx + 0.62, -9.0], [hx - 0.62, -9.0]] as [number, number][]).slice(0, d.arvores).filter((_, i) => !fora.has(`arvore-${i}`));
   // cerca: os quatro lados, com a passagem onde o caminho da porta sai do lote (o de sempre: no meio da frente)
-  const pas = passagem ?? { lado: "frente" as LadoPatio, c: 0 }, meia = 2.1 * sx;
+  const pas = passagens?.length ? passagens : [{ lado: "frente" as LadoPatio, c: 0 }], meia = 2.1 * sx;
   const lado = (de: [number, number], ate: [number, number], qual: LadoPatio): { de: [number, number]; ate: [number, number] }[] => {
-    if (pas.lado !== qual) return [{ de, ate }];
-    const horiz = de[1] === ate[1], a = horiz ? de[0] : de[1], b = horiz ? ate[0] : ate[1], c0 = Math.max(a, pas.c - meia), c1 = Math.min(b, pas.c + meia);
+    const vaos = pas.filter((x) => x.lado === qual);
+    if (!vaos.length) return [{ de, ate }];
+    const horiz = de[1] === ate[1], a = horiz ? de[0] : de[1], b = horiz ? ate[0] : ate[1];
     const p = (v: number): [number, number] => (horiz ? [v, de[1]] : [de[0], v]);
-    return [...(c0 - a > 0.3 ? [{ de, ate: p(c0) }] : []), ...(b - c1 > 0.3 ? [{ de: p(c1), ate }] : [])];
+    const out: { de: [number, number]; ate: [number, number] }[] = []; let ini = a;
+    for (const [c0, c1] of vaos.map((x): [number, number] => [Math.max(a, x.c - meia), Math.min(b, x.c + meia)]).sort((u, v) => u[0] - v[0])) {
+      if (c0 - ini > 0.3) out.push({ de: ini === a ? de : p(ini), ate: p(c0) });
+      ini = Math.max(ini, c1);
+    }
+    if (b - ini > 0.3) out.push({ de: p(ini), ate });
+    return out;
   };
   const lados = [...lado([-hx, -H], [hx, -H], "frente"), ...lado([-hx, H], [hx, H], "fundo"), ...lado([-hx, -H], [-hx, H], "esq"), ...lado([hx, -H], [hx, H], "dir")];
   return (

@@ -22,7 +22,8 @@ import { BonecoProcedural, HIPS, useAnimacao, type BonecoHandle } from "./Boneco
 import { BONECO } from "../data/bonecos";
 import { QUIOSQUES, QUIOSQUE_LARGURA as LQ, QUIOSQUE_FUNDO as FQ, TOLDO_Q, PRECO_QUIOSQUE, balcaoDoQuiosque, type QuiosqueInfo } from "../data/quiosques";
 import { useMundo, promocaoAtiva, useAgora, type Terreno, type Rascunho } from "../mundoStore";
-import { nomeNicho } from "../data/mundo";
+import { nomeNicho, LOTE_POR_CHAVE } from "../data/mundo";
+import { anexosDe, quartosDoTerreno, conferirQuartos, ID_PREDIO } from "../data/posicaoPredio";
 import { minhaPos, usePersonagem } from "../personagemStore";
 import { useEdicao, editandoQuiosque } from "../edicaoStore";
 import { usePoseAoVivo, useFantasma } from "./EditorPosicao";
@@ -224,8 +225,9 @@ function Terreninhos({ editando }: { editando: string | null }) {
   );
 }
 
-// a atendente atrás do balcão; quando o meu personagem chega no balcão deste quiosque, ela cumprimenta
-function Atendente({ m, chave, nome }: { m: Membro; chave: string; nome: string }) {
+// a atendente atrás do balcão; quando o meu personagem chega no balcão deste quiosque, ela cumprimenta (balcao: o ponto do
+// cliente no quiosque de um lote em quartos, que não está na lista da orla)
+function Atendente({ m, chave, nome, balcao }: { m: Membro; chave: string; nome: string; balcao?: [number, number] }) {
   const h = useRef<BonecoHandle>(null);
   const fase = useMemo(() => (m.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 97) / 10, [m.id]);
   useAnimacao(h, () => "idle", fase, HIPS.procedural.base);
@@ -235,8 +237,8 @@ function Atendente({ m, chave, nome }: { m: Membro; chave: string; nome: string 
   const acc = useRef(0);
   useFrame((_, dt) => {
     acc.current += dt; if (acc.current < 0.4) return; acc.current = 0;
-    const k = QUIOSQUES.find((q) => q.chave === chave); if (!k || !ativo) { if (perto) setPerto(false); return; }
-    const [bx, bz] = balcaoDoQuiosque(k);
+    const k = balcao ? null : QUIOSQUES.find((q) => q.chave === chave); if ((!balcao && !k) || !ativo) { if (perto) setPerto(false); return; }
+    const [bx, bz] = balcao ?? balcaoDoQuiosque(k!);
     const p = Math.hypot(minhaPos.x - bx, minhaPos.z - bz) < 2.4;
     if (p !== perto) setPerto(p);
   });
@@ -361,6 +363,70 @@ function Corpo({ d }: { d: Dados }) {
           <mesh geometry={placa(LQ - 0.2, 0.46)} material={letreiro} position={[0, Y0 + H - 0.3, FZ - 0.015]} />
         </group>
       )}
+    </group>
+  );
+}
+
+// ---------- quiosques dos lotes em quartos (21/11/2026, data/quartosLote.ts) ----------
+// Pedido do dono: o lote pode ter só um quiosque num quarto (e depois mais quiosques nos quartos livres). O mesmo desenho dos
+// quiosques da orla (Corpo), com o nome, a logo e a cor da empresa do lote e a atendente no balcão; quem chega no balcão é
+// atendido pela mesma atendente da empresa (data/entradas.ts › balcao). Desempenho: as peças paradas de TODOS os quiosques
+// dos lotes vão para um <Estatico> só (como os da orla); cada quiosque soma a atendente (uma malha com esqueleto) e a área
+// de clique invisível. O quiosque em edição sai do desenho junto e vira fantasma (scene/EditorPosicao.tsx).
+interface QuiosqueDoLote { chave: string; id: string; k: QuiosqueInfo; d: Dados; atendente: Membro | null; balcao: [number, number] }
+export function QuiosquesDosLotes() {
+  const terrenos = useMundo((s) => s.terrenos);
+  const sel = useMundo((s) => s.loteSelecionado);
+  const rascunhoEsc = useMundo((s) => s.rascunhoEscritorio);
+  const rascunho = useMundo((s) => s.rascunho);
+  const editando = useEdicao((s) => (s.chave && s.estrutura && s.estrutura !== ID_PREDIO ? `${s.chave}#${s.estrutura}` : null));
+  const lista = useMemo(() => {
+    const anexos = anexosDe(terrenos), out: QuiosqueDoLote[] = [];
+    for (const t of Object.values(terrenos)) {
+      if (t.status !== "ativo" || t.anexoDe) continue;
+      const e = t.chave === sel && rascunhoEsc ? rascunhoEsc : t.escritorio; if (!e) continue;
+      const q = quartosDoTerreno({ chave: t.chave, status: t.status, escritorio: e }, anexos[t.chave] ?? null); if (!q) continue;
+      const r = t.chave === sel && rascunho ? rascunho : null;
+      const nome = r?.empresaNome ?? t.empresaNome, cor = r?.cor ?? t.cor, logo = r ? r.logoDataUrl : t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null;
+      const atendente = e.equipe.find((m) => m.papel === "atendente") ?? e.equipe[0] ?? null;
+      for (const p of conferirQuartos(t.chave, e).poses) {
+        const est = p.estrutura; if (est?.tamanho !== "quiosque") continue;
+        const modelo = q.quiosques.find((x) => x.id === est.id)?.modelo ?? "toldo";
+        const k: QuiosqueInfo = { chave: `${t.chave}#${est.id}`, numero: LOTE_POR_CHAVE[t.chave]?.numero ?? 0, area: "orlaCentro", ponto: "", modelo, terreno: p.terreno.limite ?? p.terreno.ret, pos0: p.centro, rot0: p.rot, pos: p.centro, rot: p.rot };
+        out.push({ chave: t.chave, id: est.id, k, d: { k, t, r: null, estado: "ativo", nome, cor, logo, nicho: t.nicho }, atendente, balcao: p.porta });
+      }
+    }
+    return out;
+  }, [terrenos, sel, rascunhoEsc, rascunho]);
+  if (!lista.length) return null;
+  const juntos = lista.filter((x) => x.k.chave !== editando);
+  const assinatura = juntos.map((x) => `${x.k.chave}|${x.d.cor}|${x.d.nome}|${x.d.logo ?? ""}|${x.k.modelo}|${x.k.pos.join(",")}|${x.k.rot.toFixed(4)}`).join(";") + (leve() ? "|leve" : "");
+  const emEdicao = editando ? lista.find((x) => x.k.chave === editando) ?? null : null;
+  return (
+    <group>
+      {juntos.length > 0 && <Estatico key={assinatura}>{juntos.map((x) => <group key={x.k.chave} position={[x.k.pos[0], 0, x.k.pos[1]]} rotation={[0, x.k.rot, 0]}><Corpo d={x.d} /></group>)}</Estatico>}
+      {emEdicao && <QuiosqueDoLoteEmEdicao x={emEdicao} />}
+      {lista.map((x) => <VivoDoLote key={x.k.chave} x={x} />)}
+    </group>
+  );
+}
+function QuiosqueDoLoteEmEdicao({ x }: { x: QuiosqueDoLote }) {
+  const g = useRef<THREE.Group>(null);
+  usePoseAoVivo(g, x.chave, [x.k.pos[0], x.k.pos[1], x.k.rot], (p) => [p.centro[0], p.centro[1], p.rot], x.id);
+  useFantasma(g, x.chave, x.id);
+  return <group ref={g} position={[x.k.pos[0], 0, x.k.pos[1]]} rotation={[0, x.k.rot, 0]}><Estatico key={`${x.d.cor}|${x.d.nome}|${x.d.logo ?? ""}|${x.k.modelo}`}><Corpo d={x.d} /></Estatico></group>;
+}
+// a atendente e a área de clique (abre o cartão do lote); seguem a edição também
+function VivoDoLote({ x }: { x: QuiosqueDoLote }) {
+  const g = useRef<THREE.Group>(null);
+  usePoseAoVivo(g, x.chave, [x.k.pos[0], x.k.pos[1], x.k.rot], (p) => [p.centro[0], p.centro[1], p.rot], x.id);
+  const selecionar = (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); useMundo.getState().selecionarLote(x.chave); };
+  return (
+    <group ref={g} name={`quiosque-lote:${x.k.chave}`} position={[x.k.pos[0], 0, x.k.pos[1]]} rotation={[0, x.k.rot, 0]}>
+      {x.atendente && <Atendente m={x.atendente} chave={x.chave} nome={x.d.nome} balcao={x.balcao} />}
+      <mesh position={[0, 1.8, 0.5]} geometry={caixa(LQ + 0.6, 3.6, FQ + 2.2)} visible={false} onClick={selecionar}
+        onPointerOver={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); useMundo.getState().setLoteHover(x.chave); document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { useMundo.getState().setLoteHover(null); document.body.style.cursor = ""; }} />
     </group>
   );
 }
