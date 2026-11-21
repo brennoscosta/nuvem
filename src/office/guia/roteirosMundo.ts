@@ -60,7 +60,7 @@ export const ROTEIROS_MUNDO: Roteiro[] = [
       { id: "bicicleta", tipo: "manual", alvo: "button[aria-label*='icicleta']:not([aria-label='Cor da bicicleta'])", titulo: "Bicicleta",
         texto: (c) => `Grátis para quem tem personagem: anda mais rápido pela cidade.${c.celular ? "" : " Tecla B para subir e descer."}` },
       { id: "mapa", tipo: "manual", alvo: '[data-tour="mapa"]', titulo: "Mapa da cidade", texto: "As lojas por área. Toque num lote do mapa para voar até ele." },
-      { id: "online", tipo: "manual", alvo: ".hud-online", titulo: "Quem está na cidade", texto: "Quantas pessoas estão andando agora. Toque para ver quem é e onde está." },
+      { id: "online", tipo: "manual", alvo: ".hud-online", titulo: "Quem está na cidade", texto: "Toque aqui para ver quantas pessoas estão na cidade agora, quem são e onde estão." },
       { id: "loja", tipo: "manual", antes: (pronto) => { selecionar(lojaAberta()); pronto(); }, alvo: CARTAO, titulo: "Cartão da loja", texto: "Toque num prédio para ver a empresa: o que ela faz, a vitrine, os cupons e as vagas." },
       // ui/Recepcao.tsx › BotaoEntrar: data-guia="entrar-predio" nos dois jeitos do botão (sem personagem ativo ele diz
       // "Crie seu personagem grátis"); o texto fica só de reserva, para um cartão que ainda não tenha o atributo
