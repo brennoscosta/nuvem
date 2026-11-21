@@ -12,6 +12,7 @@ import { numeroDaLoja } from "@/office/data/numeroLoja";
 import { empresaIdDe } from "./equipeCliente";
 import { ehAdmin } from "./terrenos";
 import type { Usuario } from "./usuarios";
+import { paginaDaEmpresa } from "./planoVitrine";
 
 type Db = typeof sql;
 
@@ -51,7 +52,8 @@ async function linhaDaEmpresa(empId: string, usuarioId: string, nome: string) {
 // a loja já foi ao ar: lote ou quiosque ativo agora ou antes (arquivo dos lotes vencidos)
 async function jaFoiAoAr(usuarioId: string): Promise<boolean> {
   const [r] = await sql`SELECT 1 FROM terreno WHERE usuario_id = ${usuarioId} AND status = 'ativo'
-    UNION ALL SELECT 1 FROM terreno_arquivo WHERE usuario_id = ${usuarioId} LIMIT 1`;
+    UNION ALL SELECT 1 FROM terreno_arquivo WHERE usuario_id = ${usuarioId}
+    UNION ALL SELECT 1 FROM loja_vitrine WHERE usuario_id = ${usuarioId} AND publicada_em IS NOT NULL LIMIT 1`; // a página grátis (WE-13) também
   return !!r;
 }
 
@@ -91,7 +93,14 @@ export async function numeroDaEmpresa(empId: string): Promise<number | null> {
     FROM empresa e JOIN terreno t ON t.usuario_id = e.usuario_id AND t.status = 'ativo' AND t.anexo_de IS NULL
     JOIN usuario u ON u.id = t.usuario_id AND u.banido_em IS NULL WHERE e.id = ${empId} ORDER BY t.reservado_em`;
   const t = ts.filter((x) => !ehSede(x.chave)).find((x) => empresaIdDe(x.usuarioId, x.chave, ehAdmin({ email: x.email, papel: x.papel } as Usuario)) === empId);
-  return t ? numeroDaLoja({ chave: t.chave }) : null;
+  if (t) return numeroDaLoja({ chave: t.chave });
+  return (await paginaDaEmpresa(empId))?.numero ?? null; // página grátis (Plano Vitrine, WE-13)
+}
+// endereço atual da empresa, sem criar
+export async function enderecoAtual(empId: string): Promise<string | null> {
+  await migrar();
+  const [j] = await sql<{ slug: string }[]>`SELECT slug FROM loja_endereco WHERE empresa_id = ${empId} AND atual`;
+  return j?.slug ?? null;
 }
 
 // endereço de uma loja aberta (lojaPublica): sede pelo id; as outras pela empresa
@@ -126,6 +135,14 @@ export async function lojasNoAr(): Promise<{ slug: string; atualizadoEm: string 
       slug = await enderecoDaEmpresa(empId, t.empresaNome).catch(() => null);
     }
     if (slug && !vistos.has(slug)) { vistos.add(slug); out.push({ slug, atualizadoEm: new Date(t.atualizadoEm).toISOString().slice(0, 10) }); }
+  }
+  // as páginas grátis publicadas (Plano Vitrine, WE-13) das contas que não têm loja na cidade
+  const pgs = await sql<{ empresaId: string; empresaNome: string; atualizadoEm: Date }[]>`SELECT v.empresa_id, v.empresa_nome, v.atualizado_em FROM loja_vitrine v
+    JOIN usuario u ON u.id = v.usuario_id AND u.banido_em IS NULL WHERE v.publicada_em IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM terreno t WHERE t.usuario_id = v.usuario_id AND t.status = 'ativo' AND t.anexo_de IS NULL) ORDER BY v.publicada_em`;
+  for (const p of pgs) {
+    const slug = await enderecoDaEmpresa(p.empresaId, p.empresaNome).catch(() => null);
+    if (slug && !vistos.has(slug)) { vistos.add(slug); out.push({ slug, atualizadoEm: new Date(p.atualizadoEm).toISOString().slice(0, 10) }); }
   }
   return out;
 }

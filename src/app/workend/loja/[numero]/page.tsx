@@ -5,6 +5,8 @@
 // src/server/enderecoLoja.ts); /loja/N e os endereços antigos levam a ele com redirecionamento permanente. Cada loja tem
 // título, descrição, endereço canônico, a imagem da fachada para a prévia do link (api/workend/loja/[numero]/fachada) e o
 // JSON-LD LocalBusiness (seo.ts › jsonLdLoja). O botão de WhatsApp vai para o topo.
+// WE-13 (21/11/2026): a página grátis (Plano Vitrine, src/server/planoVitrine.ts) usa esta mesma página, sem o que é do lote
+// (entrar no prédio, ver na cidade, cupons e agenda); quando a conta leva a loja para a cidade, o endereço continua o mesmo.
 // 17/11/2026 (frente acabamento): visual novo (topo escuro na cor da marca, cartões brancos, celular primeiro, conversa logo
 // depois do topo) e uma versão própria para as SEDES (números 0, 901, 902, 903 — data/sedes.ts): site oficial em destaque,
 // áreas do site e os departamentos da equipe (contagem e chefe de cada um, sem o treino). Estilos em ../loja.css (.lj-).
@@ -18,6 +20,7 @@ import { SEDE_POR_NUMERO, SEDE_POR_ID, type Sede } from "@/office/data/sedes";
 import { faixasDoDia, paraHHMM, agendaUsavel } from "@/office/data/agenda";
 import { configDe } from "@/server/agenda";
 import { lerEndereco, numeroDaEmpresa, enderecoDaLoja, versaoFachada } from "@/server/enderecoLoja";
+import { ehChaveDePagina } from "@/server/planoVitrine";
 import { rotuloLoja } from "@/office/data/numeroLoja";
 import { NaoEncontrada } from "../../_nao-encontrada";
 import { usuarioAtual } from "@/server/usuarios";
@@ -116,11 +119,12 @@ export default async function Pagina({ params, searchParams }: Props) {
   // painel de resultados do dono: uma visita por pessoa por dia (o próprio dono não conta)
   void registrarVisitaDia(await headers(), { chave: l.chave, donoId: l.donoId }, u?.id ?? null, "pagina");
   const sede = SEDE_POR_NUMERO[l.numero] ?? null;
+  const gratis = ehChaveDePagina(l.chave); // página grátis: a loja ainda não tem lote nem quiosque na cidade
   const [avals, vagasBrutas, terreno, agenda] = await Promise.all([
     avaliacoesRecebidas(l.donoId, 6).catch(() => []),
     vagasAbertas({ donoId: l.donoId }).catch(() => []),
     obterTerreno(l.chave).catch(() => null),
-    sede ? null : configDe(l.donoId).catch(() => null), // horário de funcionamento do JSON-LD
+    sede || gratis ? null : configDe(l.donoId).catch(() => null), // horário de funcionamento do JSON-LD
   ]);
   // as vagas de quem é dono de várias empresas (sedes) não se misturam: só as desta
   const vagas: VagaLista[] = vagasBrutas.filter((v) => !("chave" in v) || (v as { chave?: string }).chave === l.chave).map((v) => ({ ...v, criadoEm: new Date(v.criadoEm).toISOString() }));
@@ -144,7 +148,7 @@ export default async function Pagina({ params, searchParams }: Props) {
             {sede
               ? <img src={sede.logo} alt={l.nome} className="lj-logo-sede" />
               : l.logo ? <img src={l.logo} alt={`Logo da ${l.nome}`} className="lj-logo" /> : <span className="lj-logo lj-logo-letra" aria-hidden>{l.nome.slice(0, 2).toUpperCase()}</span>}
-            <div className="pg-rotulo mt-4">{sede ? `Sede · ${primeiraLetra(sede.tipo)}` : `${rotuloLoja(l.numero)} · ${l.nicho}`}</div>
+            <div className="pg-rotulo mt-4">{sede ? `Sede · ${primeiraLetra(sede.tipo)}` : gratis ? `Loja no WorkEnd · ${l.nicho}` : `${rotuloLoja(l.numero)} · ${l.nicho}`}</div>
             <h1>{l.nome}</h1>
             <p className="lj-resumo">{resumoDe(l.sobre || (sede ? sede.resumo : "A empresa ainda não escreveu a apresentação. A atendente responde as suas dúvidas na hora."))}</p>
             <div className="lj-selos">
@@ -156,11 +160,13 @@ export default async function Pagina({ params, searchParams }: Props) {
             <div className="pg-acoes mt-5">
               {sede && <a href={sede.site} target="_blank" rel="noopener" className="btn lj-btn-marca"><Icone nome="globo" tamanho={17} />Abrir {sede.dominio}</a>}
               {zap && !sede && <LinkRastreado numero={l.numero} tipo="whatsapp" href={zap} target="_blank" rel="noreferrer nofollow" className="btn lj-btn-marca"><Icone nome="telefone" tamanho={17} />Chamar no WhatsApp</LinkRastreado>}
-              <Link prefetch={false} href={`${linkMapa}&entrar=1`} className={sede || zap ? "btn btn-linha" : "btn lj-btn-marca"}><Icone nome="casa" tamanho={17} />{sede ? "Entrar na sede" : "Entrar no prédio"}</Link>
-              <Link prefetch={false} href={linkMapa} className="btn btn-linha"><Icone nome="mapa" tamanho={17} />Ver a loja na cidade</Link>
+              {!gratis && <Link prefetch={false} href={`${linkMapa}&entrar=1`} className={sede || zap ? "btn btn-linha" : "btn lj-btn-marca"}><Icone nome="casa" tamanho={17} />{sede ? "Entrar na sede" : "Entrar no prédio"}</Link>}
+              {!gratis && <Link prefetch={false} href={linkMapa} className="btn btn-linha"><Icone nome="mapa" tamanho={17} />Ver a loja na cidade</Link>}
               <BotaoSeguir numero={l.numero} claro />
               {vagas.length > 0 && <a href="#vagas" className="btn btn-linha"><Icone nome="candidato" tamanho={17} />Contratando · {vagas.length} {vagas.length === 1 ? "vaga" : "vagas"}</a>}
-              {ehDono && <Link href={`/app/equipe?lote=${encodeURIComponent(l.chave)}`} className="btn btn-linha"><Icone nome="equipe" tamanho={17} />{sede ? "Esta sede é sua · equipe" : "Esta é a sua loja · equipe"}</Link>}
+              {ehDono && !gratis && <Link href={`/app/equipe?lote=${encodeURIComponent(l.chave)}`} className="btn btn-linha"><Icone nome="equipe" tamanho={17} />{sede ? "Esta sede é sua · equipe" : "Esta é a sua loja · equipe"}</Link>}
+              {ehDono && gratis && <Link href="/app#pagina-gratis" className="btn btn-linha"><Icone nome="editar" tamanho={17} />Esta é a sua página · editar</Link>}
+              {ehDono && gratis && <Link prefetch={false} href="/mundo" className="btn btn-linha"><Icone nome="mapa" tamanho={17} />Levar a loja para a cidade</Link>}
             </div>
           </div>
           {l.atendente && (
@@ -179,8 +185,8 @@ export default async function Pagina({ params, searchParams }: Props) {
         <div className="lj-grade">
           <div className="lj-lado">
             <div className="lj-o1"><ConversaDaLoja loja={l} logado={!!u} /></div>
-            {!sede && <div className="lj-o3"><PegarCupom numero={l.numero} /></div>}
-            {!sede && <div className="lj-o3"><AgendarLoja numero={l.numero} cor={l.cor} /></div>}
+            {!sede && !gratis && <div className="lj-o3"><PegarCupom numero={l.numero} /></div>}
+            {!sede && !gratis && <div className="lj-o3"><AgendarLoja numero={l.numero} cor={l.cor} /></div>}
             <div className="lj-o4"><Contatos c={l.contatos} numero={l.numero} site={sede?.site} /></div>
           </div>
 

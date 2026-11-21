@@ -9,7 +9,8 @@ import { rotuloLoja } from "@/office/data/numeroLoja";
 import { Icone } from "@/office/ui/Icone";
 
 type Produto = ProdutoVitrine & { ativo: boolean; ordem: number };
-type Dados = { lote: { chave: string; numero: number | null; ativo: boolean; empresa: string; cor: string } | null; whatsapp: string | null; max: number; produtos: Produto[] };
+// gratis: a página grátis (Plano Vitrine, WE-13), sem lote; endereco: workend.online/<slug> (WE-11)
+type Dados = { lote: { chave: string; numero: number | null; ativo: boolean; empresa: string; cor: string } | null; whatsapp: string | null; max: number; produtos: Produto[]; gratis?: boolean; endereco?: string | null };
 type Rascunho = { id?: string; nome: string; preco: string; descricao: string; ativo: boolean; fotoNova: string | null; fotoAtual: string | null; removerFoto: boolean };
 const VAZIO: Rascunho = { nome: "", preco: "", descricao: "", ativo: true, fotoNova: null, fotoAtual: null, removerFoto: false };
 const LIMITE_FOTO = 195 * 1024; // um pouco abaixo dos 200 KB do servidor
@@ -121,21 +122,21 @@ export function VitrinePainel() {
         <div className="pg-topo" style={lote ? ({ "--marca": lote.cor } as React.CSSProperties) : undefined}>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
-              <span className="pg-rotulo"><Icone nome="sacola" tamanho={15} />{numero != null ? `${rotuloLoja(numero)} · ` : ""}{lote?.empresa}</span>
+              <span className="pg-rotulo"><Icone nome="sacola" tamanho={15} />{dados.gratis ? "Página grátis · " : numero != null ? `${rotuloLoja(numero)} · ` : ""}{lote?.empresa}</span>
               <h1>Vitrine da loja</h1>
               <p className="pg-sub">Até {max} produtos com foto e preço. Eles aparecem no cartão da sua loja no mapa e na página da loja, com o botão <b>Pedir no WhatsApp</b>, e a atendente de IA monta o pedido com o cliente e passa o <b>Pix com a sua chave</b>. O dinheiro vai direto para você: o WorkEnd não passa dinheiro adiante.</p>
             </div>
             <div className="pg-acoes">
-              <Link href="/app/vendas" className="btn btn-tinta">Vendas e Pix</Link>
-              {numero != null && <a href={`/loja/${numero}#vitrine`} target="_blank" rel="noreferrer" className="btn btn-linha">Ver a página da loja</a>}
-              {lote && <Link prefetch={false} href={`/mundo?lote=${encodeURIComponent(lote.chave)}`} className="btn btn-claro">Ver no mapa</Link>}
+              {!dados.gratis && <Link href="/app/vendas" className="btn btn-tinta">Vendas e Pix</Link>}
+              {(dados.endereco || numero != null) && <a href={dados.endereco ? `/${dados.endereco}#vitrine` : `/loja/${numero}#vitrine`} target="_blank" rel="noreferrer" className="btn btn-linha">Ver a página da loja</a>}
+              {lote && !dados.gratis && <Link prefetch={false} href={`/mundo?lote=${encodeURIComponent(lote.chave)}`} className="btn btn-claro">Ver no mapa</Link>}
             </div>
           </div>
         </div>
         {!dados.whatsapp && (
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#FFF4DB] px-5 py-4 text-[#6B4A00]">
             <p className="max-w-[60ch] text-[15px]"><b>Sua loja ainda não tem WhatsApp nos contatos.</b> Sem ele, o botão “Pedir no WhatsApp” não aparece e o cliente só pode perguntar à atendente de IA.</p>
-            <Link href="/app/equipe?aba=sobre" className="btn btn-tinta whitespace-nowrap">Cadastrar o WhatsApp</Link>
+            <Link href={dados.gratis ? "/app#pagina-gratis" : "/app/equipe?aba=sobre"} className="btn btn-tinta whitespace-nowrap">Cadastrar o WhatsApp</Link>
           </div>
         )}
       </section>

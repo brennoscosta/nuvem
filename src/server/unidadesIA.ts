@@ -18,6 +18,8 @@ type Db = typeof sql;
 export const VALOR_UNIDADE_BRL = 0.01;
 export const UNIDADES_MES_LOTE = 1000; // = R$ 10 de IA, o antigo TETO_IA_MES
 export const UNIDADES_MES_QUIOSQUE = 300; // a frente do quiosque liga em mensalidadeDoLote()
+export const UNIDADES_MES_VITRINE = 200; // página grátis (Plano Vitrine, WE-13): ≈ 100 respostas por mês (uma resposta comum gasta 2)
+export const RESPOSTAS_MES_VITRINE = 100;
 export const AVISO_UNIDADES = 0.2; // avisa o dono quando restam 20%
 export const UNIDADES_POR_RESPOSTA = 1.6; // estimativa "≈ N respostas" quando a empresa ainda não tem histórico
 // pacotes de unidades, pagos com créditos (margem perto de 2 vezes sobre o custo real; fácil de mudar)
@@ -41,14 +43,18 @@ const nomeMes = (m: string) => { const [a, n] = m.split("-").map(Number); return
 // lotes que recebem a mensalidade de quiosque: os 14 quiosques da frente terreno (data/quiosques.ts, quiosque-101 a 114)
 export const LOTES_QUIOSQUE = new Set<string>(QUIOSQUES.map((q) => q.chave));
 export function mensalidadeDoLote(chave: string) { return LOTES_QUIOSQUE.has(chave) ? UNIDADES_MES_QUIOSQUE : UNIDADES_MES_LOTE; }
-async function mensalidadeDa(db: Db, empId: string) {
-  if (EMPRESAS_SEM_COBRANCA.has(empId)) return 0;
+// Plano Vitrine (WE-13): sem lote nem quiosque, a página grátis publicada recebe UNIDADES_MES_VITRINE
+async function mensalidadeDa(db: Db, empId: string) { return (await mensalidadeComPlano(db, empId)).unidades; }
+async function mensalidadeComPlano(db: Db, empId: string): Promise<{ unidades: number; vitrine: boolean }> {
+  if (EMPRESAS_SEM_COBRANCA.has(empId)) return { unidades: 0, vitrine: false };
   const [t] = await db<{ chave: string }[]>`SELECT t.chave FROM terreno t WHERE t.status = 'ativo' AND t.anexo_de IS NULL
     AND (('emp_' || t.usuario_id) = ${empId} OR ('emp_' || t.usuario_id || '_' || regexp_replace(replace(t.chave, '-', 'm'), '[^a-zA-Z0-9]', '_', 'g')) = ${empId}) LIMIT 1`;
-  return t ? mensalidadeDoLote(t.chave) : 0;
+  if (t) return { unidades: mensalidadeDoLote(t.chave), vitrine: false };
+  const [v] = await db`SELECT 1 FROM loja_vitrine WHERE empresa_id = ${empId} AND publicada_em IS NOT NULL`;
+  return v ? { unidades: UNIDADES_MES_VITRINE, vitrine: true } : { unidades: 0, vitrine: false };
 }
 
-interface CarteiraIA { inclusa: number; comprada: number; mes: string; baseMes: number; avisado: string | null }
+interface CarteiraIA { inclusa: number; comprada: number; mes: string; baseMes: number; avisado: string | null; planoMes: string | null } // planoMes: 'vitrine' = a mensalidade do mês veio da página grátis
 interface NovoLancIA { tipo: "mensalidade" | "compra" | "uso" | "vencimento" | "ajuste" | "estorno"; inclusa: number; comprada: number; descricao: string; agenteId?: string | null; categoria?: string | null; modelo?: string | null; custoBrl?: number | null; pagamentoId?: string | null; chave?: string | null }
 async function lancarIA(db: Db, empId: string, c: CarteiraIA, l: NovoLancIA) {
   if (l.chave) { const [ja] = await db`SELECT 1 FROM ia_lancamento WHERE chave = ${l.chave}`; if (ja) return false; }
@@ -60,23 +66,32 @@ async function lancarIA(db: Db, empId: string, c: CarteiraIA, l: NovoLancIA) {
   return true;
 }
 async function gravar(db: Db, empId: string, c: CarteiraIA) {
-  await db`UPDATE ia_carteira SET inclusa = ${c.inclusa}, comprada = ${c.comprada}, mes = ${c.mes}, base_mes = ${c.baseMes}, avisado = ${c.avisado}, atualizado_em = now() WHERE empresa_id = ${empId}`;
+  await db`UPDATE ia_carteira SET inclusa = ${c.inclusa}, comprada = ${c.comprada}, mes = ${c.mes}, base_mes = ${c.baseMes}, avisado = ${c.avisado}, plano_mes = ${c.planoMes}, atualizado_em = now() WHERE empresa_id = ${empId}`;
 }
 // Trava a carteira da empresa e vira o mês se preciso: a inclusa que sobrou vence e entra a mensalidade nova.
 // Sem lote ativo, o mês não é marcado (quem ativar o lote no meio do mês recebe a mensalidade na próxima chamada).
 async function travarIA(db: Db, empId: string): Promise<CarteiraIA> {
   await db`INSERT INTO ia_carteira (empresa_id, mes) VALUES (${empId}, '') ON CONFLICT (empresa_id) DO NOTHING`;
-  const [r] = await db<CarteiraIA[]>`SELECT inclusa, comprada, mes, base_mes, avisado FROM ia_carteira WHERE empresa_id = ${empId} FOR UPDATE`;
-  const c: CarteiraIA = { inclusa: Number(r.inclusa), comprada: Number(r.comprada), mes: r.mes, baseMes: Number(r.baseMes), avisado: r.avisado };
+  const [r] = await db<CarteiraIA[]>`SELECT inclusa, comprada, mes, base_mes, avisado, plano_mes FROM ia_carteira WHERE empresa_id = ${empId} FOR UPDATE`;
+  const c: CarteiraIA = { inclusa: Number(r.inclusa), comprada: Number(r.comprada), mes: r.mes, baseMes: Number(r.baseMes), avisado: r.avisado, planoMes: r.planoMes ?? null };
   const mes = mesAtual();
   if (c.mes !== mes) {
     if (c.inclusa > 0) await lancarIA(db, empId, c, { tipo: "vencimento", inclusa: -c.inclusa, comprada: 0, descricao: `Unidades inclusas de ${nomeMes(c.mes)} venceram`, chave: `vence:${empId}:${c.mes}` });
-    const mensal = await mensalidadeDa(db, empId);
+    const m = await mensalidadeComPlano(db, empId), mensal = m.unidades;
     if (mensal > 0) {
-      await lancarIA(db, empId, c, { tipo: "mensalidade", inclusa: mensal, comprada: 0, descricao: `Mensalidade de ${nomeMes(mes)}: ${mensal.toLocaleString("pt-BR")} unidades inclusas no lote`, chave: `mensal:${empId}:${mes}` });
-      c.mes = mes; c.baseMes = c.inclusa + c.comprada; c.avisado = null;
+      await lancarIA(db, empId, c, { tipo: "mensalidade", inclusa: mensal, comprada: 0, descricao: `Mensalidade de ${nomeMes(mes)}: ${mensal.toLocaleString("pt-BR")} unidades inclusas ${m.vitrine ? "na página grátis" : "no lote"}`, chave: `mensal:${empId}:${mes}` });
+      c.mes = mes; c.baseMes = c.inclusa + c.comprada; c.avisado = null; c.planoMes = m.vitrine ? "vitrine" : null;
     }
     await gravar(db, empId, c);
+  } else if (c.planoMes === "vitrine") {
+    // a página grátis virou loja na cidade no meio do mês: entra a diferença para a mensalidade do lote ou do quiosque
+    const m = await mensalidadeComPlano(db, empId);
+    if (!m.vitrine) {
+      const dif = m.unidades - UNIDADES_MES_VITRINE;
+      if (dif > 0 && (await lancarIA(db, empId, c, { tipo: "mensalidade", inclusa: dif, comprada: 0, descricao: `Loja na cidade: mais ${dif.toLocaleString("pt-BR")} unidades inclusas em ${nomeMes(mes)}`, chave: `mensal-loja:${empId}:${mes}` }))) c.baseMes += dif;
+      c.planoMes = null;
+      await gravar(db, empId, c);
+    }
   }
   return c;
 }

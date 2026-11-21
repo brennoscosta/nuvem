@@ -10,6 +10,7 @@ import { empresaIdDe, ErroHttp, type Contatos } from "./equipeCliente";
 import { lojaDoNumero } from "./resultados";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
 import { numeroDaLoja } from "@/office/data/numeroLoja";
+import { paginaDoUsuario, paginaPorNumero, terrenoDaPagina, ehChaveDePagina, chaveDaPagina, empresaDaConta, PRODUTOS_VITRINE_GRATIS } from "./planoVitrine";
 
 export const MAX_PRODUTOS = 12;
 export const MAX_FOTO = 200 * 1024;
@@ -58,12 +59,14 @@ type Linha = { id: string; nome: string; precoCentavos: number | null; descricao
 const paraPublico = (p: Linha): ProdutoPublico => ({ id: p.id, nome: p.nome, preco: p.precoCentavos, descricao: p.descricao, foto: urlFoto(p.id, p.temFoto, p.atualizadoEm) });
 const CAMPOS = () => sql`id, nome, preco_centavos, descricao, (foto IS NOT NULL) AS tem_foto, ordem, ativo, atualizado_em`;
 
-async function loteAtivo(u: Usuario) {
+// quantos produtos a conta pode ter: com loja na cidade, MAX_PRODUTOS; com a página grátis (Plano Vitrine, WE-13), 3
+async function loteAtivo(u: Usuario): Promise<{ max: number }> {
   if (u.banidoEm) throw new ErroHttp("Conta suspensa.", 403);
   const t = await terrenoDoUsuario(u.id);
-  if (!t) throw new ErroHttp("A vitrine fica dentro da sua loja. Escolha um lote no mapa primeiro.", 404);
-  if (t.status !== "ativo") throw new ErroHttp("Pague o 1º mês do lote para abrir a vitrine.", 402);
-  return t;
+  if (t?.status === "ativo") return { max: MAX_PRODUTOS };
+  if ((await paginaDoUsuario(u.id))?.publicadaEm) return { max: PRODUTOS_VITRINE_GRATIS };
+  if (!t) throw new ErroHttp("A vitrine fica dentro da sua loja. Publique a página grátis em Meu escritório ou escolha um lote no mapa.", 404);
+  throw new ErroHttp("Pague o 1º mês do lote para abrir a vitrine.", 402);
 }
 // o WhatsApp público da loja (Minha equipe › Sobre a empresa)
 async function whatsappDe(donoId: string, chave: string) {
@@ -85,16 +88,23 @@ export async function vitrineDoDono(u: Usuario) {
   await migrar();
   const t = await terrenoDoUsuario(u.id);
   const produtos = await sql<Linha[]>`SELECT ${CAMPOS()} FROM produto WHERE usuario_id = ${u.id} ORDER BY ordem, criado_em`;
+  // sem loja ativa na cidade, a vitrine é a da página grátis (Plano Vitrine, WE-13), com 3 produtos
+  const pg = t?.status === "ativo" ? null : await paginaDoUsuario(u.id);
+  const gratis = !!pg?.publicadaEm;
+  // o endereço próprio da loja (WE-11) para o "Ver a página da loja"
+  const empId = gratis ? empresaDaConta(u.id) : t ? empresaIdDe(u.id, t.chave, ehAdmin(u)) : null;
+  const [end] = empId ? await sql<{ slug: string }[]>`SELECT slug FROM loja_endereco WHERE empresa_id = ${empId} AND atual` : [];
   return {
-    lote: t ? { chave: t.chave, numero: numeroDaLoja(t), ativo: t.status === "ativo", empresa: t.empresaNome, cor: t.cor } : null,
-    whatsapp: t ? await whatsappDe(u.id, t.chave) : null,
-    max: MAX_PRODUTOS,
+    lote: gratis && pg ? { chave: chaveDaPagina(pg.numero), numero: pg.numero, ativo: true, empresa: pg.empresaNome, cor: pg.cor }
+      : t ? { chave: t.chave, numero: numeroDaLoja(t), ativo: t.status === "ativo", empresa: t.empresaNome, cor: t.cor } : null,
+    whatsapp: gratis && pg ? await whatsappDe(u.id, chaveDaPagina(pg.numero)) : t ? await whatsappDe(u.id, t.chave) : null,
+    max: gratis ? PRODUTOS_VITRINE_GRATIS : MAX_PRODUTOS, gratis, endereco: end?.slug ?? null,
     produtos: produtos.map((p): ProdutoDono => ({ ...paraPublico(p), ativo: p.ativo, ordem: p.ordem })),
   };
 }
 
 export async function salvarProduto(u: Usuario, d: { id?: unknown; nome?: unknown; preco?: unknown; descricao?: unknown; ativo?: unknown; foto?: unknown; removerFoto?: unknown }) {
-  await migrar(); await loteAtivo(u);
+  await migrar(); const { max } = await loteAtivo(u);
   const nome = texto(d.nome, 60).replace(/\n/g, " ");
   if (nome.length < 2) throw new ErroHttp("Dê um nome ao produto.");
   const preco = lerPreco(d.preco);
@@ -113,7 +123,7 @@ export async function salvarProduto(u: Usuario, d: { id?: unknown; nome?: unknow
       return { ...paraPublico(p), ativo: p.ativo, ordem: p.ordem };
     }
     const [{ n, maior }] = await tx<{ n: number; maior: number }[]>`SELECT count(*)::int AS n, COALESCE(max(ordem), -1)::int AS maior FROM produto WHERE usuario_id = ${u.id}`;
-    if (n >= MAX_PRODUTOS) throw new ErroHttp(`A vitrine cabe ${MAX_PRODUTOS} produtos. Apague um para pôr outro.`);
+    if (n >= max) throw new ErroHttp(max < MAX_PRODUTOS ? `A página grátis mostra ${max} produtos. Apague um para pôr outro, ou leve a loja para a cidade (lote ou quiosque) para mostrar até ${MAX_PRODUTOS}.` : `A vitrine cabe ${MAX_PRODUTOS} produtos. Apague um para pôr outro.`);
     const pid = id("prd");
     await tx`INSERT INTO produto (id, usuario_id, nome, preco_centavos, descricao, foto, foto_tipo, ordem, ativo) VALUES (${pid}, ${u.id}, ${nome}, ${preco}, ${descricao}, ${foto?.dados ?? null}, ${foto?.tipo ?? null}, ${maior + 1}, ${ativo})`;
     const [p] = await tx<Linha[]>`SELECT ${CAMPOS()} FROM produto WHERE id = ${pid}`;
@@ -148,8 +158,10 @@ export async function vitrinePublica(numero: number): Promise<VitrinePublica> {
   await migrar();
   const loja = await lojaDoNumero(numero);
   if (!loja) throw new ErroHttp("Esta loja não está aberta agora.", 404);
-  const t = await obterTerreno(loja.chave);
-  const produtos = await sql<Linha[]>`SELECT ${CAMPOS()} FROM produto WHERE usuario_id = ${loja.donoId} AND ativo ORDER BY ordem, criado_em LIMIT ${MAX_PRODUTOS}`;
+  // página grátis (Plano Vitrine, WE-13): a marca e a atendente vêm da página, e só os 3 primeiros produtos aparecem
+  const pg = ehChaveDePagina(loja.chave) ? await paginaPorNumero(numero) : null;
+  const t = pg ? terrenoDaPagina(pg) : await obterTerreno(loja.chave);
+  const produtos = await sql<Linha[]>`SELECT ${CAMPOS()} FROM produto WHERE usuario_id = ${loja.donoId} AND ativo ORDER BY ordem, criado_em LIMIT ${pg ? PRODUTOS_VITRINE_GRATIS : MAX_PRODUTOS}`;
   const atendente = t?.escritorio?.equipe.find((m) => m.papel === "atendente")?.nome ?? null;
   const [pix] = produtos.length ? await sql`SELECT 1 FROM recebimento_pix WHERE usuario_id = ${loja.donoId}`.catch(() => []) : [];
   return { numero, empresa: t?.empresaNome ?? "", cor: t?.cor ?? "#1D4ED8", whatsapp: produtos.length ? await whatsappDe(loja.donoId, loja.chave) : null, atendente, recebePix: !!pix, produtos: produtos.map(paraPublico) };
@@ -162,4 +174,11 @@ export async function fotoDoProduto(pid: string, quemPede: Usuario | null) {
   if (!p?.foto) return null;
   if (!p.ativo && quemPede?.id !== p.usuarioId && !ehAdmin(quemPede)) return null;
   return { dados: Buffer.from(p.foto), tipo: p.fotoTipo ?? "image/jpeg", publico: p.ativo, versao: Math.floor(new Date(p.atualizadoEm).getTime() / 1000) };
+}
+
+// as primeiras fotos da vitrine (a imagem de compartilhamento da página grátis: api/workend/loja/[numero]/fachada)
+export async function fotosDaVitrine(usuarioId: string, n = PRODUTOS_VITRINE_GRATIS) {
+  await migrar();
+  return sql<{ id: string; nome: string; precoCentavos: number | null; foto: Uint8Array | null; atualizadoEm: Date }[]>`SELECT id, nome, preco_centavos, foto, atualizado_em FROM produto
+    WHERE usuario_id = ${usuarioId} AND ativo ORDER BY ordem, criado_em LIMIT ${n}`;
 }

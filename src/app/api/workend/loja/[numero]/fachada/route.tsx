@@ -2,7 +2,8 @@
 // prévia do link no WhatsApp, Instagram e Google (og:image de workend.online/<slug>). Nunca a cena 3D: a arte do prédio
 // da loja (public/workend/predios/<prédio>.webp) num fundo noturno com o brilho na cor da marca, como o topo das páginas
 // (.pg-topo), o balão com a logomarca e o nome por cima, como no painel (.pn-balao), e a logomarca do WorkEnd.
-// Quiosque ganha um quiosque desenhado (não tem prédio). Fica guardada em memória por versão (nome, cor, prédio, logo e
+// Quiosque ganha um quiosque desenhado (não tem prédio). A página grátis (Plano Vitrine, WE-13) mostra os produtos da
+// vitrine no lugar da fachada (não tem prédio nem quiosque), ou só a marca quando ainda não há produto. Fica guardada em memória por versão (nome, cor, prédio, logo e
 // endereço: enderecoLoja.ts › versaoFachada) e sai em JPEG, leve para a prévia do WhatsApp.
 import fs from "node:fs";
 import path from "node:path";
@@ -14,6 +15,8 @@ import { SEDE_POR_NUMERO } from "@/office/data/sedes";
 import { QUIOSQUE_POR_NUMERO } from "@/office/data/quiosques";
 import { MODELO } from "@/office/data/modelos";
 import { rotuloLoja } from "@/office/data/numeroLoja";
+import { ehChaveDePagina, logoDaPagina } from "@/server/planoVitrine";
+import { fotosDaVitrine } from "@/server/vitrine";
 
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ numero: string }> };
@@ -49,11 +52,13 @@ export async function GET(_req: Request, { params }: Ctx) {
   const l = await lojaPublica(n).catch(() => null);
   if (!l) return Response.redirect(new URL("/workend/marca/og-workend.jpg", "https://workend.online"), 302);
   const slug = await enderecoDaLoja(l).catch(() => null);
-  const chave = `${l.numero}:${versaoFachada({ ...l, slug })}`;
+  // a página grátis muda de imagem quando mudam os produtos da vitrine
+  const vitrine = ehChaveDePagina(l.chave) ? await fotosDaVitrine(l.donoId).catch(() => []) : [];
+  const chave = `${l.numero}:${versaoFachada({ ...l, slug })}:${vitrine.map((p) => `${p.id}${new Date(p.atualizadoEm).getTime()}`).join(",")}`;
   const ja = guardadas.get(chave);
   if (ja) return resposta(ja);
   try {
-    const feita = await desenhar(l, slug);
+    const feita = await desenhar(l, slug, vitrine);
     guardadas.set(chave, feita);
     if (guardadas.size > 300) guardadas.delete(guardadas.keys().next().value!);
     return resposta(feita);
@@ -67,19 +72,23 @@ function resposta(f: { img: Buffer; tipo: string }) {
 }
 
 type Loja = NonNullable<Awaited<ReturnType<typeof lojaPublica>>>;
-async function desenhar(l: Loja, slug: string | null): Promise<{ img: Buffer; tipo: string }> {
+type Produto = Awaited<ReturnType<typeof fotosDaVitrine>>[number];
+const precoBR = (c: number | null) => (c == null ? "Sob consulta" : (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+async function desenhar(l: Loja, slug: string | null, vitrine: Produto[]): Promise<{ img: Buffer; tipo: string }> {
+  const gratis = ehChaveDePagina(l.chave);
   const sede = SEDE_POR_NUMERO[l.numero] ?? null;
   const quiosque = QUIOSQUE_POR_NUMERO[l.numero] ?? null;
   const cor = /^#[0-9a-fA-F]{6}$/.test(sede?.cor ?? l.cor) ? (sede?.cor ?? l.cor) : "#0A6CFF";
   // o prédio: o da sede vem do modelo dela; o da loja, do escritório (o mesmo desenho do painel Meu escritório)
   const predioId = sede?.modelo ? MODELO[sede.modelo].base : l.predio ?? "moderno";
-  const arte = quiosque ? null : lerPublico(`workend/predios/${predioId}.webp`) ?? lerPublico("workend/predios/moderno.webp");
+  const arte = quiosque || gratis ? null : lerPublico(`workend/predios/${predioId}.webp`) ?? lerPublico("workend/predios/moderno.webp");
   const predio = arte ? await paraPng(arte, 500) : null;
-  const logoBruta = sede ? lerPublico(sede.icone) : l.temLogo ? (await logoDoTerreno(l.chave).catch(() => null))?.dados ?? null : null;
+  const logoBruta = sede ? lerPublico(sede.icone) : l.temLogo ? (await (gratis ? logoDaPagina(l.chave) : logoDoTerreno(l.chave)).catch(() => null))?.dados ?? null : null;
+  const fotos = await Promise.all(vitrine.map(async (p) => ({ ...p, img: p.foto ? await paraPng(Buffer.from(p.foto), 200, true) : null })));
   const logo = logoBruta ? await paraPng(logoBruta, 112, true) : null;
   const marcaWE = await paraPng(lerPublico("workend/marca/workend-logotipo-branco.svg") ?? Buffer.from(""), 210);
   const nome = resumo(l.nome, 44);
-  const rotulo = sede ? `Sede · ${sede.tipo.charAt(0).toUpperCase()}${sede.tipo.slice(1)}` : `${rotuloLoja(l.numero)} · ${l.nicho}`;
+  const rotulo = sede ? `Sede · ${sede.tipo.charAt(0).toUpperCase()}${sede.tipo.slice(1)}` : gratis ? `Loja no WorkEnd · ${l.nicho}` : `${rotuloLoja(l.numero)} · ${l.nicho}`;
   const texto = resumo(l.sobre || (sede ? sede.resumo : `${l.atendente ? `${l.atendente.nome} atende na hora. ` : ""}Veja a vitrine, os cupons e fale direto com a loja.`), 118);
   const endereco = `workend.online/${slug ?? `loja/${l.numero}`}`;
   const letra = l.nome.slice(0, 1).toUpperCase();
@@ -100,8 +109,26 @@ async function desenhar(l: Loja, slug: string | null): Promise<{ img: Buffer; ti
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 120, background: "linear-gradient(180deg, rgba(22,28,37,0) 0%, rgba(10,13,18,.75) 100%)" }} />
         <div style={{ position: "absolute", right: 40, bottom: 34, width: 560, height: 64, borderRadius: 280, background: "radial-gradient(ellipse, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 70%)" }} />
 
+        {/* página grátis: a vitrine (até 3 produtos, em leque) ou, sem produto, o cartão com a marca */}
+        {gratis && fotos.length > 0 && (
+          <div style={{ position: "absolute", left: 640, right: 50, top: 150, bottom: 60, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            {fotos.map((p, i) => (
+              <div key={p.id} style={{ width: 200, display: "flex", flexDirection: "column", background: "#fff", borderRadius: 20, padding: 10, marginLeft: i ? -26 : 0, marginBottom: fotos.length === 3 && i === 1 ? 46 : 0, transform: `rotate(${fotos.length === 1 ? 0 : (i - (fotos.length - 1) / 2) * 5}deg)`, boxShadow: "0 24px 46px -18px rgba(0,0,0,.75)" }}>
+                {p.img ? <img src={p.img} alt="" width={180} height={180} style={{ borderRadius: 14 }} />
+                  : <div style={{ width: 180, height: 180, borderRadius: 14, background: rgba(cor, 0.16), display: "flex", alignItems: "center", justifyContent: "center", color: cor, fontSize: 64, fontWeight: 700 }}>{p.nome.slice(0, 1).toUpperCase()}</div>}
+                <div style={{ display: "flex", marginTop: 10, fontSize: 20, fontWeight: 700, color: "#1D2128" }}>{resumo(p.nome, 16)}</div>
+                <div style={{ display: "flex", marginTop: 2, fontSize: 18, fontWeight: 600, color: "#5A6472" }}>{precoBR(p.precoCentavos)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {gratis && !fotos.length && (
+          <div style={{ position: "absolute", right: 150, top: 200, width: 330, height: 330, borderRadius: 48, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 30px 60px -20px rgba(0,0,0,.75)", transform: "rotate(-4deg)" }}>
+            {logo ? <img src={logo} alt="" width={230} height={230} style={{ borderRadius: 28 }} /> : <div style={{ width: 230, height: 230, borderRadius: 40, background: cor, color: "#fff", fontSize: 130, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{letra}</div>}
+          </div>
+        )}
         {/* a fachada: o prédio da loja, ou o quiosque desenhado */}
-        {predio ? <img src={predio} alt="" width={500} height={500} style={{ position: "absolute", right: 70, bottom: 44 }} /> : (
+        {gratis ? null : predio ? <img src={predio} alt="" width={500} height={500} style={{ position: "absolute", right: 70, bottom: 44 }} /> : (
           <div style={{ position: "absolute", right: 110, bottom: 62, width: 420, height: 330, display: "flex", flexDirection: "column", alignItems: "center" }}>
             <div style={{ width: 420, height: 78, display: "flex", borderTopLeftRadius: 14, borderTopRightRadius: 14, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, overflow: "hidden", boxShadow: "0 16px 30px -12px rgba(0,0,0,.6)" }}>
               {Array.from({ length: 7 }, (_, i) => <div key={i} style={{ flex: 1, background: i % 2 ? "#F2F5F8" : cor }} />)}
@@ -115,9 +142,9 @@ async function desenhar(l: Loja, slug: string | null): Promise<{ img: Buffer; ti
           </div>
         )}
         {/* o balão da loja por cima da fachada, preso por um fio */}
-        <div style={{ position: "absolute", left: 640, right: 60, top: quiosque ? 130 : 78, display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ position: "absolute", left: 640, right: 60, top: quiosque ? 130 : gratis ? 64 : 78, display: "flex", flexDirection: "column", alignItems: "center" }}>
           {balao}
-          <div style={{ width: 3, height: quiosque ? 40 : 34, background: "rgba(255,255,255,.55)" }} />
+          {!gratis && <div style={{ width: 3, height: quiosque ? 40 : 34, background: "rgba(255,255,255,.55)" }} />}
         </div>
 
         {/* o texto, à esquerda */}

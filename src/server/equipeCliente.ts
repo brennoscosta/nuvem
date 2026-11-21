@@ -28,6 +28,7 @@ import type { AreaId, Nivel } from "@/office/data/org";
 import { avisar, contatosNaFala } from "./conectores";
 import { numeroDaLoja, chaveDaLoja } from "@/office/data/numeroLoja";
 import { tetoDaEmpresa, MSG_SEM_UNIDADES, AVISO_UNIDADES } from "./unidadesIA";
+import { ehNumeroDePagina, ehChaveDePagina, paginaPorNumero, terrenoDaPagina, lojaNaCidade } from "./planoVitrine";
 import { roteiroDono, roteiroVisitante } from "./escopoEquipe";
 import { PERSONALIDADE_POR_ID, personalidadeParaIA } from "@/office/data/personalidades";
 import { escopoDe } from "@/office/data/escopo";
@@ -81,7 +82,10 @@ export async function garantirEmpresaDoLote(t: Terreno, forcar = false): Promise
   await migrar();
   const dono = await donoDe(t);
   const empId = empresaIdDe(t.usuarioId, t.chave, ehAdmin(dono as Usuario | null));
-  const [est] = await sql<{ loteEm: Date; empEm: Date | null }[]>`SELECT t.atualizado_em AS lote_em, (SELECT e.atualizado_em FROM empresa e WHERE e.id = ${empId}) AS emp_em FROM terreno t WHERE t.chave = ${t.chave}`;
+  // página grátis (Plano Vitrine, WE-13): a data que conta é a da página, não a de um lote
+  const [est] = ehChaveDePagina(t.chave)
+    ? await sql<{ loteEm: Date; empEm: Date | null }[]>`SELECT v.atualizado_em AS lote_em, (SELECT e.atualizado_em FROM empresa e WHERE e.id = ${empId}) AS emp_em FROM loja_vitrine v WHERE v.usuario_id = ${t.usuarioId}`
+    : await sql<{ loteEm: Date; empEm: Date | null }[]>`SELECT t.atualizado_em AS lote_em, (SELECT e.atualizado_em FROM empresa e WHERE e.id = ${empId}) AS emp_em FROM terreno t WHERE t.chave = ${t.chave}`;
   const precisa = forcar || !est?.empEm || (est.loteEm && new Date(est.loteEm) > new Date(est.empEm));
   if (!precisa) return empId;
   await sql`INSERT INTO empresa (id, slug, nome, usuario_id) VALUES (${empId}, ${empId}, ${t.empresaNome}, ${t.usuarioId})
@@ -185,7 +189,7 @@ export async function agenteDoMembro(empId: string, membroId: string) {
 export async function empresaDoDono(u: Usuario, chave?: string | null) { const t = await loteDoDono(u, chave); return { t, empId: await garantirEmpresaDoLote(t) }; }
 
 export interface Contatos { whatsapp?: string; instagram?: string; site?: string; email?: string }
-function limparContatos(x: unknown): Contatos {
+export function limparContatos(x: unknown): Contatos {
   const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
   const s = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
   const zap = s(o.whatsapp, 20).replace(/\D/g, "");
@@ -418,6 +422,15 @@ export async function conversaDeVisitante(u: Usuario, chave: string | null, visi
 
 // ---------- a loja, vista por quem chega ----------
 async function lojaPorNumero(numero: number) {
+  // página grátis (Plano Vitrine, WE-13, planoVitrine.ts): número a partir de 10001. Se a conta já levou a loja para a
+  // cidade, vale a loja do lote (a mesma empresa e a mesma atendente)
+  if (ehNumeroDePagina(numero)) {
+    const pg = await paginaPorNumero(numero);
+    if (!pg) throw new ErroHttp("Esta loja não está aberta agora.", 404);
+    const ch = await lojaNaCidade(pg.usuarioId);
+    const t = (ch ? await obterTerreno(ch) : null) ?? terrenoDaPagina(pg);
+    return { t, empId: await garantirEmpresaDoLote(t), numero };
+  }
   // sedes (data/sedes.ts) não têm número de loja: a recepção de cada uma atende pelo número dela (Social RP 0, outras 901+)
   const sd = SEDE_POR_NUMERO[numero];
   // quiosques (101+, data/quiosques.ts) pelo mesmo caminho dos lotes: chaveDaLoja

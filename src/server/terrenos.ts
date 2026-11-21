@@ -182,13 +182,18 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
     } else {
       // quem já teve um lote recupera a marca e a equipe guardadas
       const [guardado] = await tx<{ logo: Uint8Array | null; logoTipo: string | null; escritorio: Escritorio | null; nicho: string | null }[]>`SELECT logo, logo_tipo, escritorio, nicho FROM terreno_arquivo WHERE usuario_id = ${u.id} ORDER BY arquivado_em DESC LIMIT 1`;
-      const logoFinal = logo ?? (guardado?.logo ? Buffer.from(guardado.logo) : null);
-      const tipoFinal = logo ? logoTipo : guardado?.logo ? guardado.logoTipo : null;
+      // Plano Vitrine (WE-13): quem tem a página grátis leva a mesma loja para a cidade: a logomarca, o nicho e a atendente
+      // (o mesmo id, então as conversas continuam). O endereço, a vitrine, o "Sobre" e os contatos já são da conta.
+      const [pagina] = guardado ? [] : await tx<{ logo: Uint8Array | null; logoTipo: string | null; escritorio: Escritorio | null; nicho: string | null }[]>`SELECT logo, logo_tipo, escritorio, nicho FROM loja_vitrine WHERE usuario_id = ${u.id}`;
+      const logoFinal = logo ?? (guardado?.logo ? Buffer.from(guardado.logo) : pagina?.logo ? Buffer.from(pagina.logo) : null);
+      const tipoFinal = logo ? logoTipo : guardado?.logo ? guardado.logoTipo : pagina?.logo ? pagina.logoTipo : null;
       // o modelo de prédio comprado fica com a empresa só enquanto o lote está ativo (20/11/2026): quem volta do arquivo
       // traz a equipe e a marca, mas o prédio pago volta para o escritório básico; o quiosque volta só com a atendente
       const guardadoEsc = guardado?.escritorio ? semModeloPago(quiosque ? equipeDoQuiosque(guardado.escritorio) : guardado.escritorio) : null;
-      const escFinal = guardadoEsc ? sql.json(guardadoEsc as unknown as Parameters<typeof sql.json>[0]) : escJson;
-      const nicho = nichoPedido ?? nichoValido(guardado?.nicho); // sem nicho na reserva: o guardado, ou "negocios"
+      const atPg = pagina?.escritorio?.equipe.find((m) => m.papel === "atendente") ?? null;
+      const escPg = atPg ? { ...esc, equipe: esc.equipe.map((m) => (m.papel === "atendente" ? { ...m, id: atPg.id, nome: d.atendenteNome?.trim() ? m.nome : atPg.nome, boneco: atPg.boneco, camisa: atPg.camisa, treino: atPg.treino } : m)) } : null;
+      const escFinal = guardadoEsc ? sql.json(guardadoEsc as unknown as Parameters<typeof sql.json>[0]) : escPg ? sql.json(escPg as unknown as Parameters<typeof sql.json>[0]) : escJson;
+      const nicho = nichoPedido ?? nichoValido(guardado?.nicho ?? pagina?.nicho); // sem nicho na reserva: o guardado (ou o da página grátis), ou "negocios"
       await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, status, reservado_ate, escritorio) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${nicho}, ${logoFinal}, ${tipoFinal}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${escFinal})`;
     }
     const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${chave}`;

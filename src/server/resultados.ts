@@ -14,6 +14,7 @@ import { LOTES, LOTE_POR_CHAVE } from "@/office/data/mundo";
 import type { Terreno } from "./terrenos";
 import { numeroDaLoja } from "@/office/data/numeroLoja";
 import { chaveDaLoja } from "@/office/data/numeroLoja";
+import { ehNumeroDePagina, paginaPorNumero, lojaNaCidade, chaveDaPagina } from "./planoVitrine";
 
 const TZ = "America/Sao_Paulo";
 export const diaBR = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d); // AAAA-MM-DD
@@ -28,6 +29,8 @@ const ehRobo = (h: Headers) => { const ua = h.get("user-agent") ?? ""; return !/
 
 // a loja (lote principal) de um número de lote; uma ampliação conta para o lote principal
 export async function lojaDoNumero(numero: number): Promise<{ chave: string; donoId: string } | null> {
+  // página grátis (Plano Vitrine, WE-13): número a partir de 10001; com a loja já na cidade, conta para a loja do lote
+  if (ehNumeroDePagina(numero)) { const pg = await paginaPorNumero(numero); return pg ? { chave: (await lojaNaCidade(pg.usuarioId)) ?? chaveDaPagina(numero), donoId: pg.usuarioId } : null; }
   const chave = chaveDaLoja(numero); if (!chave) return null; // 0 = a sede da Social RP
   await migrar();
   const [t] = await sql<{ chave: string; usuarioId: string; status: string; anexoDe: string | null }[]>`SELECT chave, usuario_id, status, anexo_de FROM terreno WHERE chave = ${chave}`;

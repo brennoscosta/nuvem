@@ -3,6 +3,8 @@
 //    as ferramentas com prévia de verdade, a equipe de IA, a indicação e o catálogo de especialistas por setor;
 //  - lote reservado: contagem da reserva e o preço do 1º mês já com a oferta;
 //  - sem lote: o convite com o preço de entrada, os 3 passos e o catálogo.
+//    WE-13 (21/11/2026): antes do convite, "Sua página grátis" (Plano Vitrine): publicar a página da loja sem pagar e, publicada,
+//    o link, os 3 produtos e o atalho para editar (./_pagina-gratis.tsx).
 // Os dados vêm de src/server/painel.ts; o movimento fica em ./_painel.tsx e ./painel.css.
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -18,6 +20,12 @@ import { Icone } from "@/office/ui/Icone";
 import { MedirUmaVez } from "../_cookies";
 import { AssinaturaPainel } from "./_assinatura"; // pagamento automático (WE-09)
 import { LembretePerfil } from "../_lembrete-perfil"; // o que falta no perfil do cadastro (20/11/2026)
+import { PaginaGratis, type DadosPaginaGratis } from "./_pagina-gratis"; // Plano Vitrine (WE-13)
+import { paginaDoUsuario, perfilDaConta, empresaDaConta, PRODUTOS_VITRINE_GRATIS } from "@/server/planoVitrine";
+import { vitrineResumo } from "@/server/vitrine";
+import { enderecoAtual } from "@/server/enderecoLoja";
+import { RESPOSTAS_MES_VITRINE } from "@/server/unidadesIA";
+import type { Usuario } from "@/server/usuarios";
 import { meta } from "../seo";
 import "./painel.css";
 
@@ -37,11 +45,12 @@ export default async function App() {
   const empresa = chao?.empresaNome || u.empresaNome || `Empresa de ${nome}`;
   const { oi, data } = saudacaoBR();
   const ativo = chao?.status === "ativo";
-  const [p, reserva, entrada, vendas] = await Promise.all([
+  const [p, reserva, entrada, vendas, gratis] = await Promise.all([
     ativo && chao ? painelDoDono(u, chao).catch((e) => { console.error("[painel]", (e as Error).message); return null; }) : null,
     chao && !ativo ? painelReserva(u, chao) : null,
     !chao ? ofertaDeEntrada(u) : null,
     ativo ? resumoVendas(u.id).catch(() => null) : null, // pedidos pela atendente (17/11/2026)
+    !chao ? dadosPaginaGratis(u).catch((e) => { console.error("[página grátis]", (e as Error).message); return null; }) : null,
   ]);
   const linkLote = chao ? (sedeDe(chao.chave) ? `/mundo?sede=${sedeDe(chao.chave)!.id}` : `/mundo?lote=${encodeURIComponent(chao.chave)}`) : "/mundo";
 
@@ -55,14 +64,15 @@ export default async function App() {
         <p className="pn-sub">
           {ativo ? <>A <b>{empresa}</b> está aberta no mapa. Veja como foi a semana e o que dá para fazer hoje.</>
             : chao ? <>Falta pagar o 1º mês para a <b>{empresa}</b> abrir as portas no mapa.</>
-            : <>Falta só o endereço da sua empresa na cidade.</>}
+            : gratis?.pagina ? <>A página da <b>{gratis.pagina.empresaNome}</b> está no ar, grátis. Quando quiser, leve a loja para a cidade.</>
+            : <>Publique agora a página grátis da sua empresa. O endereço na cidade vem quando você quiser.</>}
         </p>
         <LembretePerfil usuarioId={u.id} />
       </section>
 
       {ativo && chao && p ? <LojaAberta chao={chao} p={p} empresa={empresa} linkLote={linkLote} vendas={vendas} />
         : chao && reserva ? <Reservado chao={chao} r={reserva} linkLote={linkLote} />
-        : <SemLote fundador={entrada?.fundador ?? null} />}
+        : <>{gratis && <PaginaGratis d={gratis} />}<SemLote fundador={entrada?.fundador ?? null} paginaNoAr={!!gratis?.pagina} /></>}
 
       {outras.length > 0 && (
         <section className="faixa pn-bloco">
@@ -441,14 +451,26 @@ function Reservado({ chao, r, linkLote }: { chao: Terreno; r: { valor: number | 
 }
 
 // ======================= sem lote =======================
-function SemLote({ fundador }: { fundador: { valor: number; vagas: number; restam: number } | null }) {
+// Sua página grátis (Plano Vitrine, WE-13): a página da conta, o "Sobre" e os contatos, o endereço e os 3 produtos
+async function dadosPaginaGratis(u: Usuario): Promise<DadosPaginaGratis> {
+  const empId = empresaDaConta(u.id);
+  const [pg, perfil, endereco, vit] = await Promise.all([paginaDoUsuario(u.id), perfilDaConta(u.id), enderecoAtual(empId), vitrineResumo(u.id, PRODUTOS_VITRINE_GRATIS)]);
+  const publicada = pg?.publicadaEm ? pg : null;
+  return {
+    pagina: publicada ? { numero: publicada.numero, empresaNome: publicada.empresaNome, cor: publicada.cor, nicho: publicada.nicho, logo: publicada.temLogo ? `/api/terrenos/pagina-${publicada.numero}/logo?v=${new Date(publicada.atualizadoEm).getTime()}` : null } : null,
+    endereco, sobre: perfil.sobre, whatsapp: perfil.contatos.whatsapp ?? "", instagram: perfil.contatos.instagram ?? "", nomeConta: u.empresaNome || "",
+    produtos: vit.primeiros.map((x) => ({ id: x.id, nome: x.nome, preco: x.preco, foto: x.foto })), ativos: vit.ativos, maxGratis: PRODUTOS_VITRINE_GRATIS, respostas: RESPOSTAS_MES_VITRINE,
+  };
+}
+
+function SemLote({ fundador, paginaNoAr = false }: { fundador: { valor: number; vagas: number; restam: number } | null; paginaNoAr?: boolean }) {
   return (
     <>
       <section className="faixa">
         <div className="pn-chegar">
           <div className="pn-chegar-texto">
-            <h2>Escolha o endereço da sua empresa</h2>
-            <p>Um lote de 20 × 20 m numa cidade 3D aberta 24 horas, com o seu prédio, a sua placa e uma equipe de IA atendendo quem passa.</p>
+            <h2>{paginaNoAr ? "Leve a mesma loja para a cidade" : "Escolha o endereço da sua empresa"}</h2>
+            <p>Um lote de 20 × 20 m numa cidade 3D aberta 24 horas, com o seu prédio, a sua placa e uma equipe de IA atendendo quem passa.{paginaNoAr ? " A página, o endereço, a vitrine e a atendente continuam os mesmos, e a vitrine passa a mostrar até 12 produtos." : ""}</p>
             {fundador ? (
               <div className="pn-preco pn-preco-claro">
                 <span>1º mês</span><s>{reais(PRECO_LOTE)}</s><b>{reais(fundador.valor)}</b>

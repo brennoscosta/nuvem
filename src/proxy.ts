@@ -27,7 +27,8 @@ function rotaWorkend(req: NextRequest) {
   if (p === "/mundo" || p === "/mundo/") { url.pathname = "/"; return reescrever(url); }
   if (p === "/app" || p.startsWith("/app/")) { url.pathname = "/workend" + p; return noindex(reescrever(url)); }
   // busca de profissionais e empresas e a página pública de cada loja (11/11/2026)
-  if (p === "/encontrar" || /^\/loja\/\d{1,4}$/.test(p)) { url.pathname = "/workend" + p; return reescrever(url); }
+  // até 5 algarismos: a página grátis (Plano Vitrine, WE-13) tem número a partir de 10001, e /loja/N leva ao endereço dela
+  if (p === "/encontrar" || /^\/loja\/\d{1,5}$/.test(p)) { url.pathname = "/workend" + p; return reescrever(url); }
   // perfil público do cadastro (20/11/2026): /perfil/<apelido>
   if (/^\/perfil\/[a-z0-9-]{3,40}\/?$/.test(p)) { url.pathname = "/workend" + p.replace(/\/$/, ""); return reescrever(url); }
   // /emails: preferências dos avisos por e-mail, pelo link assinado do rodapé (WE-17, 21/11/2026)

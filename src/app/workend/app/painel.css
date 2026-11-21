@@ -382,3 +382,29 @@
   .we .pn-mes-txt small { font-size: 14px; color: var(--muted); white-space: nowrap; }
   .we .pn-mes-ico { flex: none; display: grid; place-items: center; width: 2.1rem; height: 2.1rem; border-radius: 10px; background: #fff; color: var(--ink); }
 }
+
+/* Sua página grátis (Plano Vitrine, WE-13, 21/11/2026): o bloco da página publicada usa o .pn-loja (fundo noturno com o
+   brilho da marca); à direita, a vitrine com os 3 espaços de produto. O formulário usa o .pn-chegar com a prévia ao lado. */
+.we .pn-gr-link { font-weight: 600; color: #fff; overflow-wrap: anywhere; }
+.we .pn-gr-inclui { margin-top: .8rem; max-width: 52ch; font-size: 15px; color: rgba(255,255,255,.72); }
+.we .pn-gr-vitrine { position: relative; align-self: center; border-radius: 18px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); padding: 1rem; min-width: 0; }
+.we .pn-gr-vitrine-topo { display: flex; justify-content: space-between; gap: 1rem; font-size: 14px; color: rgba(255,255,255,.7); margin-bottom: .6rem; }
+.we .pn-gr-vitrine-topo b { color: #fff; }
+.we .pn-gr-vitrine ul { display: grid; gap: .5rem; }
+.we .pn-gr-produto { display: flex; align-items: center; gap: .75rem; border-radius: 12px; background: #fff; color: var(--ink); padding: .45rem; min-width: 0; }
+.we .pn-gr-produto img, .we .pn-gr-sem-foto { flex: none; width: 52px; height: 52px; border-radius: 9px; object-fit: cover; }
+.we .pn-gr-sem-foto { display: grid; place-items: center; background: var(--surface-dim); color: var(--muted); }
+.we .pn-gr-produto small { color: var(--muted); font-size: 13.5px; }
+.we .pn-gr-vazio { background: rgba(255,255,255,.06); border: 1px dashed rgba(255,255,255,.28); color: rgba(255,255,255,.72); font-size: 14px; }
+.we .pn-gr-vazio .pn-gr-sem-foto { background: rgba(255,255,255,.1); color: #fff; }
+.we .pn-gr-selo { align-self: flex-start; width: fit-content; font-size: 13px; font-weight: 700; color: #0B5E2B; background: #DDF6E6; padding: .3rem .7rem; border-radius: 999px; margin-bottom: .6rem; }
+.we .pn-gr-cor { width: 44px; height: 44px; border-radius: 50%; border: 3px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+.we .pn-gr-cor-sim { border-color: var(--ink); }
+.we .pn-gr-previa { position: relative; display: grid; place-items: center; min-height: 260px; padding: 1.5rem; overflow: hidden;
+  background: radial-gradient(closest-side at 70% 30%, color-mix(in srgb, var(--marca) 55%, transparent), transparent 75%), var(--night); }
+.we .pn-gr-previa-cartao { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; width: min(100%, 300px); border-radius: 18px; background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14); padding: 1.1rem; color: #fff; box-shadow: 0 30px 60px -30px rgba(0,0,0,.7); }
+.we .pn-gr-previa-cartao b { font-size: 1.3rem; line-height: 1.15; margin-top: .4rem; overflow-wrap: anywhere; }
+.we .pn-gr-previa-cartao small { color: rgba(255,255,255,.65); font-size: 14px; }
+.we .pn-gr-previa-btn { margin-top: .7rem; display: inline-flex; align-items: center; gap: .4rem; border-radius: 10px; background: #fff; color: var(--ink); font-weight: 600; font-size: 14px; padding: .5rem .8rem; }
+@media (max-width: 899px) { .we .pn-gr-previa { order: -1; min-height: 200px; } }

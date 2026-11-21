@@ -20,7 +20,7 @@ function assinarRelogio(cb: () => void) {
   return () => { ouvintesRel.delete(cb); if (!ouvintesRel.size && timerRel) { clearInterval(timerRel); timerRel = null; } };
 }
 export const useAgora = () => useSyncExternalStore(assinarRelogio, () => agoraRel, () => 0);
-export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null }
+export interface UsuarioWorkend { id: string; email: string; nome: string; empresaNome: string; papel?: "dono" | "admin"; banidoEm?: string | null; corLoja?: string } // corLoja: a cor da página grátis (WE-13)
 export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: string | null; ceoNome: string; atendenteNome: string; nicho: string }
 export type AbaEscritorio = "predio" | "visual" | "interior" | "setores" | "equipe" | "contratar" | "treinar";
 // creditos: o que a carteira de créditos cobriu (20/11/2026); valor é só a parte do Pix (0 = pago todo com créditos)
@@ -233,7 +233,7 @@ export const useMundo = create<Estado>((set, get) => ({
     if (!t) medir("abrir_reserva", { tipo: ehQuiosque(loteSelecionado) ? "quiosque" : "lote" }); // lote livre: o formulário de reserva
     const ceo = t?.escritorio?.equipe.find((m) => m.papel === "ceo")?.nome ?? "";
     const atendente = t?.escritorio?.equipe.find((m) => m.papel === "atendente")?.nome ?? "";
-    set({ painelEmpresa: true, configurarEmpresa: false, rascunho: { empresaNome: t?.empresaNome ?? usuario?.empresaNome ?? "", cor: t?.cor ?? CORES_EMPRESA[0], logoDataUrl: t?.temLogo ? `/api/terrenos/${encodeURIComponent(loteSelecionado)}/logo?v=${Date.now()}` : null, ceoNome: ceo, atendenteNome: atendente, nicho: t?.nicho ?? "negocios" } });
+    set({ painelEmpresa: true, configurarEmpresa: false, rascunho: { empresaNome: t?.empresaNome ?? usuario?.empresaNome ?? "", cor: t?.cor ?? usuario?.corLoja ?? CORES_EMPRESA[0], logoDataUrl: t?.temLogo ? `/api/terrenos/${encodeURIComponent(loteSelecionado)}/logo?v=${Date.now()}` : null, ceoNome: ceo, atendenteNome: atendente, nicho: t?.nicho ?? "negocios" } });
   },
   abrirConfiguracao: () => { get().abrirPainel(); if (get().painelEmpresa) set({ configurarEmpresa: true }); },
   fecharPainel: () => set({ painelEmpresa: false, rascunho: null }),
