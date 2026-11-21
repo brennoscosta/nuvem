@@ -8,6 +8,7 @@
 // testa as ofertas (paga 1/100), mas não gasta as vagas de fundador.
 import { randomBytes } from "node:crypto";
 import { sql, migrar } from "./db";
+import { brl } from "./email";
 import type { Usuario } from "./usuarios";
 import { PRECO_LOTE, ADMIN_EMAIL, ehAdmin, obterTerreno } from "./terrenos";
 // lote extra e quiosque (20/11/2026, data/precosTerreno.ts): preço do quiosque e renovação do lote extra junto com o principal
@@ -72,7 +73,7 @@ export async function cotacaoLote(u: Usuario, chave: string, meses = 1): Promise
   let oferta: Cotacao["oferta"] = null;
   if (novo && (admin || (await primeiraVez(u.id)))) {
     const opcoes: NonNullable<Cotacao["oferta"]>[] = [];
-    if (restam > 0) opcoes.push({ id: "fundador", nome: FUNDADOR.nome, desconto: centavos(PRECO_LOTE - FUNDADOR.valor), detalhe: `As ${FUNDADOR.vagas} primeiras empresas pagam ${FUNDADOR.valor.toFixed(2).replace(".", ",")} no 1º mês. Restam ${restam}.` });
+    if (restam > 0) opcoes.push({ id: "fundador", nome: FUNDADOR.nome, desconto: centavos(PRECO_LOTE - FUNDADOR.valor), detalhe: `As ${FUNDADOR.vagas} primeiras empresas pagam ${brl(FUNDADOR.valor)} no 1º mês. Restam ${restam}.` });
     if (await teveBarraca(u.id)) opcoes.push({ id: "feira", nome: FEIRA.nome, desconto: centavos(PRECO_LOTE - FEIRA.valor), detalhe: "Você já teve barraca na feira de sábado." });
     const ind = admin ? null : await indicacaoPendente(u.id);
     if (ind) opcoes.push({ id: "indicado", nome: INDICADO.nome, desconto: centavos(PRECO_LOTE * INDICADO.desconto), detalhe: ind.empresa ? `Indicado por ${ind.empresa}.` : "Você chegou por indicação." });

@@ -249,7 +249,7 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
   // troca de prédio: 3 grátis, depois cada uma custa R$ 9,90 (crédito comprado no Pix); admin não paga
   if (mudou) {
     if (!ehAdmin(u)) {
-      if (trocasRestantes(base) <= 0) throw new Error(`Você já usou as ${TROCAS_LAYOUT_GRATIS} trocas de prédio grátis. Cada troca agora custa R$ ${PRECO_TROCA_LAYOUT.toFixed(2).replace(".", ",")}.`);
+      if (trocasRestantes(base) <= 0) throw new Error(`Você já usou as ${TROCAS_LAYOUT_GRATIS} trocas de prédio grátis. Cada troca agora custa ${brl(PRECO_TROCA_LAYOUT)}.`);
       if ((base.trocasLayout ?? 0) < TROCAS_LAYOUT_GRATIS) e.trocasLayout = (base.trocasLayout ?? 0) + 1;
       else e.creditosLayout = Math.max(0, (base.creditosLayout ?? 0) - 1);
     }

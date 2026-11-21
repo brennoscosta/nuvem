@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AREAS, type AreaId, type Nivel } from "../data/org";
 import { SETORES_ESCRITORIO } from "../data/layout";
+import { brl } from "./equipeComum";
 
 // Setor que faz as artes (gpt-image-2). Era "Design gráfico"; no escritório compacto é o setor Criativos.
 const SETOR_ARTE = (a: AreaId) => a === "criativos" || a === "designgrafico";
@@ -50,6 +51,33 @@ const FORMATOS = [
   { id: "horizontal", nome: "Horizontal", sub: "3:2 · capa / banner", w: 21, h: 14 },
 ];
 const inp = "rounded-xl border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#4F7DF3]";
+// Custo de uma arte em unidades de IA, mostrado antes de gerar (WE-10, 21/11/2026): o preço que a geração usa de verdade
+// (server/imagens.ts) e o saldo da empresa do agente, pela rota /api/tarefas/custo-imagem
+interface CustoImagem { formatos: Record<string, { custoBrl: number; unidades: number }>; saldo: { cobrada: boolean; total: number }; mensalidade: number }
+function useCustoImagem(agenteId: string | null, versao: string) {
+  const [c, setC] = useState<CustoImagem | null>(null);
+  useEffect(() => {
+    if (!agenteId) return;
+    let vivo = true;
+    api(`/api/tarefas/custo-imagem?agente=${encodeURIComponent(agenteId)}`).then((j: CustoImagem) => { if (vivo) setC(j); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [agenteId, versao]);
+  return c;
+}
+const num = (n: number) => n.toLocaleString("pt-BR");
+function AvisoCustoImagem({ custo, formato }: { custo: CustoImagem | null | undefined; formato?: string }) {
+  const f = custo ? custo.formatos[formato ?? "quadrado"] ?? custo.formatos.quadrado : null;
+  if (!custo || !f || f.unidades <= 0) return null;
+  const porMes = Math.floor(custo.mensalidade / f.unidades), restam = Math.floor(custo.saldo.total / f.unidades);
+  return (
+    <div data-custo-imagem={f.unidades} className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] leading-snug text-[#5B6472]">
+      Gerar esta arte consome <b className="text-[#1D2128]">{num(f.unidades)} unidades de IA</b> ({brl(f.custoBrl)}).{" "}
+      {custo.saldo.cobrada
+        ? <>Restam <b className="text-[#1D2128]">{num(custo.saldo.total)} unidades</b> na empresa: dá para {num(restam)} {restam === 1 ? "arte" : "artes"}. As {num(custo.mensalidade)} inclusas por mês dão {num(porMes)}.</>
+        : <>A empresa interna da Nuvem não desconta unidades (o gasto aparece no consumo do admin). Numa loja, as {num(custo.mensalidade)} unidades inclusas por mês dão {num(porMes)} artes.</>}
+    </div>
+  );
+}
 const fmtData = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export function AbaTarefas({ agenteId, nomeAgente, area, nivel, config, recarregarFicha }: Props) {
@@ -59,6 +87,8 @@ export function AbaTarefas({ agenteId, nomeAgente, area, nivel, config, recarreg
   const [aviso, setAviso] = useState<string | null>(null);
   const ehCEO = nivel === "ceo";
   const ehGerenteDesign = SETOR_ARTE(area) && nivel === "gerente";
+  // o saldo muda quando uma arte termina: busca de novo quando o status das tarefas muda
+  const custoImagem = useCustoImagem(ehGerenteDesign ? agenteId : null, tarefas.map((t) => t.status).join(","));
   const carregar = useCallback(async () => {
     try { if (ehCEO) setConexoes(await api("/api/conexoes")); setTarefas(await api(`/api/tarefas?agente=${agenteId}`)); setErro(null); } catch (e) { setErro((e as Error).message); }
   }, [agenteId, ehCEO]);
@@ -101,7 +131,7 @@ export function AbaTarefas({ agenteId, nomeAgente, area, nivel, config, recarreg
 
       {ehGerenteDesign && (
         <>
-          <NovaArte agenteId={agenteId} nomeAgente={nomeAgente} aoCriar={carregar} />
+          <NovaArte agenteId={agenteId} nomeAgente={nomeAgente} aoCriar={carregar} custo={custoImagem} />
           <AcaoAoConcluir agenteId={agenteId} nomeAgente={nomeAgente} area={area} atual={config?.aoConcluir?.encaminharPara ?? null} aoSalvar={recarregarFicha} />
         </>
       )}
@@ -116,7 +146,7 @@ export function AbaTarefas({ agenteId, nomeAgente, area, nivel, config, recarreg
       <section>
         <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[#5B6472]">Tarefas ({tarefas.length})</div>
         {tarefas.length === 0 && <div className="text-xs text-[#5B6472]">Nenhuma tarefa ainda.</div>}
-        <div className="flex flex-col gap-2">{tarefas.map((t) => <CartaoTarefa key={t.id} t={t} nomeAgente={nomeAgente} recarregar={carregar} />)}</div>
+        <div className="flex flex-col gap-2">{tarefas.map((t) => <CartaoTarefa key={t.id} t={t} nomeAgente={nomeAgente} recarregar={carregar} custo={custoImagem} />)}</div>
       </section>
     </div>
   );
@@ -176,7 +206,7 @@ function NovaPublicacao({ agenteId, nomeAgente, aoCriar, conectadas }: { agenteI
 }
 
 // ---------------- Criativos (antes Design gráfico): criar arte ----------------
-function NovaArte({ agenteId, nomeAgente, aoCriar }: { agenteId: string; nomeAgente: string; aoCriar: () => Promise<void> }) {
+function NovaArte({ agenteId, nomeAgente, aoCriar, custo }: { agenteId: string; nomeAgente: string; aoCriar: () => Promise<void>; custo: CustoImagem | null }) {
   const [briefing, setBriefing] = useState("");
   const [titulo, setTitulo] = useState("");
   const [formato, setFormato] = useState("quadrado");
@@ -199,7 +229,7 @@ function NovaArte({ agenteId, nomeAgente, aoCriar }: { agenteId: string; nomeAge
 
   return (
     <section className="rounded-2xl border border-black/10 p-3">
-      <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[#5B6472]">Nova tarefa · Criar arte <span className="ml-1 rounded-full bg-black/5 px-2 py-0.5 text-[10px] normal-case tracking-normal">gpt-image-2 · alta qualidade · ~R$ 1 por arte</span></div>
+      <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[#5B6472]">Nova tarefa · Criar arte <span className="ml-1 rounded-full bg-black/5 px-2 py-0.5 text-[10px] normal-case tracking-normal">gpt-image-2 · alta qualidade</span></div>
       <div className="flex flex-col gap-2">
         <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Nome da peça (opcional)" className={inp} />
         <textarea value={briefing} onChange={(e) => setBriefing(e.target.value)} rows={5} className={inp}
@@ -212,6 +242,7 @@ function NovaArte({ agenteId, nomeAgente, aoCriar }: { agenteId: string; nomeAge
             </button>
           ))}
         </div>
+        <AvisoCustoImagem custo={custo} formato={formato} />
         <label className="flex cursor-pointer items-center justify-between gap-2 rounded-xl border-2 border-dashed border-black/15 px-3 py-2 text-xs text-[#5B6472] hover:border-[#4F7DF3]">
           <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => setRefs(Array.from(e.target.files ?? []).slice(0, 4))} />
           <span>🖼 Referências (opcional): logo, produto, foto — até 4. {refs.length ? <b className="text-[#1D2128]">{refs.map((r) => r.name).join(", ")}</b> : null}</span>
@@ -252,7 +283,7 @@ function AcaoAoConcluir({ agenteId, nomeAgente, area, atual, aoSalvar }: { agent
 }
 
 // ---------------- cartão de tarefa (todos os tipos) ----------------
-function CartaoTarefa({ t, nomeAgente, recarregar }: { t: Tarefa; nomeAgente: string; recarregar: () => Promise<void> }) {
+function CartaoTarefa({ t, nomeAgente, recarregar, custo }: { t: Tarefa; nomeAgente: string; recarregar: () => Promise<void>; custo?: CustoImagem | null }) {
   const st = STATUS[t.status] ?? { nome: t.status, cor: "#9AA3AD" };
   const arte = t.tipo === "criar_arte";
   const recebido = t.tipo === "arquivo_recebido";
@@ -301,6 +332,7 @@ function CartaoTarefa({ t, nomeAgente, recarregar }: { t: Tarefa; nomeAgente: st
               {t.plano.tags?.length ? <div className="mt-1 text-[#5B6472]">tags: {t.plano.tags.join(", ")}</div> : null}
             </>
           )}
+          {arte && <div className="mt-2"><AvisoCustoImagem custo={custo} formato={t.plano.formato ?? t.dados.formato} /></div>}
           <div className="mt-2 flex flex-wrap gap-1.5">
             <button onClick={aprovar} disabled={ocupado} className="rounded-full bg-[#22A86B] px-3 py-1.5 font-bold text-white disabled:opacity-50">{ocupado ? (arte ? "Gerando…" : "Publicando…") : arte ? "Aprovar e gerar" : "Aprovar e publicar"}</button>
             <button onClick={() => setEditando(!editando)} className="rounded-full bg-black/5 px-3 py-1.5 font-semibold">{editando ? `Ver como ${nomeAgente} propôs` : arte ? "Ajustar prompt" : "Ajustar texto"}</button>
@@ -318,7 +350,7 @@ function CartaoTarefa({ t, nomeAgente, recarregar }: { t: Tarefa; nomeAgente: st
           {recebido && t.dados.mensagem && <div className="mt-1 text-[11px] text-[#5B6472]">{t.dados.mensagem}</div>}
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
             <a href={imagemUrl} download={(recebido ? t.dados.arquivoNome : t.resultado?.arquivoNome) ?? "arte.png"} className="rounded-full bg-[#1D2128] px-3 py-1.5 font-bold text-white">⬇ Baixar</a>
-            {typeof t.resultado?.custoBrl === "number" && <span className="text-[#5B6472]">R$ {t.resultado.custoBrl.toFixed(2)}</span>}
+            {typeof t.resultado?.custoBrl === "number" && <span className="text-[#5B6472]">{brl(t.resultado.custoBrl)}</span>}
             {!recebido && (
               <span className="ml-auto flex items-center gap-1">
                 <select value={destino} onChange={(e) => setDestino(e.target.value)} className="rounded-full border border-black/10 px-2 py-1 text-xs">

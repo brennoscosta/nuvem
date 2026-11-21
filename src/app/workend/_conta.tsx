@@ -49,10 +49,10 @@ export function FormCadastro() {
   return (
     <form onSubmit={enviar} className="flex flex-col gap-4">
       <BotaoGoogle texto="Criar conta com Google" />
-      <label className="campo">Seu nome<input value={f.nome} onChange={set("nome")} autoComplete="name" required /></label>
-      <label className="campo">Nome da empresa (opcional)<input value={f.empresaNome} onChange={set("empresaNome")} autoComplete="organization" placeholder="Vai ser o nome do prédio" /></label>
-      <label className="campo">E-mail<input type="email" value={f.email} onChange={set("email")} autoComplete="email" required /></label>
-      <label className="campo">Senha<input type="password" value={f.senha} onChange={set("senha")} autoComplete="new-password" minLength={8} required placeholder="pelo menos 8 caracteres" /></label>
+      <label className="campo">Seu nome<input name="nome" value={f.nome} onChange={set("nome")} autoComplete="name" required /></label>
+      <label className="campo">Nome da empresa (opcional)<input name="empresa" value={f.empresaNome} onChange={set("empresaNome")} autoComplete="organization" placeholder="Vai ser o nome do prédio" /></label>
+      <label className="campo">E-mail<input type="email" name="email" value={f.email} onChange={set("email")} autoComplete="email" required /></label>
+      <label className="campo">Senha<input type="password" name="senha" value={f.senha} onChange={set("senha")} autoComplete="new-password" minLength={8} required placeholder="pelo menos 8 caracteres" /></label>
       {erro && <div className="rounded-xl bg-[#FDE8E8] px-3 py-2 text-sm text-[#8A2A2A]">{erro}</div>}
       <button type="submit" disabled={ocupado} className="btn btn-azul mt-2 justify-center text-[1.05rem]">{ocupado ? "Criando sua conta…" : "Criar conta"}</button>
       <p className="text-sm text-[var(--tinta-2)]">Já tem conta? <Link href={"/entrar" + busca} className="font-semibold text-[var(--azul)]">Entrar</Link></p>
@@ -72,8 +72,8 @@ export function FormEntrar({ esqueci = false }: { esqueci?: boolean }) {
   return (
     <form onSubmit={enviar} className="flex flex-col gap-4">
       <BotaoGoogle texto="Entrar com Google" />
-      <label className="campo">E-mail<input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} autoComplete="email" required /></label>
-      <label className="campo">Senha<input type="password" value={f.senha} onChange={(e) => setF({ ...f, senha: e.target.value })} autoComplete="current-password" required /></label>
+      <label className="campo">E-mail<input type="email" name="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} autoComplete="email" required /></label>
+      <label className="campo">Senha<input type="password" name="senha" value={f.senha} onChange={(e) => setF({ ...f, senha: e.target.value })} autoComplete="current-password" required /></label>
       {erro && <div className="rounded-xl bg-[#FDE8E8] px-3 py-2 text-sm text-[#8A2A2A]">{erro}</div>}
       <button type="submit" disabled={ocupado} className="btn btn-azul mt-2 justify-center text-[1.05rem]">{ocupado ? "Entrando…" : "Entrar"}</button>
       {esqueci && <Link href="/esqueci" className="text-sm font-semibold text-[var(--azul)]">Esqueci minha senha</Link>}
@@ -94,7 +94,7 @@ export function FormPedirSenha() {
   if (pedido) return <p className="text-[var(--tinta-2)]">Se existir uma conta com esse e-mail, o link já está a caminho. Confira também o spam.</p>;
   return (
     <form onSubmit={enviar} className="flex flex-col gap-4">
-      <label className="campo">E-mail<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required /></label>
+      <label className="campo">E-mail<input type="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required /></label>
       {erro && <div className="rounded-xl bg-[#FDE8E8] px-3 py-2 text-sm text-[#8A2A2A]">{erro}</div>}
       <button type="submit" disabled={ocupado} className="btn btn-azul mt-2 justify-center text-[1.05rem]">{ocupado ? "Enviando…" : "Enviar o link"}</button>
     </form>
@@ -111,7 +111,7 @@ export function FormNovaSenha({ token }: { token: string }) {
   };
   return (
     <form onSubmit={enviar} className="flex flex-col gap-4">
-      <label className="campo">Nova senha<input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="new-password" minLength={8} required placeholder="pelo menos 8 caracteres" /></label>
+      <label className="campo">Nova senha<input type="password" name="senha" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="new-password" minLength={8} required placeholder="pelo menos 8 caracteres" /></label>
       {erro && <div className="rounded-xl bg-[#FDE8E8] px-3 py-2 text-sm text-[#8A2A2A]">{erro}</div>}
       <button type="submit" disabled={ocupado} className="btn btn-azul mt-2 justify-center text-[1.05rem]">{ocupado ? "Salvando…" : "Salvar a nova senha"}</button>
     </form>

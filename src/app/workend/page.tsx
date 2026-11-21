@@ -19,6 +19,7 @@ import { VideoExplica } from "./_inicio/VideoExplica";
 import { CenaLote, CenaFachada, CenaEquipe } from "./_inicio/CenasPassos";
 import { Revelar, Contador, Rolagem } from "./_inicio/efeitos";
 import { vagasFundador, FUNDADOR } from "@/server/ofertas";
+import { brl } from "@/server/email";
 import { lojaDestaque } from "@/server/destaque";
 import "./inicio.css";
 
@@ -186,7 +187,8 @@ export default async function Inicio() {
                   <div key={k} className={`wi-fila ${k ? "volta" : ""}`}>
                     <div className="wi-trilho">{[...f, ...f].map((c, i) => (
                       <div key={i} className="wi-cracha" style={{ ["--cor" as string]: c.cor }} aria-hidden={i >= f.length}>
-                        <img className="wi-avatar" src={fotoEspecialista(c.id)} alt="" width={96} height={96} loading="lazy" decoding="async" />
+                        {/* WE-10: a 2ª volta da esteira repete a 1ª e fica escondida (aria-hidden): ali o retrato fica sem texto */}
+                        <img className="wi-avatar" src={fotoEspecialista(c.id)} alt={i < f.length ? `Retrato de ${c.nome}, ${c.cargo}` : ""} width={96} height={96} loading="lazy" decoding="async" />
                         <div><b>{c.nome}</b><small>{c.cargo}</small><em>{c.skill}</em></div>
                       </div>
                     ))}</div>
@@ -218,7 +220,7 @@ export default async function Inicio() {
               <Revelar className="wi-plano wi-plano-forte">
                 <h3>Lote no mapa</h3>
                 <p className="wi-valor"><b>R$ 99</b><span>por mês</span></p>
-                {restamFundador > 0 && <p className="wi-fundador"><b>Preço de fundador:</b> 1º mês por R$ {FUNDADOR.valor.toFixed(2).replace(".", ",")} para as {FUNDADOR.vagas} primeiras empresas · <b>restam {restamFundador}</b></p>}
+                {restamFundador > 0 && <p className="wi-fundador"><b>Preço de fundador:</b> 1º mês por {brl(FUNDADOR.valor)} para as {FUNDADOR.vagas} primeiras empresas · <b>restam {restamFundador}</b></p>}
                 <ul className="wi-lista">
                   <li>Seu endereço com placa, nome, logomarca e cor da marca</li>
                   <li>{LAYOUTS.length} tipos de prédio e 3 trocas de prédio grátis</li>

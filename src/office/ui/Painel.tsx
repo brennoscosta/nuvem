@@ -18,6 +18,7 @@ import { Mural } from "./Mural";
 import { ModalLogin, CartaoPublico } from "./Login";
 import { CartaoLote, PainelEmpresa, ContaWorkend, MenuConta, AvisoPagamento } from "./Lote";
 import { Icone } from "./Icone";
+import { brl } from "./equipeComum";
 import { CartaoPraca, AvisoEventos } from "./Praca";
 import { CartaoQuiosque } from "./Quiosque";
 import { MiniMapa } from "./MiniMapa";
@@ -115,7 +116,7 @@ export function BarraTopo() {
       <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-[#111418]/85 px-4 py-2 text-white shadow-xl backdrop-blur">
         <div className="flex items-center gap-2 pr-3 border-r border-white/10">
           <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-[#4F7DF3] to-[#8B6CF0]" />
-          <div className="leading-tight"><div className="text-sm font-bold tracking-wide">Escritório Nuvem</div><div className="text-[10px] text-white/50">{`${total} agentes · ${trabalhando} trabalhando · R$ ${gasto.toFixed(2)} hoje`}</div></div>
+          <div className="leading-tight"><div className="text-sm font-bold tracking-wide">Escritório Nuvem</div><div className="text-[10px] text-white/50">{`${total} agentes · ${trabalhando} trabalhando · ${brl(gasto)} hoje`}</div></div>
         </div>
         <div className="flex flex-1 items-center gap-1.5 overflow-x-auto">
           {ordem.map((id) => { const a = agentes[id]; if (!a) return null; const st = STATUS[a.status]; return (

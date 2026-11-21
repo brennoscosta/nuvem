@@ -8,6 +8,7 @@
 //  - Gasto: primeiro o bônus, depois o comprado (o mais antigo primeiro), para o comprado recente continuar devolvível.
 //  - Valores no código em CENTAVOS de crédito (inteiros); no banco NUMERIC(12,2), exato.
 import { sql, migrar, id } from "./db";
+import { brl } from "./email";
 
 type Db = typeof sql;
 
@@ -163,7 +164,7 @@ export async function marcarDevolucao(adminId: string, pagamentoId: string, moti
     if (d.jaDevolvido) throw new Error("Esse pacote já foi devolvido.");
     if (!d.noPrazo && !foraDoPrazo) throw new Error(`Passou o prazo de ${DIAS_DEVOLUCAO} dias (venceu em ${d.prazoAte.toLocaleDateString("pt-BR")}). Marque "fora do prazo" se for uma exceção.`);
     if (d.restante <= 0) throw new Error("Os créditos desse pacote já foram usados: não há o que devolver.");
-    await lancar(db, pg.usuarioId, { tipo: "devolucao", comprado: -cent(d.restante), bonus: -cent(d.bonusSai), descricao: `Devolução de ${fmtCreditos(d.restante)} créditos comprados${d.bonusSai > 0 ? ` e do bônus do pacote` : ""} · R$ ${d.valorReais.toFixed(2).replace(".", ",")} no Pix`, pagamentoId, chave: `devolucao:${pagamentoId}`, motivo: m, adminId });
+    await lancar(db, pg.usuarioId, { tipo: "devolucao", comprado: -cent(d.restante), bonus: -cent(d.bonusSai), descricao: `Devolução de ${fmtCreditos(d.restante)} créditos comprados${d.bonusSai > 0 ? ` e do bônus do pacote` : ""} · ${brl(d.valorReais)} no Pix`, pagamentoId, chave: `devolucao:${pagamentoId}`, motivo: m, adminId });
     await db`UPDATE pagamento SET devolvido_em = now(), devolvido_valor = ${d.valorReais}, devolvido_por = ${adminId} WHERE id = ${pagamentoId}`;
     return d;
   });

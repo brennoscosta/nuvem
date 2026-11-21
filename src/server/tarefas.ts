@@ -14,6 +14,7 @@ import { publicarNoYouTube } from "./youtube";
 import { publicarNoInstagram } from "./instagram";
 import { publicarNoTikTok } from "./tiktok";
 import { gerarImagem, custoImagemBRL, FORMATOS, type Formato } from "./imagens";
+import { brl } from "./email";
 import { AREAS, type AreaId } from "@/office/data/org";
 
 export const DIR_UPLOADS = process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads");
@@ -207,7 +208,7 @@ export async function executarArte(tid: string, baseUrl: string, ajustes?: Parti
   if (!plano.prompt?.trim()) throw new Error("Prompt vazio.");
   const custoPrevisto = custoImagemBRL(plano.formato ?? "quadrado");
   const gasto = await gastoHoje(t.agenteId);
-  if (gasto + custoPrevisto > Number(f.agente.tetoDiarioBrl)) throw new Error(`Teto diário do agente atingido (R$ ${gasto.toFixed(2)} de R$ ${Number(f.agente.tetoDiarioBrl).toFixed(2)}). Aumente o teto no Perfil ou tente amanhã.`);
+  if (gasto + custoPrevisto > Number(f.agente.tetoDiarioBrl)) throw new Error(`Teto diário do agente atingido (${brl(gasto)} de ${brl(Number(f.agente.tetoDiarioBrl))}). Aumente o teto no Perfil ou tente amanhã.`);
   await atualizar(tid, { status: "executando", plano, erro: null });
   await gravarEvento(f.agente.empresaId, t.agenteId, "trabalhando", "Gerando a arte agora.");
   try {
@@ -218,7 +219,7 @@ export async function executarArte(tid: string, baseUrl: string, ajustes?: Parti
     const fala = `Terminei a arte "${plano.titulo}"`;
     await salvarFalaPublica(t.agenteId, fala);
     await gravarEvento(f.agente.empresaId, t.agenteId, "concluido", `Arte pronta: ${plano.titulo}`, { tarefaId: tid, url });
-    await gravarMural({ autorTipo: "agente", autorNome: f.agente.nome, agenteId: t.agenteId, texto: `Arte "${plano.titulo}" pronta (R$ ${custoBrl.toFixed(2)}).`, publico: `${f.agente.nome} terminou uma arte nova` });
+    await gravarMural({ autorTipo: "agente", autorNome: f.agente.nome, agenteId: t.agenteId, texto: `Arte "${plano.titulo}" pronta (${brl(custoBrl)}).`, publico: `${f.agente.nome} terminou uma arte nova` });
     const tarefa = await atualizar(tid, { status: "concluida", resultado });
     // ação automática configurada no agente: encaminhar pro gerente de outro setor
     const destino = f.agente.config?.aoConcluir?.encaminharPara;

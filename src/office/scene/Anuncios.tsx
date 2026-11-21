@@ -11,6 +11,7 @@ import { ceu } from "./CicloDia";
 import { useMundo } from "../mundoStore";
 import { OUTDOORS, type OutdoorPublico } from "../data/outdoors";
 import { useModalOutdoor } from "../modalOutdoor";
+import { brl } from "../data/telao";
 
 export interface DadosMarca { nome: string; cor: string; nicho: string; frase?: string; numero?: number | null; logo?: string | null }
 const FONTE = "system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
@@ -130,7 +131,7 @@ const MAT_COSTAS = typeof document === "undefined" ? null : new THREE.MeshStanda
 
 function PainelOutdoor({ o, preco }: { o: OutdoorPublico | undefined; preco: number }) {
   const dados: DadosMarca | null = o?.status === "ativo" && o.empresa ? { nome: o.empresa.nome, cor: o.empresa.cor, nicho: o.empresa.nicho, frase: o.frase, numero: o.empresa.numero, logo: o.empresa.logo } : null;
-  const livre = { titulo: o?.status === "reservado" ? "Reservado" : "Anuncie aqui", sub: o?.status === "reservado" ? "Uma empresa está pagando este outdoor agora." : `A sua marca vista pela cidade inteira por R$ ${preco.toFixed(2).replace(".", ",")} a cada 30 dias.`, chamada: o?.status === "reservado" ? "" : "Clique neste outdoor" };
+  const livre = { titulo: o?.status === "reservado" ? "Reservado" : "Anuncie aqui", sub: o?.status === "reservado" ? "Uma empresa está pagando este outdoor agora." : `A sua marca vista pela cidade inteira por ${brl(preco)} a cada 30 dias.`, chamada: o?.status === "reservado" ? "" : "Clique neste outdoor" };
   // arte maior no computador; no modo leve, a de antes (pesa menos na placa de vídeo do celular)
   const [w, h] = leve() ? [1024, 512] : [1280, 640];
   const tex = useTexturaMarca(dados, w, h, false, livre);

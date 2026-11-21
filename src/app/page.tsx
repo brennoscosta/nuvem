@@ -21,9 +21,11 @@ export async function generateMetadata(): Promise<Metadata> {
 // WE-15 (21/11/2026): o primeiro quadro (HTML do servidor) já sabe se é o mapa e qual sede ou lote o link pede, para
 // não desenhar a barra do escritório da Nuvem antes do JavaScript (src/office/inicioMundo.ts). O proxy marca o mapa do
 // WorkEnd com x-site; ?mundo vale em qualquer domínio, igual a modoMundo() no navegador.
+// WE-10 (21/11/2026): o mapa do WorkEnd não tinha nenhum h1; um título só para leitores de tela e buscadores (sr-only),
+// só no domínio do WorkEnd; o escritório da Nuvem continua como estava.
 export default async function Home({ searchParams }: PageProps<"/">) {
   const [h, q] = await Promise.all([headers(), searchParams]);
   const um = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
   const mundo = h.get("x-site") === "workend" || q.mundo !== undefined;
-  return <Escritorio inicio={{ mundo, sede: mundo ? um(q.sede) : null, lote: mundo ? um(q.lote) : null }} />;
+  return <>{h.get("x-site") === "workend" && <h1 className="sr-only">Mapa da cidade do WorkEnd</h1>}<Escritorio inicio={{ mundo, sede: mundo ? um(q.sede) : null, lote: mundo ? um(q.lote) : null }} /></>;
 }

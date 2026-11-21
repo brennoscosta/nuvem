@@ -17,6 +17,7 @@ import { minhaPos, usePersonagem } from "../personagemStore";
 import { leve } from "../scene/qualidade";
 import { projetar, noChao, PROPORCAO, miniMapa, useVersaoMiniMapa } from "../miniMapa";
 import { Icone } from "./Icone";
+import { brl } from "./equipeComum";
 import { abrirSede } from "./CartaoOneState";
 import { SEDES, centroTorre, alturaSede, frenteDaSede, sedeNoPonto } from "../data/sedes";
 import { QUIOSQUES, QUIOSQUE_POR_CHAVE, PRECO_QUIOSQUE } from "../data/quiosques";
@@ -275,7 +276,7 @@ export function MiniMapa() {
           })}
           {/* quiosques livres (20/11/2026): quadradinho verde-água; tocar abre o cartão */}
           {QUIOSQUES.filter((q) => !terrenos[q.chave]).map((q) => { const p = projetar(q.pos[0], 1, q.pos[1]); return (
-            <button key={q.chave} onClick={(e) => { e.stopPropagation(); ir(q.chave); }} title={`Quiosque ${q.numero} · disponível · R$ ${PRECO_QUIOSQUE}/mês`} aria-label={`Quiosque ${q.numero} disponível`}
+            <button key={q.chave} onClick={(e) => { e.stopPropagation(); ir(q.chave); }} title={`Quiosque ${q.numero} · disponível · ${brl(PRECO_QUIOSQUE)}/mês`} aria-label={`Quiosque ${q.numero} disponível`}
               className={`mm-e absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[3px] bg-[#2DD4BF] ring-2 ${sel === q.chave ? "ring-white" : "ring-[#111418]"} ${nicho ? "opacity-30" : ""}`} style={{ left: pct(p.u), top: pct(p.v) }} />
           ); })}
           {dica && largo && <span className="pointer-events-none absolute z-[3] -translate-x-1/2 -translate-y-[130%] whitespace-nowrap rounded-md bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#1D2128] shadow" style={{ left: pct(dica.u), top: pct(dica.v) }}>{dica.texto}</span>}

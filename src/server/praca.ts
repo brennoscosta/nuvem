@@ -3,6 +3,7 @@
 // entra na grade do telão. Recusado: o dono é avisado com o motivo e o Pix é devolvido à mão (fica registrado).
 // A cobrança é uma função só (cobrarAnuncioPraca), pelo caminho único da frente "creditos": créditos, Pix ou os dois.
 import { sql, migrar, id } from "./db";
+import { brl } from "./email";
 import type { Usuario } from "./usuarios";
 import { ehAdmin, terrenoDoUsuario } from "./terrenos";
 import { cobrar, type CobrancaPix, type OpcoesCobranca } from "./mercadopago";
@@ -157,7 +158,7 @@ export async function decidirAnuncio(admin: Usuario, anuncioId: string, acao: un
   if (acao === "aprovar") void avisar(a.usuarioId, { tipo: "pagamento", ref: `praca:${anuncioId}:ok`, titulo: `${nome} aprovado`, texto: a.tipo === "patrocinio" ? "A sua marca já está na placa e no telão da Praça de Eventos." : "O seu anúncio entrou na grade do telão da Praça de Eventos.", link: "/app/divulgar" });
   else {
     void avisar(a.usuarioId, { tipo: "pagamento", ref: `praca:${anuncioId}:recusa`, titulo: `${nome} recusado`, texto: `Motivo: ${motivo}. O valor do Pix será devolvido.`, link: "/app/divulgar" });
-    void registrar("pagamento", `ATENÇÃO: devolver o Pix de R$ ${Number(a.valor).toFixed(2).replace(".", ",")} (${nome} recusado)`, { usuarioId: a.usuarioId, dados: { detalhes: `Anúncio ${anuncioId} recusado: ${motivo}. Devolva o valor pelo Mercado Pago.` }, avisarDono: true });
+    void registrar("pagamento", `ATENÇÃO: devolver o Pix de ${brl(Number(a.valor))} (${nome} recusado)`, { usuarioId: a.usuarioId, dados: { detalhes: `Anúncio ${anuncioId} recusado: ${motivo}. Devolva o valor pelo Mercado Pago.` }, avisarDono: true });
   }
   return { ok: true, status: acao === "aprovar" ? "aprovado" : "recusado" };
 }

@@ -76,7 +76,7 @@ export function GaleriaPredios({ predios, lote, logado }: { predios: PredioGaler
             <div key={x.id} id={`wg-${x.id}`} role="option" aria-selected={i === ativo} aria-label={x.nome}
               className={`wg-cartao ${a < 0.5 ? "centro" : ""}`} style={estilo}
               onClick={() => { if (!s.current.moveu && a >= 0.5) ir(Math.round(pos + o)); }}>
-              <img src={`/workend/predios/${x.id}.webp`} alt="" draggable={false} loading={i < 2 || i > N - 2 ? "eager" : "lazy"} decoding="async" />
+              <img src={`/workend/predios/${x.id}.webp`} alt={`${x.nome}: ${x.descricao}`} draggable={false} loading={i < 2 || i > N - 2 ? "eager" : "lazy"} decoding="async" />
               <i className="wg-chao" aria-hidden />
               {a < 0.5 && (
                 <div className={`wg-placa ${v ? "acesa" : ""}`} aria-hidden>

@@ -21,6 +21,7 @@ import { linhaMaquina, estiloDoCarimbo, NATAL_META } from "../data/passaporte";
 import { Carimbo, dataCarimbo, ESTILO_CARIMBO } from "./Carimbo";
 import { MiniAvatar } from "./MiniAvatar";
 import { Icone, ICONE_ACESSORIO } from "./Icone";
+import { brl } from "./equipeComum";
 import { dicaDoPresente } from "./CacaNatal";
 
 const TINTA = "#1E2A44", PAPEL = "#F5F0E4";
@@ -185,7 +186,7 @@ function Visto({ m, total }: { m: MarcoTela; total: number }) {
         <div className="min-w-0 flex-1">
           <div className="text-[9px] font-bold uppercase tracking-[0.16em]" style={{ color: m.cor }}>Visto · {m.n} carimbos</div>
           <div className="font-serif text-[15px] font-bold leading-tight">{m.insignia}</div>
-          <div className="text-[12px] leading-snug text-[#1E2A44]/75">{m.itemNome}, só para quem tem este visto{m.bonus ? ` · e R$ ${m.bonus.toFixed(2).replace(".", ",")} em créditos de bônus` : ""}</div>
+          <div className="text-[12px] leading-snug text-[#1E2A44]/75">{m.itemNome}, só para quem tem este visto{m.bonus ? ` · e ${brl(m.bonus)} em créditos de bônus` : ""}</div>
         </div>
       </div>
       {m.ganho ? (

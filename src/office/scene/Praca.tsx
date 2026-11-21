@@ -15,7 +15,7 @@ import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
 import { PRACA_CHAVE, TIPOS_BARRACA, feiraAberta, dataCurta } from "../data/praca";
 import { useMundo, type Praca as DadosPraca, type EventoPraca, type BarracaFeira } from "../mundoStore";
 import { useGradeTelao, telaoFixo } from "../telao";
-import { itemDoMomento, PRECO_PATROCINIO, type ItemGrade, type GradeTelao, type Patrocinio } from "../data/telao";
+import { itemDoMomento, PRECO_PATROCINIO, brl, type ItemGrade, type GradeTelao, type Patrocinio } from "../data/telao";
 import { desenharAnuncio, desenharEventoDestaque, desenharPatrocinio, desenharCasa, casaPorId, desenharFeira, desenharPlaca, imagemPronta, rodapeTelao } from "../telaoDesenho";
 import { natalAtivo } from "./Natal";
 import { leve } from "./qualidade";
@@ -214,7 +214,7 @@ function PlacaPraca({ p }: { p: Patrocinio | null }) {
   const { tex, canvas } = useMemo(() => { const c = document.createElement("canvas"); c.width = 768; c.height = 320; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return { tex: t, canvas: c }; }, []);
   const chave = p ? `${p.id}|${p.nome}|${p.logo}|${p.cor}` : "livre";
   useEffect(() => {
-    const preco = `R$ ${PRECO_PATROCINIO.toFixed(2).replace(".", ",")}`;
+    const preco = brl(PRECO_PATROCINIO);
     const pintar = () => { desenharPlaca(canvas.getContext("2d")!, 768, 320, p, imagemPronta(p?.logo, pintar), preco); tex.needsUpdate = true; };
     pintar();
   }, [chave]); // eslint-disable-line react-hooks/exhaustive-deps

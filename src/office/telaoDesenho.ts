@@ -1,8 +1,8 @@
 // Desenho dos itens pagos e da casa no telão da Praça de Eventos (20/11/2026). Só canvas 2D (sem three): o mesmo desenho
 // vai para a textura do telão na cena 3D, para a prévia em /app/divulgar e para a fila do admin.
-import { CASA, type Casa, type Patrocinio } from "./data/telao";
+import { CASA, brl, type Casa, type Patrocinio } from "./data/telao";
 import { PRECO_BARRACA } from "./data/praca";
-const PRECO_BARRACA_TEXTO = `R$ ${PRECO_BARRACA.toFixed(2).replace(".", ",")}`;
+const PRECO_BARRACA_TEXTO = brl(PRECO_BARRACA);
 
 const F = (tam: number, peso = 800) => `${peso} ${Math.round(tam)}px Inter, Arial, sans-serif`;
 const TZ = { timeZone: "America/Sao_Paulo" } as const;

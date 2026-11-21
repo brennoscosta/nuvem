@@ -4,6 +4,7 @@
 // (pedirComEquipe): aparece na conversa dele, a equipe divide o trabalho e a entrega fica em tarefa_api. Ao entregar,
 // dispara o aviso tarefa.entregue e, se o pedido trouxe "avisar", um POST para essa URL assinado com o sha256 da chave.
 import { sql, id, migrar } from "./db";
+import { brl } from "./email";
 import type { Usuario } from "./usuarios";
 import type { AgenteDB } from "./agentes";
 import { bloqueio, contar } from "./limite";
@@ -49,7 +50,7 @@ export async function criarTarefaApi(ctx: CtxApi, d: { para?: unknown; texto?: u
   const { t, empId } = await empresaDoDono(ctx.usuario, ctx.lote);
   const para = d.para ? String(d.para) : t.escritorio?.equipe.find((m) => m.papel === "ceo")?.id ?? "ceo";
   const a = await agenteDoMembro(empId, para);
-  if ((await gastoDoMes(empId)) >= TETO_IA_MES) throw new ErroHttp(`A equipe já usou os R$ ${TETO_IA_MES.toFixed(2).replace(".", ",")} de IA deste mês. Ela volta a responder no dia 1º.`, 402);
+  if ((await gastoDoMes(empId)) >= TETO_IA_MES) throw new ErroHttp(`A equipe já usou os ${brl(TETO_IA_MES)} de IA deste mês. Ela volta a responder no dia 1º.`, 402);
   const tid = id("tf");
   await sql`INSERT INTO tarefa_api (id, empresa_id, chave_id, membro_id, agente_id, texto, avisar) VALUES (${tid}, ${empId}, ${ctx.chaveId}, ${para}, ${a.id}, ${texto}, ${avisarUrl})`;
   void executar(tid, empId, ctx.usuario.id, a.id, texto, avisarUrl, ctx.hash);

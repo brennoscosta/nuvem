@@ -11,7 +11,7 @@ type Lanc = { id: string; tipo: string; comprado: number; bonus: number; saldoCo
 type Devolvivel = { pagamentoId: string; restante: number; valorReais: number; prazoAte: string };
 type Pacote = { id: string; creditos: number; bonus: number };
 type DadosCred = { saldo: Saldo; extrato: Lanc[]; devolviveis: Devolvivel[]; pacotes: Pacote[]; regras: string[]; diasDevolucao: number; pagamento: boolean; admin: boolean };
-type DadosIA = { semLote?: boolean; chave?: string; empresa?: string; saldo?: { inclusa: number; comprada: number; total: number; baseMes: number; cobrada: boolean }; usadasMes?: number; respostas?: number; mensalidade?: number; aviso?: boolean; esgotado?: boolean;
+type DadosIA = { semLote?: boolean; imagem?: { custoBrl: number; unidades: number }; chave?: string; empresa?: string; saldo?: { inclusa: number; comprada: number; total: number; baseMes: number; cobrada: boolean }; usadasMes?: number; respostas?: number; mensalidade?: number; aviso?: boolean; esgotado?: boolean;
   pacotes?: { id: string; unidades: number; creditos: number }[]; porAgente?: { agenteId: string; nome: string; nomeCategoria: string; usadas: number; vezes: number }[]; extrato?: { id: string; tipo: string; unidades: number; descricao: string; criadoEm: string }[] };
 type Pix = { id: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status?: string; creditos?: number };
 
@@ -91,7 +91,7 @@ export function PainelCreditos() {
           <div className="text-[13px] font-semibold text-[var(--tinta-2)]">Saldo de créditos</div>
           <div className="mt-1 text-[2.2rem] font-bold leading-none tracking-tight">{fmtCreditos(c.saldo.total)}</div>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-[var(--tinta-2)]"><span>Comprado: <b className="text-[var(--tinta)]" data-comprado={c.saldo.comprado}>{fmtCreditos(c.saldo.comprado)}</b></span><span>Bônus: <b className="text-[var(--tinta)]" data-bonus={c.saldo.bonus}>{fmtCreditos(c.saldo.bonus)}</b></span></div>
-          {c.devolviveis.length > 0 && <div className="mt-3 rounded-xl bg-[#F1F3F6] px-3 py-2 text-[12.5px] text-[var(--tinta-2)]">{c.devolviveis.map((d) => <div key={d.pagamentoId}>Você pode pedir a devolução de {fmtCreditos(d.restante)} créditos comprados (R$ {d.valorReais.toFixed(2).replace(".", ",")}) até {new Date(d.prazoAte).toLocaleDateString("pt-BR")}: escreva para contato@workend.online.</div>)}</div>}
+          {c.devolviveis.length > 0 && <div className="mt-3 rounded-xl bg-[#F1F3F6] px-3 py-2 text-[12.5px] text-[var(--tinta-2)]">{c.devolviveis.map((d) => <div key={d.pagamentoId}>Você pode pedir a devolução de {fmtCreditos(d.restante)} créditos comprados ({brl(d.valorReais)}) até {new Date(d.prazoAte).toLocaleDateString("pt-BR")}: escreva para contato@workend.online.</div>)}</div>}
           <h2 className="mt-5 !text-[1.1rem]">Comprar créditos</h2>
           <p className="text-[13px] text-[var(--tinta-2)]">No Pix, com o QR na tela. Os pacotes maiores vêm com bônus, separado do que você comprou.</p>
           <ul className="mt-2 divide-y divide-[var(--linha)] rounded-xl border border-[var(--linha)]">
@@ -110,7 +110,7 @@ export function PainelCreditos() {
           <div className="flex items-center gap-2 text-[13px] font-semibold text-white/70"><Icone nome="unidades" tamanho={16} />Unidades de IA{ia?.empresa ? ` · ${ia.empresa}` : ""}</div>
           {ia?.semLote || !u ? <p className="mt-2 text-[14px] text-white/75">As unidades de IA são da empresa: aparecem aqui quando o seu lote estiver ativo. Todo lote recebe {num(1000)} unidades por mês.</p> : (
             <>
-              <div className="mt-1 flex items-end gap-3"><div className="text-[2.2rem] font-bold leading-none">{num(u.total)}</div><div className="pb-1 text-[13px] text-white/70">≈ {num(ia.respostas ?? 0)} respostas</div></div>
+              <div className="mt-1 flex items-end gap-3"><div className="text-[2.2rem] font-bold leading-none">{num(u.total)}</div><div className="pb-1 text-[13px] text-white/70">≈ {num(ia.respostas ?? 0)} respostas{ia.imagem && ia.imagem.unidades > 0 ? ` · ou ≈ ${num(Math.floor(u.total / ia.imagem.unidades))} imagens` : ""}</div></div>
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/15" role="meter" aria-valuemin={0} aria-valuemax={base} aria-valuenow={u.total} aria-label="Unidades de IA restantes"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: ia.esgotado ? "#E2575B" : ia.aviso ? "#F59E0B" : "#38E07B" }} /></div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-white/70"><span>Inclusas do mês: <b className="text-white">{num(u.inclusa)}</b></span><span>Compradas (não vencem): <b className="text-white">{num(u.comprada)}</b></span><span>Usadas no mês: <b className="text-white">{num(ia.usadasMes ?? 0)}</b></span></div>
               {ia.esgotado && <div className="mt-3 rounded-xl bg-[#E2575B]/20 px-3 py-2 text-[13px]">As unidades acabaram: a equipe responde com o recado fixo até você comprar mais ou a mensalidade do mês que vem chegar.</div>}
@@ -158,8 +158,8 @@ export function PainelCreditos() {
           <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[13px] text-[var(--tinta-2)]">{c.regras.map((r) => <li key={r}>{r}</li>)}</ul>
           <h3 className="mt-4 text-[0.98rem] font-bold">Unidades de IA</h3>
           <ul className="mt-1 list-disc space-y-1.5 pl-5 text-[13px] text-[var(--tinta-2)]">
-            <li>São da empresa, não da pessoa: 1 unidade cobre R$ 0,01 de IA. Uma resposta comum gasta 1 ou 2 unidades; uma imagem, perto de 116.</li>
-            <li>Todo lote ativo recebe {num(1000)} unidades por mês. As inclusas vencem no fim do mês; as compradas não vencem.</li>
+            <li>São da empresa, não da pessoa: 1 unidade cobre R$ 0,01 de IA. Uma resposta comum gasta 1 ou 2 unidades{ia?.imagem ? `; uma imagem, ${num(ia.imagem.unidades)}` : ""}.</li>
+            <li>Todo lote ativo recebe {num(1000)} unidades por mês{ia?.imagem && ia.imagem.unidades > 0 ? ` (dá para ${num(Math.floor(1000 / ia.imagem.unidades))} imagens)` : ""}. As inclusas vencem no fim do mês; as compradas não vencem.</li>
             <li>A equipe usa primeiro as inclusas. Quando acaba tudo, ela responde com o recado fixo e você recebe um aviso. Os visitantes da loja não pagam nada.</li>
           </ul>
         </div>

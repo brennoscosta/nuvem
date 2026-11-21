@@ -9,6 +9,7 @@ import { useEscritorio, type Status } from "../store";
 import { SKILLS_PRONTAS } from "../data/skillsProntas";
 import { AbaTarefas } from "./AbaTarefas";
 import { Icone } from "./Icone";
+import { brl } from "./equipeComum";
 
 export const STATUS: Record<Status, { nome: string; cor: string }> = {
   chegando: { nome: "Chegando", cor: "#9AA3AD" }, disponivel: { nome: "Disponível", cor: "#3FBFA8" }, trabalhando: { nome: "Trabalhando", cor: "#4F7DF3" },
@@ -270,7 +271,7 @@ function AbaConversar({ ficha, recarregar }: { ficha: Ficha; recarregar: () => P
               <div className="mt-1 flex items-center gap-1 text-[11px] text-[#5B6472]">
                 <button onClick={() => avaliar(m, m.avaliacao === 1 ? null : 1)} className={`rounded-full px-2 py-0.5 ${m.avaliacao === 1 ? "bg-[#22A86B] text-white" : "bg-black/5"}`}>👍</button>
                 <button onClick={() => { setCorrigindo(corrigindo === m.id ? null : m.id); setCorrecao(m.correcao ?? ""); }} className={`rounded-full px-2 py-0.5 ${m.avaliacao === -1 ? "bg-[#E2575B] text-white" : "bg-black/5"}`}>👎 Corrigir</button>
-                {Number(m.custoBrl) > 0 && <span>R$ {Number(m.custoBrl).toFixed(3)}</span>}
+                {Number(m.custoBrl) > 0 && <span>{Number(m.custoBrl).toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 3 })}</span>}
                 {m.correcao && <span className="italic">· regra criada</span>}
               </div>
             )}
@@ -302,7 +303,7 @@ function FichaSimulada() {
   const nv = NIVEL[a.nivel]; const prox = NIVEIS.find((n) => n.ordem === nv.ordem + 1);
   return (
     <div className="flex flex-col gap-3 text-xs">
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5"><dt className="text-[#5B6472]">Personalidade</dt><dd>{a.personalidade}</dd><dt className="text-[#5B6472]">Autonomia</dt><dd>{nv.autonomia}</dd><dt className="text-[#5B6472]">Entregas hoje</dt><dd>{a.tarefasConcluidas}</dd><dt className="text-[#5B6472]">Gasto hoje</dt><dd>R$ {a.gastoHoje.toFixed(2)}</dd></dl>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5"><dt className="text-[#5B6472]">Personalidade</dt><dd>{a.personalidade}</dd><dt className="text-[#5B6472]">Autonomia</dt><dd>{nv.autonomia}</dd><dt className="text-[#5B6472]">Entregas hoje</dt><dd>{a.tarefasConcluidas}</dd><dt className="text-[#5B6472]">Gasto hoje</dt><dd>{brl(a.gastoHoje)}</dd></dl>
       <div className="flex gap-2">{prox && prox.id !== "ceo" && prox.id !== "diretor" && <button onClick={() => promover(a.id, prox.id)} className="flex-1 rounded-xl bg-[#22A86B] px-3 py-2 font-bold text-white">Promover a {prox.nome}</button>}<button onClick={() => { demitir(a.id); selecionar(null); }} className="rounded-xl bg-[#F1F3F6] px-3 py-2 font-bold text-[#E2575B]">Demitir</button></div>
     </div>
   );

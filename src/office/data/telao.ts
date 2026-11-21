@@ -23,7 +23,8 @@ export type FormatoAnuncio = "modelo" | "imagem" | "video";
 export type StatusAnuncio = "aguardando_pagamento" | "em_analise" | "aprovado" | "recusado" | "cancelado" | "estornado";
 export const NOME_TIPO: Record<TipoAnuncio, string> = { telao: "Anúncio no telão", destaque: "Evento em destaque", patrocinio: "Patrocínio da praça" };
 export const precoAnuncio = (tipo: TipoAnuncio, dias = 1) => (tipo === "telao" ? Math.round(PRECO_TELAO_DIA * dias * 100) / 100 : tipo === "destaque" ? PRECO_EVENTO_DESTAQUE : PRECO_PATROCINIO);
-const brl = (n: number) => `R$ ${n.toFixed(2).replace(".", ",")}`;
+// formato brasileiro de reais (Intl, WE-10 21/11/2026); também usado no desenho do telão, da praça e dos outdoors
+export const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 // propaganda do próprio WorkEnd: entra na grade quando não há anúncio pago (e a do telão, enquanto sobra vaga)
 export interface Casa { id: string; rotulo: string; titulo: string; sub: string; chamada: string; cor: string }

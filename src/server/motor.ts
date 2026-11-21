@@ -2,6 +2,7 @@
 import OpenAI from "openai";
 import { fichaCompleta, gravarMensagem, listarMensagens, registrarUso, gastoHoje, gravarEvento, salvarFalaPublica, type SkillDB } from "./agentes";
 import { NIVEL, AREAS, type Nivel, type AreaId } from "@/office/data/org";
+import { brl } from "./email";
 import { contextoEquipeIA } from "./escopoEquipe";
 
 // Preço aproximado em R$ por 1M tokens (entrada / saída). Ajustável.
@@ -119,10 +120,10 @@ export async function conversar(agenteId: string, texto: string, autor = "admin"
   const gasto = opts.tetoMes ? opts.tetoMes.gasto : await gastoHoje(agenteId);
   const teto = opts.tetoMes ? opts.tetoMes.teto : Number(f.agente.tetoDiarioBrl);
   if (gasto >= teto) {
-    if (interno) await gravarEvento(f.agente.empresaId, agenteId, "expediente_encerrado", `Teto diário de R$ ${teto.toFixed(2)} atingido`);
+    if (interno) await gravarEvento(f.agente.empresaId, agenteId, "expediente_encerrado", `Teto diário de ${brl(teto)} atingido`);
     throw new Error(opts.tetoMes
       ? "As unidades de IA da empresa acabaram. Compre unidades em Créditos para a equipe voltar a responder agora, ou espere a mensalidade do mês que vem."
-      : `Teto diário de gasto atingido (R$ ${gasto.toFixed(2)} de R$ ${teto.toFixed(2)}). Aumente o teto na ficha do agente pra continuar.`);
+      : `Teto diário de gasto atingido (${brl(gasto)} de ${brl(teto)}). Aumente o teto na ficha do agente pra continuar.`);
   }
   const visitanteId = opts.visitanteId ?? null;
   const pergunta = await gravarMensagem({ agenteId, papel: "user", autor, conteudo: texto, visitanteId });

@@ -14,7 +14,7 @@ const Cursor = () => <svg className="wp-cursor" viewBox="0 0 24 24" width="30" h
 export function CenaLote() {
   return (
     <div className="wi-cena wp-arte wp-lote" aria-hidden>
-      <img src="/workend/passos/lote.webp" alt="" loading="lazy" decoding="async" draggable={false} />
+      <img src="/workend/passos/lote.webp" alt="Quarteirão da cidade 3D do WorkEnd com um lote livre para reservar" loading="lazy" decoding="async" draggable={false} />
       <svg className="wp-lote-marca" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"><polygon points="1157,1025 1497,1204 1182,1407 841,1195" /></svg>
       <i className="wp-toque" style={pc(1180, 1225)} />
       <span className="wp-pino" style={pc(1172, 1105)}><b>Sua empresa</b><small>Lote 12 · livre agora</small></span>
@@ -48,7 +48,7 @@ export function CenaFachada() {
   }, []);
   return (
     <div ref={caixa} className="wi-cena wp-arte wp-fachada" aria-hidden>
-      <img src="/workend/passos/fachada.webp" alt="" loading="lazy" decoding="async" draggable={false} />
+      <img src="/workend/passos/fachada.webp" alt="Fachada de um prédio do WorkEnd com o letreiro onde vai o nome da empresa" loading="lazy" decoding="async" draggable={false} />
       <div className="wp-placa" style={{ width: PW, height: PH, transform: m || undefined, visibility: m ? "visible" : "hidden" }}>
         <Maquina textos={["Padaria do Bairro", "Studio Ana", "Oficina 77", "Clínica Sorriso"]} />
         <b />
@@ -68,7 +68,7 @@ export function CenaEquipe() {
   const porta = pc(870, 1270);
   return (
     <div className="wi-cena wp-arte wp-equipe" aria-hidden>
-      <img src="/workend/passos/equipe.webp" alt="" loading="lazy" decoding="async" draggable={false} />
+      <img src="/workend/passos/equipe.webp" alt="Prédio por dentro, com a sala de cada setor da equipe" loading="lazy" decoding="async" draggable={false} />
       {SALAS.map((s, k) => {
         const alvo = pc(s.tx, s.ty), rot = pc(s.lx, s.ly);
         return (

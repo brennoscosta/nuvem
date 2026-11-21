@@ -2,6 +2,7 @@
 // empresas; GET ?usuario= → extrato de uma pessoa (e as devoluções possíveis);
 // POST { acao: "ajuste", usuario|email, valor, motivo } | { acao: "devolucao", pagamento, motivo, foraDoPrazo }.
 import { sql } from "@/server/db";
+import { brl } from "@/server/email";
 import { carteirasAdmin, extratoDe, saldoDe, ajustarCreditos, marcarDevolucao, calcularDevolucao } from "@/server/creditos";
 import { consumoIAAdmin } from "@/server/unidadesIA";
 import { registrar } from "@/server/eventos";
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
     }
     if (b.acao === "devolucao") {
       const d = await marcarDevolucao(admin.id, String(b.pagamento ?? ""), String(b.motivo ?? ""), b.foraDoPrazo === true);
-      void registrar("pagamento", `Devolução de créditos marcada (R$ ${d.valorReais.toFixed(2).replace(".", ",")} a estornar no Mercado Pago)`, { dados: { detalhes: `Pagamento ${d.pagamentoId}: ${d.restante} créditos saíram da carteira.` } });
+      void registrar("pagamento", `Devolução de créditos marcada (${brl(d.valorReais)} a estornar no Mercado Pago)`, { dados: { detalhes: `Pagamento ${d.pagamentoId}: ${d.restante} créditos saíram da carteira.` } });
       return ok(d);
     }
     return erro("Ação desconhecida.", 400);
