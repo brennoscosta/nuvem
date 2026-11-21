@@ -36,12 +36,11 @@ export default function Politicas() {
             </ul>
             <p className="mt-3">Você também pode se opor a um tratamento feito sem o seu consentimento quando ele descumprir a lei, pedir a revisão de decisões tomadas só de forma automática que afetem os seus interesses (art. 20) e reclamar na Autoridade Nacional de Proteção de Dados (ANPD), pelo site <a href="https://www.gov.br/anpd" className="font-semibold text-[var(--blue-dark)] underline underline-offset-2">gov.br/anpd</a>.</p>
           </div>
-          {/* TODO(dono), PENDÊNCIA GRAVE (LGPD, art. 18): hoje não existe canal para pedir a exclusão nem para exercer os
-              direitos do item 7. Não há botão de apagar a conta no /app, e o contato@workend.online não recebe mensagens (o
-              domínio não tem e-mail). Quando EMPRESA.email for preenchido, a frase troca sozinha para o pedido por e-mail. */}
-          <p><b>8. Como pedir a exclusão.</b> Você pode pedir a exclusão da sua conta e dos seus dados pessoais. {EMPRESA.email
-            ? <>Para isso, ou para exercer qualquer dos direitos do item 7, escreva para <a href={`mailto:${EMPRESA.email}`} className="font-semibold text-[var(--blue-dark)] underline underline-offset-2">{EMPRESA.email}</a> a partir do e-mail da sua conta.</>
-            : <>Hoje o site ainda não tem um botão para apagar a conta nem um canal de atendimento para esse pedido.</>}</p>
+          {/* 21/11/2026 (LGPD, art. 18): a exclusão tem botão em Meu perfil › Excluir minha conta (src/server/exclusao.ts).
+              TODO(dono): ainda falta um canal para os outros direitos do item 7, porque o contato@workend.online não recebe
+              mensagens (o domínio não tem e-mail). Quando EMPRESA.email for preenchido, a frase do pedido por e-mail aparece. */}
+          <p><b>8. Como pedir a exclusão.</b> Você pode pedir a exclusão da sua conta e dos seus dados pessoais. Para isso, entre na sua conta e use <b>Excluir minha conta</b>, em Meu perfil. A exclusão é imediata: apaga os seus dados pessoais e encerra a sua loja, se houver; os registros de pagamento e os extratos de créditos ficam guardados sem identificar você, pelo prazo que a lei exige.{EMPRESA.email
+            && <> Para esse pedido, ou para exercer qualquer dos direitos do item 7, você também pode escrever para <a href={`mailto:${EMPRESA.email}`} className="font-semibold text-[var(--blue-dark)] underline underline-offset-2">{EMPRESA.email}</a> a partir do e-mail da sua conta.</>}</p>
           <p className="text-[var(--tinta-2)]">Versão de 21/11/2026. Mudanças serão avisadas no painel.</p>
         </div>
       </section>

@@ -116,5 +116,5 @@ export interface UsuarioAdmin extends Usuario { lote: string | null; loteStatus:
 export async function listarUsuarios(): Promise<UsuarioAdmin[]> {
   await migrar();
   return sql<UsuarioAdmin[]>`SELECT u.id, u.email, u.nome, u.empresa_nome, u.interesse_em, u.criado_em, u.ultimo_acesso, u.papel, u.banido_em, u.banido_motivo, t.chave AS lote, t.status AS lote_status
-    FROM usuario u LEFT JOIN terreno t ON t.usuario_id = u.id ORDER BY u.criado_em DESC`;
+    FROM usuario u LEFT JOIN terreno t ON t.usuario_id = u.id WHERE u.id <> 'usr_contas_excluidas' ORDER BY u.criado_em DESC`; // sem a conta técnica dos pagamentos guardados (exclusao.ts)
 }

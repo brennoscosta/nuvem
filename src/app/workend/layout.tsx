@@ -3,6 +3,7 @@ import "./workend.css";
 import { meta, jsonLdLanding } from "./seo";
 import { SCRIPT_NATAL } from "@/office/data/natal";
 import { ClasseNatal } from "./_natal";
+import { AvisoContaExcluida } from "./_aviso-conta";
 
 export const metadata: Metadata = meta({ caminho: "/" });
 export const viewport: Viewport = { themeColor: "#DFE5EC", width: "device-width", initialScale: 1, colorScheme: "light" };
@@ -20,6 +21,8 @@ export default function WorkendLayout({ children }: { children: React.ReactNode 
       {/* dados estruturados (organização, site, produto, página e vídeo) */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdLanding()) }} />
       {children}
+      {/* depois de excluir a conta (/?conta=excluida): o aviso de que ela foi excluída */}
+      <AvisoContaExcluida />
     </div>
   );
 }

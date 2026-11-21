@@ -378,7 +378,8 @@ export async function listarCadastros(f: FiltrosCadastro, limite = 2000): Promis
       cardinality(p.etapas) AS n_etapas, p.concluido_em, p.pulou_em,
       (SELECT t.chave FROM terreno t WHERE t.usuario_id = u.id AND t.anexo_de IS NULL AND t.status = 'ativo' ORDER BY t.reservado_em LIMIT 1) AS lote_chave
     FROM usuario u LEFT JOIN perfil_cadastro p ON p.usuario_id = u.id
-    WHERE (${objetivo}::text IS NULL OR p.objetivo = ${objetivo})
+    WHERE u.id <> 'usr_contas_excluidas' -- conta técnica dos pagamentos guardados (exclusao.ts)
+      AND (${objetivo}::text IS NULL OR p.objetivo = ${objetivo})
       AND (${tipo}::text IS NULL OR p.tipo = ${tipo})
       AND (${nicho}::text IS NULL OR ${nicho} = ANY(p.nichos))
       AND (${uf}::text IS NULL OR p.uf = ${uf})

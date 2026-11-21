@@ -1,5 +1,6 @@
 // Meu perfil (20/11/2026, frente "cadastro"): o dono edita no painel tudo o que respondeu no formulário de cadastro e vê a
 // prévia do perfil público (/perfil/<apelido>). O formulário fica em ./_form.tsx; as regras em src/server/perfis.ts.
+// No fim, a seção Excluir minha conta (./_excluir.tsx, 21/11/2026).
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
@@ -10,6 +11,7 @@ import { Icone } from "@/office/ui/Icone";
 import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { EditorPerfil, type Rascunho } from "./_form";
+import { ExcluirConta } from "./_excluir";
 import { meta } from "../../seo";
 import "../../perfil/perfil.css";
 
@@ -36,6 +38,8 @@ export default async function MeuPerfil() {
           </div>
         </section>
         <EditorPerfil inicial={inicial} nomeConta={u.empresaNome || u.nome} emailConta={u.email} />
+        {/* LGPD (21/11/2026): excluir a conta, discreto, no fim da página */}
+        <ExcluirConta />
       </main>
       <div className="h-16" />
       <Rodape />

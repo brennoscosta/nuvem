@@ -247,3 +247,23 @@
   .we .cd-previa-links span { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
   .we .cd-previa-end { overflow-wrap: anywhere; }
 }
+
+/* Excluir minha conta (21/11/2026, LGPD): seção discreta no fim de Meu perfil (app/perfil/_excluir.tsx). Prefixo .ex-.
+   Borda tracejada e sem sombra para não chamar atenção; o vermelho fica só no botão final. */
+@layer components {
+  .we .ex-secao { margin-top: 2.5rem; padding: clamp(1.1rem, 2.6vw, 1.6rem); background: transparent; border-style: dashed; box-shadow: none; }
+  .we .ex-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem 1.25rem; }
+  .we .ex-topo h2 { font-size: 1.15rem; letter-spacing: -.01em; }
+  .we .ex-topo .cd-sub { margin-top: .3rem; }
+  .we .ex-corpo { display: grid; gap: .85rem; max-width: 68ch; margin-top: 1.25rem; font-size: 15.5px; line-height: 1.5; color: var(--ink); }
+  .we .ex-corpo p, .we .ex-corpo li { overflow-wrap: anywhere; }
+  .we .ex-corpo h3 { margin-top: .35rem; font-size: 15px; font-weight: 700; }
+  .we .ex-lista { display: grid; gap: .45rem; padding-left: 1.15rem; list-style: disc; }
+  .we .ex-lista li::marker { color: var(--muted); }
+  .we .ex-nota { padding: .7rem .9rem; border-radius: 12px; background: #FBEDEC; color: #7A1A12; font-size: 14.5px; font-weight: 600; }
+  .we .ex-bloqueio { padding: .8rem 1rem; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
+  .we .ex-confirma { display: grid; gap: .8rem; margin-top: .35rem; padding-top: 1.1rem; border-top: 1px solid var(--line); }
+  .we .ex-botoes { display: flex; flex-wrap: wrap; gap: .6rem; }
+  .we .ex-botao { background: #B42318; color: #fff; }
+  .we .ex-botao:hover:not(:disabled) { background: #8F1C13; }
+}
