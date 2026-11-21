@@ -176,3 +176,16 @@ html.we-natal .we-sino i { position: absolute; left: 0; top: 9px; width: 14px; h
 html.we-natal .hud-ilha .we-marca { margin-right: 10px; }
 @keyframes we-sino { 0%, 72%, 100% { transform: rotate(0); } 75% { transform: rotate(17deg); } 78.5% { transform: rotate(-14deg); } 82% { transform: rotate(10deg); } 85.5% { transform: rotate(-7deg); } 89% { transform: rotate(4deg); } 92.5% { transform: rotate(-2deg); } }
 @media (prefers-reduced-motion: reduce) { html.we-natal .we-sino { animation: none; } }
+
+/* ---------- responsividade (21/11/2026, print do dono com o cartão da sede cortado no celular) ----------
+   No iPhone, tocar num campo com letra menor que 16 px faz o Safari AMPLIAR a página, e ela não volta sozinha: tudo fica
+   ~1,4 vez maior e os cartões passam da borda direita. No celular e no tablet todo campo de texto tem 16 px (o layout da
+   raiz ainda põe maximum-scale=1 só no iOS, src/app/layout.tsx). Caixas de marcar, cores e arquivos ficam como estão. */
+@media (max-width: 1024px), (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+  textarea, select { font-size: 16px !important; }
+}
+/* mapa da cidade (src/office/Escritorio.tsx): a pinça e o toque duplo mexem a câmera, nunca ampliam a página. Uma pinça
+   que começasse num balão, num cartão ou na barra ampliava o site inteiro no celular. A rolagem dentro dos cartões continua
+   (pan-x pan-y vale até a caixa que rola). */
+.mapa-raiz { touch-action: pan-x pan-y; }
