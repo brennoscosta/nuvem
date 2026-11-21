@@ -29,7 +29,8 @@ function rotaWorkend(req: NextRequest) {
   if (p === "/encontrar" || /^\/loja\/\d{1,4}$/.test(p)) { url.pathname = "/workend" + p; return reescrever(url); }
   // perfil público do cadastro (20/11/2026): /perfil/<apelido>
   if (/^\/perfil\/[a-z0-9-]{3,40}\/?$/.test(p)) { url.pathname = "/workend" + p.replace(/\/$/, ""); return reescrever(url); }
-  if (p === "/" || p === "/cadastro" || p === "/entrar" || p === "/politicas" || p === "/esqueci" || p === "/redefinir") { url.pathname = "/workend" + (p === "/" ? "" : p); return reescrever(url); }
+  // /emails: preferências dos avisos por e-mail, pelo link assinado do rodapé (WE-17, 21/11/2026)
+  if (p === "/" || p === "/cadastro" || p === "/entrar" || p === "/politicas" || p === "/esqueci" || p === "/redefinir" || p === "/emails") { url.pathname = "/workend" + (p === "/" ? "" : p); return reescrever(url); }
   return NextResponse.next({ request: { headers: h } });
 }
 

@@ -51,7 +51,7 @@ async function gerarAvisosDaHora(usuarioId: string) {
 
 // Resumo da semana para o dono (13/11/2026): um aviso por semana (ISO), a partir de segunda 6h no horário de Brasília,
 // só para quem tem loja aberta. `agora` existe para teste.
-function semanaBR(agora: Date) {
+export function semanaBR(agora: Date) {
   const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23", weekday: "short" }).formatToParts(agora).map((x) => [x.type, x.value]));
   const dia = new Date(Date.UTC(+p.year, +p.month - 1, +p.day));
   const dow = (dia.getUTCDay() + 6) % 7; // 0 = segunda

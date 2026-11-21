@@ -14,6 +14,8 @@ import { registrar } from "./eventos";
 import { enviarEmail, emailLigado, brl, dataBR } from "./email";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
 import { QUIOSQUE_POR_CHAVE, ehQuiosque, equipeDoQuiosque } from "@/office/data/quiosques";
+import { PRECO_QUIOSQUE } from "@/office/data/precosTerreno";
+import { numeroDaLoja, rotuloLoja } from "@/office/data/numeroLoja";
 
 declare global {
   var __workendAvisoEm: number | undefined;
@@ -74,14 +76,21 @@ async function limparVencidos() {
 }
 
 // Avisa por e-mail quem está perto de vencer, uma vez por ciclo pago. Sem e-mail ligado, não marca nada: o aviso sai quando ligar.
-async function avisarVencimentos() {
+// WE-17 (21/11/2026): também é chamado pela agenda dos e-mails (emailsCiclo.ts), para sair mesmo sem ninguém abrir o mapa.
+// Só o lote principal avisa (a ampliação vence junto e mandava um 2º e-mail), com o rótulo da loja (quiosque, lote) e o valor
+// da renovação pela mesma cotação do mapa (quiosque R$ 47, lote com extras somados).
+export async function avisarVencimentos() {
   if (!emailLigado() || Date.now() - (globalThis.__workendAvisoEm ?? 0) < 3600_000) return;
   globalThis.__workendAvisoEm = Date.now();
   try {
-    const lista = await sql<{ chave: string; empresaNome: string; pagoAte: Date; email: string; nome: string }[]>`UPDATE terreno t SET avisado_em = now() FROM usuario u
-      WHERE u.id = t.usuario_id AND t.status = 'ativo' AND t.avisado_em IS NULL AND t.pago_ate < now() + make_interval(days => ${DIAS_AVISO})
-      RETURNING t.chave, t.empresa_nome, t.pago_ate, u.email, u.nome`;
-    for (const d of lista) void enviarEmail("vencimento", d.email, { nome: d.nome, empresa: d.empresaNome, lote: `Lote ${LOTE_POR_CHAVE[d.chave]?.numero ?? "?"}`, valor: brl(PRECO_LOTE), pago_ate: dataBR(d.pagoAte), link_pagar: `https://workend.online/mundo?lote=${encodeURIComponent(d.chave)}` });
+    const lista = await sql<{ chave: string; empresaNome: string; pagoAte: Date; email: string; nome: string; usuarioId: string; papel: Usuario["papel"] }[]>`UPDATE terreno t SET avisado_em = now() FROM usuario u
+      WHERE u.id = t.usuario_id AND t.status = 'ativo' AND t.anexo_de IS NULL AND t.avisado_em IS NULL AND t.pago_ate < now() + make_interval(days => ${DIAS_AVISO})
+      RETURNING t.chave, t.empresa_nome, t.pago_ate, u.email, u.nome, u.id AS usuario_id, u.papel`;
+    const { cotacaoLote } = await import("./ofertas"); // importado na hora: ofertas.ts já importa este arquivo
+    for (const d of lista) {
+      const valor = await cotacaoLote({ id: d.usuarioId, email: d.email, papel: d.papel } as Usuario, d.chave, 1).then((c) => c.base).catch(() => (ehQuiosque(d.chave) ? PRECO_QUIOSQUE : PRECO_LOTE));
+      void enviarEmail("vencimento", d.email, { nome: d.nome, empresa: d.empresaNome, lote: rotuloLoja(numeroDaLoja({ chave: d.chave })) || `Lote ${LOTE_POR_CHAVE[d.chave]?.numero ?? "?"}`, valor: brl(valor), pago_ate: dataBR(d.pagoAte), link_pagar: `https://workend.online/mundo?lote=${encodeURIComponent(d.chave)}` });
+    }
   } catch (e) { console.error("[vencimento]", (e as Error).message); }
 }
 
