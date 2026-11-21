@@ -1,8 +1,9 @@
 // Medição do WorkEnd (WE-01, 21/11/2026): o único lugar que manda eventos para o Google (dataLayer do Tag Manager e
 // gtag do GA4) e para o Meta Pixel. Sem consentimento não faz nada. Os scripts só carregam depois do aceite
 // (src/app/workend/_cookies.tsx); até lá, e enquanto eles não estão prontos, os eventos ficam numa fila na memória.
-// Os nomes dos eventos são os do brief, exatamente assim.
-export const EVENTOS = ["ver_preco", "clicar_cta_principal", "cadastro_iniciado", "cadastro_concluido", "abrir_reserva", "reserva_confirmada", "pix_gerado", "pix_pago", "loja_publicada", "checklist_completo"] as const;
+// Os nomes dos eventos são os do brief, exatamente assim, mais cartao_iniciado e cartao_pago do pagamento automático no
+// cartão (WE-09, junção v98: ui/Assinatura.tsx), que não usam o pix_pago.
+export const EVENTOS = ["ver_preco", "clicar_cta_principal", "cadastro_iniciado", "cadastro_concluido", "abrir_reserva", "reserva_confirmada", "pix_gerado", "pix_pago", "loja_publicada", "checklist_completo", "cartao_iniciado", "cartao_pago"] as const;
 export type Evento = (typeof EVENTOS)[number];
 export type Parametros = Record<string, string | number | boolean | undefined>;
 export const ehEvento = (v: unknown): v is Evento => typeof v === "string" && (EVENTOS as readonly string[]).includes(v);

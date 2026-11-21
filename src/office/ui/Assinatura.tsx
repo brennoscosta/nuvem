@@ -9,6 +9,8 @@
 // Não importa o mundoStore de propósito (o painel /app não carrega o mapa): o mapa é recarregado por import dinâmico.
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Icone } from "./Icone";
+import { medir, medirUmaVez } from "@/lib/medir";
+import { ehQuiosque } from "../data/quiosques";
 
 type Config = { cartao: boolean; pixAutomatico: boolean; chavePublica: string; sdk: string };
 type Resumo = { id: string; estado: "pendente" | "ativa" | "falhando" | "cancelada" | "encerrada" | "recusada"; meio: "cartao" | "pix_automatico"; valor: number; primeiroValor: number; proximaCobranca: string | null; tentativas: number; ultimaFalhaEm: string | null; primeiraPaga: boolean; dentroDos7Dias: boolean; inicio: "agora" | "vencimento"; criadoEm: string; canceladaEm: string | null; motivoFim: string | null };
@@ -144,7 +146,7 @@ export function EscolhaPagamento({ chave, desligado = false, sinal = "", childre
     <div data-assinatura-escolha>
       <div role="radiogroup" aria-label="Como pagar" className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-[#F1F3F6] p-1 text-[12px] font-semibold">
         <button type="button" role="radio" aria-checked={modo === "pix"} data-modo="pix" onClick={() => setModo("pix")} className={aba(modo === "pix")}>Pagar só este mês<span className="block text-[10px] font-normal">Pix</span></button>
-        <button type="button" role="radio" aria-checked={modo === "auto"} data-modo="auto" onClick={() => setModo("auto")} className={aba(modo === "auto")}>Pagar todo mês automaticamente<span className="block text-[10px] font-normal">{cfg.pixAutomatico && cfg.cartao ? "cartão ou Pix Automático" : cfg.cartao ? "cartão de crédito" : "Pix Automático"}</span></button>
+        <button type="button" role="radio" aria-checked={modo === "auto"} data-modo="auto" onClick={() => { if (modo !== "auto" && usarMeio === "cartao") medir("cartao_iniciado", { tipo: cot.tipo, value: cot.primeiro, currency: "BRL" }); setModo("auto"); }} className={aba(modo === "auto")}>Pagar todo mês automaticamente<span className="block text-[10px] font-normal">{cfg.pixAutomatico && cfg.cartao ? "cartão ou Pix Automático" : cfg.cartao ? "cartão de crédito" : "Pix Automático"}</span></button>
       </div>
       {modo === "pix" ? children : (
         <div className="mt-2 rounded-2xl border border-[#D9E2FF] bg-[#F7F9FF] px-3 py-2.5 text-xs text-[#1D2128]" data-assinatura-auto>
@@ -172,6 +174,11 @@ export function AssinaturaDoLote({ chave, sinal = "", pagoAte = null, painel = f
   const [ocupado, setOcupado] = useState(false);
   const [idem] = useState(novoIdem);
   const [visto, setVisto] = useState(false);
+  // funil (src/lib/medir.ts, junção v98): cartao_pago quando a pessoa vê a 1ª cobrança aprovada no cartão do lote que ela
+  // acabou de ligar (o mesmo momento do aviso "1ª cobrança aprovada no cartão"), uma vez por assinatura; não é o pix_pago
+  const paga = e?.assinatura && e.assinatura.meio === "cartao" && e.assinatura.primeiraPaga && recemLigados.has(chave) ? e.assinatura : null;
+  const pagaId = paga?.id ?? null, pagaValor = paga?.primeiroValor ?? 0;
+  useEffect(() => { if (pagaId) medirUmaVez(`cartao_pago:${pagaId}`, "cartao_pago", { tipo: ehQuiosque(chave) ? "quiosque" : "lote", value: pagaValor, currency: "BRL" }); }, [pagaId, pagaValor, chave]);
   if (!e) return painel ? null : <>{children}</>;
   const a = e.assinatura, cfg = e.config, cot = e.cotacao;
   const podeLigar = (cfg.cartao || cfg.pixAutomatico) && !!cot;
