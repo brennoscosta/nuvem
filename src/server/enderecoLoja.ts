@@ -108,3 +108,24 @@ export function versaoFachada(l: { nome: string; cor: string; predio?: string | 
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36);
 }
+
+// Lojas no ar com o endereço próprio (sitemap.xml, WE-12): os lotes e quiosques ativos (a ampliação do lote duplo não conta)
+// de contas não suspensas e as sedes. Quem ainda não tem endereço ganha um agora, pelo nome da placa.
+export async function lojasNoAr(): Promise<{ slug: string; atualizadoEm: string }[]> {
+  await migrar();
+  const ts = await sql<{ chave: string; usuarioId: string; empresaNome: string; email: string; papel: Usuario["papel"]; atualizadoEm: Date }[]>`
+    SELECT t.chave, t.usuario_id, t.empresa_nome, u.email, u.papel, t.atualizado_em FROM terreno t JOIN usuario u ON u.id = t.usuario_id AND u.banido_em IS NULL
+    WHERE t.status = 'ativo' AND t.anexo_de IS NULL ORDER BY t.reservado_em`;
+  const sedePorChave = new Map(Object.values(SEDE_POR_ID).map((s) => [s.chave, s.id]));
+  const out: { slug: string; atualizadoEm: string }[] = [], vistos = new Set<string>();
+  for (const t of ts) {
+    let slug = sedePorChave.get(t.chave) ?? null;
+    if (!slug) {
+      const empId = empresaIdDe(t.usuarioId, t.chave, ehAdmin({ email: t.email, papel: t.papel } as Usuario));
+      await linhaDaEmpresa(empId, t.usuarioId, t.empresaNome);
+      slug = await enderecoDaEmpresa(empId, t.empresaNome).catch(() => null);
+    }
+    if (slug && !vistos.has(slug)) { vistos.add(slug); out.push({ slug, atualizadoEm: new Date(t.atualizadoEm).toISOString().slice(0, 10) }); }
+  }
+  return out;
+}
