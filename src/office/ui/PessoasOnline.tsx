@@ -1,6 +1,8 @@
 "use client";
 // Pessoas na cidade agora (20/11/2026, pedido do dono: "quero que mostre quantas pessoas estão online na cidade e que
 // possam ver"). Para todos, com ou sem conta: no topo do mapa, "N pessoas na cidade agora" com o ponto verde pulsando.
+// 21/11/2026 (brief, decisão do dono: "fica, mas discreto, num lugar em que se clica para ver"): no alto fica só o ícone
+// com o ponto verde, e o número aparece ao tocar, no título da lista. A classe hud-online é o alvo do tutorial (guia).
 // Tocar abre a lista curta de quem está online: a aparência e o nome do personagem (o que já é público no mapa), onde ele
 // está e o botão "Ir até" para quem anda com o próprio personagem (sem personagem, "Ver" leva a câmera até lá). Quem está
 // sem conta entra só no número. Os dados vêm de /api/cidade/online (server/online.ts), pelo ui/onlineComum.ts.
@@ -51,14 +53,11 @@ export function ContadorCidade() {
   const caixa = useRef<HTMLDivElement>(null);
   const fechar = useCallback(() => setAberto(false), []);
   useFecharFora(aberto, caixa, fechar);
-  const n = resumo?.total;
   return (
     <div ref={caixa} className="pointer-events-auto relative" data-teste="contador-cidade">
-      <button type="button" onClick={() => setAberto(!aberto)} aria-expanded={aberto} aria-label={n == null ? "Pessoas na cidade agora" : `${n} ${pessoas(n)} na cidade agora. Ver quem está online`} className="hud-ilha hud-online">
+      <button type="button" onClick={() => setAberto(!aberto)} aria-expanded={aberto} aria-label="Quem está na cidade agora" title="Quem está na cidade agora" className="hud-ilha hud-online">
+        <Icone nome="pessoa" tamanho={18} />
         <i className="hud-online-ponto" aria-hidden="true" />
-        <b data-teste="total-online">{n ?? "–"}</b>
-        <span className="hud-online-longo">{pessoas(n ?? 2)} na cidade agora</span>
-        <span className="hud-online-curto">na cidade</span>
       </button>
       {aberto && <ListaOnline resumo={resumo} fechar={fechar} />}
     </div>
@@ -79,7 +78,7 @@ function ListaOnline({ resumo, fechar }: { resumo: ResumoOnline | null; fechar: 
   const resto = resumo ? resumo.personagens - lista.length : 0;
   return (
     <div className="hud-pop hud-pop-baixo hud-online-pop" role="dialog" aria-label="Quem está na cidade agora" data-teste="lista-online">
-      <b className="hud-pop-titulo"><Icone nome="pessoa" tamanho={18} />Na cidade agora</b>
+      <b className="hud-pop-titulo"><Icone nome="pessoa" tamanho={18} />{resumo ? <span><span data-teste="total-online">{resumo.total}</span> {pessoas(resumo.total)} na cidade agora</span> : "Na cidade agora"}</b>
       {!resumo ? <p className="hud-nota">Contando quem está por aqui…</p> : (
         <>
           {lista.length > 0 ? (

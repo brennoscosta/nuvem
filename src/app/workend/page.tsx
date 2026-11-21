@@ -101,7 +101,8 @@ export default async function Inicio() {
   const restamFundador = temBanco() ? await vagasFundador().catch(() => 0) : 0;
   // loja destaque da semana (13/11/2026): a mais visitada na semana passada
   const destaque = temBanco() ? await lojaDestaque().catch(() => null) : null;
-  // pessoas na cidade agora (20/11/2026): o número já vem na página e o navegador atualiza (app/workend/_online.tsx)
+  // pessoas na cidade agora (20/11/2026): o número já vem na página e o navegador atualiza (app/workend/_online.tsx).
+  // 21/11/2026 (brief, decisão do dono): discreto, no fim da página, e o número só aparece ao tocar
   const online = temBanco() ? await resumoOnline().catch(() => null) : null;
   const lote = livres.length ? LOTES.find((l) => l.chave === livres[0]) ?? null : null;
   const crachas = ESPECIALISTAS_IA.map((e) => ({ id: e.id, nome: e.nome, cargo: e.cargo, cor: AREAS[e.area].cor, skill: e.skills[0]?.nome ?? "" }));
@@ -131,7 +132,6 @@ export default async function Inicio() {
               </div>
             </div>
             <p className="wh-vivo"><i className="wi-vivo" aria-hidden /><b><Contador valor={livres.length} /></b> de {LOTES.length} lotes livres agora <span>·</span> R$ 99 por mês <span>·</span> Pix direto no mapa</p>
-            <PessoasNaCidade inicial={online?.total ?? null} />
           </div>
           <Rolagem className="faixa wh-video">
             <div className="wc-tela">
@@ -249,6 +249,7 @@ export default async function Inicio() {
               <h2>O seu endereço <em>está esperando.</em></h2>
               <p>{livres.length > 0 ? <>Ainda há <b>{livres.length} lotes livres</b> no mapa.</> : <>Todos os lotes estão ocupados agora. Crie a conta para saber quando abrir um novo.</>}</p>
               <div className="wh-acoes"><Link href={cta.href} className="wi-btn wi-btn-tinta">{cta.texto}<span aria-hidden>→</span></Link><Link prefetch={false} href="/mundo" className="wi-seta">Passear pelo mapa<span aria-hidden>↗</span></Link></div>
+              <PessoasNaCidade inicial={online?.total ?? null} />
             </Revelar>
           </div>
           <div className="wfim-marca" aria-hidden><Logotipo altura={240} /></div>

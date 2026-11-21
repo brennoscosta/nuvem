@@ -430,8 +430,16 @@
 .wi .wi-btn-vidro.wc-btn { background: rgba(10, 14, 22, .55); border-color: rgba(255, 255, 255, .35); text-shadow: 0 1px 2px rgba(0, 0, 0, .45); }
 .wi .wi-btn-vidro.wc-btn:hover { background: rgba(10, 14, 22, .7); }
 
-/* pessoas na cidade agora (20/11/2026, app/workend/_online.tsx), logo abaixo dos lotes livres */
-.wi .wh-online { margin-top: .4rem; }
+/* pessoas na cidade agora (20/11/2026, app/workend/_online.tsx). 21/11/2026 (brief, decisão do dono): discreto, no fim da
+   página perto do "Passear pelo mapa"; fechado mostra só o ponto e a pergunta, e o número aparece ao tocar */
+.wi .wh-online { display: flex; flex-direction: column; align-items: center; font-size: .88rem; color: var(--tinta-3); text-align: center; }
+.wi .wh-online-botao { display: inline-flex; align-items: center; min-height: 44px; padding: 0 .4rem; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: rgba(18,20,25,.18); text-underline-offset: 3px; transition: color .15s; }
+.wi .wh-online-botao:hover, .wi .wh-online-botao[aria-expanded="true"] { color: var(--tinta-2); }
+.wi .wh-online-botao:focus-visible { outline: 3px solid rgba(10,108,255,.45); outline-offset: 2px; border-radius: 8px; }
+.wi .wh-online-botao .wi-vivo { animation: none; }
+.wi .wh-online .wh-online-numero { font-size: .88rem; color: var(--tinta-2); animation: wi-entra .4s var(--suave); }
+.wi .wh-online .wh-online-numero b { color: var(--tinta); }
+.wi .wh-online-numero > span { margin: 0 .35rem; color: var(--tinta-3); }
 .wi .wh-online-link { font-weight: 600; color: var(--tinta); text-decoration: underline; text-decoration-color: rgba(10,108,255,.35); text-underline-offset: 3px; }
 .wi .wh-online-link:hover { text-decoration-color: currentColor; }
 
