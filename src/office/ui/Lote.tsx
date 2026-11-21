@@ -130,7 +130,7 @@ export function PixAberto({ chave }: { chave: string }) {
     <div className="mt-3 rounded-2xl bg-[#FDE8E8] px-3 py-3 text-sm text-[#8A2A2A]"><div className="font-bold">{pix.status === "expirado" ? "Este Pix expirou." : "Pagamento não aprovado."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-bold text-white">Gerar outro Pix</button></div>
   );
   return (
-    <div className="mt-3 rounded-2xl border border-[#16A34A]/30 bg-[#F3FBF5] p-3 text-sm">
+    <div className="mt-3 rounded-2xl border border-[#16A34A]/30 bg-[#F3FBF5] p-3 text-sm" data-clarity-mask="true">
       <div className="flex items-center justify-between"><div className="font-bold text-[#166534]">Pague {brl(pix.valor)} no Pix</div>{resta != null && <div className="text-xs text-[#5B6472]">vale {mmss(resta)}</div>}</div>
       {(pix.creditos ?? 0) > 0 && <div className="mt-1 text-[11px] text-[#166534]">{fmtCreditos(pix.creditos ?? 0)} créditos já estão reservados para esta compra. Se o Pix não for pago, eles voltam para a sua carteira.</div>}
       {pix.qrBase64 && <img src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code Pix" className="mx-auto mt-2 h-44 w-44 rounded-xl bg-white p-1" />}
@@ -523,7 +523,7 @@ export function PainelEmpresa() {
       </div>
 
       <label className="mt-3 block text-xs font-semibold text-[#5B6472]">Nome da empresa
-        <input autoFocus value={rascunho.empresaNome} onChange={(e) => setRascunho({ empresaNome: e.target.value.slice(0, 60) })} placeholder="Ex.: Padaria do Zé" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
+        <input autoFocus data-clarity-mask="true" value={rascunho.empresaNome} onChange={(e) => setRascunho({ empresaNome: e.target.value.slice(0, 60) })} placeholder="Ex.: Padaria do Zé" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
       </label>
 
       <div className="mt-3 text-xs font-semibold text-[#5B6472]">Cor da marca</div>

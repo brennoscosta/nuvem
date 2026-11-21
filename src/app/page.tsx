@@ -28,6 +28,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const [h, q] = await Promise.all([headers(), searchParams]);
   const um = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
   const mundo = h.get("x-site") === "workend" || q.mundo !== undefined;
-  // WE-01 (21/11/2026): aviso de cookies e medição só no mapa do WorkEnd; o escritório da Nuvem não mede nada
+  // WE-01 e WE-02 (21/11/2026): aviso de cookies e medição só no mapa do WorkEnd; o escritório da Nuvem não mede nada
   return <>{h.get("x-site") === "workend" && <h1 className="sr-only">Mapa da cidade do WorkEnd</h1>}<Escritorio inicio={{ mundo, sede: mundo ? um(q.sede) : null, lote: mundo ? um(q.lote) : null }} />{h.get("x-site") === "workend" && <Medicao lugar="mapa" />}</>;
 }

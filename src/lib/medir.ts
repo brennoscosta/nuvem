@@ -8,7 +8,7 @@ export type Parametros = Record<string, string | number | boolean | undefined>;
 export const ehEvento = (v: unknown): v is Evento => typeof v === "string" && (EVENTOS as readonly string[]).includes(v);
 
 // Escolha da pessoa no aviso de cookies: cookie de primeira parte (essencial), lido só no navegador.
-// Formato "v1.a1.m0": versão, análise (Google Analytics e Tag Manager) e anúncios (Meta Pixel).
+// Formato "v1.a1.m0": versão, análise (Google Analytics, Tag Manager e Clarity) e anúncios (Meta Pixel).
 export interface Consentimento { analise: boolean; anuncios: boolean }
 export const COOKIE_CONSENTIMENTO = "we_cookies";
 const VALIDADE_DIAS = 180;

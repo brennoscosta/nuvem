@@ -24,7 +24,7 @@ export default function WorkendLayout({ children }: { children: React.ReactNode 
       {children}
       {/* depois de excluir a conta (/?conta=excluida): o aviso de que ela foi excluída */}
       <AvisoContaExcluida />
-      {/* aviso de cookies e medição (WE-01): nada de fora carrega antes do aceite */}
+      {/* aviso de cookies e medição (WE-01 e WE-02): nada de fora carrega antes do aceite */}
       <Medicao />
     </div>
   );

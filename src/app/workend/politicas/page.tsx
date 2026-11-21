@@ -2,7 +2,7 @@
 // 21/11/2026 (WE-06, confiança): itens 6 a 8, com quem cuida dos dados (a controladora), os direitos pela LGPD e como pedir
 // a exclusão. Dados da empresa em ../_empresa.ts: o que ainda falta (endereço, e-mail, encarregado) não aparece na tela.
 // Sem cláusula de foro, por decisão do dono (21/11/2026).
-// 21/11/2026 (WE-01): item 9, cookies e ferramentas de análise, junto com o aviso de cookies (../_cookies.tsx).
+// 21/11/2026 (WE-01 e WE-02): item 9, cookies e ferramentas de análise, junto com o aviso de cookies (../_cookies.tsx).
 import { Topo, Rodape } from "../_partes";
 import { EMPRESA } from "../_empresa";
 import { meta } from "../seo";
@@ -46,6 +46,7 @@ export default function Politicas() {
             <p><b>9. Cookies e ferramentas de análise.</b> Para o site funcionar, usamos cookies essenciais: o que mantém você na sua conta, o que guarda por 30 dias o código de quem indicou o WorkEnd para você e o que guarda a sua escolha sobre cookies. Eles não dependem do seu consentimento. Com o seu consentimento, podemos usar também:</p>
             <ul className="mt-3 list-disc space-y-1.5 pl-6">
               <li><b>Google Analytics e Google Tag Manager</b> (Google), para análise: contam as visitas e mostram quais páginas e botões são usados, para melhorarmos o site;</li>
+              <li><b>Microsoft Clarity</b> (Microsoft), para análise: grava como a visita acontece na página inicial, no cadastro e no mapa (cliques, rolagem e movimento do mouse) e monta mapas de calor. Os campos com dado pessoal e o código do Pix ficam escondidos na gravação;</li>
               <li><b>Meta Pixel</b> (Meta), para anúncios: mede se os anúncios no Facebook e no Instagram trazem visitas, cadastros e pagamentos.</li>
             </ul>
             <p className="mt-3">Essas ferramentas só são carregadas depois que você aceita, no aviso de cookies. Você pode aceitar tudo, recusar tudo ou escolher por tipo (análise e anúncios). Se recusar, nenhuma delas é carregada e o site funciona do mesmo jeito. A sua escolha fica guardada por 6 meses e pode ser mudada a qualquer momento pelo link <b>Cookies</b>, no rodapé do site. Os dados que essas ferramentas coletam também são tratados pelas empresas que as oferecem, conforme a política de privacidade de cada uma, e podem ser guardados fora do Brasil.</p>
