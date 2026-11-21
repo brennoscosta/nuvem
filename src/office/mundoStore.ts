@@ -25,7 +25,8 @@ export interface Rascunho { empresaNome: string; cor: string; logoDataUrl: strin
 export type AbaEscritorio = "predio" | "visual" | "interior" | "setores" | "equipe" | "contratar" | "treinar";
 // creditos: o que a carteira de créditos cobriu (20/11/2026); valor é só a parte do Pix (0 = pago todo com créditos)
 // modelo (20/11/2026, frente predios): compra de um modelo de prédio do catálogo (data/modelos.ts); `modelo` diz qual
-export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" | "personagem" | "outdoor" | "barraca" | "item" | "creditos" | "agente" | "ia" | "personalidade" | "modelo"; creditos?: number; modelo?: string }
+// inicio (WE-07, 21/11/2026): 1º pagamento de um lote ou quiosque reservado; aprovado, vem o passo de configuração
+export interface Pix { id: string; lote: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status: "pendente" | "aprovado" | "rejeitado" | "expirado"; tipo: "lote" | "layout" | "personagem" | "outdoor" | "barraca" | "item" | "creditos" | "agente" | "ia" | "personalidade" | "modelo"; creditos?: number; modelo?: string; inicio?: boolean }
 // resposta de qualquer rota de pagamento (mercadopago.ts › cobrar): Pix pendente ou já aprovado com créditos
 export interface RespostaCobranca { id: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status?: "pendente" | "aprovado"; creditos?: number }
 // praça de eventos e feira de sábado (12/11/2026)
@@ -75,6 +76,8 @@ interface Estado {
   loteSelecionado: string | null;
   loteHover: string | null;
   painelEmpresa: boolean; // painel "Montar minha empresa" aberto
+  // o painel abriu como o passo logo depois do 1º pagamento (WE-07, 21/11/2026): nicho, nomes da equipe e logomarca
+  configurarEmpresa: boolean;
   rascunho: Rascunho | null; // o que está sendo editado (a cena mostra ao vivo)
   alvoCamera: [number, number, number] | null; // a câmera desliza até aqui
   // de que lado a câmera olha o alvo (ângulo em volta do eixo vertical, 0 = do sul): só as sedes pedem (19/11/2026, as
@@ -86,7 +89,7 @@ interface Estado {
   praca: Praca | null; carregarPraca: () => Promise<void>;
   abrirPix: (p: Pix) => void; // Pix de barraca e de roupa do personagem (criados fora do cartão do lote)
   // cobrança única (20/11/2026): abre o Pix ou, se já foi pago com créditos, mostra o "confirmado" e recarrega
-  abrirCobranca: (j: RespostaCobranca, lote: string, tipo: Pix["tipo"], extra?: { modelo?: string }) => Promise<void>;
+  abrirCobranca: (j: RespostaCobranca, lote: string, tipo: Pix["tipo"], extra?: { modelo?: string; inicio?: boolean }) => Promise<void>;
   aposAprovado: (p: Pix) => Promise<void>;
   // outdoors nas avenidas (12/11/2026)
   outdoors: OutdoorPublico[]; precoOutdoor: number; outdoorSelecionado: string | null;
@@ -97,6 +100,7 @@ interface Estado {
   selecionarLote: (chave: string | null) => void;
   setLoteHover: (chave: string | null) => void;
   abrirPainel: () => void;
+  abrirConfiguracao: () => void; // o passo depois do 1º pagamento (ui/Lote.tsx › PixAberto)
   fecharPainel: () => void;
   setRascunho: (r: Partial<Rascunho>) => void;
   reservar: () => Promise<string | null>;
@@ -118,7 +122,7 @@ export const useMundo = create<Estado>((set, get) => ({
   carregarPraca: async () => { const j = await fetch("/api/workend/praca", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null); if (j?.agenda) set({ praca: j as Praca }); },
   abrirPix: (p) => set({ pix: p }),
   abrirCobranca: async (j, lote, tipo, extra) => {
-    const p: Pix = { id: j.id, lote, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: j.status === "aprovado" ? "aprovado" : "pendente", tipo, creditos: j.creditos ?? 0, ...(extra?.modelo ? { modelo: extra.modelo } : {}) };
+    const p: Pix = { id: j.id, lote, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: j.status === "aprovado" ? "aprovado" : "pendente", tipo, creditos: j.creditos ?? 0, ...(extra?.modelo ? { modelo: extra.modelo } : {}), ...(extra?.inicio ? { inicio: true } : {}) };
     set({ pix: p });
     void useCreditos.getState().carregar();
     if (p.status === "aprovado") await get().aposAprovado(p);
@@ -163,7 +167,7 @@ export const useMundo = create<Estado>((set, get) => ({
       void get().carregarOutdoors(); return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },
-  terrenos: {}, meu: null, meus: [], usuario: null, admin: false, pagamentoLigado: false, preco: 99, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null, giroCamera: null, versaoSedes: 0,
+  terrenos: {}, meu: null, meus: [], usuario: null, admin: false, pagamentoLigado: false, preco: 99, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, configurarEmpresa: false, rascunho: null, alvoCamera: null, giroCamera: null, versaoSedes: 0,
 
   carregar: async () => {
     void get().carregarOutdoors();
@@ -219,8 +223,9 @@ export const useMundo = create<Estado>((set, get) => ({
     const t = terrenos[loteSelecionado];
     const ceo = t?.escritorio?.equipe.find((m) => m.papel === "ceo")?.nome ?? "";
     const atendente = t?.escritorio?.equipe.find((m) => m.papel === "atendente")?.nome ?? "";
-    set({ painelEmpresa: true, rascunho: { empresaNome: t?.empresaNome ?? usuario?.empresaNome ?? "", cor: t?.cor ?? CORES_EMPRESA[0], logoDataUrl: t?.temLogo ? `/api/terrenos/${encodeURIComponent(loteSelecionado)}/logo?v=${Date.now()}` : null, ceoNome: ceo, atendenteNome: atendente, nicho: t?.nicho ?? "negocios" } });
+    set({ painelEmpresa: true, configurarEmpresa: false, rascunho: { empresaNome: t?.empresaNome ?? usuario?.empresaNome ?? "", cor: t?.cor ?? CORES_EMPRESA[0], logoDataUrl: t?.temLogo ? `/api/terrenos/${encodeURIComponent(loteSelecionado)}/logo?v=${Date.now()}` : null, ceoNome: ceo, atendenteNome: atendente, nicho: t?.nicho ?? "negocios" } });
   },
+  abrirConfiguracao: () => { get().abrirPainel(); if (get().painelEmpresa) set({ configurarEmpresa: true }); },
   fecharPainel: () => set({ painelEmpresa: false, rascunho: null }),
   setRascunho: (r) => set((s) => ({ rascunho: s.rascunho ? { ...s.rascunho, ...r } : null })),
 
@@ -230,7 +235,10 @@ export const useMundo = create<Estado>((set, get) => ({
     if (!usuario) return "Entre na sua conta do WorkEnd.";
     const atual = terrenos[loteSelecionado];
     const logoNovo = rascunho.logoDataUrl?.startsWith("data:") ? rascunho.logoDataUrl : null;
-    const body = { empresaNome: rascunho.empresaNome, cor: rascunho.cor, ceoNome: rascunho.ceoNome, atendenteNome: rascunho.atendenteNome, nicho: rascunho.nicho, logoBase64: logoNovo, logoTipo: logoNovo ? (/^data:(image\/[a-z]+)/.exec(logoNovo)?.[1] ?? "image/png") : null, manterLogo: !logoNovo && !!rascunho.logoDataUrl && !!atual?.temLogo };
+    // WE-07 (21/11/2026): a reserva nova leva só o nome e a cor; o servidor grava as sugestões do resto. Editar a placa de um
+    // lote que já é meu manda tudo, como antes.
+    const meuJa = !!atual && atual.usuarioId === usuario.id;
+    const body = !meuJa ? { empresaNome: rascunho.empresaNome, cor: rascunho.cor } : { empresaNome: rascunho.empresaNome, cor: rascunho.cor, ceoNome: rascunho.ceoNome, atendenteNome: rascunho.atendenteNome, nicho: rascunho.nicho, logoBase64: logoNovo, logoTipo: logoNovo ? (/^data:(image\/[a-z]+)/.exec(logoNovo)?.[1] ?? "image/png") : null, manterLogo: !logoNovo && !!rascunho.logoDataUrl && !!atual?.temLogo };
     const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/reservar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return j.erro ?? `Erro ${r.status}`;
@@ -250,12 +258,13 @@ export const useMundo = create<Estado>((set, get) => ({
   // Gera o Pix (QR Code + copia e cola) e mostra no cartão do lote; o mapa confere o pagamento a cada poucos segundos
   pagar: async (meses = 1, tipo = "lote", creditos = false, modelo) => {
     const { loteSelecionado } = get(); if (!loteSelecionado) return "Escolha um lote.";
+    const inicio = tipo === "lote" && get().terrenos[loteSelecionado]?.status === "reservado"; // 1º mês (WE-07)
     set({ pagando: true });
     try {
       const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/pagar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ meses, tipo, creditos, idem: novoIdem(), ...(modelo ? { modelo } : {}) }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return j.erro ?? `Erro ${r.status}`;
-      await get().abrirCobranca(j, loteSelecionado, tipo, modelo ? { modelo } : undefined);
+      await get().abrirCobranca(j, loteSelecionado, tipo, modelo || inicio ? { ...(modelo ? { modelo } : {}), ...(inicio ? { inicio } : {}) } : undefined);
       return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },

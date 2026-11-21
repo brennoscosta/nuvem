@@ -126,7 +126,11 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
   const nome = (d.empresaNome ?? "").trim().slice(0, 60);
   if (nome.length < 2) throw new Error("Diga o nome da empresa.");
   const cor = d.cor && corValida(d.cor) ? d.cor.toUpperCase() : COR_PADRAO;
-  const nicho = nichoValido(d.nicho);
+  // checkout mais curto (WE-07, 21/11/2026): a reserva nova pede só o nome e a cor. O nicho, os nomes do CEO e da atendente
+  // e a logomarca vêm depois do pagamento; sem eles, valem as sugestões (nicho "negocios", os nomes sorteados de
+  // escritorioPadrao e nenhuma logo). Na edição, o que não veio fica como estava.
+  const nichoPedido = d.nicho == null ? null : nichoValido(d.nicho);
+  const manterLogo = !!d.manterLogo || (d.logoBase64 === undefined && d.manterLogo === undefined);
   let logo: Buffer | null = null, logoTipo: string | null = null;
   if (d.logoBase64) {
     logoTipo = d.logoTipo ?? "image/png";
@@ -155,8 +159,8 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
       await tx`DELETE FROM terreno WHERE usuario_id = ${u.id} AND chave <> ${chave} AND status = 'reservado' AND anexo_de IS NULL`;
     }
     if (dono) {
-      if (d.manterLogo && !logo) await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, nicho = ${nicho}, atualizado_em = now() WHERE chave = ${chave}`;
-      else await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, nicho = ${nicho}, logo = ${logo}, logo_tipo = ${logoTipo}, atualizado_em = now() WHERE chave = ${chave}`;
+      if (manterLogo && !logo) await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, nicho = COALESCE(${nichoPedido}::text, nicho), atualizado_em = now() WHERE chave = ${chave}`;
+      else await tx`UPDATE terreno SET empresa_nome = ${nome}, cor = ${cor}, nicho = COALESCE(${nichoPedido}::text, nicho), logo = ${logo}, logo_tipo = ${logoTipo}, atualizado_em = now() WHERE chave = ${chave}`;
       // editar a placa: só renomeia CEO/atendente se o dono preencheu os campos (não apaga o que ele já montou)
       if (dono.escritorio && (d.ceoNome || d.atendenteNome)) {
         const e = dono.escritorio;
@@ -165,13 +169,14 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
       } else if (!dono.escritorio) await tx`UPDATE terreno SET escritorio = ${escJson} WHERE chave = ${chave}`;
     } else {
       // quem já teve um lote recupera a marca e a equipe guardadas
-      const [guardado] = await tx<{ logo: Uint8Array | null; logoTipo: string | null; escritorio: Escritorio | null }[]>`SELECT logo, logo_tipo, escritorio FROM terreno_arquivo WHERE usuario_id = ${u.id} ORDER BY arquivado_em DESC LIMIT 1`;
+      const [guardado] = await tx<{ logo: Uint8Array | null; logoTipo: string | null; escritorio: Escritorio | null; nicho: string | null }[]>`SELECT logo, logo_tipo, escritorio, nicho FROM terreno_arquivo WHERE usuario_id = ${u.id} ORDER BY arquivado_em DESC LIMIT 1`;
       const logoFinal = logo ?? (guardado?.logo ? Buffer.from(guardado.logo) : null);
       const tipoFinal = logo ? logoTipo : guardado?.logo ? guardado.logoTipo : null;
       // o modelo de prédio comprado fica com a empresa só enquanto o lote está ativo (20/11/2026): quem volta do arquivo
       // traz a equipe e a marca, mas o prédio pago volta para o escritório básico; o quiosque volta só com a atendente
       const guardadoEsc = guardado?.escritorio ? semModeloPago(quiosque ? equipeDoQuiosque(guardado.escritorio) : guardado.escritorio) : null;
       const escFinal = guardadoEsc ? sql.json(guardadoEsc as unknown as Parameters<typeof sql.json>[0]) : escJson;
+      const nicho = nichoPedido ?? nichoValido(guardado?.nicho); // sem nicho na reserva: o guardado, ou "negocios"
       await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, status, reservado_ate, escritorio) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${nicho}, ${logoFinal}, ${tipoFinal}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${escFinal})`;
     }
     const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${chave}`;

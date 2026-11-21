@@ -104,6 +104,7 @@ export function PixAberto({ chave }: { chave: string }) {
   const conferir = useMundo((s) => s.conferirPagamento);
   const fechar = useMundo((s) => s.fecharPix);
   const abrirEscritorio = useMundo((s) => s.abrirEscritorio);
+  const abrirConfiguracao = useMundo((s) => s.abrirConfiguracao);
   const [copiado, setCopiado] = useState(false);
   const [conferindo, setConferindo] = useState(false);
   const { resta } = useContagem(pix && pix.status === "pendente" ? pix.expiraEm : null);
@@ -118,9 +119,11 @@ export function PixAberto({ chave }: { chave: string }) {
   if ((pix.tipo === "layout" || pix.tipo === "modelo" || pix.tipo === "agente" || pix.tipo === "personalidade") && !painelEsc) return null; // aparecem dentro do painel do escritório
   // quiosque e lote extra (20/11/2026) não montam escritório depois de pagar
   const pixQuiosque = ehQuiosque(pix.lote), pixExtra = !!useMundo.getState().terrenos[pix.lote]?.anexoDe;
+  // 1º mês do lote ou do quiosque (WE-07, 21/11/2026): o nicho, os nomes e a logo, que ficaram fora da reserva
+  const inicio = pix.tipo === "lote" && !pixExtra && !!pix.inicio;
   const copiar = async () => { try { await navigator.clipboard.writeText(pix.codigo); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { window.prompt("Copie o código Pix:", pix.codigo); } };
   if (pix.status === "aprovado") return (
-    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]" data-pago={pix.valor > 0 ? "pix" : "creditos"}><div className="font-bold"><Icone nome="check" tamanho={16} className="mr-1 inline align-[-3px]" />{pix.valor > 0 ? "Pagamento confirmado!" : `Pago com ${fmtCreditos(pix.creditos ?? 0)} créditos`}</div><div className="mt-1 text-xs">{pix.tipo === "agente" ? "O agente novo já está na equipe, com a personalidade escolhida. Salve o escritório quando terminar." : pix.tipo === "personalidade" ? "A personalidade nova já vale nas próximas conversas." : pix.tipo === "ia" ? "As unidades de IA já estão na empresa." : pix.tipo === "creditos" ? "Os créditos já estão na sua carteira." : pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : pix.tipo === "modelo" ? "Modelo comprado: o prédio novo já está no seu lote." : pix.tipo === "personagem" ? "Seu personagem está ativo por 30 dias. Clique no chão pra andar e nos outros pra conversar." : pix.tipo === "outdoor" ? "Seu anúncio já está no outdoor por 30 dias. Quem clicar nele vem até a sua loja." : pix.tipo === "barraca" ? "Sua barraca está garantida no sábado. Ela aparece na praça das 8h às 18h, com o seu nome na placa." : pix.tipo === "item" ? "Item liberado: o seu personagem já está usando." : pixQuiosque ? "Seu quiosque está aberto por 30 dias. A atendente já atende no balcão." : pixExtra ? "Terreno expandido: o seu prédio já ocupa os dois lotes e renova junto com o lote principal." : "O chão é seu por 30 dias. Próximo passo: montar o escritório (prédio, salas e equipe)."}</div>{/* 17/11/2026: o "Fechar" daqui repetia o X do cartão; no Pix do lote o botão já leva ao próximo passo */}{pix.tipo === "lote" && !pixQuiosque && !pixExtra ? <button onClick={() => { fechar(); abrirEscritorio("predio"); }} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">Montar escritório agora</button> : <button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">Entendi</button>}</div>
+    <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-3 text-sm text-[#166534]" data-pago={pix.valor > 0 ? "pix" : "creditos"}><div className="font-bold"><Icone nome="check" tamanho={16} className="mr-1 inline align-[-3px]" />{pix.valor > 0 ? "Pagamento confirmado!" : `Pago com ${fmtCreditos(pix.creditos ?? 0)} créditos`}</div><div className="mt-1 text-xs">{pix.tipo === "agente" ? "O agente novo já está na equipe, com a personalidade escolhida. Salve o escritório quando terminar." : pix.tipo === "personalidade" ? "A personalidade nova já vale nas próximas conversas." : pix.tipo === "ia" ? "As unidades de IA já estão na empresa." : pix.tipo === "creditos" ? "Os créditos já estão na sua carteira." : pix.tipo === "layout" ? "Crédito de troca de prédio liberado: salve o escritório com o prédio novo." : pix.tipo === "modelo" ? "Modelo comprado: o prédio novo já está no seu lote." : pix.tipo === "personagem" ? "Seu personagem está ativo por 30 dias. Clique no chão pra andar e nos outros pra conversar." : pix.tipo === "outdoor" ? "Seu anúncio já está no outdoor por 30 dias. Quem clicar nele vem até a sua loja." : pix.tipo === "barraca" ? "Sua barraca está garantida no sábado. Ela aparece na praça das 8h às 18h, com o seu nome na placa." : pix.tipo === "item" ? "Item liberado: o seu personagem já está usando." : pixQuiosque ? `Seu quiosque está aberto por 30 dias. A atendente já atende no balcão.${inicio ? " Falta um passo rápido: o nicho, o nome da atendente e a logo, que já vêm sugeridos." : ""}` : pixExtra ? "Terreno expandido: o seu prédio já ocupa os dois lotes e renova junto com o lote principal." : inicio ? "O chão é seu por 30 dias. Falta um passo rápido: o nicho, os nomes da equipe e a logo, que já vêm sugeridos." : "O chão é seu por 30 dias. Próximo passo: montar o escritório (prédio, salas e equipe)."}</div>{/* 17/11/2026: o "Fechar" daqui repetia o X do cartão; no Pix do lote o botão já leva ao próximo passo */}{inicio ? <button type="button" data-guia="configurar-depois-do-pix" onClick={abrirConfiguracao} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">{pixQuiosque ? "Escolher nicho, nome e logo" : "Escolher nicho, nomes e logo"}</button> : pix.tipo === "lote" && !pixQuiosque && !pixExtra ? <button onClick={() => { fechar(); abrirEscritorio("predio"); }} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">Montar escritório agora</button> : <button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#16A34A] px-3 py-2 text-xs font-bold text-white hover:bg-[#15803d]">Entendi</button>}</div>
   );
   if (pix.status !== "pendente") return (
     <div className="mt-3 rounded-2xl bg-[#FDE8E8] px-3 py-3 text-sm text-[#8A2A2A]"><div className="font-bold">{pix.status === "expirado" ? "Este Pix expirou." : "Pagamento não aprovado."}</div><button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#1D4ED8] px-3 py-2 text-xs font-bold text-white">Gerar outro Pix</button></div>
@@ -232,7 +235,7 @@ export function CartaoLote() {
           <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm">
             <div className="flex items-center justify-between"><span className="text-[#5B6472]">Mensalidade</span><span className="font-semibold">{brl(preco)}/mês</span></div>
             {!!fundador && fundador.restam > 0 && <div className="mt-1.5 rounded-xl bg-[#EAF7EE] px-2 py-1.5 text-xs font-semibold text-[#166534]"><Icone nome="brilho" tamanho={14} className="mr-1 inline align-[-3px]" />Preço de fundador: 1º mês por {brl(fundador.valor)} · restam {fundador.restam} de {fundador.vagas} vagas</div>}
-            <div className="mt-1 text-xs text-[#5B6472]">Você reserva por {minutos >= 60 ? `${Math.round(minutos / 60)} hora${minutos >= 120 ? "s" : ""}` : `${minutos} minutos`}, coloca o nome e a logo na placa e paga no Pix, direto aqui no mapa (QR Code, sem cadastro no Mercado Pago). Sem pagamento, o lote volta a ficar livre.</div>
+            <div className="mt-1 text-xs text-[#5B6472]">Você reserva por {minutos >= 60 ? `${Math.round(minutos / 60)} hora${minutos >= 120 ? "s" : ""}` : `${minutos} minutos`}, coloca o nome e a cor na placa e paga no Pix, direto aqui no mapa (QR Code, sem cadastro no Mercado Pago). Sem pagamento, o lote volta a ficar livre.</div>
           </div>
           {usuario?.banidoEm ? (
             <div className="mt-3 rounded-xl bg-[#FDE8E8] px-3 py-2 text-xs text-[#8A2A2A]">Sua conta está suspensa por descumprir as políticas de uso. Fale com contato@workend.online.</div>
@@ -486,6 +489,14 @@ export function PainelEmpresa() {
   const fechar = useMundo((s) => s.fecharPainel);
   const reservar = useMundo((s) => s.reservar);
   const meu = useMundo((s) => s.meu);
+  // checkout mais curto (WE-07, 21/11/2026): antes do Pix, só o nome e a cor. O nicho, o CEO, a atendente e a logomarca
+  // ficam para depois do pagamento, já com as sugestões que o servidor grava na reserva (server/terrenos.ts ›
+  // reservarTerreno). Pago o 1º mês, o painel abre como o passo de configuração (PixAberto › abrirConfiguracao); depois, em
+  // "Marca e logo", com todos os campos.
+  const pago = useMundo((s) => { const t = s.loteSelecionado ? s.terrenos[s.loteSelecionado] : null; return !!t && !!s.usuario && t.usuarioId === s.usuario.id && t.status === "ativo"; });
+  const configurar = useMundo((s) => s.configurarEmpresa);
+  const fecharPix = useMundo((s) => s.fecharPix);
+  const abrirEscritorio = useMundo((s) => s.abrirEscritorio);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const arquivo = useRef<HTMLInputElement>(null);
@@ -493,14 +504,17 @@ export function PainelEmpresa() {
   const l = LOTE_POR_CHAVE[chave];
   const qk = QUIOSQUE_POR_CHAVE[chave] ?? null; // quiosque (20/11/2026): só a atendente, sem CEO
   const editando = meu === chave;
-  const enviar = async () => { setEnviando(true); setErro(null); const e = await reservar(); setEnviando(false); if (e) setErro(e); };
+  const passo = pago && configurar; // o passo logo depois do 1º pagamento
+  // depois do passo, o lote segue para "Montar escritório" (o próximo passo de sempre); o quiosque só fecha
+  const seguir = () => { fecharPix(); if (qk) fechar(); else abrirEscritorio("predio"); };
+  const enviar = async () => { setEnviando(true); setErro(null); const e = await reservar(); setEnviando(false); if (e) setErro(e); else if (passo) seguir(); };
   return (
-    <div className={`${FLUTUANTE} ${LARGO} painel-entra overflow-y-auto p-4`}>
+    <div data-guia={passo ? "configurar-empresa" : pago ? undefined : "formulario-reserva"} className={`${FLUTUANTE} ${LARGO} painel-entra overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-[12px] font-bold text-[#1D4ED8]">{qk ? `Quiosque ${qk.numero}` : `Lote ${l?.numero}`} · {editando ? (qk ? "seu letreiro" : "sua placa") : qk ? "abrir meu quiosque" : "montar minha empresa"}</div>
-          <div className="text-lg font-bold">{editando ? "Editar a placa" : "Como vai se chamar?"}</div>
-          <div className="text-xs text-[#5B6472]">Olhe o lote no mapa: a placa e o tapume mudam enquanto você preenche.</div>
+          <div className="text-[12px] font-bold text-[#1D4ED8]">{qk ? `Quiosque ${qk.numero}` : `Lote ${l?.numero}`} · {passo ? "pagamento confirmado" : editando ? (qk ? "seu letreiro" : "sua placa") : qk ? "abrir meu quiosque" : "montar minha empresa"}</div>
+          <div className="text-lg font-bold">{passo ? "Último passo: a cara da empresa" : editando ? "Editar a placa" : "Como vai se chamar?"}</div>
+          <div className="text-xs text-[#5B6472]">{passo ? "Já deixamos sugestões, e elas já valem no mapa. Troque o que quiser agora ou depois, em Marca e logo." : "Olhe o lote no mapa: a placa e o tapume mudam enquanto você preenche."}</div>
         </div>
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5" aria-label="Fechar"><Icone nome="fechar" tamanho={16} /></button>
       </div>
@@ -517,38 +531,48 @@ export function PainelEmpresa() {
         </label>
       </div>
 
-      <label className="mt-3 block text-xs font-semibold text-[#5B6472]">Nicho (aparece no balão da loja)
-        <select value={rascunho.nicho} onChange={(e) => setRascunho({ nicho: e.target.value })} className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]">
-          {NICHOS.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}
-        </select>
-      </label>
-      <div className={`mt-3 grid gap-2 ${qk ? "grid-cols-1" : "grid-cols-2"}`}>
-        {!qk && <label className="block text-xs font-semibold text-[#5B6472]">Quem é o CEO?
-          <input value={rascunho.ceoNome} onChange={(e) => setRascunho({ ceoNome: e.target.value.slice(0, 24) })} placeholder="Ex.: Maria" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
-        </label>}
-        <label className="block text-xs font-semibold text-[#5B6472]">Nome da atendente
-          <input value={rascunho.atendenteNome} onChange={(e) => setRascunho({ atendenteNome: e.target.value.slice(0, 24) })} placeholder="Ex.: Ana" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
-        </label>
-      </div>
-      <div className="mt-1 text-[11px] text-[#5B6472]">{qk ? "O quiosque vem com a atendente, que atende quem chega no balcão; você treina ela depois." : "Todo escritório nasce com um CEO e uma atendente; depois você edita, treina e contrata mais gente em “Montar escritório”."}</div>
+      {pago ? (
+        <>
+          <label className="mt-3 block text-xs font-semibold text-[#5B6472]">Nicho (aparece no balão da loja)
+            <select value={rascunho.nicho} onChange={(e) => setRascunho({ nicho: e.target.value })} className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]">
+              {NICHOS.map((n) => <option key={n.id} value={n.id}>{n.nome}</option>)}
+            </select>
+          </label>
+          <div className={`mt-3 grid gap-2 ${qk ? "grid-cols-1" : "grid-cols-2"}`}>
+            {!qk && <label className="block text-xs font-semibold text-[#5B6472]">Quem é o CEO?
+              <input value={rascunho.ceoNome} onChange={(e) => setRascunho({ ceoNome: e.target.value.slice(0, 24) })} placeholder="Ex.: Maria" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
+            </label>}
+            <label className="block text-xs font-semibold text-[#5B6472]">Nome da atendente
+              <input value={rascunho.atendenteNome} onChange={(e) => setRascunho({ atendenteNome: e.target.value.slice(0, 24) })} placeholder="Ex.: Ana" className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm font-normal text-[#1D2128] outline-none focus:border-[#1D4ED8]" />
+            </label>
+          </div>
+          <div className="mt-1 text-[11px] text-[#5B6472]">{qk ? "O quiosque vem com a atendente, que atende quem chega no balcão; você treina ela depois." : "Todo escritório nasce com um CEO e uma atendente; depois você edita, treina e contrata mais gente em “Montar escritório”."}</div>
 
-      <div className="mt-3 text-xs font-semibold text-[#5B6472]">Logomarca (opcional)</div>
-      <div className="mt-1 flex items-center gap-3">
-        <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-black/10 bg-[#F1F3F6]">
-          {rascunho.logoDataUrl ? <img src={rascunho.logoDataUrl} alt="" className="h-full w-full object-contain" /> : <span className="text-[10px] text-[#5B6472]">sem logo</span>}
-        </div>
-        <div className="flex flex-col gap-1">
-          <button onClick={() => arquivo.current?.click()} className="rounded-xl bg-[#F1F3F6] px-3 py-1.5 text-xs font-semibold text-[#1D4ED8]">{rascunho.logoDataUrl ? "Trocar imagem" : "Enviar imagem"}</button>
-          {rascunho.logoDataUrl && <button onClick={() => setRascunho({ logoDataUrl: null })} className="text-left text-[11px] text-[#5B6472]">Remover</button>}
-          <input ref={arquivo} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { setRascunho({ logoDataUrl: await prepararLogo(f) }); } catch { setErro("Não consegui ler essa imagem."); } e.target.value = ""; }} />
-        </div>
-      </div>
+          <div className="mt-3 text-xs font-semibold text-[#5B6472]">Logomarca (opcional)</div>
+          <div className="mt-1 flex items-center gap-3">
+            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-black/10 bg-[#F1F3F6]">
+              {rascunho.logoDataUrl ? <img src={rascunho.logoDataUrl} alt="" className="h-full w-full object-contain" /> : <span className="text-[10px] text-[#5B6472]">sem logo</span>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <button onClick={() => arquivo.current?.click()} className="rounded-xl bg-[#F1F3F6] px-3 py-1.5 text-xs font-semibold text-[#1D4ED8]">{rascunho.logoDataUrl ? "Trocar imagem" : "Enviar imagem"}</button>
+              {rascunho.logoDataUrl && <button onClick={() => setRascunho({ logoDataUrl: null })} className="text-left text-[11px] text-[#5B6472]">Remover</button>}
+              <input ref={arquivo} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; try { setRascunho({ logoDataUrl: await prepararLogo(f) }); } catch { setErro("Não consegui ler essa imagem."); } e.target.value = ""; }} />
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="mt-3 text-[11px] leading-snug text-[#5B6472]">O nicho, os nomes da equipe e a logomarca ficam para depois do pagamento, já com sugestões que você troca quando quiser.</div>
+      )}
 
-      <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Reservar segura o lote por 1 hora pra você pagar o 1º mês ({fundador && fundador.restam > 0 ? <><b>{brl(fundador.valor)}</b> com o preço de fundador, depois {brl(preco)}/mês</> : brl(preco)}, Pix, direto no mapa). Ao reservar você concorda com as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros na placa.</div>
+      {pago
+        ? <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Na placa valem as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros.</div>
+        : <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-xs text-[#5B6472]">Reservar segura o lote por 1 hora pra você pagar o 1º mês ({fundador && fundador.restam > 0 ? <><b>{brl(fundador.valor)}</b> com o preço de fundador, depois {brl(preco)}/mês</> : brl(preco)}, Pix, direto no mapa). Ao reservar você concorda com as <a href="/politicas" target="_blank" className="font-semibold text-[#1D4ED8]">políticas de uso</a>: nada ofensivo, ilegal ou marca de terceiros na placa.</div>}
       {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}
-      <div className="mt-3 flex justify-end gap-2">
-        <button onClick={fechar} className="rounded-xl px-4 py-2 text-sm text-[#5B6472]">Cancelar</button>
-        <button onClick={enviar} disabled={enviando || rascunho.empresaNome.trim().length < 2} className="rounded-xl bg-[#1D4ED8] px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{enviando ? "Salvando…" : editando ? "Salvar placa" : "Reservar por 1 hora e pagar"}</button>
+      {/* no passo depois do pagamento, o botão principal ocupa a largura e "Usar as sugestões" fica embaixo */}
+      <div className={passo ? "mt-3 flex flex-col gap-1.5" : "mt-3 flex justify-end gap-2"}>
+        {!passo && <button onClick={fechar} className="rounded-xl px-4 py-2 text-sm text-[#5B6472]">Cancelar</button>}
+        <button onClick={enviar} disabled={enviando || rascunho.empresaNome.trim().length < 2} className={`rounded-xl bg-[#1D4ED8] px-5 text-sm font-bold text-white disabled:opacity-50 ${passo ? "w-full py-2.5" : "py-2"}`}>{enviando ? "Salvando…" : passo ? (qk ? "Salvar" : "Salvar e montar o escritório") : editando ? "Salvar placa" : "Reservar por 1 hora e pagar"}</button>
+        {passo && <button onClick={() => { fechar(); seguir(); }} className="w-full rounded-xl px-4 py-2 text-sm text-[#5B6472] hover:bg-black/5">Usar as sugestões</button>}
       </div>
     </div>
   );
