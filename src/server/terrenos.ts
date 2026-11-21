@@ -77,6 +77,8 @@ async function limparVencidos() {
 
 // Avisa por e-mail quem está perto de vencer, uma vez por ciclo pago. Sem e-mail ligado, não marca nada: o aviso sai quando ligar.
 // WE-17 (21/11/2026): também é chamado pela agenda dos e-mails (emailsCiclo.ts), para sair mesmo sem ninguém abrir o mapa.
+// Lote com o pagamento automático valendo (WE-09, junção v99) não recebe: o cartão renova sozinho e o lembrete de 3 dias
+// é o da assinatura (assinaturas.ts).
 // Só o lote principal avisa (a ampliação vence junto e mandava um 2º e-mail), com o rótulo da loja (quiosque, lote) e o valor
 // da renovação pela mesma cotação do mapa (quiosque R$ 47, lote com extras somados).
 export async function avisarVencimentos() {
@@ -85,6 +87,7 @@ export async function avisarVencimentos() {
   try {
     const lista = await sql<{ chave: string; empresaNome: string; pagoAte: Date; email: string; nome: string; usuarioId: string; papel: Usuario["papel"] }[]>`UPDATE terreno t SET avisado_em = now() FROM usuario u
       WHERE u.id = t.usuario_id AND t.status = 'ativo' AND t.anexo_de IS NULL AND t.avisado_em IS NULL AND t.pago_ate < now() + make_interval(days => ${DIAS_AVISO})
+        AND NOT EXISTS (SELECT 1 FROM assinatura a WHERE a.terreno_chave = t.chave AND a.estado IN ('pendente', 'ativa', 'falhando'))
       RETURNING t.chave, t.empresa_nome, t.pago_ate, u.email, u.nome, u.id AS usuario_id, u.papel`;
     const { cotacaoLote } = await import("./ofertas"); // importado na hora: ofertas.ts já importa este arquivo
     for (const d of lista) {
