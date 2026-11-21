@@ -2,6 +2,7 @@
 // 21/11/2026 (WE-06, confiança): itens 6 a 8, com quem cuida dos dados (a controladora), os direitos pela LGPD e como pedir
 // a exclusão. Dados da empresa em ../_empresa.ts: o que ainda falta (endereço, e-mail, encarregado) não aparece na tela.
 // Sem cláusula de foro, por decisão do dono (21/11/2026).
+// 21/11/2026 (WE-01): item 9, cookies e ferramentas de análise, junto com o aviso de cookies (../_cookies.tsx).
 import { Topo, Rodape } from "../_partes";
 import { EMPRESA } from "../_empresa";
 import { meta } from "../seo";
@@ -41,6 +42,14 @@ export default function Politicas() {
               mensagens (o domínio não tem e-mail). Quando EMPRESA.email for preenchido, a frase do pedido por e-mail aparece. */}
           <p><b>8. Como pedir a exclusão.</b> Você pode pedir a exclusão da sua conta e dos seus dados pessoais. Para isso, entre na sua conta e use <b>Excluir minha conta</b>, em Meu perfil. A exclusão é imediata: apaga os seus dados pessoais e encerra a sua loja, se houver; os registros de pagamento e os extratos de créditos ficam guardados sem identificar você, pelo prazo que a lei exige.{EMPRESA.email
             && <> Para esse pedido, ou para exercer qualquer dos direitos do item 7, você também pode escrever para <a href={`mailto:${EMPRESA.email}`} className="font-semibold text-[var(--blue-dark)] underline underline-offset-2">{EMPRESA.email}</a> a partir do e-mail da sua conta.</>}</p>
+          <div id="cookies" className="scroll-mt-6">
+            <p><b>9. Cookies e ferramentas de análise.</b> Para o site funcionar, usamos cookies essenciais: o que mantém você na sua conta, o que guarda por 30 dias o código de quem indicou o WorkEnd para você e o que guarda a sua escolha sobre cookies. Eles não dependem do seu consentimento. Com o seu consentimento, podemos usar também:</p>
+            <ul className="mt-3 list-disc space-y-1.5 pl-6">
+              <li><b>Google Analytics e Google Tag Manager</b> (Google), para análise: contam as visitas e mostram quais páginas e botões são usados, para melhorarmos o site;</li>
+              <li><b>Meta Pixel</b> (Meta), para anúncios: mede se os anúncios no Facebook e no Instagram trazem visitas, cadastros e pagamentos.</li>
+            </ul>
+            <p className="mt-3">Essas ferramentas só são carregadas depois que você aceita, no aviso de cookies. Você pode aceitar tudo, recusar tudo ou escolher por tipo (análise e anúncios). Se recusar, nenhuma delas é carregada e o site funciona do mesmo jeito. A sua escolha fica guardada por 6 meses e pode ser mudada a qualquer momento pelo link <b>Cookies</b>, no rodapé do site. Os dados que essas ferramentas coletam também são tratados pelas empresas que as oferecem, conforme a política de privacidade de cada uma, e podem ser guardados fora do Brasil.</p>
+          </div>
           <p className="text-[var(--tinta-2)]">Versão de 21/11/2026. Mudanças serão avisadas no painel.</p>
         </div>
       </section>

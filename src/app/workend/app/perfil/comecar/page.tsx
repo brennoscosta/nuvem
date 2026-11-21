@@ -7,6 +7,7 @@ import { meuPerfil, sugestaoInicial } from "@/server/perfis";
 import { ETAPAS, PERFIL_VAZIO, ehEtapa, ordemEtapas, type EtapaId } from "@/office/data/cadastro";
 import { Etapas, type Rascunho } from "../_form";
 import { meta } from "../../../seo";
+import { MedirUmaVez } from "../../../_cookies";
 import "../../../perfil/perfil.css";
 
 export const metadata = meta({ titulo: "Seu perfil — WorkEnd", caminho: "/app/perfil/comecar", indexar: false });
@@ -24,6 +25,8 @@ export default async function Comecar({ searchParams }: { searchParams: Promise<
   const falta = ordem.find((e) => !inicial.etapas.includes(e));
   if (!falta && !ehEtapa(sp.etapa)) redirect("/app/perfil");
   const comecarEm: EtapaId = ehEtapa(sp.etapa) ? sp.etapa : (falta ?? ETAPAS[0].id);
-  return <Etapas inicial={inicial} comecarEm={comecarEm} depois={destinoSeguro(sp.depois)} nomeConta={u.empresaNome || u.nome} emailConta={u.email} />;
+  // WE-01 (21/11/2026): cadastro_concluido sai aqui, o destino de toda conta nova (pelo e-mail e pelo Google)
+  return <>{contaNova(u.criadoEm) && <MedirUmaVez evento="cadastro_concluido" chave={`cadastro:${u.id}`} />}<Etapas inicial={inicial} comecarEm={comecarEm} depois={destinoSeguro(sp.depois)} nomeConta={u.empresaNome || u.nome} emailConta={u.email} /></>;
 }
+const contaNova = (criadoEm: Date) => Date.now() - new Date(criadoEm).getTime() < 30 * 60_000;
 async function perfilVazio(u: NonNullable<Awaited<ReturnType<typeof usuarioAtual>>>) { return sugestaoInicial(u).catch(() => ({})); }

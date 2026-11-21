@@ -1,0 +1,43 @@
+/* Aviso de cookies (WE-01, 21/11/2026). Cores do site (workend.css) repetidas aqui porque o mapa (/mundo) fica fora do
+   escopo .we. Um cartão discreto no canto, com os dois botões iguais; no celular ocupa a largura, preso embaixo. */
+.ck {
+  --ck-ink: #1D2128; --ck-muted: #5A6472; --ck-surface: #F2F5F8; --ck-line: #C3CCD7; --ck-blue: #0A6CFF; --ck-blue-dark: #0453CC;
+  position: fixed; z-index: 70; left: 16px; bottom: 16px; width: min(392px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto;
+  box-sizing: border-box; padding: 14px 16px 8px; border: 1px solid var(--ck-line); border-radius: 14px; background: var(--ck-surface); color: var(--ck-ink);
+  box-shadow: 0 24px 60px -28px rgba(16, 24, 40, .5), 0 2px 6px rgba(16, 24, 40, .08);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased;
+  text-align: left; outline: none;
+}
+.ck *, .ck *::before, .ck *::after { box-sizing: border-box; }
+.ck p { margin: 0; }
+.ck-titulo { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px !important; }
+.ck-texto { color: var(--ck-muted); }
+.ck a { color: var(--ck-blue-dark); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.ck-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.ck-acoes-1 { grid-template-columns: 1fr; }
+.ck-btn { min-height: 44px; padding: 0 12px; border: 1px solid var(--ck-ink); border-radius: 8px; background: var(--ck-ink); color: #fff; font: inherit; font-weight: 600; cursor: pointer; transition: background .15s ease; }
+.ck-btn:hover { background: #343A44; }
+.ck-btn:focus-visible, .ck-link:focus-visible, .ck-opcao input:focus-visible { outline: 3px solid var(--ck-blue); outline-offset: 2px; }
+.ck-link { display: block; width: 100%; min-height: 40px; margin-top: 2px; padding: 0; border: 0; background: none; color: var(--ck-blue-dark); font: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.ck-opcoes { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; border: 0; min-width: 0; }
+.ck-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ck-opcao { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--ck-line); border-radius: 10px; background: #fff; cursor: pointer; }
+.ck-opcao input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--ck-blue); cursor: pointer; }
+.ck-opcao input:disabled { cursor: default; }
+.ck-opcao b { display: block; font-size: 15px; }
+.ck-opcao small { display: block; margin-top: 1px; color: var(--ck-muted); font-size: 13px; line-height: 1.4; }
+@media (max-width: 520px) {
+  .ck { left: 12px; right: 12px; width: auto; bottom: calc(12px + env(safe-area-inset-bottom)); }
+}
+/* mapa: o mesmo cartão, longe da barra de baixo e dos botões do alto (o "Ver o guia" do tutorial, quem está na cidade,
+   o mapa e as pílulas de Natal). No computador fica no meio da tela; no celular, logo abaixo do botão do guia, e nunca
+   desce até a barra de baixo (rola por dentro). O tutorial fica por cima (z-index maior) e, enquanto ele está aberto, o
+   aviso espera (_cookies.tsx). Camada 15: acima da barra de baixo (10) e abaixo dos cartões e avisos do mapa (20), que
+   ficam por cima dele (o cartão do lote, o "Usar o mapa simples"). Medido em testes/we-medicao/mede-mapa.mjs. */
+.ck-mapa { z-index: 15; top: 50%; bottom: auto; left: 50%; transform: translate(-50%, -50%); max-height: calc(100dvh - 220px); }
+@media (max-width: 520px) {
+  .ck-mapa { left: 12px; right: 12px; transform: none; top: calc(186px + env(safe-area-inset-top)); bottom: auto; max-height: calc(100dvh - 186px - 150px - env(safe-area-inset-top)); }
+}
+/* link "Cookies" do rodapé, igual aos outros links de lá */
+.we .ck-rodape { display: block; padding: .5rem 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.we .ck-rodape:hover { color: var(--tinta); }

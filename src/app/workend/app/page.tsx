@@ -15,6 +15,7 @@ import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
 import { CabecalhoApp } from "../_cabecalho";
 import { Contador, ContagemReserva, CopiarLink, Catalogo } from "./_painel";
 import { Icone } from "@/office/ui/Icone";
+import { MedirUmaVez } from "../_cookies";
 import { LembretePerfil } from "../_lembrete-perfil"; // o que falta no perfil do cadastro (20/11/2026)
 import { meta } from "../seo";
 import "./painel.css";
@@ -208,6 +209,8 @@ function LojaAberta({ chao, p, empresa, linkLote, vendas }: { chao: Terreno; p: 
         <div className="pn-cartao">
           <div className="flex items-center gap-4">
             <Anel feitos={feitos} total={p.passos.length} />
+            {/* WE-01: checklist_completo na 1ª vez que o dono vê os 6 itens prontos */}
+            {p.passos.length > 0 && feitos === p.passos.length && <MedirUmaVez evento="checklist_completo" chave={`checklist:${chao.chave}`} />}
             <div>
               <h3>{feitos === p.passos.length ? "Sua loja está completa" : "Deixe a loja completa"}</h3>
               <p className="pn-mudo">{feitos === p.passos.length ? "Tudo montado. Agora é divulgar." : `${feitos} de ${p.passos.length} prontos. Lojas completas recebem mais conversas.`}</p>

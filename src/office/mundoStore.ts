@@ -41,7 +41,8 @@ import { LOTE_POR_CHAVE } from "./data/mundo";
 import { OUTDOOR_POR_ID, type OutdoorPublico } from "./data/outdoors";
 import { PRACA_CHAVE } from "./data/praca";
 import { useCreditos, novoIdem } from "./creditosStore";
-import { QUIOSQUE_POR_CHAVE, balcaoDoQuiosque } from "./data/quiosques";
+import { QUIOSQUE_POR_CHAVE, balcaoDoQuiosque, ehQuiosque } from "./data/quiosques";
+import { medir, medirUmaVez } from "@/lib/medir";
 import { aplicarPosesCidade } from "./data/posesCidade";
 // trava de seleção do modo "Editar posição" (edicaoStore liga e desliga)
 let selecaoTravada = false;
@@ -117,13 +118,18 @@ interface Estado {
   limparAlvo: () => void;
 }
 
+// eventos de medição (WE-01, 21/11/2026, src/lib/medir.ts): o tipo do que foi pago, separando quiosque e lote extra
+const tipoMedido = (p: Pix, t?: Terreno) => (p.tipo !== "lote" ? p.tipo : ehQuiosque(p.lote) ? "quiosque" : t?.anexoDe ? "lote_extra" : "lote");
+const pixGerado = (p: Pix, t?: Terreno) => { if (p.status === "pendente" && p.valor > 0) medirUmaVez(`pix_gerado:${p.id}`, "pix_gerado", { tipo: tipoMedido(p, t), value: p.valor, currency: "BRL" }); };
+
 export const useMundo = create<Estado>((set, get) => ({
   vagas: {}, praca: null,
   carregarPraca: async () => { const j = await fetch("/api/workend/praca", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null); if (j?.agenda) set({ praca: j as Praca }); },
-  abrirPix: (p) => set({ pix: p }),
+  abrirPix: (p) => { set({ pix: p }); pixGerado(p, get().terrenos[p.lote]); },
   abrirCobranca: async (j, lote, tipo, extra) => {
     const p: Pix = { id: j.id, lote, valor: j.valor, codigo: j.codigo, qrBase64: j.qrBase64, expiraEm: j.expiraEm, status: j.status === "aprovado" ? "aprovado" : "pendente", tipo, creditos: j.creditos ?? 0, ...(extra?.modelo ? { modelo: extra.modelo } : {}), ...(extra?.inicio ? { inicio: true } : {}) };
     set({ pix: p });
+    pixGerado(p, get().terrenos[lote]); // o QR Code aparece no cartão
     void useCreditos.getState().carregar();
     if (p.status === "aprovado") await get().aposAprovado(p);
   },
@@ -131,6 +137,9 @@ export const useMundo = create<Estado>((set, get) => ({
   aposAprovado: async (pix) => {
     const antes = new Set((get().terrenos[pix.lote]?.escritorio?.equipe ?? []).map((m) => m.id));
     await get().carregar();
+    // 1º pagamento do lote ou do quiosque: a loja aparece no mapa (o lote extra só aumenta o prédio que já existe)
+    const tl = get().terrenos[pix.lote];
+    if (pix.tipo === "lote" && pix.inicio && tl?.status === "ativo" && !tl.anexoDe) medirUmaVez(`loja:${pix.lote}:${pix.id}`, "loja_publicada", { tipo: tipoMedido(pix, tl) });
     void useCreditos.getState().carregar();
     if (pix.tipo === "outdoor") await get().carregarOutdoors();
     if (pix.tipo === "barraca") await get().carregarPraca();
@@ -221,6 +230,7 @@ export const useMundo = create<Estado>((set, get) => ({
   abrirPainel: () => {
     const { loteSelecionado, terrenos, usuario } = get(); if (!loteSelecionado || loteSelecionado === PRACA_CHAVE) return; // a praça não está à venda
     const t = terrenos[loteSelecionado];
+    if (!t) medir("abrir_reserva", { tipo: ehQuiosque(loteSelecionado) ? "quiosque" : "lote" }); // lote livre: o formulário de reserva
     const ceo = t?.escritorio?.equipe.find((m) => m.papel === "ceo")?.nome ?? "";
     const atendente = t?.escritorio?.equipe.find((m) => m.papel === "atendente")?.nome ?? "";
     set({ painelEmpresa: true, configurarEmpresa: false, rascunho: { empresaNome: t?.empresaNome ?? usuario?.empresaNome ?? "", cor: t?.cor ?? CORES_EMPRESA[0], logoDataUrl: t?.temLogo ? `/api/terrenos/${encodeURIComponent(loteSelecionado)}/logo?v=${Date.now()}` : null, ceoNome: ceo, atendenteNome: atendente, nicho: t?.nicho ?? "negocios" } });
@@ -242,6 +252,7 @@ export const useMundo = create<Estado>((set, get) => ({
     const r = await fetch(`/api/terrenos/${encodeURIComponent(loteSelecionado)}/reservar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return j.erro ?? `Erro ${r.status}`;
+    if (!meuJa) medir("reserva_confirmada", { tipo: ehQuiosque(loteSelecionado) ? "quiosque" : "lote" });
     set({ painelEmpresa: false, rascunho: null });
     await get().carregar();
     return null;
@@ -275,7 +286,8 @@ export const useMundo = create<Estado>((set, get) => ({
     const status = r.ok ? (j.status as string) : "erro";
     const { pix } = get();
     if (pix && pix.id === ref) {
-      if (status === "aprovado") { set({ pix: { ...pix, status: "aprovado" } }); await get().aposAprovado(pix); }
+      // pix_pago quando a pessoa vê a confirmação no cartão (relógio de 4 s ou "Já paguei"); uma vez por cobrança
+      if (status === "aprovado") { set({ pix: { ...pix, status: "aprovado" } }); if (pix.valor > 0) medirUmaVez(`pix_pago:${pix.id}`, "pix_pago", { tipo: tipoMedido(pix, get().terrenos[pix.lote]), value: pix.valor, currency: "BRL" }); await get().aposAprovado(pix); }
       else if (status === "rejeitado" || status === "cancelado" || status === "estornado") set({ pix: { ...pix, status: "rejeitado" } });
       else if (new Date(pix.expiraEm).getTime() < Date.now()) set({ pix: { ...pix, status: "expirado" } });
     } else await get().carregar();

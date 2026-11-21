@@ -4,6 +4,7 @@ import { meta, jsonLdLanding } from "./seo";
 import { SCRIPT_NATAL } from "@/office/data/natal";
 import { ClasseNatal } from "./_natal";
 import { AvisoContaExcluida } from "./_aviso-conta";
+import { Medicao } from "./_medicao";
 
 export const metadata: Metadata = meta({ caminho: "/" });
 export const viewport: Viewport = { themeColor: "#DFE5EC", width: "device-width", initialScale: 1, colorScheme: "light" };
@@ -23,6 +24,8 @@ export default function WorkendLayout({ children }: { children: React.ReactNode 
       {children}
       {/* depois de excluir a conta (/?conta=excluida): o aviso de que ela foi excluída */}
       <AvisoContaExcluida />
+      {/* aviso de cookies e medição (WE-01): nada de fora carrega antes do aceite */}
+      <Medicao />
     </div>
   );
 }

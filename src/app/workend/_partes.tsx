@@ -5,6 +5,7 @@ import { Logotipo, MarcaTopo } from "./_marca";
 import { EMPRESA, identificacao } from "./_empresa";
 import { AREAS, AREAS_OPERACIONAIS, FUNCOES, type AreaId } from "@/office/data/org";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
+import { BotaoCookies } from "./_cookies";
 
 // demonstração dentro do próprio WorkEnd (17/11/2026): a sede da Social RP, com a equipe trabalhando por dentro
 export const DEMO = "/mundo?sede=1";
@@ -22,7 +23,7 @@ export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
         ) : (
           <>
             <Link href="/entrar" className="px-2 py-2 font-medium hover:text-[var(--tinta-2)]">Entrar</Link>
-            <Link href="/cadastro" className="btn btn-azul">Criar conta grátis</Link>
+            <Link href="/cadastro" className="btn btn-azul" data-medir="clicar_cta_principal" data-medir-local="topo-paginas">Criar conta grátis</Link>
           </>
         )}
       </nav>
@@ -44,6 +45,8 @@ export async function Rodape() {
           <Link prefetch={false} href="/mundo">Passear pelo mapa</Link>
           <Link prefetch={false} href={DEMO}>Conhecer uma empresa por dentro</Link>
           <Link href="/politicas">Políticas de uso</Link>
+          {/* mudar a escolha de cookies a qualquer momento (WE-01, LGPD) */}
+          <BotaoCookies className="ck-rodape" />
         </nav>
         <div className="flex flex-col gap-[11px]">
           {/* e-mail só quando existir (./_empresa.ts): o contato@workend.online ainda não recebe mensagens (WE-06, 21/11/2026) */}

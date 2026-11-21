@@ -8,6 +8,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, inte
 import { Escritorio } from "@/office/Escritorio";
 import { ehHostWorkend } from "@/server/hosts";
 import { meta } from "./workend/seo";
+import { Medicao } from "./workend/_medicao";
 
 // No domínio do WorkEnd esta página é o mapa da cidade (/mundo, reescrito pelo proxy): título, descrição e imagem de
 // compartilhamento do WorkEnd (17/11/2026, revisão geral: o link do mapa aparecia como "Escritório Nuvem" no WhatsApp).
@@ -27,5 +28,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const [h, q] = await Promise.all([headers(), searchParams]);
   const um = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
   const mundo = h.get("x-site") === "workend" || q.mundo !== undefined;
-  return <>{h.get("x-site") === "workend" && <h1 className="sr-only">Mapa da cidade do WorkEnd</h1>}<Escritorio inicio={{ mundo, sede: mundo ? um(q.sede) : null, lote: mundo ? um(q.lote) : null }} /></>;
+  // WE-01 (21/11/2026): aviso de cookies e medição só no mapa do WorkEnd; o escritório da Nuvem não mede nada
+  return <>{h.get("x-site") === "workend" && <h1 className="sr-only">Mapa da cidade do WorkEnd</h1>}<Escritorio inicio={{ mundo, sede: mundo ? um(q.sede) : null, lote: mundo ? um(q.lote) : null }} />{h.get("x-site") === "workend" && <Medicao lugar="mapa" />}</>;
 }

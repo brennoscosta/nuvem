@@ -70,7 +70,7 @@ function Cabecalho({ logado }: { logado: boolean }) {
         <Link href="/" aria-label="WorkEnd, início" className="wi-logo"><MarcaTopo altura={24} /></Link>
         <nav className="wi-nav" aria-label="Seções da página">{links.map(([h, t]) => <a key={h} href={h}>{t}</a>)}</nav>
         <div className="wi-topo-acoes">
-          {logado ? <Link href="/app" className="wi-btn wi-btn-tinta wi-btn-p">Meu escritório</Link> : <><Link href="/entrar" className="wi-entrar">Entrar</Link><Link href="/cadastro" className="wi-btn wi-btn-tinta wi-btn-p">Criar conta<span className="wi-so-largo"> grátis</span></Link></>}
+          {logado ? <Link href="/app" className="wi-btn wi-btn-tinta wi-btn-p">Meu escritório</Link> : <><Link href="/entrar" className="wi-entrar">Entrar</Link><Link href="/cadastro" className="wi-btn wi-btn-tinta wi-btn-p" data-medir="clicar_cta_principal" data-medir-local="topo">Criar conta<span className="wi-so-largo"> grátis</span></Link></>}
           <details className="wi-menu">
             <summary aria-label="Abrir o menu"><span /><span /></summary>
             <div>{links.map(([h, t]) => <a key={h} href={h}>{t}</a>)}{!logado && <Link href="/entrar">Entrar</Link>}</div>
@@ -128,7 +128,7 @@ export default async function Inicio() {
             <div className="wh-base">
               <p className="wh-lead">Escolha um lote numa cidade 3D, ponha a sua marca na fachada e monte uma sala para cada setor. Quem passeia pelo WorkEnd passa na sua porta.</p>
               <div className="wh-acoes">
-                <Link href={cta.href} className="wi-btn wi-btn-tinta">{cta.texto}<span aria-hidden>→</span></Link>
+                <Link href={cta.href} className="wi-btn wi-btn-tinta" data-medir="clicar_cta_principal" data-medir-local="abertura">{cta.texto}<span aria-hidden>→</span></Link>
                 <Link prefetch={false} href="/mundo" className="wi-seta">Passear pelo mapa<span aria-hidden>↗</span></Link>
               </div>
             </div>
@@ -213,7 +213,7 @@ export default async function Inicio() {
             </a>
           </section>
         )}
-        <section id="preco" className="ws">
+        <section id="preco" className="ws" data-medir-ver="ver_preco">
           <Revelar className="faixa ws-cab"><h2>Preço simples, <em>sem letra miúda.</em></h2><p>Criar a conta é grátis. Você só paga pelo que usar.</p></Revelar>
           <div className="faixa">
             <div className="wi-planos">
@@ -229,7 +229,7 @@ export default async function Inicio() {
                   <li>Pagamento por Pix, direto no mapa</li>
                   <li>Desistiu em até 7 dias? O valor volta para você</li>
                 </ul>
-                <Link href={cta.href} className="wi-btn wi-btn-azul">{u ? "Abrir meu escritório" : "Reservar meu lote"}<span aria-hidden>→</span></Link>
+                <Link href={cta.href} className="wi-btn wi-btn-azul" data-medir="clicar_cta_principal" data-medir-local="preco">{u ? "Abrir meu escritório" : "Reservar meu lote"}<span aria-hidden>→</span></Link>
               </Revelar>
               <Revelar className="wi-plano">
                 <h3>Personagem</h3>
@@ -240,7 +240,7 @@ export default async function Inicio() {
                   <li>Propostas de negócio com avaliação dos dois lados</li>
                   <li>Chamadas de áudio e vídeo</li>
                 </ul>
-                <Link href={u ? "/app/rede" : "/cadastro"} className="wi-btn wi-btn-linha">{u ? "Criar meu personagem grátis" : "Criar conta grátis"}</Link>
+                <Link href={u ? "/app/rede" : "/cadastro"} className="wi-btn wi-btn-linha" data-medir={u ? undefined : "clicar_cta_principal"} data-medir-local={u ? undefined : "preco-personagem"}>{u ? "Criar meu personagem grátis" : "Criar conta grátis"}</Link>
               </Revelar>
             </div>
             <Revelar className="wi-perguntas">
@@ -250,7 +250,7 @@ export default async function Inicio() {
             <Revelar className="wfim-texto">
               <h2>O seu endereço <em>está esperando.</em></h2>
               <p>{livres.length > 0 ? <>Ainda há <b>{livres.length} lotes livres</b> no mapa.</> : <>Todos os lotes estão ocupados agora. Crie a conta para saber quando abrir um novo.</>}</p>
-              <div className="wh-acoes"><Link href={cta.href} className="wi-btn wi-btn-tinta">{cta.texto}<span aria-hidden>→</span></Link><Link prefetch={false} href="/mundo" className="wi-seta">Passear pelo mapa<span aria-hidden>↗</span></Link></div>
+              <div className="wh-acoes"><Link href={cta.href} className="wi-btn wi-btn-tinta" data-medir="clicar_cta_principal" data-medir-local="fim">{cta.texto}<span aria-hidden>→</span></Link><Link prefetch={false} href="/mundo" className="wi-seta">Passear pelo mapa<span aria-hidden>↗</span></Link></div>
               <PessoasNaCidade inicial={online?.total ?? null} />
             </Revelar>
           </div>
