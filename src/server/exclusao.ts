@@ -12,6 +12,9 @@
 //  - ANONIMIZA o que é de outras pessoas e cita a conta: horários e pedidos feitos como cliente em outras lojas (os que
 //    ainda estavam abertos são cancelados), carimbos que outras pessoas ganharam na loja, visitas e cliques contados nas
 //    outras lojas, mensagens à equipe de uma loja em que era sócia e os agentes que comprou para ela.
+//  - PAGAMENTO AUTOMÁTICO (0054, junção v98): a assinatura no cartão é cancelada no Mercado Pago antes de apagar a conta
+//    (se o Mercado Pago falhar, nada é excluído); a assinatura e o pedido de devolução ficam com o código anônimo, e do
+//    bruto do Mercado Pago saem o pagador, o cartão e a descrição. As cobranças já estão em pagamento (acima).
 //  - REGISTRA a exclusão em conta_excluida (0053), sem dado pessoal: hash do id antigo, data, motivo e contagens.
 // Não excluem por aqui: contas de administrador e as contas das sedes (titulares ou sócias de uma sede). Pix gerado e
 // ainda não pago também segura a exclusão até vencer (senão o pagamento chegaria depois, sem conta).
@@ -23,6 +26,7 @@ import { sql, id, migrar } from "./db";
 import { autenticar, type Usuario } from "./usuarios";
 import { ehAdmin } from "./terrenos";
 import { saldoDe, lancar, fmtCreditos } from "./creditos";
+import { cancelarAssinaturasDaConta } from "./assinaturas";
 import { registrar } from "./eventos";
 import { SEDE_POR_CHAVE } from "@/office/data/sedes";
 import { numeroDaLoja, rotuloLoja } from "@/office/data/numeroLoja";
@@ -137,6 +141,11 @@ export async function excluirConta(u: Usuario, conf: { senha?: unknown; palavra?
     if (String(conf.palavra ?? "").trim() !== PALAVRA_EXCLUIR) throw new ErroExclusao(`Para confirmar, digite ${PALAVRA_EXCLUIR} em letras maiúsculas.`, 403);
   } else if (!(await autenticar(u.email, String(conf.senha ?? "")))) throw new ErroExclusao("A senha não confere.", 403);
 
+  // pagamento automático no cartão (WE-09): cancelado no Mercado Pago antes de apagar a conta, sem esperar o ciclo
+  let assinaturasCanceladas = 0;
+  try { assinaturasCanceladas = await cancelarAssinaturasDaConta(u.id); }
+  catch { throw new ErroExclusao("Não conseguimos cancelar agora o pagamento automático no Mercado Pago. Nada foi excluído. Tente de novo em alguns minutos.", 503); }
+
   const uid = u.id, hash = hashTitular(uid), anon = codigoAnonimo(hash);
   const arquivos: string[] = [];
   const resumo = await sql.begin(async (tx) => {
@@ -210,6 +219,18 @@ export async function excluirConta(u: Usuario, conf: { senha?: unknown; palavra?
     await db`UPDATE atividade SET usuario_id = NULL, titulo = replace(titulo, ${uid}, ${anon}), dados = replace(dados::text, ${uid}, ${anon})::jsonb
       WHERE tipo = 'pagamento' AND (usuario_id = ${uid} OR position(${uid} in COALESCE(dados::text, '')) > 0)`;
 
+    // pagamento automático (0054): a assinatura e o pedido de devolução ficam, sem identificar; do bruto do Mercado Pago
+    // (preapproval) ficam só os campos sem dado pessoal (saem o pagador, o cartão e a descrição)
+    const assinaturas = await db`UPDATE assinatura SET usuario_id = ${anon}, terreno_chave = replace(terreno_chave, ${uid}, ${anon}), idem = NULL, atualizado_em = now(),
+      bruto = CASE WHEN bruto IS NULL THEN NULL ELSE jsonb_strip_nulls(jsonb_build_object(
+        'id', bruto->'id', 'status', bruto->'status', 'external_reference', bruto->'external_reference',
+        'date_created', bruto->'date_created', 'last_modified', bruto->'last_modified', 'next_payment_date', bruto->'next_payment_date',
+        'payment_method_id', bruto->'payment_method_id', 'transaction_amount', bruto->'auto_recurring'->'transaction_amount',
+        'currency_id', bruto->'auto_recurring'->'currency_id', 'frequency', bruto->'auto_recurring'->'frequency', 'frequency_type', bruto->'auto_recurring'->'frequency_type',
+        'anonimizado', true)) END
+      WHERE usuario_id = ${uid}`;
+    await db`UPDATE devolucao_pedido SET usuario_id = ${anon} WHERE usuario_id = ${uid}`;
+
     // ===== 2) o que é de outras pessoas e cita esta conta: fica, sem identificar =====
     await db`UPDATE terreno SET socios = array_remove(socios, ${uid}), atualizado_em = now() WHERE ${uid} = ANY(socios)`; // sócia: só sai da sociedade
     await db`UPDATE agente_contratado SET usuario_id = ${anon} WHERE usuario_id = ${uid} AND NOT (terreno_chave = ANY(${L}::text[]))`; // agente comprado para a loja de outra pessoa continua nela
@@ -249,7 +270,7 @@ export async function excluirConta(u: Usuario, conf: { senha?: unknown; palavra?
     if (!fim) throw new ErroExclusao("Esta conta não existe mais.", 404);
 
     // ===== 4) o registro, sem dado pessoal =====
-    const r = { lotes: terrenos.count, empresas: empresas.length, pagamentos: pagamentos.count, extratoCreditos: creditos.count, extratoUnidades: unidades.count, avisos: avisos.count };
+    const r = { lotes: terrenos.count, empresas: empresas.length, pagamentos: pagamentos.count, assinaturas: assinaturas.count, assinaturasCanceladas, extratoCreditos: creditos.count, extratoUnidades: unidades.count, avisos: avisos.count };
     await db`INSERT INTO conta_excluida (titular_hash, motivo, resumo) VALUES (${hash}, ${MOTIVO}, ${sql.json(r)}) ON CONFLICT (titular_hash) DO NOTHING`;
     return r;
   });

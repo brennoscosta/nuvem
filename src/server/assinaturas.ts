@@ -229,6 +229,24 @@ export async function cancelar(u: Usuario, chave: string): Promise<ResumoAssinat
   return { ...(await resumo((await porId(a.id))!)), devolucao };
 }
 
+// Excluir minha conta (src/server/exclusao.ts, junção v98): cancela na hora, no Mercado Pago, as assinaturas da conta que
+// ainda valem, pelo mesmo cancelarNoMP do painel, sem esperar o ciclo de 30 min. Sem aviso nem pedido de devolução: a conta
+// está sendo apagada (a tela da exclusão já diz que os dias pagos se perdem). Se o Mercado Pago falhar, o erro sobe e a
+// exclusão não acontece: senão o cartão continuaria sendo cobrado de uma conta que não existe mais.
+export async function cancelarAssinaturasDaConta(uid: string): Promise<number> {
+  await migrar();
+  const vivas = await sql<Assinatura[]>`SELECT * FROM assinatura WHERE usuario_id = ${uid} AND estado IN ('pendente', 'ativa', 'falhando')`;
+  for (const a of vivas) {
+    if (a.externoId) await cancelarNoMP(a.externoId);
+    await sql.begin(async (tx) => {
+      const db = tx as unknown as typeof sql;
+      await db`UPDATE assinatura SET estado = 'cancelada', cancelada_em = now(), motivo_fim = 'conta excluída a pedido do titular', atualizado_em = now() WHERE id = ${a.id}`;
+      if (a.primeiroPagamento) await db`UPDATE pagamento SET status = 'cancelado' WHERE id = ${a.primeiroPagamento} AND status = 'pendente'`;
+    });
+  }
+  return vivas.length;
+}
+
 // Trocar o cartão (também é o "atualizar o cartão" do aviso de falha): o Mercado Pago usa o novo nas próximas tentativas
 export async function trocarCartao(u: Usuario, chave: string, tok: unknown) {
   await migrar();
