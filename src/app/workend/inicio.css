@@ -164,7 +164,10 @@
 /* ---------- passos: cartões que se empilham ---------- */
 .wi .wp-pilha { display: flex; flex-direction: column; gap: 1.4rem; padding-bottom: 2rem; }
 .wi .wp-cartao { position: sticky; top: calc(80px + var(--i) * 20px); display: flex; flex-direction: column; border-radius: 32px; overflow: hidden; background: var(--papel-3); border: 1px solid var(--linha); box-shadow: 0 -18px 50px -38px rgba(18,20,25,.45); transform-origin: 50% 0; scale: calc(1 - .05 * clamp(0, var(--p, 0) * 3 - var(--i) - .6, 1)); }
-.wi .wp-cartao.wi-revela { transition: opacity .9s var(--suave), transform .9s var(--suave); }
+/* WE-04 (21/11/2026, brief): os cartões da pilha ficam sempre 100% opacos. Com a entrada em opacidade (0 → 1 em 0,9 s),
+   o cartão que chegava à pilha ainda estava translúcido por cima do que já estava parado, e os textos dos dois se liam ao
+   mesmo tempo (na rolagem rápida, no tablet e no celular com as barras do navegador). Fica só o deslize da entrada. */
+.wi .wp-cartao.wi-revela { opacity: 1; transition: transform .9s var(--suave); }
 .wi .wp-texto { display: flex; flex-direction: column; gap: .7rem; padding: 1.5rem 1.6rem 1.8rem; }
 .wi .wp-num { font-family: var(--sans); font-weight: 200; font-size: clamp(3.4rem, 7.5vw, 6.4rem); line-height: .8; letter-spacing: -.06em; color: var(--azul); font-variant-numeric: tabular-nums; }
 .wi .wp-texto h3 { font-family: var(--sans); font-weight: 680; font-size: clamp(1.6rem, 2.8vw, 2.3rem); line-height: 1.05; letter-spacing: -.04em; }
