@@ -41,6 +41,10 @@ import { OUTDOOR_POR_ID, type OutdoorPublico } from "./data/outdoors";
 import { PRACA_CHAVE } from "./data/praca";
 import { useCreditos, novoIdem } from "./creditosStore";
 import { QUIOSQUE_POR_CHAVE, balcaoDoQuiosque } from "./data/quiosques";
+import { aplicarPosesCidade } from "./data/posesCidade";
+// trava de seleção do modo "Editar posição" (edicaoStore liga e desliga)
+let selecaoTravada = false;
+export const travarSelecao = (sim: boolean) => { selecaoTravada = sim; };
 
 // Estamos no mapa do WorkEnd (workend.online/mundo)? Aí o login é o do WorkEnd, não o do admin da Nuvem.
 export const modoMundo = () => typeof window !== "undefined" && (window.location.pathname.startsWith("/mundo") || new URLSearchParams(window.location.search).has("mundo"));
@@ -76,6 +80,8 @@ interface Estado {
   // de que lado a câmera olha o alvo (ângulo em volta do eixo vertical, 0 = do sul): só as sedes pedem (19/11/2026, as
   // viradas para o norte são vistas de frente, pela rua delas); null = mantém o ângulo de agora (scene/Cena3D.tsx)
   giroCamera: number | null;
+  // sobe quando a conta admin gira uma sede (data/sedes.ts › aplicarPosesSedes): quem desenha a sede é montado de novo
+  versaoSedes: number;
   vagas: Record<string, number>; // vagas abertas por lote (placa "Estamos contratando")
   praca: Praca | null; carregarPraca: () => Promise<void>;
   abrirPix: (p: Pix) => void; // Pix de barraca e de roupa do personagem (criados fora do cartão do lote)
@@ -157,7 +163,7 @@ export const useMundo = create<Estado>((set, get) => ({
       void get().carregarOutdoors(); return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },
-  terrenos: {}, meu: null, meus: [], usuario: null, admin: false, pagamentoLigado: false, preco: 99, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null, giroCamera: null,
+  terrenos: {}, meu: null, meus: [], usuario: null, admin: false, pagamentoLigado: false, preco: 99, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, rascunho: null, alvoCamera: null, giroCamera: null, versaoSedes: 0,
 
   carregar: async () => {
     void get().carregarOutdoors();
@@ -171,6 +177,9 @@ export const useMundo = create<Estado>((set, get) => ({
       ]);
       const terrenos: Record<string, Terreno> = {};
       for (const x of (t.terrenos ?? []) as Terreno[]) terrenos[x.chave] = x;
+      // quiosques e sedes vão para a posição gravada (data/posesCidade.ts, 21/11/2026)
+      const poses = aplicarPosesCidade(terrenos);
+      if (poses.sedes) set({ versaoSedes: get().versaoSedes + 1 });
       set({ terrenos, vagas: t.vagas ?? {}, meu: t.meu ?? null, meus: Array.isArray(t.meus) ? t.meus : t.meu ? [t.meu] : [], usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? 99, fundador: t.fundador ?? null, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
       // veio do cadastro com ?lote=: já abre o lote escolhido
       const busca = primeira && typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
@@ -182,6 +191,8 @@ export const useMundo = create<Estado>((set, get) => ({
   },
 
   selecionarLote: (chave) => {
+    // no modo "Editar posição" o clique no prédio não abre cartão (office/edicaoStore.ts)
+    if (chave && selecaoTravada) return;
     // a sede do OneState não é um lote da lista: abre o cartão dela (src/office/ui/CartaoOneState.tsx)
     const sd = sedeDe(chave);
     if (sd) { const [x, z] = frenteDaSede(sd, 0); set({ loteSelecionado: null, alvoCamera: [x, 0.5, z], giroCamera: sd.rot }); useSede.setState({ aberto: true, id: sd.id }); return; }

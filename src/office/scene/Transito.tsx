@@ -15,7 +15,8 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import { caixa, cilindro, esfera, mat, plano, toro } from "./geo";
 import { Estatico } from "./Estatico";
-import { ComFallback, Modelo, type NomeModelo } from "./Modelos";
+import { desenhoCarro, rodaGeo, geometriaParados, MEIO_CARRO, CORES_CARRO, COR_TAXI, COR_ONIBUS, type TipoCarro, type Desenho, type Lente } from "./carros";
+import { materialSombra } from "./SombraContato";
 import { SombraContato } from "./SombraContato";
 import { leve } from "./qualidade";
 import { EIXOS_RUA, RUA, QUARTEIROES, PASSO, BORDA_CALCADA, LOTES, LOTE_POR_CHAVE } from "../data/mundo";
@@ -48,7 +49,10 @@ const FAIXA_CARRO = 1.75; // centro da faixa a partir do eixo
 const ZEBRA_INI = MEIA_RUA, ZEBRA_FIM = MEIA_RUA + 2.5; // faixa de pedestre alinhada com a calçada da rua que cruza
 const LINHA_PARADA = ZEBRA_FIM + 0.5; // 6,5 do centro do cruzamento
 const FRENTE = 2.2; // meio comprimento do carro
-const PARADA_CENTRO = LINHA_PARADA + 0.4 + FRENTE; // onde o centro do carro para
+// 21/11/2026: quem espera o sinal para 2,5 m antes da linha (como nas ruas de verdade): o ônibus virando à direita varre
+// com a frente a ponta da faixa de quem espera na rua de destino, e os dois ficavam esperando um pelo outro
+const RECUO = 2.5;
+const PARADA_CENTRO = LINHA_PARADA + 0.4 + RECUO + FRENTE; // onde o centro do carro para
 const MIN_E = Math.min(...EIXOS_RUA), MAX_E = Math.max(...EIXOS_RUA);
 interface Cruzamento { x: number; z: number; ix: number; iz: number; grupo: number }
 const CRUZAMENTOS: Cruzamento[] = EIXOS_RUA.flatMap((x, ix) => EIXOS_RUA.map((z, iz) => ({ x, z, ix, iz, grupo: (ix + iz) % 2 })));
@@ -179,12 +183,10 @@ export function Semaforos() {
 }
 
 // ---------- carros ----------
-type Modelo3 = "carroSedan" | "carroHatch" | "carroSuv";
-const ALTURA: Record<Modelo3, number> = { carroSedan: 1.45, carroHatch: 1.5, carroSuv: 1.7 };
 const ACEL = 2.4, FREIO = 6, FREIO_CONFORTO = 3.2, VEL_CURVA = 3.6, DISTANCIA = 7; // m/s², m/s, m (centro a centro)
 interface Curva { cx: number; cz: number; lado: 1 | -1; R: number; d: V2; r: V2; phi: number }
 interface Carro {
-  modelo: Modelo3; x: number; z: number; d: V2; v: number; vMax: number; curva: Curva | null;
+  modelo: TipoCarro; x: number; z: number; d: V2; v: number; vMax: number; curva: Curva | null;
   meio: number; // meio comprimento (carro 2,2; ônibus 5,3)
   // ônibus (12/11/2026): rota fixa virando sempre à direita em volta da Nuvem e paradas nos pontos
   onibus?: { paradas: { x: number; z: number; d: V2 }[]; esperaAte: number; ultima: number };
@@ -195,6 +197,8 @@ interface Carro {
   ativo?: boolean;
   moto?: { cor: string; ate: number; saindo: number | null };
   bici?: { cor: string; camisa: string };
+  // 21/11/2026: cor da pintura, quanto as rodas já giraram, esterço das rodas da frente e o número do veículo
+  cor?: string; giroRoda?: number; volante?: number; id?: number;
 }
 const lateral = (c: { x: number; z: number; d: V2 }) => { const r = direita(c.d); return c.x * r[0] + c.z * r[1]; }; // coordenada do lado
 const frente = (c: { x: number; z: number; d: V2 }) => c.x * c.d[0] + c.z * c.d[1]; // coordenada ao longo do caminho
@@ -227,18 +231,81 @@ function decidir(c: Carro, cr: Cruzamento): "reto" | "direita" | "esquerda" {
   if (dir) return "direita";
   return esq ? "esquerda" : "direita";
 }
-function iniciarCurva(c: Carro, cr: Cruzamento, lado: 1 | -1) {
-  const r = direita(c.d); const R = lado > 0 ? MEIA_RUA - FAIXA_CARRO : MEIA_RUA + FAIXA_CARRO; // 1,75 à direita; 5,25 à esquerda
-  // ponto de entrada: na boca do cruzamento, na faixa do carro
-  const ex = cr.x - c.d[0] * MEIA_RUA + r[0] * FAIXA_CARRO, ez = cr.z - c.d[1] * MEIA_RUA + r[1] * FAIXA_CARRO;
-  c.x = ex; c.z = ez;
-  c.curva = { cx: ex + lado * r[0] * R, cz: ez + lado * r[1] * R, lado, R, d: c.d, r, phi: 0 };
+// Curvas (21/11/2026, pedido do dono: "os carros estão mal feitos"): à direita o carro faz um arco de 3,2 m (o ônibus, de
+// 2,7 m) que começa antes da boca do cruzamento e passa rente à esquina sem subir na calçada; antes era um arco de 1,75 m
+// em volta da quina, quase um giro no lugar (o carro de 4,4 m rodava o corpo inteiro sobre a esquina). À esquerda continua
+// o arco de 5,25 m. Na curva a velocidade dá uns 2,6 m/s² para o lado. Se o carro passou do ponto de entrada neste quadro, a
+// sobra entra no arco (antes ele voltava até o ponto e dava um tranco para trás, mais visível com poucos quadros por segundo).
+const R_DIREITA = 3.2, R_DIREITA_ONIBUS = 2.7;
+const raioCurva = (c: Carro, lado: 1 | -1) => (lado > 0 ? (c.onibus ? R_DIREITA_ONIBUS : R_DIREITA) : MEIA_RUA + FAIXA_CARRO);
+const inicioCurva = (c: Carro, lado: 1 | -1) => (lado > 0 ? FAIXA_CARRO + raioCurva(c, lado) : MEIA_RUA); // do centro do cruzamento
+const velCurva = (c: Carro, R: number) => Math.min(c.onibus ? 3 : VEL_CURVA, Math.sqrt(2.6 * R));
+function iniciarCurva(c: Carro, cr: Cruzamento, lado: 1 | -1, sobra = 0) {
+  const r = direita(c.d), R = raioCurva(c, lado), ini = inicioCurva(c, lado);
+  // ponto de entrada: na faixa do carro, a "ini" metros do centro do cruzamento
+  const ex = cr.x - c.d[0] * ini + r[0] * FAIXA_CARRO, ez = cr.z - c.d[1] * ini + r[1] * FAIXA_CARRO;
+  c.curva = { cx: ex + lado * r[0] * R, cz: ez + lado * r[1] * R, lado, R, d: c.d, r, phi: Math.min(Math.PI / 2 - 1e-3, Math.max(0, sobra) / R) };
+  posNaCurva(c);
+}
+function posNaCurva(c: Carro) {
+  const k = c.curva; if (!k) return;
+  const co = Math.cos(k.phi), si = Math.sin(k.phi);
+  c.x = k.cx - k.lado * k.r[0] * k.R * co + k.d[0] * k.R * si;
+  c.z = k.cz - k.lado * k.r[1] * k.R * co + k.d[1] * k.R * si;
+}
+// Ninguém atravessa ninguém (21/11/2026): distância livre até o veículo mais perto à frente na direção (hx, hz), venha de
+// onde vier (na mesma faixa, virando ou cruzando o cruzamento), pela medida de cada um. Dois que se têm à frente ao mesmo
+// tempo, cruzando: passa o de número menor (os dois nunca ficam travados).
+const meiaLargura = (o: Carro) => (o.onibus ? 1.25 : o.bici || o.moto ? 0.4 : 0.9);
+function rumoDe(c: Carro): V2 {
+  const k = c.curva; if (!k) return c.d;
+  return [k.d[0] * Math.cos(k.phi) + k.lado * k.r[0] * Math.sin(k.phi), k.d[1] * Math.cos(k.phi) + k.lado * k.r[1] * Math.sin(k.phi)];
+}
+// caixa orientada (centro, direção, meio comprimento e meia largura) e o teste de cruzamento de duas (eixos separadores)
+type CaixaO = { x: number; z: number; hx: number; hz: number; m: number; w: number };
+function cruzam(a: CaixaO, b: CaixaO) {
+  for (const [ex, ez] of [[a.hx, a.hz], [-a.hz, a.hx], [b.hx, b.hz], [-b.hz, b.hx]]) {
+    const raio = (q: CaixaO) => Math.abs(q.hx * ex + q.hz * ez) * q.m + Math.abs(-q.hz * ex + q.hx * ez) * q.w;
+    if (Math.abs((b.x - a.x) * ex + (b.z - a.z) * ez) > raio(a) + raio(b)) return false;
+  }
+  return true;
+}
+function arcoLivre(c: Carro, carros: Carro[], s: number): boolean {
+  const k = c.curva; if (!k) return true;
+  const phi = Math.min(Math.PI / 2, k.phi + s / k.R), co = Math.cos(phi), si = Math.sin(phi);
+  const a: CaixaO = { x: k.cx - k.lado * k.r[0] * k.R * co + k.d[0] * k.R * si, z: k.cz - k.lado * k.r[1] * k.R * co + k.d[1] * k.R * si, hx: k.d[0] * co + k.lado * k.r[0] * si, hz: k.d[1] * co + k.lado * k.r[1] * si, m: c.meio + 0.2, w: meiaLargura(c) + 0.15 };
+  for (const o of carros) {
+    if (o === c || o.ativo === false || Math.abs(o.x - a.x) + Math.abs(o.z - a.z) > c.meio + o.meio + 4) continue;
+    const [ox, oz] = rumoDe(o);
+    if (cruzam(a, { x: o.x, z: o.z, hx: ox, hz: oz, m: o.meio, w: meiaLargura(o) })) return false;
+  }
+  return true;
+}
+// Ônibus (21/11/2026): virando à direita, a frente dele (10,6 m) varre a faixa contrária da rua (no teste, ele e uma
+// bicicleta que atravessava no verde ficavam um esperando o outro). Como na rua de verdade: ele só começa a curva com o
+// miolo do cruzamento vazio, e enquanto vira quem chega a esse cruzamento espera na linha
+const onibusVirando = (cr: Cruzamento, carros: Carro[]) => carros.some((o) => o.onibus && o.curva && Math.abs(o.curva.cx - cr.x) < 8 && Math.abs(o.curva.cz - cr.z) < 8);
+const miolocupado = (cr: Cruzamento, c: Carro, carros: Carro[]) => carros.some((o) => o !== c && o.ativo !== false && Math.abs(o.x - cr.x) < MEIA_RUA + 1.5 && Math.abs(o.z - cr.z) < MEIA_RUA + 1.5);
+function folgaAFrente(c: Carro, carros: Carro[], hx: number, hz: number): number {
+  let melhor = Infinity; const wc = meiaLargura(c);
+  for (const o of carros) {
+    if (o === c || o.ativo === false) continue;
+    const dx = o.x - c.x, dz = o.z - c.z, g = dx * hx + dz * hz;
+    if (g <= 0 || g > 26) continue;
+    const [ox, oz] = rumoDe(o), cos = Math.abs(ox * hx + oz * hz), sin = Math.sqrt(Math.max(0, 1 - cos * cos));
+    const extG = cos * o.meio + sin * meiaLargura(o), extL = sin * o.meio + cos * meiaLargura(o);
+    if (Math.abs(dz * hx - dx * hz) > wc + extL + 0.25) continue;
+    if (cos < 0.7 && (c.id ?? 0) < (o.id ?? 0) && -(dx * ox + dz * oz) > 0 && Math.abs(dx * oz - dz * ox) < meiaLargura(o) + c.meio + 0.25) continue;
+    melhor = Math.min(melhor, g - c.meio - extG);
+  }
+  return melhor;
 }
 
 function criarCarros(n: number): Carro[] {
-  const modelos: Modelo3[] = ["carroSedan", "carroHatch", "carroSuv"];
+  // 21/11/2026: hatch, sedã, utilitário esportivo, van e táxi desenhados em código (scene/carros.ts), cada um no seu tamanho
+  const tipos: TipoCarro[] = ["hatch", "sedan", "suv", "hatch", "taxi", "sedan", "van", "hatch", "suv", "sedan", "hatch", "taxi"];
   // o ônibus nasce primeiro (os carros sorteados ficam longe dele)
-  const lista: Carro[] = [{ modelo: "carroSedan", x: -12, z: -26 + FAIXA_CARRO, d: [1, 0], v: 0, vMax: 5, curva: null, plano: null, freando: false, meio: MEIO_ONIBUS, onibus: { paradas: PONTOS_ONIBUS, esperaAte: 0, ultima: -1 } }];
+  const lista: Carro[] = [{ modelo: "onibus", cor: COR_ONIBUS, x: -12, z: -26 + FAIXA_CARRO, d: [1, 0], v: 0, vMax: 5, curva: null, plano: null, freando: false, meio: MEIO_ONIBUS, onibus: { paradas: PONTOS_ONIBUS, esperaAte: 0, ultima: -1 } }];
   let semente = 7; const sorte = () => ((semente = (semente * 9301 + 49297) % 233280) / 233280);
   let tentativas = 0;
   while (lista.length < n + 1 && tentativas++ < 2000) {
@@ -249,8 +316,9 @@ function criarCarros(n: number): Carro[] {
     if (EIXOS_RUA.some((e) => Math.abs(ao - e) < LINHA_PARADA + FRENTE + 1)) continue;
     const x = d[0] !== 0 ? ao : rua + r[0] * FAIXA_CARRO, z = d[0] !== 0 ? rua + r[1] * FAIXA_CARRO : ao;
     if (lista.some((o) => Math.hypot(o.x - x, o.z - z) < 9)) continue;
-    const modelo = modelos[lista.length % 3];
-    lista.push({ modelo, x, z, d, v: 0, vMax: 5.2 + sorte() * 2.6, curva: null, plano: null, freando: false, meio: FRENTE });
+    const modelo = tipos[(lista.length - 1) % tipos.length];
+    const cor = modelo === "taxi" ? COR_TAXI : modelo === "van" && lista.length % 2 ? "#F1F2F4" : CORES_CARRO[(lista.length * 7 + 3) % CORES_CARRO.length];
+    lista.push({ modelo, cor, x, z, d, v: 0, vMax: (modelo === "van" ? 4.8 : 5.2) + sorte() * 2.6, curva: null, plano: null, freando: false, meio: MEIO_CARRO[modelo] });
   }
   // ciclistas: andam na faixa dos carros, devagar (os carros esperam atrás, como na rua de verdade)
   const coresBici = ["#E2575B", "#22A86B", "#1D4ED8", "#FFB020", "#8B6CF0", "#EC6B8D"], camisas = ["#FFFFFF", "#2B2F36", "#40C4FF", "#F2913D", "#3FBFA8", "#FFD24A"];
@@ -262,11 +330,12 @@ function criarCarros(n: number): Carro[] {
     if (EIXOS_RUA.some((e) => Math.abs(ao - e) < LINHA_PARADA + FRENTE + 1)) continue;
     const x = d[0] !== 0 ? ao : rua + r[0] * FAIXA_CARRO, z = d[0] !== 0 ? rua + r[1] * FAIXA_CARRO : ao;
     if (lista.some((o) => Math.hypot(o.x - x, o.z - z) < 10)) continue;
-    lista.push({ modelo: "carroHatch", x, z, d, v: 0, vMax: 3.8 + sorte() * 1.1, curva: null, plano: null, freando: false, meio: MEIO_BICI, bici: { cor: coresBici[feitos % coresBici.length], camisa: camisas[(feitos * 5) % camisas.length] } });
+    lista.push({ modelo: "hatch", x, z, d, v: 0, vMax: 3.8 + sorte() * 1.1, curva: null, plano: null, freando: false, meio: MEIO_BICI, bici: { cor: coresBici[feitos % coresBici.length], camisa: camisas[(feitos * 5) % camisas.length] } });
     feitos++;
   }
   // vagas de motoboy: guardadas fora da cidade até alguém pedir
-  for (let k = 0; k < MAX_MOTOS; k++) lista.push({ modelo: "carroHatch", x: 5000 + k * 50, z: 5000, d: [1, 0], v: 0, vMax: 8.5, curva: null, plano: null, freando: false, meio: MEIO_MOTO, ativo: false, moto: { cor: "#1D4ED8", ate: 0, saindo: null } });
+  for (let k = 0; k < MAX_MOTOS; k++) lista.push({ modelo: "hatch", x: 5000 + k * 50, z: 5000, d: [1, 0], v: 0, vMax: 8.5, curva: null, plano: null, freando: false, meio: MEIO_MOTO, ativo: false, moto: { cor: "#1D4ED8", ate: 0, saindo: null } });
+  lista.forEach((c, i) => { c.id = i; c.giroRoda = 0; c.volante = 0; });
   return lista;
 }
 const MEIO_BICI = 0.95, MEIO_MOTO = 1.1, MAX_MOTOS = 3;
@@ -285,13 +354,18 @@ function passo(carros: Carro[], dt: number, t: number) {
       // pedestre na frente (na faixa da rua de destino): espera no meio da curva
       const hx = k.d[0] * Math.cos(k.phi) + k.lado * k.r[0] * Math.sin(k.phi), hz = k.d[1] * Math.cos(k.phi) + k.lado * k.r[1] * Math.sin(k.phi);
       if (pedestreNaFrente(c.x, c.z, hx, hz, c.meio + 4.5, 1.8)) { c.v = 0; c.freando = true; continue; }
-      c.v = Math.min(c.onibus ? 3 : VEL_CURVA, c.v + ACEL * dt);
+      // a velocidade da curva, ou menos se tiver alguém à frente no arco
+      let vC = velCurva(c, k.R);
+      // a curva vai livre? A pose do veículo um pouco adiante no próprio arco (o que ele anda até parar, e mais 60 cm)
+      // contra a caixa de cada um. Olhar reto à frente, como fora da curva, travava o ônibus contra quem espera o sinal na
+      // rua de destino, em quem ele não vai encostar
+      if (!arcoLivre(c, carros, 0.6 + (c.v * c.v) / (2 * FREIO))) vC = 0;
+      const antesC = c.v;
+      c.v = c.v < vC ? Math.min(vC, c.v + ACEL * dt) : Math.max(vC, c.v - FREIO * dt);
       k.phi = Math.min(Math.PI / 2, k.phi + (c.v * dt) / k.R);
-      const co = Math.cos(k.phi), si = Math.sin(k.phi);
-      c.x = k.cx - k.lado * k.r[0] * k.R * co + k.d[0] * k.R * si;
-      c.z = k.cz - k.lado * k.r[1] * k.R * co + k.d[1] * k.R * si;
+      posNaCurva(c);
       if (k.phi >= Math.PI / 2) { c.d = [k.lado * k.r[0], k.lado * k.r[1]] as V2; c.curva = null; c.plano = null; }
-      c.freando = false;
+      c.freando = c.v < antesC - 0.01 || c.v < 0.3;
       continue;
     }
     // ---- em linha reta ----
@@ -301,24 +375,28 @@ function passo(carros: Carro[], dt: number, t: number) {
       const { cr, dist } = prox;
       const chave = `${cr.x},${cr.z}`;
       if (!c.plano || c.plano.chave !== chave) c.plano = { chave, acao: decidir(c, cr) };
+      // ônibus virando neste cruzamento: quem ainda não passou da linha espera nela
+      if (!c.onibus && dist - PARADA_CENTRO > -0.2 && onibusVirando(cr, carros)) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO * Math.max(0, dist - PARADA_CENTRO))));
       const eixo = c.d[0] !== 0 ? "x" : "z";
       const luz = luzDe(cr.grupo, eixo, t);
-      const atePararr = dist - (LINHA_PARADA + 0.4 + c.meio); // quanto falta até o ponto de parada
+      const atePararr = dist - (LINHA_PARADA + 0.4 + RECUO + c.meio); // quanto falta até o ponto de parada
       if (atePararr > -0.2 && luz !== "verde") {
         // amarelo: só para se dá para parar com freada confortável; vermelho: para sempre
         const precisa = (c.v * c.v) / (2 * FREIO_CONFORTO);
         if (luz === "vermelho" || precisa < atePararr + 0.5) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, atePararr))));
       }
-      if (c.plano.acao !== "reto") vAlvo = Math.min(vAlvo, Math.max(VEL_CURVA, Math.sqrt(VEL_CURVA * VEL_CURVA + 2 * FREIO_CONFORTO * Math.max(0, dist - MEIA_RUA))));
+      const ladoP: 1 | -1 = c.plano.acao === "direita" ? 1 : -1, iniP = inicioCurva(c, ladoP), vcP = velCurva(c, raioCurva(c, ladoP));
+      if (c.plano.acao !== "reto") vAlvo = Math.min(vAlvo, Math.max(vcP, Math.sqrt(vcP * vcP + 2 * FREIO_CONFORTO * Math.max(0, dist - iniP))));
       // curva planejada: só entra se a pista de destino tem espaço logo depois da saída
       if (c.plano.acao !== "reto" && dist < 14 && dist > -0.5) {
         const lado = c.plano.acao === "direita" ? 1 : -1; const r = direita(c.d); const nd: V2 = [lado * r[0], lado * r[1]];
         const sx = cr.x + nd[0] * MEIA_RUA + direita(nd)[0] * FAIXA_CARRO, sz = cr.z + nd[1] * MEIA_RUA + direita(nd)[1] * FAIXA_CARRO;
         const ocupada = carros.some((o) => o !== c && o.ativo !== false && !o.curva && o.d[0] === nd[0] && o.d[1] === nd[1] && Math.abs((o.x - sx) * direita(nd)[0] + (o.z - sz) * direita(nd)[1]) < 1.2 && (() => { const g = (o.x - sx) * nd[0] + (o.z - sz) * nd[1]; return g > -1 && g < DISTANCIA + 1; })());
         // e só vira se ninguém está atravessando a faixa da rua de destino
-        const pedestre = pedestreNaFrente(sx - nd[0] * 1.2, sz - nd[1] * 1.2, nd[0], nd[1], 4.5, 3.6);
-        if (ocupada || pedestre) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, dist - (pedestre ? MEIA_RUA + 0.2 : PARADA_CENTRO)))));
-        else if (dist <= MEIA_RUA + 0.05) { iniciarCurva(c, cr, lado); continue; }
+        // o ônibus só começa a curva com o miolo do cruzamento vazio (a frente dele varre a faixa contrária)
+        const pedestre = pedestreNaFrente(sx - nd[0] * 1.2, sz - nd[1] * 1.2, nd[0], nd[1], 4.5, 3.6) || (!!c.onibus && miolocupado(cr, c, carros));
+        if (ocupada || pedestre) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, dist - (pedestre ? iniP + 0.2 : PARADA_CENTRO)))));
+        else if (dist <= iniP + 0.05) { iniciarCurva(c, cr, lado, iniP - dist); continue; }
       }
     }
     // carro da frente na mesma faixa (inclusive quem está entrando nela numa curva)
@@ -332,6 +410,9 @@ function passo(carros: Carro[], dt: number, t: number) {
       if (g > 0 && g < gap) { gap = g; folga = c.meio + o.meio + 2.6; }
     }
     if (gap < Infinity) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, gap - folga))));
+    // e qualquer um à frente, cruzando ou virando (a faixa acima só vê quem está alinhado com ele)
+    const gF = folgaAFrente(c, carros, c.d[0], c.d[1]);
+    if (gF < Infinity) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO_CONFORTO * Math.max(0, gF - 1.6))));
     // pedestre atravessando na frente: para antes da faixa
     const p = pedestreAFrente(c.x, c.z, c.d[0], c.d[1], c.meio + 7, 1.7);
     if (p != null) vAlvo = Math.min(vAlvo, Math.sqrt(Math.max(0, 2 * FREIO * Math.max(0, p - c.meio - 1.6))));
@@ -449,13 +530,118 @@ function useChamadasMotoboy() {
   }, []);
 }
 
+// ---------- a frota desenhada por instâncias (21/11/2026) ----------
+// Carros e ônibus (scene/carros.ts): uma malha por tipo para a pintura (cor de cada carro) e uma para o resto; e, para a frota
+// toda, uma malha de rodas (giram pelo quanto o carro andou e as da frente esterçam na curva), uma de faróis (acendem à
+// noite), uma de lanternas e letreiros (acesas à noite e fortes na freada), uma de sombras e, só à noite, a dos fachos no
+// chão e a dos cones de luz. Umas 18 chamadas de desenho para a frota inteira; antes eram umas 8 por carro.
+const TIPOS: TipoCarro[] = ["hatch", "sedan", "suv", "van", "taxi", "onibus"];
+let MATS_FROTA: { pintura: THREE.Material; resto: THREE.Material; lente: THREE.MeshBasicMaterial } | null = null;
+function materiaisFrota(simples: boolean) {
+  if (!MATS_FROTA) MATS_FROTA = simples
+    ? { pintura: new THREE.MeshLambertMaterial({ vertexColors: true }), resto: new THREE.MeshLambertMaterial({ vertexColors: true }), lente: new THREE.MeshBasicMaterial({ toneMapped: false }) }
+    : { pintura: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.36, metalness: 0.18 }), resto: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.05 }), lente: new THREE.MeshBasicMaterial({ toneMapped: false }) };
+  return MATS_FROTA;
+}
+const LANT_DIA = new THREE.Color("#6A1717"), LANT_NOITE = new THREE.Color("#C4201E"), LANT_FREIO = new THREE.Color("#FF3A2E");
+let GEO_LENTE: THREE.BufferGeometry | null = null, GEO_SOMBRA: THREE.BufferGeometry | null = null, GEO_FACHO: THREE.BufferGeometry | null = null;
+const _M = new THREE.Matrix4(), _L = new THREE.Matrix4(), _W = new THREE.Matrix4(), _A = new THREE.Matrix4();
+function lente(f: Lente) { _L.makeScale(f.d ?? 0.04, f.h, f.w).setPosition(f.x, f.y, f.z); return _W.multiplyMatrices(_M, _L); }
+class Frota {
+  grupo = new THREE.Group();
+  itens: { c: Carro; d: Desenho; j: number }[];
+  porTipo = new Map<TipoCarro, { p: THREE.InstancedMesh; r: THREE.InstancedMesh }>();
+  rodas: THREE.InstancedMesh; farois: THREE.InstancedMesh; lanternas: THREE.InstancedMesh; sombras: THREE.InstancedMesh; fachos: THREE.InstancedMesh; cones: THREE.InstancedMesh;
+  corLant: (THREE.Color | null)[] = [];
+  constructor(carros: Carro[], simples: boolean, cone: THREE.BufferGeometry) {
+    const m = materiaisFrota(simples);
+    this.itens = carros.filter((c) => !c.moto && !c.bici).map((c) => ({ c, d: desenhoCarro(c.modelo), j: 0 }));
+    const malha = (geo: THREE.BufferGeometry, mat: THREE.Material, n: number, ordem = 0) => {
+      const im = new THREE.InstancedMesh(geo, mat, Math.max(1, n)); im.count = n; im.frustumCulled = false; im.raycast = () => {}; im.renderOrder = ordem;
+      this.grupo.add(im); return im;
+    };
+    for (const t of TIPOS) {
+      const lista = this.itens.filter((it) => it.c.modelo === t); if (!lista.length) continue;
+      const d = desenhoCarro(t), p = malha(d.pintura, m.pintura, lista.length), r = malha(d.resto, m.resto, lista.length);
+      lista.forEach((it, j) => { it.j = j; p.setColorAt(j, new THREE.Color(it.c.cor ?? "#F1F2F4")); });
+      this.porTipo.set(t, { p, r });
+    }
+    const soma = (f: (d: Desenho) => number) => this.itens.reduce((s, it) => s + f(it.d), 0);
+    GEO_LENTE ??= new THREE.BoxGeometry(1, 1, 1);
+    GEO_SOMBRA ??= new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2);
+    GEO_FACHO ??= new THREE.PlaneGeometry(6.5, 3.4).rotateX(-Math.PI / 2);
+    this.rodas = malha(rodaGeo(), m.resto, soma((d) => d.rodas.length));
+    this.farois = malha(GEO_LENTE, FAROL, soma((d) => d.farois.length));
+    this.lanternas = malha(GEO_LENTE, m.lente, soma((d) => d.lanternas.length + d.letreiros.length));
+    this.sombras = malha(GEO_SOMBRA, materialSombra(), this.itens.length);
+    this.fachos = malha(GEO_FACHO, FACHO, this.itens.length, 2);
+    this.cones = malha(cone, CONE, this.itens.length, 3);
+    // cor de cada lanterna (muda com a noite e a freada) e a dos letreiros (fixa)
+    let k = 0;
+    for (const it of this.itens) {
+      for (let i = 0; i < it.d.lanternas.length; i++) { this.lanternas.setColorAt(k, LANT_DIA); this.corLant[k++] = LANT_DIA; }
+      for (const l of it.d.letreiros) { this.lanternas.setColorAt(k, new THREE.Color(l.cor)); this.corLant[k++] = null; }
+    }
+    this.atualizar(0);
+  }
+  atualizar(dt: number) {
+    const acesa = ceu.noite > 0.3, luzes = ceu.noite > 0.02;
+    this.fachos.visible = this.cones.visible = luzes;
+    let kr = 0, kf = 0, kl = 0, mudouCor = false;
+    for (let n = 0; n < this.itens.length; n++) {
+      const { c, d, j } = this.itens[n];
+      _M.makeRotationY(rotacao(c)).setPosition(c.x, 0, c.z);
+      const t = this.porTipo.get(c.modelo);
+      if (t) { t.p.setMatrixAt(j, _M); t.r.setMatrixAt(j, _M); }
+      // rodas: giram pelo quanto andou; as da frente esterçam na curva, suave
+      c.giroRoda = ((c.giroRoda ?? 0) + (c.v * dt) / d.raioRoda) % (Math.PI * 2);
+      const alvoV = c.curva ? -c.curva.lado * Math.atan(d.entreEixos / c.curva.R) * 0.7 : 0;
+      c.volante = (c.volante ?? 0) + (alvoV - (c.volante ?? 0)) * (1 - Math.exp(-dt * 7));
+      for (const [wx, wz] of d.rodas) {
+        _L.makeTranslation(wx, d.raioRoda, wz);
+        if (wx > 0 && c.volante) _L.multiply(_A.makeRotationY(c.volante));
+        _L.multiply(_A.makeRotationZ(-c.giroRoda));
+        if (wz < 0) _L.multiply(_A.makeRotationY(Math.PI)); // a face de fora da roda para o lado de fora
+        _L.multiply(_A.makeScale(d.raioRoda, d.raioRoda, d.raioRoda));
+        this.rodas.setMatrixAt(kr++, _W.multiplyMatrices(_M, _L));
+      }
+      for (const f of d.farois) this.farois.setMatrixAt(kf++, lente(f));
+      const cl = c.freando ? LANT_FREIO : acesa ? LANT_NOITE : LANT_DIA;
+      for (const f of d.lanternas) { this.lanternas.setMatrixAt(kl, lente(f)); if (this.corLant[kl] !== cl) { this.lanternas.setColorAt(kl, cl); this.corLant[kl] = cl; mudouCor = true; } kl++; }
+      for (const f of d.letreiros) this.lanternas.setMatrixAt(kl++, lente(f));
+      _L.makeScale(d.meio + 0.45, 1, d.largura / 2 + 0.4).setPosition(0, 0.012, 0);
+      this.sombras.setMatrixAt(n, _W.multiplyMatrices(_M, _L));
+      if (luzes) {
+        _L.makeTranslation(d.meio + 3, 0.04, 0); this.fachos.setMatrixAt(n, _W.multiplyMatrices(_M, _L));
+        _L.makeTranslation(d.meio - 0.05, d.alturaFarol, 0); this.cones.setMatrixAt(n, _W.multiplyMatrices(_M, _L));
+      }
+    }
+    for (const { p, r } of this.porTipo.values()) { p.instanceMatrix.needsUpdate = true; r.instanceMatrix.needsUpdate = true; }
+    for (const im of [this.rodas, this.farois, this.lanternas, this.sombras]) im.instanceMatrix.needsUpdate = true;
+    if (mudouCor && this.lanternas.instanceColor) this.lanternas.instanceColor.needsUpdate = true;
+    if (luzes) { this.fachos.instanceMatrix.needsUpdate = true; this.cones.instanceMatrix.needsUpdate = true; }
+  }
+  descartar() { this.grupo.traverse((o) => { if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose(); }); }
+}
+
+// carros estacionados (a lanchonete): numa geometria só, com a cor gravada nos vértices; uma chamada de desenho
+export type CarroParado = { x: number; z: number; rot: number; tipo: TipoCarro; cor: string };
+export function CarrosParados({ itens }: { itens: CarroParado[] }) {
+  const geo = useMemo(() => geometriaParados(itens), [itens]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return <mesh geometry={geo} material={materiaisFrota(leve()).resto} castShadow receiveShadow raycast={() => null} />;
+}
+
 export function Trafego() {
   const poucos = leve();
   const carros = useMemo(() => criarCarros(poucos ? 10 : 22), [poucos]);
   // ?medir=1: os testes leem as posições dos carros e o relógio do semáforo
-  useEffect(() => { if (new URLSearchParams(window.location.search).has("medir")) (window as unknown as { __trafego?: unknown }).__trafego = { carros, luzDe, CRUZAMENTOS, agora, passo, relogio, PEDESTRES, passoPedestres, chamarMotoboy, soltarMotos, FILA_MOTOS }; }, [carros]);
+  useEffect(() => { if (new URLSearchParams(window.location.search).has("medir")) (window as unknown as { __trafego?: unknown }).__trafego = { carros, luzDe, CRUZAMENTOS, agora, passo, relogio, PEDESTRES, passoPedestres, chamarMotoboy, soltarMotos, FILA_MOTOS, folgaAFrente }; }, [carros]);
   useChamadasMotoboy();
   const cone = useMemo(() => geometriaCone(7.5, 1.7), []), coneMoto = useMemo(() => geometriaCone(5, 1), []);
+  const frota = useMemo(() => new Frota(carros, poucos, cone), [carros, poucos, cone]);
+  useEffect(() => () => frota.descartar(), [frota]);
+  const duasRodas = useMemo(() => carros.map((c, i) => ({ c, i })).filter(({ c }) => c.moto || c.bici), [carros]);
   const grupos = useRef<(THREE.Group | null)[]>([]);
   const freios = useRef<(THREE.Mesh | null)[][]>([]);
   useFrame((_, dt) => {
@@ -463,33 +649,24 @@ export function Trafego() {
     soltarMotos(carros, t);
     passo(carros, passoDt, t);
     acenderFarois();
-    carros.forEach((c, i) => {
-      const g = grupos.current[i]; if (!g) return;
+    frota.atualizar(passoDt);
+    for (const { c, i } of duasRodas) {
+      const g = grupos.current[i]; if (!g) continue;
       g.visible = c.ativo !== false;
-      if (!g.visible) return;
-      g.position.set(c.x, 0, c.z);
-      const alvo = rotacao(c); let dif = alvo - g.rotation.y; dif = Math.atan2(Math.sin(dif), Math.cos(dif));
-      g.rotation.y += dif * Math.min(1, passoDt * 14); // suaviza a virada
+      if (!g.visible) continue;
+      g.position.set(c.x, 0, c.z); g.rotation.y = rotacao(c); // a curva já é contínua: o giro sai direto dela
       for (const f of freios.current[i] ?? []) if (f) f.material = c.freando ? LUZ_FREIO_ACESA : LUZ_FREIO;
-    });
+    }
   });
   return (
     <group>
-      {carros.map((c, i) => (
+      <primitive object={frota.grupo} />
+      {duasRodas.map(({ c, i }) => (
         <group key={i} ref={(el) => { grupos.current[i] = el; }} position={[c.x, 0, c.z]} rotation={[0, rotacao(c), 0]}>
-          {c.onibus ? <Onibus /> : c.moto ? <Moto c={c} freio={(el) => { (freios.current[i] ??= [])[0] = el; }} /> : c.bici ? <Bicicleta c={c} /> : (
-            <ComFallback fallback={<mesh geometry={caixa(4.2, 1.3, 1.9)} material={mat("#E53935")} position={[0, 0.7, 0]} />}>
-              <Modelo nome={c.modelo as NomeModelo} position={[0, 0, 0]} altura={ALTURA[c.modelo]} sombra={false} />
-            </ComFallback>
-          )}
-          {/* luzes de freio na traseira (acendem quando o carro freia ou está parado no sinal) */}
-          {!c.moto && !c.bici && [-0.62, 0.62].map((lz, k) => (
-            <mesh key={k} ref={(el) => { (freios.current[i] ??= [])[k] = el; }} geometry={caixa(0.06, 0.12, 0.3)} material={LUZ_FREIO} position={[-c.meio + 0.08, c.onibus ? 0.9 : 0.78, lz * (c.onibus ? 1.6 : 1)]} />
-          ))}
-          {!c.moto && !c.bici && [-0.6, 0.6].map((lz, k) => <mesh key={`f${k}`} geometry={caixa(0.06, 0.16, 0.36)} material={FAROL} position={[c.meio - 0.08, c.onibus ? 0.8 : 0.72, lz * (c.onibus ? 1.6 : 1)]} />)}
-          {!c.bici && <mesh geometry={c.moto ? plano(3.8, 1.8) : plano(6.5, 3.4)} material={FACHO} rotation={[-Math.PI / 2, 0, 0]} position={[c.meio + (c.moto ? 1.9 : 3), 0.04, 0]} renderOrder={2} />}
-          {!c.bici && <mesh geometry={c.moto ? coneMoto : cone} material={CONE} position={[c.meio - 0.05, c.onibus ? 0.85 : c.moto ? 0.85 : 0.72, 0]} renderOrder={3} />}
-          <SombraContato r={c.onibus ? 5.6 : c.moto ? 1.3 : c.bici ? 1.1 : 2.4} />
+          {c.moto ? <Moto c={c} freio={(el) => { (freios.current[i] ??= [])[0] = el; }} /> : <Bicicleta c={c} />}
+          {c.moto && <mesh geometry={plano(3.8, 1.8)} material={FACHO} rotation={[-Math.PI / 2, 0, 0]} position={[c.meio + 1.9, 0.04, 0]} renderOrder={2} />}
+          {c.moto && <mesh geometry={coneMoto} material={CONE} position={[c.meio - 0.05, 0.85, 0]} renderOrder={3} />}
+          <SombraContato r={c.moto ? 1.3 : 1.1} />
         </group>
       ))}
     </group>
@@ -582,22 +759,7 @@ const PONTOS_ONIBUS: { x: number; z: number; d: V2 }[] = [
   { x: -2, z: 26 - FAIXA_CARRO, d: [-1, 0] },
 ];
 const AZUL = "#0A6CFF";
-function Onibus() {
-  const vidro = mat("#1C2B3A", { rough: 0.2, metal: 0.4 }), roda = mat("#1B1E23", { rough: 0.8 });
-  return (
-    <group>
-      <mesh geometry={caixa(10.4, 2.5, 2.5)} material={mat(AZUL, { rough: 0.55 })} position={[0, 1.65, 0]} castShadow />
-      <mesh geometry={caixa(10.42, 0.35, 2.52)} material={mat("#FFFFFF", { rough: 0.6 })} position={[0, 1.05, 0]} />
-      <mesh geometry={caixa(10.3, 0.12, 2.4)} material={mat("#E8ECF2", { rough: 0.6 })} position={[0, 2.95, 0]} />
-      {/* janelas dos dois lados e para-brisa */}
-      <mesh geometry={caixa(8.6, 0.95, 2.54)} material={vidro} position={[-0.5, 2.15, 0]} />
-      <mesh geometry={caixa(0.06, 1.3, 2.2)} material={vidro} position={[5.21, 2.05, 0]} />
-      {/* letreiro de destino aceso */}
-      <mesh geometry={caixa(0.07, 0.3, 1.6)} material={mat("#FFB020", { emissive: "#FFB020", ei: 1.4 })} position={[5.23, 2.78, 0]} />
-      {[[-3.4, 1], [-3.4, -1], [3.3, 1], [3.3, -1]].map(([x, z], i) => <mesh key={i} geometry={cilindro(0.48, 0.48, 0.3, 14)} material={roda} position={[x, 0.48, z * 1.13]} rotation={[Math.PI / 2, 0, 0]} />)}
-    </group>
-  );
-}
+// (21/11/2026: o ônibus é desenhado em scene/carros.ts e vai na frota por instâncias, em Trafego)
 function PontoOnibus({ x, z, frente }: { x: number; z: number; frente: 1 | -1 }) {
   const metal = mat("#2B2F36", { metal: 0.4, rough: 0.5 });
   return (

@@ -13,6 +13,7 @@ import { usarMapa2D, qualidade, escolherQualidade, escolherMapa } from "../scene
 import { alternarSom, assinarSom, somLigado } from "../som";
 import { Icone, type NomeIcone } from "./Icone";
 import { BotaoBicicleta, AvisoBicicleta } from "./BotaoBicicleta";
+import { useCartaoAberto } from "./cartaoAberto";
 
 // modoMundo() lê o endereço do navegador: no servidor é sempre falso. Para não dar erro de hidratação, a barra só aparece
 // depois de montar no navegador.
@@ -54,13 +55,16 @@ export function ControlesCamera() {
   const fechar = useCallback(() => setAberto(null), []);
   useFecharFora(!!aberto, caixa, fechar);
   const noMundo = useNoMundo();
+  // tela baixa (celular deitado, 21/11/2026): com um cartão aberto a barra some, como no celular em pé; ela ficava por
+  // baixo do cartão, que só tem uns 280 px de altura ali
+  const cartao = useCartaoAberto();
   if (!noMundo) return null;
   return (
     <>
       <ModoCamera />
       <AvisoMover />
       <AvisoBicicleta />
-      <div ref={caixa} data-tour="camera" className="hud-ilha hud-dock pointer-events-auto absolute bottom-4 left-3 z-10 hidden sm:flex" role="toolbar" aria-label="Câmera">
+      <div ref={caixa} data-tour="camera" className={`hud-ilha hud-dock pointer-events-auto absolute bottom-4 left-3 z-10 hidden sm:flex ${cartao ? "[@media(max-height:600px)]:!hidden" : ""}`} role="toolbar" aria-label="Câmera">
         <Botao tipo="girarEsq" rotulo="Girar para a esquerda" tecla="Q" />
         <Botao tipo="girarDir" rotulo="Girar para a direita" tecla="E" />
         <span className="hud-sep" aria-hidden="true" />
@@ -167,7 +171,7 @@ export function ControlesCameraCelular() {
   const noMundo = useNoMundo();
   if (!noMundo) return null;
   return (
-    <span ref={caixa} className="hud-ilha pointer-events-auto relative flex gap-0.5 p-1 sm:hidden">
+    <span ref={caixa} className="dock-cel hud-ilha pointer-events-auto relative flex gap-0.5 p-1 sm:hidden">
       {(["girarEsq", "girarDir", "inicio", "drone", "andar"] as ComandoCamera[]).map((t) => (
         <button key={t} type="button" onClick={() => pedir(t)} aria-label={ROTULO_CEL[t]} aria-pressed={t === "drone" ? drone : t === "andar" ? andar : undefined} className="hud-btn hud-btn-icone !h-9 !w-9">
           <Icone nome={ICONE[t]} tamanho={18} />

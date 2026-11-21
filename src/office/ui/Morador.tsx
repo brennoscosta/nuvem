@@ -13,6 +13,7 @@ import { MORADOR_POR_ID, ACOES_MORADOR, NOME_TOM, estadoMorador, novoEstado, typ
 import { FLUTUANTE, LARGO } from "./estilo";
 import { Icone } from "./Icone";
 import { MiniAvatar } from "./MiniAvatar";
+import { PedidoDoMorador } from "./PedidoMorador";
 
 type Indicacao = { numero: number; chave: string; nome: string; nichoNome: string; sobre: string };
 type Msg = { id: string; autor: "visitante" | "morador"; texto: string; em: string; indicacao: Indicacao | null };
@@ -105,7 +106,7 @@ function Conversa({ m }: { m: DadosMorador }) {
           {rel && rel.conversas > 0 ? ` Vocês já conversaram ${rel.conversas} ${rel.conversas === 1 ? "vez" : "vezes"}.` : ""}
         </p>
       )}
-      <div className="min-h-[150px] flex-1 space-y-2 overflow-y-auto border-t border-black/5 p-3" style={{ maxHeight: "min(42vh, 360px)" }} aria-live="polite">
+      <div className="min-h-[150px] flex-1 space-y-2 overflow-y-auto border-t border-black/5 p-3" style={{ maxHeight: "min(42dvh, 360px)" }} aria-live="polite">
         {ficha && ficha.historico.length > 0 && (
           <>
             <div className="text-center text-[10px] font-bold uppercase tracking-wide text-[#9AA3AD]">Última conversa</div>
@@ -114,6 +115,7 @@ function Conversa({ m }: { m: DadosMorador }) {
           </>
         )}
         {ficha ? <Bolha msg={{ id: "abertura", autor: "morador", texto: ficha.abertura, em: "", indicacao: null }} abertura /> : <div className="text-[12px] text-[#5B6472]">{m.nome} está olhando para você…</div>}
+        {ficha?.logado && <PedidoDoMorador m={m} />}
         {msgs.map((x) => <Bolha key={x.id} msg={x} />)}
         {enviando && <div className="text-[12px] text-[#5B6472]">{m.curto} está respondendo…</div>}
         <div ref={fim} />

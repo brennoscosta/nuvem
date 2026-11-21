@@ -431,3 +431,17 @@
 .wi .wh-online { margin-top: .4rem; }
 .wi .wh-online-link { font-weight: 600; color: var(--tinta); text-decoration: underline; text-decoration-color: rgba(10,108,255,.35); text-underline-offset: 3px; }
 .wi .wh-online-link:hover { text-decoration-color: currentColor; }
+
+/* 21/11/2026 (responsividade): no celular (até ~400 px) o botão "Criar conta grátis" não cabia ao lado do logotipo e do
+   menu: a linha passava da faixa e o botão do menu ficava cortado na borda. Até 419 px ele fica "Criar conta" e a linha
+   aperta um pouco. */
+@media (max-width: 419px) {
+  .wi .wi-topo-linha { gap: .6rem; }
+  .wi .wi-topo-acoes .wi-btn-p { padding: 0 .95rem; }
+  .wi .wi-so-largo { display: none; }
+}
+/* e no de 320 px ainda faltavam 13 px: ali a faixa do cabeçalho usa margens de 12 px em vez de 20 */
+@media (max-width: 359px) {
+  .wi .wi-topo .faixa.wi-topo-linha { width: calc(100% - 1.5rem); gap: .35rem; }
+  .wi .wi-topo-acoes { gap: .35rem; }
+}

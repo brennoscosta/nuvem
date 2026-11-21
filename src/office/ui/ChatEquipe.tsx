@@ -93,7 +93,7 @@ export function ChatEquipe() {
   const pct = p ? Math.min(100, (p.gasto.mes / p.gasto.teto) * 100) : 0;
 
   return (
-    <div className={`${FLUTUANTE} painel-entra flex h-[72vh] flex-col overflow-hidden sm:h-[min(46rem,calc(100vh-7rem))] sm:w-[46rem]`} role="dialog" aria-label="Conversar com a equipe">
+    <div className={`${FLUTUANTE} cartao-largo painel-entra flex h-[72dvh] flex-col overflow-hidden sm:h-[min(46rem,calc(100dvh-7rem))] sm:w-[46rem]`} role="dialog" aria-label="Conversar com a equipe">
       <header className="flex items-center gap-2.5 border-b border-black/5 px-3 py-2.5">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white" style={{ background: p?.lote.cor ?? "#1D2128" }}><Icone nome="equipe" tamanho={19} /></span>
         <div className="min-w-0 flex-1 leading-tight">

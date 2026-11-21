@@ -10,7 +10,12 @@ import { registrar } from "./eventos";
 import { NICHOS, nomeNicho } from "@/office/data/mundo";
 import { corDaBicicleta, ehVeiculo, VEL_MAX_VEICULO, type IdVeiculo, type VeiculoPublico } from "@/office/data/veiculos";
 
-export const PRECO_PERSONAGEM = 5.9; // R$/mês (promoção)
+// 21/11/2026 (decisão do dono): o personagem básico é GRÁTIS para toda conta logada: montou, está ativo. A cobrança
+// antiga (PRECO_PERSONAGEM, mercadopago.ts › criarCobrancaPersonagem, o produto "personagem", ativarPersonagem e
+// reverterPersonagem) fica sem uso, sem apagar: pagamentos e estornos antigos continuam funcionando. Os itens de visual
+// pagos (os premium de R$ 5,90 e o uniforme) continuam pagos: são outra cobrança (src/server/cidade.ts › comprarItem).
+export const PERSONAGEM_GRATIS = true;
+export const PRECO_PERSONAGEM = 5.9; // R$/mês (promoção) — sem uso desde 21/11/2026 (PERSONAGEM_GRATIS)
 export const PRECO_PERSONAGEM_CHEIO = 19.9;
 export const SEGUNDOS_ONLINE = 25;
 
@@ -47,7 +52,9 @@ export async function meuPersonagem(usuarioId: string): Promise<Personagem | nul
   const [p] = await sql<Personagem[]>`SELECT ${CAMPOS()} FROM personagem WHERE usuario_id = ${usuarioId}`;
   return p ?? null;
 }
-export const personagemAtivo = (p: Personagem | null, u?: Usuario | null) => !!p && (!!(p.pagoAte && new Date(p.pagoAte).getTime() > Date.now()) || ehAdmin(u));
+export const personagemAtivo = (p: Personagem | null, u?: Usuario | null) => !!p && (PERSONAGEM_GRATIS || !!(p.pagoAte && new Date(p.pagoAte).getTime() > Date.now()) || ehAdmin(u));
+// o mesmo "ativo" nas consultas (mapa, pessoas online, busca de profissionais e perfil público)
+export const filtroPersonagemAtivo = () => (PERSONAGEM_GRATIS ? sql`TRUE` : sql`(pago_ate > now() OR usuario_id IN (SELECT id FROM usuario WHERE papel = 'admin'))`);
 
 // o boneco (código v1:…) e a cor da roupa de um visual sobre o tipo pronto
 function bonecoDoVisual(tipo: (typeof TIPOS_AVATAR)[number], v: Visual) {
@@ -157,7 +164,7 @@ export async function escolherCorVeiculo(usuarioId: string, cor: unknown) {
 }
 export async function outrosOnline(excetoId: string | null): Promise<PersonagemPublico[]> {
   await migrar();
-  const lista = await sql<(Personagem & { usuarioNome: string })[]>`SELECT ${CAMPOS()} FROM personagem WHERE visto_em > now() - make_interval(secs => ${SEGUNDOS_ONLINE}) AND (pago_ate > now() OR usuario_id IN (SELECT id FROM usuario WHERE papel = 'admin')) AND usuario_id <> ${excetoId ?? ""} ORDER BY visto_em DESC LIMIT 200`;
+  const lista = await sql<(Personagem & { usuarioNome: string })[]>`SELECT ${CAMPOS()} FROM personagem WHERE visto_em > now() - make_interval(secs => ${SEGUNDOS_ONLINE}) AND ${filtroPersonagemAtivo()} AND usuario_id <> ${excetoId ?? ""} ORDER BY visto_em DESC LIMIT 200`;
   return lista.map((p) => ({ usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, bio: p.bio, x: p.x, z: p.z, rot: p.rot, destino: p.destX != null && p.destZ != null ? [p.destX, p.destZ] as [number, number] : null, vel: p.vel ?? 0, redes: p.mostrarRedes ? p.redes : undefined, online: true, acessorios: p.acessorios ?? [], veiculo: veiculoPublico(p.visual?.veiculo) }));
 }
 export async function personagemPublico(usuarioId: string, paraId: string | null): Promise<PersonagemPublico | null> {
@@ -182,7 +189,7 @@ export async function buscarProfissionais(f: { q?: string | null; nicho?: string
       (SELECT AVG(a.nota)::float FROM avaliacao a WHERE a.para_id = personagem.usuario_id) AS media,
       (SELECT COUNT(*)::int FROM avaliacao a WHERE a.para_id = personagem.usuario_id) AS n
     FROM personagem
-    WHERE (pago_ate > now() OR usuario_id IN (SELECT id FROM usuario WHERE papel = 'admin'))
+    WHERE ${filtroPersonagemAtivo()}
       AND usuario_id NOT IN (SELECT id FROM usuario WHERE banido_em IS NOT NULL)
       AND (profissao <> '' OR servicos <> '')
       AND (${q} = '' OR nome ILIKE ${like} OR profissao ILIKE ${like} OR servicos ILIKE ${like} OR bio ILIKE ${like} OR local ILIKE ${like})

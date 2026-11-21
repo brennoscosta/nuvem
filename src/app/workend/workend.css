@@ -11,6 +11,7 @@
   --azul: var(--blue); --azul-escuro: var(--blue-dark); --azul-claro: var(--surface-dim); --azul-pilula: var(--surface-dim);
   --grama: #6CC04A; --corpo: var(--font);
   min-height: 100vh;
+  min-height: 100dvh; /* celular: a altura visível, com a barra do navegador (21/11/2026) */
   background: var(--bg);
   color: var(--ink);
   font-family: var(--corpo);
@@ -206,3 +207,12 @@
 .we .pg-topo .btn-linha, .we .pg-topo .btn-claro { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.24); }
 .we .pg-topo .btn-linha:hover, .we .pg-topo .btn-claro:hover { background: rgba(255,255,255,.18); }
 .we .pg-topo .btn-tinta { background: #fff; color: var(--ink); }
+
+/* 21/11/2026 (responsividade): o .btn nunca quebrava linha e, no celular estreito, um botão de texto comprido passava da
+   caixa e ficava cortado ("Pedir relatório da semana", "Quem combina comigo" em 320 px). Até 480 px ele quebra a linha
+   só quando sozinho não cabe; nos outros casos continua igual. */
+@media (max-width: 480px) {
+  .we .btn { white-space: normal; text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
+}
+/* e nunca fica mais largo que a caixa onde está (o perfil com um site comprido passava 290 px em 414) */
+.we .btn { max-width: 100%; }

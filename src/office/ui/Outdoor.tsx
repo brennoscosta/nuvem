@@ -39,7 +39,7 @@ function ModalOutdoor({ slot, preco, aoAnunciar, aoFechar }: { slot: string; pre
   const ouvir = () => { const v = video.current; if (!v) return; v.muted = false; v.currentTime = 0; void v.play().catch(() => {}); setSom(true); };
   return createPortal(
     <div data-modal-outdoor className="fixed inset-0 z-[80] flex items-end justify-center bg-[#0B1220]/70 sm:items-center sm:p-4" onClick={aoFechar} role="dialog" aria-modal="true" aria-label="Anunciar neste outdoor">
-      <div className="painel-entra max-h-[100dvh] w-full max-w-[44rem] overflow-y-auto rounded-t-3xl bg-white text-[#1D2128] shadow-2xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+      <div className="painel-entra max-h-[100dvh] w-full max-w-[44rem] overflow-y-auto rounded-t-3xl sm:max-h-[calc(100dvh-2rem)] bg-white text-[#1D2128] shadow-2xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="relative bg-black">
           <video ref={video} className="block aspect-video w-full" autoPlay muted playsInline loop={!som} controls={som} preload="auto" poster="/workend/outdoor/anuncie-outdoor.jpg">
             <source src="/workend/outdoor/anuncie-outdoor.mp4" type='video/mp4; codecs="avc1.4D401F, mp4a.40.2"' />

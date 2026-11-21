@@ -21,6 +21,7 @@ import { BotaoEntrar } from "./Recepcao";
 import { NIVEL_COR, NIVEL_ROTULO } from "./equipeComum";
 
 export const useCartaoOneState = useSede;
+import { BotaoEditarPosicao } from "./EditorPosicao";
 export function abrirSede(id: string) {
   // a câmera vai até a frente da sede e, se estiver olhando pelas costas, dá a volta (19/11/2026: cada sede num lote, de
   // frente para a rua dela; scene/Cena3D.tsx)
@@ -127,13 +128,15 @@ export function CartaoOneState() {
   };
   const departamentos = setores.filter((s) => s.id !== "recepcao").length;
   return (
-    <div className={`${FLUTUANTE} ${LARGO} painel-entra flex flex-col overflow-hidden !bg-[#0E1013] !text-white`} role="dialog" aria-label={`Sede da ${sd.nome}`} style={{ "--sede": sd.cor, "--sede-tinta": tinta(sd.cor) } as React.CSSProperties}>
+    <div className={`${FLUTUANTE} ${LARGO} painel-entra flex flex-col overflow-hidden [@media(max-height:600px)]:overflow-y-auto !bg-[#0E1013] !text-white`} role="dialog" aria-label={`Sede da ${sd.nome}`} style={{ "--sede": sd.cor, "--sede-tinta": tinta(sd.cor) } as React.CSSProperties}>
       <div className="relative shrink-0 overflow-hidden px-4 pb-3 pt-4" style={{ background: `radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, ${sd.cor} 24%, #0E1013) 0%, #0E1013 60%)` }}>
         <button onClick={fechar} aria-label="Fechar" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full text-white/70 hover:bg-white/10"><Icone nome="fechar" tamanho={17} /></button>
         <img src={sd.logo} alt={sd.nome} className="h-11 w-auto max-w-[78%] object-contain object-left" />
         <p className="mt-2 text-[13px] leading-snug text-white/75">{sd.resumo}</p>
         {e && <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11.5px] font-semibold"><span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5"><Icone nome="equipe" tamanho={13} className="text-[var(--sede)]" />{e.equipe.length} agentes de IA</span><span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5"><Icone nome="camadas" tamanho={13} className="text-[var(--sede)]" />{departamentos} departamentos</span></div>}
         <BotaoEntrar chave={sd.chave} escuro className="mt-3" />
+        {/* 21/11/2026: girar a sede no lote (só a conta admin; o botão some para as outras contas) */}
+        <BotaoEditarPosicao chave={sd.chave} className="mt-2 !bg-white/10 !text-white hover:!bg-white/15" />
         <div className="mt-3 flex flex-wrap gap-2">
           {souDono && <button type="button" onClick={() => void abrirChatEquipe(sd.chave)} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--sede)] px-3 py-1.5 text-[12.5px] font-bold text-[var(--sede-tinta)] hover:brightness-105"><Icone nome="conversar" tamanho={15} />Falar com a equipe</button>}
           {souDono && <a href={`/app/equipe?lote=${encodeURIComponent(sd.chave)}&aba=internas`} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-white/15"><Icone nome="equipe" tamanho={15} />Conversas internas</a>}
@@ -141,7 +144,9 @@ export function CartaoOneState() {
           {dentro && <button type="button" onClick={() => useEscritorio.getState().setLuz(!luz)} aria-pressed={luz} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-white/15"><Icone nome={luz ? "sol" : "lua"} tamanho={15} className="text-[var(--sede)]" />{luz ? "Apagar a luz" : "Acender a luz"}</button>}
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      {/* tela baixa (celular deitado, 21/11/2026): o topo sozinho passava da altura do cartão e a lista ficava sem espaço;
+          ali o cartão inteiro rola e a lista vai junto */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 [@media(max-height:600px)]:flex-none">
         <div className="mb-1.5 mt-3 flex items-center gap-2 px-1 text-[12px] font-semibold text-[var(--sede)]"><Icone nome="camadas" tamanho={14} />Departamentos</div>
         {souDono && <p className="mb-2 px-1 text-[11.5px] leading-snug text-white/50">Abra um departamento para ver a equipe, conversar com cada pessoa ou dar uma tarefa ao chefe. Por dentro, tocar numa pessoa também abre a conversa.</p>}
         {!e && <p className="px-1 text-[12.5px] text-white/60">A equipe da sede ainda está sendo montada.</p>}

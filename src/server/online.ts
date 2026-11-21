@@ -7,7 +7,7 @@
 //    em 90 s sem batida.
 // Uma consulta agregada no banco, guardada por 5 s (e uma só em andamento): mais gente olhando não pesa o servidor.
 import { sql, migrar } from "./db";
-import { SEGUNDOS_ONLINE } from "./personagens";
+import { SEGUNDOS_ONLINE, filtroPersonagemAtivo } from "./personagens";
 
 export interface PessoaOnline { usuarioId: string; nome: string; boneco: string; roupa: string; x: number; z: number }
 export interface ResumoOnline { total: number; personagens: number; semConta: number; semPersonagem: number; lista: PessoaOnline[] }
@@ -49,7 +49,7 @@ async function personagensAgora() {
   buscando ??= (async () => {
     await migrar();
     const linhas = await sql<(PessoaOnline & { total: number })[]>`SELECT usuario_id, nome, boneco, roupa, x, z, COUNT(*) OVER ()::int AS total FROM personagem
-      WHERE visto_em > now() - make_interval(secs => ${SEGUNDOS_ONLINE}) AND (pago_ate > now() OR usuario_id IN (SELECT id FROM usuario WHERE papel = 'admin'))
+      WHERE visto_em > now() - make_interval(secs => ${SEGUNDOS_ONLINE}) AND ${filtroPersonagemAtivo()}
       ORDER BY visto_em DESC LIMIT ${LISTA_MAX}`;
     guardado = { em: Date.now(), personagens: linhas[0]?.total ?? 0, lista: linhas.map((p) => ({ usuarioId: p.usuarioId, nome: p.nome, boneco: p.boneco, roupa: p.roupa, x: Number(p.x) || 0, z: Number(p.z) || 0 })) };
     return guardado;

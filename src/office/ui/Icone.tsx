@@ -85,6 +85,9 @@ const ICONES = {
   placa: <><rect {...T} x="4" y="3.5" width="16" height="8.5" rx="1.4" /><rect x="4" y="3.5" width="16" height="8.5" rx="1.4" /><path d="M12 12v8.5M8.5 20.5h7M7.5 7.8h9" /></>,
   arrastar: <><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth="2.8" /></>,
   expandir: <><path d="M14 4h6v6M20 4l-6.5 6.5M10 20H4v-6M4 20l6.5-6.5" /></>,
+  // modo "Editar posição" (21/11/2026): mover o prédio no lote (cruz de setas) e centralizar (mira)
+  posicao: <><path d="M12 3v18M3 12h18M9.4 5.6L12 3l2.6 2.6M9.4 18.4L12 21l2.6-2.6M5.6 9.4L3 12l2.6 2.6M18.4 9.4L21 12l-2.6 2.6" /><rect x="8.6" y="8.6" width="6.8" height="6.8" rx="1.2" /></>,
+  centralizar: <><circle cx="12" cy="12" r="7" /><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /></>,
   recolher: <><path d="M20 10h-6V4M14 10l6.5-6.5M4 14h6v6M10 14l-6.5 6.5" /></>,
   // roupas e acessórios do personagem (src/office/data/acessorios.ts)
   bone: <><path {...T} d="M4.6 15a7.4 7.4 0 0 1 14.8 0z" /><path d="M4.6 15a7.4 7.4 0 0 1 14.8 0M3 15h18.4c.5 0 .7.6.3.9-1.7 1.2-3.9 1.6-6 1.6H4a1 1 0 0 1-1-1zM12 7.6V6.6" /></>,
@@ -139,6 +142,15 @@ const ICONES = {
   relogioPulso: <><circle {...T} cx="12" cy="12" r="4.6" /><circle cx="12" cy="12" r="4.6" /><path d="M9.4 8.2l.8-4.2h3.6l.8 4.2M9.4 15.8l.8 4.2h3.6l.8-4.2M12 10v2.2l1.4.9" /></>,
   pulseira: <><ellipse {...T} cx="12" cy="12" rx="8" ry="4.5" /><ellipse cx="12" cy="12" rx="8" ry="4.5" /><circle cx="12" cy="16.5" r="1.6" /><path d="M6 9.2h.01M9 7.9h.01M15 7.9h.01M18 9.2h.01" strokeWidth="2.4" /></>,
   brinco: <><circle cx="12" cy="4.6" r="1.5" /><path d="M12 6.1v3" /><circle {...T} cx="12" cy="14.6" r="5.4" /><circle cx="12" cy="14.6" r="5.4" /></>,
+  // placa de direção: o botão "Ver o guia" (21/11/2026, frente tutorial)
+  guia: <><path {...T} d="M5 5.5h11l3 2.5-3 2.5H5z" /><path d="M5 5.5h11l3 2.5-3 2.5H5zM19 13.5H8l-3 2.5 3 2.5h11z" /><path d="M12 3v2.5M12 10.5v3M12 18.5V21M8.5 21h7" /></>,
+  // frente "visitante" (20/11/2026): passaporte, presente de Natal e as peças exclusivas
+  passaporte: <><rect {...T} x="5" y="3" width="14" height="18" rx="2" /><rect x="5" y="3" width="14" height="18" rx="2" /><circle cx="12" cy="10.4" r="3.6" /><path d="M8.4 10.4h7.2M12 6.8c1.1 1 1.7 2.3 1.7 3.6s-.6 2.6-1.7 3.6c-1.1-1-1.7-2.3-1.7-3.6s.6-2.6 1.7-3.6M9 17.6h6" /></>,
+  presente: <><rect {...T} x="4" y="9.5" width="16" height="11" rx="1.6" /><rect x="4" y="9.5" width="16" height="11" rx="1.6" /><path d="M3 9.5h18M12 9.5v11M12 9.3c-1.2-2.8-4.8-3.8-5.3-1.9-.4 1.5 2.4 2 5.3 1.9zm0 0c1.2-2.8 4.8-3.8 5.3-1.9.4 1.5-2.4 2-5.3 1.9z" /></>,
+  cordao: <><path d="M7 3.5c0 5 2.2 8.5 5 8.5s5-3.5 5-8.5" /><rect {...T} x="8.5" y="12" width="7" height="9" rx="1.2" /><rect x="8.5" y="12" width="7" height="9" rx="1.2" /><circle cx="12" cy="16.2" r="1.6" /></>,
+  chapeuExplorador: <><path {...T} d="M7.5 13.4V10a4.5 4.5 0 0 1 9 0v3.4z" /><path d="M7.5 13.4V10a4.5 4.5 0 0 1 9 0v3.4M2.5 14.6c0 1.6 4.3 2.8 9.5 2.8s9.5-1.2 9.5-2.8c0-1-1.7-1.8-4.2-2.3M6.7 12.3c-2.5.5-4.2 1.3-4.2 2.3M7.6 11.9h8.8" /><circle cx="12" cy="11.9" r=".9" /></>,
+  mochilaExpedicao: <><rect {...T} x="5.5" y="8" width="13" height="13" rx="3" /><rect x="5.5" y="8" width="13" height="13" rx="3" /><rect x="6" y="3.5" width="12" height="4.2" rx="2.1" /><path d="M9 3.5v4.2M15 3.5v4.2M9 14h6v3.4H9z" /></>,
+  gorroNatal: <><path {...T} d="M5 17c.6-6.2 4-11 9.5-11 2.4 0 4 1.6 4.5 4.2" /><path d="M5 17c.6-6.2 4-11 9.5-11 2.4 0 4 1.6 4.5 4.2" /><circle cx="19.1" cy="12.2" r="1.8" /><rect x="3.5" y="16.5" width="15" height="4" rx="2" /></>,
 } satisfies Record<string, ReactNode>;
 
 export type NomeIcone = keyof typeof ICONES;
@@ -148,6 +160,8 @@ export const ICONE_ACESSORIO: Record<string, NomeIcone> = {
   // 20/11/2026 (editor completo)
   "chapeu-panama": "panama", boina: "boina", "oculos-aviador": "aviador", "gravata-borboleta": "gravata", "bolsa-couro": "bolsa",
   "relogio-ouro": "relogioPulso", relogio: "relogioPulso", pulseira: "pulseira", "brinco-argola": "brinco", "brinco-ponto": "brinco",
+  // exclusivos do passaporte e do Natal (frente "visitante")
+  "cordao-passaporte": "cordao", "chapeu-explorador": "chapeuExplorador", "mochila-expedicao": "mochilaExpedicao", "gorro-natal": "gorroNatal",
 };
 // selo de cada missão de visitante (src/office/data/missoes.ts)
 export const ICONE_MISSAO: Record<string, NomeIcone> = { explorador: "explorador", papo: "conversar", amigos: "equipe", negociante: "maleta", avaliador: "estrela", candidato: "candidato", feirante: "feirante" };

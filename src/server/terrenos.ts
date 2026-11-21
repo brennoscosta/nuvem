@@ -255,6 +255,14 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
     }
     detalhes.push(`Prédio trocado para "${modeloNovo ? MODELO[modeloNovo].nome : LAYOUT[e.layout].nome}".`);
   }
+  // troca de modelo (21/11/2026, modo "Editar posição"): o giro fica e, se o prédio novo não couber onde estava, ele vai para
+  // o lugar válido mais perto (src/server/posicao.ts › reposicionar, a mesma conta que a cena faz)
+  if (mudou && !ehQuiosque(chave)) {
+    const { reposicionar } = await import("./posicao");
+    const [ax] = await sql<{ chave: string }[]>`SELECT chave FROM terreno WHERE anexo_de = ${chave} AND status = 'ativo' LIMIT 1`;
+    const r = reposicionar(chave, e, ax?.chave ?? null);
+    if (r.decor && e.decor && (r.decor.giro !== e.decor.giro || r.decor.desloc?.join() !== e.decor.desloc?.join())) { e.decor = r.decor; detalhes.push("O prédio novo não cabia onde o antigo estava: foi para o lugar mais perto que cabe."); }
+  }
   const antes = new Set(base.equipe.map((m) => m.id));
   const novos = e.equipe.filter((m) => !antes.has(m.id));
 

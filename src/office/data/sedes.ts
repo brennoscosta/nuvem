@@ -19,6 +19,9 @@ export type EstiloSede = "classica" | "tech" | "festa" | "estudio";
 export interface Sede {
   id: string; nome: string; chave: string; i: number; j: number;
   k: number; x: number; z: number; rot: number; // lote físico (centroLote), centro dele e giro do desenho (frente local +z → rua)
+  // o lote como foi feito (centro, giro para a rua da frente e o lado da esquina). x, z, rot e lado acima são onde a sede
+  // está agora: a conta admin pode girar a sede no modo "Editar posição" (21/11/2026, data/posicaoPredio.ts › aplicarPosesSedes)
+  lote: { k: number; x: number; z: number; rot: number; lado: LadoSede };
   lado: LadoSede; // face lateral (local) virada para a rua do lado da esquina: é ela que leva as áreas junto com a frente
   cor: string; // destaque (frisos, pórtico, coroa, placas)
   corClara: string; // texto das placas da fachada e brilhos
@@ -91,7 +94,25 @@ function noLote(i: number, j: number) {
   // rua (oeste nos lotes k 0 e 2, leste nos k 1 e 3). Girado o desenho, esse lado do mundo vira o "oeste" ou o "leste" local
   const ladoMundo = k % 2 === 0 ? -1 : 1; // -1 = a rua do lado fica a oeste (-x) do lote; +1 = a leste
   const lado: LadoSede = ladoMundo * Math.round(Math.cos(rot)) < 0 ? "oeste" : "leste";
-  return { k, x, z, rot, lado };
+  return { k, x, z, rot, lado, lote: { k, x, z, rot, lado } };
+}
+// Giro da sede pela conta admin (21/11/2026, modo "Editar posição"): leva cada sede para a pose gravada no terreno dela
+// (data/posicaoPredio.ts) e refaz o lado da esquina (a face lateral que dá para a rua, a das áreas do site). A chave do
+// terreno nunca muda. Devolve true se alguma sede mudou (quem desenha a sede é montado de novo: mundoStore › versaoSedes).
+export function aplicarPosesSedes(poseDe: (chave: string) => { centro: [number, number]; rot: number } | null): boolean {
+  let mudou = false;
+  for (const s of SEDES) {
+    const p = poseDe(s.chave), x = p ? p.centro[0] : s.lote.x, z = p ? p.centro[1] : s.lote.z, rot = p ? p.rot : s.lote.rot;
+    if (x === s.x && z === s.z && Math.abs(rot - s.rot) < 1e-9) continue;
+    // lados do lote que dão para a rua: a da frente (norte ou sul) e a do lado (oeste ou leste)
+    const ruas: [number, number][] = [[0, s.lote.k >= 2 ? 1 : -1], [s.lote.k % 2 === 0 ? -1 : 1, 0]];
+    const daRua = (lx: number) => { const v: [number, number] = [Math.round(lx * Math.cos(rot)), Math.round(-lx * Math.sin(rot))]; return ruas.some((r) => r[0] === v[0] && r[1] === v[1]); };
+    const lado: LadoSede = daRua(-1) ? "oeste" : daRua(1) ? "leste" : s.lote.lado;
+    Object.assign(s, { x, z, rot, lado });
+    FAIXAS_SEDE.delete(s.id); FACHADAS_SEDE.delete(s.id); SALAS_SEDE.delete(s.id);
+    mudou = true;
+  }
+  return mudou;
 }
 
 export const SEDE_SOCIALRP = SEDES[0];

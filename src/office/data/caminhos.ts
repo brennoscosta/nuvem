@@ -3,7 +3,7 @@
 // praça são livres; dentro dos quarteirões (prédios, lojas, a sede) não se entra. Tocar no chão calcula o caminho
 // pelas ruas e calçadas (A* numa grade de 1 m, depois esticado em retas que não encostam em nada); tocar dentro de um
 // quarteirão leva até a calçada mais perto. A caminhada pelo teclado usa o mesmo livre() (scene/CameraMundo.tsx).
-import { LOTE_POR_CHAVE, PASSO, MEIO_Q, MUNDO, N, LOTE, MEIO_CALCADA, pontoNaCalcada } from "./mundo";
+import { LOTE_POR_CHAVE, PASSO, MEIO_Q, MUNDO, N, LOTE, MEIO_CALCADA, BORDAS, NORTE, pontoNaCalcada } from "./mundo";
 import { PRACA_CHAVE } from "./praca";
 import { sedeNoPonto, paraLocalSede, paraMundoSede } from "./sedes";
 import { quiosqueNoPonto } from "./quiosques";
@@ -11,9 +11,18 @@ import { quiosqueNoPonto } from "./quiosques";
 export type Ponto = [number, number];
 const PRACA = LOTE_POR_CHAVE[PRACA_CHAVE]?.centro ?? null;
 
+// ---- início do trecho da frente "editor" (21/11/2026) ----
+// O calçadão da orla (leste e sul, até a mureta da areia) também é livre: a Rua dos Quiosques da Orla (data/quiosques.ts)
+// fica de frente para ele e o cliente é atendido no balcão, na beira do calçadão.
+export const ORLA_FIM = MUNDO.x + BORDAS.orla - 0.6; // 98,4 (a mureta fica em 99)
+const naOrla = (x: number, z: number) =>
+  (x > MUNDO.x - 2 && x <= ORLA_FIM && z >= NORTE.calcadao.z0 && z <= ORLA_FIM) || (z > MUNDO.z - 2 && z <= ORLA_FIM && x >= -(MUNDO.x - 2) && x <= ORLA_FIM);
+// a grade do caminho é montada uma vez; quando um quiosque muda de lugar (giro do dono), ela é refeita
+export function refazerCaminhos() { grade = null; }
+// ---- fim do trecho da frente "editor" ----
 // calçadas, ruas e a grama das bordas são livres; dentro dos quarteirões só a praça é aberta
 export function livre(x: number, z: number) {
-  if (Math.abs(x) > MUNDO.x - 2 || Math.abs(z) > MUNDO.z - 2) return false;
+  if (Math.abs(x) > MUNDO.x - 2 || Math.abs(z) > MUNDO.z - 2) return naOrla(x, z) && !quiosqueNoPonto(x, z);
   if (quiosqueNoPonto(x, z)) return false; // quiosques (20/11/2026): desvia do corpo; o balcão e os banquinhos ficam de fora
   const i = Math.round(x / PASSO), j = Math.round(z / PASSO);
   if (Math.abs(i) > N || Math.abs(j) > N) return true;
@@ -28,7 +37,7 @@ const folgado = (x: number, z: number) => livre(x, z) && livre(x + FOLGA, z) && 
 // ponto livre mais perto: dentro de um quarteirão vai para a calçada da frente; fora do mapa volta para a borda
 export function pontoLivre(x: number, z: number): Ponto {
   const lx = MUNDO.x - 2.6, lz = MUNDO.z - 2.6;
-  let px = Math.max(-lx, Math.min(lx, x)), pz = Math.max(-lz, Math.min(lz, z));
+  let px = Math.max(-lx, Math.min(ORLA_FIM - 0.6, x)), pz = Math.max(-lz, Math.min(ORLA_FIM - 0.6, z)); // até a orla (editor)
   if (folgado(px, pz)) return [px, pz];
   // tocou numa sede (data/sedes.ts; desde 19/11/2026 num lote só): vai até a calçada da frente dela, e não à mais perto
   const sd = sedeNoPonto(px, pz);
@@ -53,7 +62,7 @@ export function retaLivre(a: Ponto, b: Ponto) {
 // ---- grade do A* (1 m), montada uma vez ----
 const CEL = 1;
 const X0 = -(MUNDO.x - 2), Z0 = -(MUNDO.z - 2);
-const NX = Math.floor((2 * (MUNDO.x - 2)) / CEL) + 1, NZ = Math.floor((2 * (MUNDO.z - 2)) / CEL) + 1;
+const NX = Math.floor((ORLA_FIM - X0) / CEL) + 1, NZ = Math.floor((ORLA_FIM - Z0) / CEL) + 1; // até a orla (editor)
 let grade: Uint8Array | null = null;
 function montarGrade() {
   const g = new Uint8Array(NX * NZ);

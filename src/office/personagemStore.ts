@@ -25,7 +25,8 @@ export type FasePredio = "indo" | "entrando" | "recepcao" | "dentro" | "saindo";
 // setor para onde a recepção mandou o visitante, com o caminho que a catraca liberou (data/plantaInterna.ts ›
 // liberarCaminho), onde ele para (ponto) e quem atende (agente). `atendido`: a recepção já falou com ele nesta visita.
 export type Liberado = Destino & { acesso: AcessoLiberado; ponto: [number, number]; agente: [number, number]; chegou: boolean };
-export type PredioAtual = Pick<Entrada, "chave" | "nome" | "numero" | "fora" | "porta" | "espera" | "olhar" | "centro"> & { fase: FasePredio; visita: number; fila: number; esperaMs: number; atendido?: boolean; liberado?: Liberado | null };
+// trilha (21/11/2026, modo "Editar posição"): o caminho pelo lote da frente da porta até a calçada (data/entradas.ts)
+export type PredioAtual = Pick<Entrada, "chave" | "nome" | "numero" | "fora" | "porta" | "espera" | "olhar" | "centro" | "trilha"> & { fase: FasePredio; visita: number; fila: number; esperaMs: number; atendido?: boolean; liberado?: Liberado | null };
 // o que o meu personagem pode usar por dentro deste prédio: dono e sócio, tudo; visitante, a recepção ou o caminho liberado
 export function acessoNoPredio(p: Pick<PredioAtual, "chave" | "liberado">): Acesso {
   if (useMundo.getState().meus.includes(p.chave)) return false;
@@ -113,7 +114,10 @@ interface Estado {
 }
 
 // Posição viva do meu boneco, escrita pela cena a cada quadro (fora do estado reativo pra não re-renderizar nada)
-export const minhaPos = { x: 0, z: 21.3, rot: 0, vel: 0 };
+// prev (21/11/2026): andando direto pelo teclado ou joystick (sem destino), o ponto aonde ele chega em ~1,8 s na direção em
+// que vai, até a primeira parede (scene/Personagens.tsx › Meu). Vai na batida no lugar do destino: quem olha de fora vê o
+// boneco andando sem parar, em vez de andar 2,6 m, esperar a próxima batida e pular
+export const minhaPos = { x: 0, z: 21.3, rot: 0, vel: 0, prev: null as [number, number] | null };
 let batidaPendente: ReturnType<typeof setTimeout> | null = null;
 // vaga da bicicleta na porta de um prédio: 1,1 m para o lado do ponto da calçada, de frente para a porta
 function vagaNaPorta(chave: string, fora: Ponto, porta: Ponto): BicicletaParada {
@@ -201,12 +205,13 @@ export const usePersonagem = create<Estado>((set, get) => ({
     if (st.predio?.chave === e.chave && st.predio.fase !== "indo") return;
     const pl = plantaPorChave(e.chave, useMundo.getState().terrenos);
     const porDentro = pl ? [portaDentroMundo(pl), ...(rotaDentro(pl, portaDentroMundo(pl), e.espera, false) ?? [e.espera])] : [e.espera];
-    const vaga = st.veiculo ? vagaNaPorta(e.chave, e.fora, e.porta) : null;
+    const pelaTrilha = [...(e.trilha ?? [])].reverse(); // da calçada até a frente da porta, por dentro do lote
+    const vaga = st.veiculo ? vagaNaPorta(e.chave, e.fora, pelaTrilha[0] ?? e.porta) : null;
     const ate = vaga ? [...rota([minhaPos.x, minhaPos.z], [vaga.x, vaga.z]), e.fora] : rota([minhaPos.x, minhaPos.z], e.fora);
     if (vaga) { const fim = ate[ate.length - 2]; vaga.x = fim[0]; vaga.z = fim[1]; }
-    const [primeiro, ...resto] = [...ate, e.porta, ...porDentro];
+    const [primeiro, ...resto] = [...ate, ...pelaTrilha, e.porta, ...porDentro];
     set({ destino: primeiro, rota: resto, passeio: false, falaRecepcao: null, acaoNoPonto: vaga ? { ponto: [vaga.x, vaga.z], acao: "descer", parada: vaga } : null,
-      predio: { chave: e.chave, nome: e.nome, numero: e.numero, fora: e.fora, porta: e.porta, espera: e.espera, olhar: e.olhar, centro: e.centro, fase: "indo", visita: (st.predio?.visita ?? 0) + 1, fila: 0, esperaMs: 0 } });
+      predio: { chave: e.chave, nome: e.nome, numero: e.numero, fora: e.fora, porta: e.porta, espera: e.espera, olhar: e.olhar, centro: e.centro, trilha: e.trilha ?? [], fase: "indo", visita: (st.predio?.visita ?? 0) + 1, fila: 0, esperaMs: 0 } });
     useMundo.setState({ loteSelecionado: null, alvoCamera: [e.fora[0], 0.5, e.fora[1]] });
     useSede.setState({ aberto: false });
     get().avisarMovimento();
@@ -218,7 +223,7 @@ export const usePersonagem = create<Estado>((set, get) => ({
     const pl = plantaPorChave(p.chave, useMundo.getState().terrenos);
     const ate = pl ? rotaDentro(pl, [minhaPos.x, minhaPos.z], portaDentroMundo(pl), acessoNoPredio(p)) ?? [portaDentroMundo(pl)] : [];
     const sb = subirNaSaida(p, get().bicicletaParada);
-    const [primeiro, ...resto] = [...ate, p.porta, p.fora, ...sb.pts];
+    const [primeiro, ...resto] = [...ate, p.porta, ...(p.trilha ?? []), p.fora, ...sb.pts];
     set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "saindo" }, falaRecepcao: null, acaoNoPonto: sb.acao }); get().avisarMovimento();
   },
   andarNoPredio: (x, z) => {
@@ -246,7 +251,7 @@ export const usePersonagem = create<Estado>((set, get) => ({
     // tocou fora do prédio: sai pela porta e segue pela rua até o ponto tocado
     const ate = rotaDentro(pl, de, portaDentroMundo(pl), publico) ?? [portaDentroMundo(pl)];
     const sb = subirNaSaida(p, st.bicicletaParada);
-    const [primeiro, ...resto] = [...ate, p.porta, p.fora, ...sb.pts, ...rota(sb.pts[0] ?? p.fora, [x, z])];
+    const [primeiro, ...resto] = [...ate, p.porta, ...(p.trilha ?? []), p.fora, ...sb.pts, ...rota(sb.pts[0] ?? p.fora, [x, z])];
     set({ destino: primeiro, rota: resto, passeio: false, predio: { ...p, fase: "saindo" }, falaRecepcao: null, acaoNoPonto: sb.acao });
     get().avisarMovimento();
   },
@@ -283,7 +288,7 @@ export const usePersonagem = create<Estado>((set, get) => ({
   avisarMovimento: () => { if (batidaPendente) clearTimeout(batidaPendente); batidaPendente = setTimeout(() => { batidaPendente = null; void get().batida(); }, 120); },
   batida: async () => {
     try {
-      const { x, z, rot, vel } = minhaPos; const { destino, veiculo, bicicletaParada: bp } = get();
+      const { x, z, rot, vel } = minhaPos; const { veiculo, bicicletaParada: bp } = get(); const destino = get().destino ?? minhaPos.prev;
       const parada = bp ? [bp.x, bp.z, bp.rot, bp.chave ? 1 : 0] : null;
       const j = await fetch("/api/personagem/presenca", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ x, z, rot, destino, vel: destino ? vel : 0, veiculo, parada }) }).then((r) => r.json());
       const outros: Outro[] = j.outros ?? [];

@@ -1,5 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
+
+// 21/11/2026 (responsividade): no mapa as conversas ficam em cartões presos embaixo; com o teclado aberto (Android) a
+// altura útil (dvh) encolhe acima dele e o cartão sobe junto, em vez de o teclado cobrir o campo. O iPhone ignora isto e
+// rola sozinho até o campo.
+export const viewport: Viewport = { width: "device-width", initialScale: 1, interactiveWidget: "resizes-content" };
 import { Escritorio } from "@/office/Escritorio";
 import { ehHostWorkend } from "@/server/hosts";
 import { meta } from "./workend/seo";

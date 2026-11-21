@@ -14,7 +14,8 @@
 //  - Acesso { zonas, catracas }: visitante que a recepção encaminhou: ganha só as zonas e as catracas do caminho até a
 //    sala do setor (liberarCaminho).
 // Tudo aqui é função pura (sem three.js, sem React): testável com tsx.
-import { LOTE_POR_CHAVE, frenteDoLote } from "./mundo";
+import { LOTE_POR_CHAVE } from "./mundo";
+import { poseConferida } from "./posicaoPredio"; // centro e giro do prédio no lote (21/11/2026, modo "Editar posição")
 import { PREDIO_CLIENTE, plantaCliente, catracasCliente, Z_CATRACA_CLIENTE, DECORACAO_DISCRETA, type Escritorio } from "./escritorio";
 import { sedeDe } from "./sedes";
 import { montarSalas, paredesDaSede, lugaresDaSala, catracasDaSede, cx, X0 as SX0, X1 as SX1, Z0 as SZ0, Z1 as SZ1, ZC, CORREDOR, ESP_PAREDE, MESA_COMPACTA, MOVEIS_SEDE, type Catraca } from "./plantaSede";
@@ -95,10 +96,8 @@ function paredeComPorta(a: Ponto, b: Ponto, vao: number): Ret[] {
 }
 function plantaDaLoja(chave: string, nome: string, e: Escritorio, anexo: string | null): PlantaInterna | null {
   const l = LOTE_POR_CHAVE[chave]; if (!l) return null;
-  const la = anexo ? LOTE_POR_CHAVE[anexo] : null;
-  const centro: Ponto = [l.centro[0] + (la ? (la.centro[0] - l.centro[0]) / 2 : 0), l.centro[1]];
-  const giro = e.decor?.giro ?? 0, giroEf = la ? giro - (giro % 2) : giro;
-  const rot = frenteDoLote(l.k) + Math.PI + giroEf * (Math.PI / 2);
+  const pc = poseConferida({ chave, status: "ativo", escritorio: e }, anexo); if (!pc) return null;
+  const centro: Ponto = pc.pose.centro, rot = pc.pose.rot;
   const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = PREDIO_CLIENTE;
   const pl = plantaCliente(e);
   const zMeio = pl.salas[0].z1;

@@ -34,6 +34,9 @@ import { SaldoCreditos } from "./SaldoCreditos";
 import { MarcaTopo } from "@/app/workend/_marca";
 import { ContadorCidade } from "./PessoasOnline";
 import { ClasseNatal } from "@/app/workend/_natal";
+import { Visitante } from "./Visitante";
+import "./ganchoMedir"; // só com ?medir=1: a ferramenta de medir as telas abre os cartões por aqui
+import { EditorPosicaoPainel } from "./EditorPosicao";
 
 // Estamos no mapa do WorkEnd (workend.online/mundo)? Só dá pra saber no navegador (sem erro de hidratação).
 const semAssinatura = () => () => {};
@@ -302,8 +305,11 @@ export function Painel() {
       <CartaoQuiosque />
       <CartaoOutdoor />
       <CartaoOneState />
+      <EditorPosicaoPainel />
       <ChatEquipe />
       <Recepcao />
+      {/* passaporte, aviso do atendimento, caça de Natal e "acontecendo agora" (frente visitante, ui/Visitante.tsx) */}
+      <Visitante />
       <PainelEmpresa />
       <PainelEscritorio />
       <PainelPersonagem />

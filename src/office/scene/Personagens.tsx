@@ -19,8 +19,12 @@ import { modoMundo, useMundo } from "../mundoStore";
 import { useEscritorio } from "../store";
 import { sedeDe } from "../data/sedes";
 import { VEICULOS } from "../data/veiculos";
-import { plantaPorChave, zonaNoMundo } from "../data/plantaInterna";
+import { plantaPorChave, zonaNoMundo, caminharDentro, type PlantaInterna, type Acesso } from "../data/plantaInterna";
 import { Bicicleta, BicicletaParada, SombraAlongada, usePedalar, bicicletasNaCena, type BicicletaHandle } from "./Bicicleta";
+import { livre } from "../data/caminhos";
+import { acessoNoPredio } from "../personagemStore";
+import { comandoAndar } from "../cameraStore";
+import type { Veiculo } from "../data/veiculos";
 
 // entrar e sair dos prédios (17/11/2026): marcos do caminho (calçada da porta, porta e balcão), ver personagemStore.ts
 const perto = (a: readonly [number, number], b: readonly [number, number], r = 0.7) => Math.hypot(a[0] - b[0], a[1] - b[1]) < r;
@@ -63,6 +67,76 @@ const VEL_PASSEIO = 1.0; // quando passeia sozinho, anda no ritmo dos outros ped
 const PAUSA_PASSEIO = 9; // s parado antes de sair passeando pela calçada
 const def = (id: string) => bonecoDe(id, BONECOS[1]); // catálogo ou visual personalizado (v1:…)
 
+// ---------- movimento do meu boneco (21/11/2026, pedido do dono: "a movimentação é bugada") ----------
+// Andar pela rua (tecla C) com o teclado ou o joystick: anda direto pela direção pedida (comandoAndar, escrito pelo
+// CameraMundo), com arranque e freada (a pé quase na hora; de bicicleta mais devagar, virando em arco) e colisão a cada
+// 12 cm: encostado num quarteirão ou numa parede, escorrega ao longo dela, olhando para onde anda. Antes o teclado mandava
+// o boneco até um ponto 2,6 m à frente a cada 160 ms: ele parava longe das paredes, cortava as quinas (só o ponto final era
+// testado), a bicicleta pulsava de velocidade e soltar a tecla parava de uma vez.
+type Est = ReturnType<typeof usePersonagem.getState>;
+const _p: [number, number] = [0, 0];
+function andarDireto(o: THREE.Group, dt: number, vc: Veiculo | null, vel: { current: number }, rumo: { current: number | null }, st: Est) {
+  const cmd = comandoAndar, forca = Math.min(1, Math.hypot(cmd.x, cmd.z));
+  const velMax = vc ? vc.vel * CORRER : VEL, acel = vc ? vc.acel * CORRER : 6, freio = vc ? vc.freio * CORRER : 8;
+  if (rumo.current == null || vel.current < 0.05) rumo.current = o.rotation.y;
+  let alvo = forca > 0.08 ? forca * velMax : 0;
+  if (alvo > 0) {
+    let d = Math.atan2(cmd.x, cmd.z) - rumo.current; d = Math.atan2(Math.sin(d), Math.cos(d));
+    if (vc && Math.abs(d) > 1.9) alvo = Math.min(alvo, 1.6); // de bicicleta, meia-volta devagar
+    rumo.current += d * (1 - Math.exp(-dt * (vc ? 3.5 : 12)));
+  }
+  vel.current = vel.current < alvo ? Math.min(alvo, vel.current + acel * dt) : Math.max(alvo, vel.current - freio * dt);
+  if (vel.current < 0.01) { vel.current = 0; minhaPos.prev = null; return; }
+  const passo = vel.current * dt, ax = o.position.x, az = o.position.z;
+  const pd = st.predio, pl = pd && (pd.fase === "recepcao" || pd.fase === "dentro") ? plantaPorChave(pd.chave, useMundo.getState().terrenos) : null;
+  deslizar(ax, az, Math.sin(rumo.current) * passo, Math.cos(rumo.current) * passo, pl, pd ? acessoNoPredio(pd) : false, _p);
+  const andou = Math.hypot(_p[0] - ax, _p[1] - az);
+  // de cara na parede: fica parado, sem "andar no lugar" (e arranca de novo assim que a direção abrir)
+  if (andou < passo * 0.05) { vel.current = Math.min(vel.current, 0.5); minhaPos.prev = null; return; }
+  const dir = andou > passo * 0.3 ? Math.atan2(_p[0] - ax, _p[1] - az) : rumo.current;
+  o.position.x = _p[0]; o.position.z = _p[1];
+  girar(o, dir, dt, vc ? vc.giro : 12);
+  minhaPos.prev = pl ? null : prever(_p[0], _p[1], dir, Math.min(12, vel.current * 1.8));
+}
+// anda (dx, dz) em passinhos de 12 cm; o que bater escorrega pelo eixo livre (na rua) ou pela planta do prédio (por dentro)
+function deslizar(x: number, z: number, dx: number, dz: number, pl: PlantaInterna | null, acesso: Acesso, out: [number, number]) {
+  if (!pl && !livre(x, z)) { out[0] = x + dx; out[1] = z + dz; return; } // boneco antigo dentro de um quarteirão: deixa sair
+  const n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.12)), sx = dx / n, sz = dz / n;
+  for (let k = 0; k < n; k++) {
+    if (pl) { const [nx, nz] = caminharDentro(pl, x, z, sx, sz, acesso); if (nx === x && nz === z) break; x = nx; z = nz; continue; }
+    if (livre(x + sx, z + sz)) { x += sx; z += sz; }
+    else if (Math.abs(sx) > 1e-6 && livre(x + sx, z)) x += sx;
+    else if (Math.abs(sz) > 1e-6 && livre(x, z + sz)) z += sz;
+    else break;
+  }
+  out[0] = x; out[1] = z;
+}
+// aonde ele chega andando reto (para a batida: os outros veem o boneco seguir sem parar), até a primeira parede
+function prever(x: number, z: number, ang: number, dist: number): [number, number] {
+  const sx = Math.sin(ang), sz = Math.cos(ang); let px = x, pz = z;
+  for (let k = 0.5; k <= dist; k += 0.5) { const qx = x + sx * k, qz = z + sz * k; if (!livre(qx, qz)) break; px = qx; pz = qz; }
+  return [px, pz];
+}
+// vira o corpo suave (igual em qualquer taxa de quadros)
+function girar(o: THREE.Object3D, alvo: number, dt: number, k: number) { let d = alvo - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.rotation.y += d * (1 - Math.exp(-dt * k)); }
+// passo no ritmo da velocidade (as pernas não patinam): a passada do boneco cabe ~1,55 m/s no ritmo normal da animação
+const ritmoDoPasso = (v: number) => (v > 0.15 ? Math.max(0.55, Math.min(1.5, v / 1.55)) : 1);
+// fim de todo quadro: a velocidade de verdade e a posição viva (minhaPos), lidas pela câmera e pela batida
+function quadroPronto(o: THREE.Object3D, x0: number, z0: number, dt: number, velReal: { current: number }, intencao: number) {
+  const andou = Math.min(Math.hypot(o.position.x - x0, o.position.z - z0) / Math.max(dt, 1e-4), intencao + 0.6);
+  velReal.current += (andou - velReal.current) * (1 - Math.exp(-dt * 18));
+  if (velReal.current < 0.03) velReal.current = 0;
+  minhaPos.x = o.position.x; minhaPos.z = o.position.z; minhaPos.rot = o.rotation.y; minhaPos.vel = velReal.current;
+}
+// batida andando direto: na saída, a cada 1 s, quando muda de direção (mais de ~30°) e quando para (com o ponto final)
+function avisarAndando(a: { em: number; dir: number; andando: boolean }) {
+  const agora = performance.now(), st = usePersonagem.getState();
+  if (minhaPos.vel > 0.2) {
+    let d = minhaPos.rot - a.dir; d = Math.atan2(Math.sin(d), Math.cos(d));
+    if (!a.andando || agora - a.em > 1000 || (Math.abs(d) > 0.5 && agora - a.em > 300)) { a.em = agora; a.dir = minhaPos.rot; a.andando = true; st.avisarMovimento(); }
+  } else if (a.andando) { a.andando = false; a.em = agora; st.setPosicao(minhaPos.x, minhaPos.z, minhaPos.rot); st.avisarMovimento(); }
+}
+
 function Nome({ nome, cor, eu = false, online = true, onClick }: { nome: string; cor: string; eu?: boolean; online?: boolean; onClick?: () => void }) {
   return (
     <Html position={[0, 1.5, 0]} center zIndexRange={[6, 0]} style={{ pointerEvents: "none" }}>
@@ -81,7 +155,6 @@ function Nome({ nome, cor, eu = false, online = true, onClick }: { nome: string;
 function Meu() {
   const meu = usePersonagem((s) => s.meu);
   const ativo = usePersonagem((s) => s.ativo);
-  const destino = usePersonagem((s) => s.destino);
   const veiculo = usePersonagem((s) => s.veiculo);
   const corBici = usePersonagem((s) => s.corBicicleta);
   const g = useRef<THREE.Group>(null);
@@ -91,13 +164,21 @@ function Meu() {
   const vel = useRef(0); // velocidade atual (m/s), acelera e freia
   const paradoDesde = useRef(0); // 0 = marca na primeira frame; passeia sozinho depois de um tempo parado
   const pausaAte = useRef(0); // descendo ou subindo na bicicleta: fica parado um instante
+  // ---- movimento (21/11/2026, pedido do dono: "a movimentação é bugada"; ver andarDireto, mais abaixo) ----
+  // velReal: o que ele andou de verdade ÷ dt (anima as pernas e vai para a câmera e para a batida). rumo: a direção em que
+  // anda, que vira suave; antes ela trocava de uma vez nas esquinas e ele deslizava de lado até o corpo terminar de virar
+  const velReal = useRef(0);
+  const rumo = useRef<number | null>(null);
+  const aviso = useRef({ em: 0, dir: 0, andando: false });
   const fase = useMemo(() => 1.3, []);
-  useAnimacao(h, () => (usePersonagem.getState().veiculo ? "pedal" : vel.current > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base);
+  useAnimacao(h, () => (usePersonagem.getState().veiculo ? "pedal" : velReal.current > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base, 1, () => ritmoDoPasso(velReal.current));
   usePedalar(h, g, inclina, bike, () => !!usePersonagem.getState().veiculo);
   // posição inicial: a salva no servidor (encostada na calçada, nunca no meio da rua)
   useEffect(() => { if (g.current && meu) { const [x, z] = pontoNaCalcada(meu.x, meu.z); g.current.position.set(x, 0, z); g.current.rotation.y = meu.rot; usePersonagem.getState().setPosicao(x, z, meu.rot); } }, [meu?.usuarioId, ativo]); // eslint-disable-line react-hooks/exhaustive-deps
-  useFrame((_, dt) => {
-    const o = g.current; if (!o) return; dt = Math.min(dt, CORRER > 1 ? 0.4 : 0.1);
+  // prioridade -3 (21/11/2026): o boneco anda ANTES de a câmera (CameraMundo) ler a posição dele no mesmo quadro. Antes a
+  // câmera rodava primeiro e ficava um quadro atrás; com o tempo de cada quadro variando, o boneco tremia na tela
+  useFrame((_, dt0) => {
+    const o = g.current; if (!o) return; const dt = Math.min(dt0, CORRER > 1 ? 0.4 : 0.1);
     const st = usePersonagem.getState();
     const vc = st.veiculo ? VEICULOS[st.veiculo] : null;
     // dentro do prédio não tem bicicleta: se entrou montado por outro caminho, desce ali mesmo
@@ -105,16 +186,23 @@ function Meu() {
     // longe da bicicleta parada (mais de 20 m, na rua): ela é guardada
     const bp = st.bicicletaParada;
     if (bp && !st.predio && Math.hypot(bp.x - o.position.x, bp.z - o.position.z) > 20) usePersonagem.setState({ bicicletaParada: null });
-    if (performance.now() < pausaAte.current) { vel.current = 0; minhaPos.vel = 0; return; }
+    const x0 = o.position.x, z0 = o.position.z;
+    const pronto = () => quadroPronto(o, x0, z0, dt, velReal, vel.current);
+    if (performance.now() < pausaAte.current) { vel.current = 0; pronto(); return; }
+    // modo andar (teclado ou joystick) sem caminho: anda direto pela direção pedida
+    if (comandoAndar.ativo && !st.destino) { paradoDesde.current = performance.now(); andarDireto(o, dt, vc, vel, rumo, st); pronto(); avisarAndando(aviso.current); return; }
+    minhaPos.prev = null; aviso.current.andando = false;
+    const destino = st.destino; // o estado de agora (a cópia do último desenho do React pode estar um quadro atrasada)
     if (!destino) {
       vel.current = Math.max(0, vel.current - (vc ? vc.freio * CORRER : 8) * dt);
       if (!paradoDesde.current) paradoDesde.current = performance.now();
       // como um pedestre comum: depois de um tempo parado, dá uma volta pela calçada (um clique no chão interrompe); de
       // bicicleta não sai passeando sozinho
       if (performance.now() - paradoDesde.current > PAUSA_PASSEIO * 1000 && st.painel !== "chat" && !st.predio && !vc) { paradoDesde.current = performance.now(); usePersonagem.setState({ destino: passeioNaCalcada(o.position.x, o.position.z), passeio: true }); st.avisarMovimento(); }
-      minhaPos.vel = 0; return;
+      pronto(); return;
     }
-    const dx = destino[0] - o.position.x, dz = destino[1] - o.position.z; const dist = Math.hypot(dx, dz);
+    let alvoX = destino[0], alvoZ = destino[1];
+    let dx = alvoX - o.position.x, dz = alvoZ - o.position.z; let dist = Math.hypot(dx, dz);
     const velMax = st.passeio ? VEL_PASSEIO : vc ? vc.vel * CORRER : VEL;
     const acel = vc ? vc.acel * CORRER : 6, freio = vc ? vc.freio * CORRER : 8;
     // freia nos últimos 60 cm do caminho (nas esquinas do meio do caminho segue sem frear), acelera no resto. Também para
@@ -124,34 +212,44 @@ function Meu() {
     const para = ultimo || noPonto;
     const alvo = !para ? velMax : vc ? Math.max(0.4, Math.min(velMax, Math.sqrt(2 * freio * 0.8 * dist))) : dist < 0.6 ? Math.max(0.5, velMax * (dist / 0.6)) : velMax;
     vel.current = vel.current < alvo ? Math.min(alvo, vel.current + acel * dt) : Math.max(alvo, vel.current - freio * dt);
-    // chegou numa esquina do caminho: segue para o próximo ponto (data/caminhos.ts) sem parar
-    if (!para && dist < 0.35) { passouPor(destino); const [prox, ...resto] = usePersonagem.getState().rota; usePersonagem.setState({ destino: prox, rota: resto }); st.avisarMovimento(); return; }
-    if (dist < 0.06) {
-      o.position.set(destino[0], 0, destino[1]); vel.current = 0; minhaPos.vel = 0;
+    // chegou numa esquina do caminho: segue para o próximo ponto (data/caminhos.ts) sem parar, ainda neste quadro
+    if (!para && dist < 0.35) {
+      passouPor(destino); const [prox, ...resto] = usePersonagem.getState().rota; usePersonagem.setState({ destino: prox, rota: resto }); st.avisarMovimento();
+      if (!prox) { pronto(); return; }
+      alvoX = prox[0]; alvoZ = prox[1]; dx = alvoX - o.position.x; dz = alvoZ - o.position.z; dist = Math.hypot(dx, dz);
+    } else if (dist < 0.06) {
+      o.position.set(destino[0], 0, destino[1]); vel.current = 0;
       passouPor(destino);
       if (noPonto && acao) {
         const agora = usePersonagem.getState();
         if (acao.acao === "descer" && agora.veiculo) usePersonagem.setState({ veiculo: null, acaoNoPonto: null, bicicletaParada: { ...(acao.parada ?? { x: o.position.x, z: o.position.z, rot: o.rotation.y, chave: null }), de: [o.position.x, o.position.z, o.rotation.y] } });
         else if (acao.acao === "subir" && !agora.veiculo && agora.bicicletaParada && Math.hypot(agora.bicicletaParada.x - o.position.x, agora.bicicletaParada.z - o.position.z) < 2.5) {
-          o.rotation.y = agora.bicicletaParada.rot; // pega a bicicleta como ela estava
+          o.rotation.y = agora.bicicletaParada.rot; rumo.current = o.rotation.y; // pega a bicicleta como ela estava
           usePersonagem.setState({ veiculo: "bicicleta", bicicletaParada: null, acaoNoPonto: null });
         } else usePersonagem.setState({ acaoNoPonto: null });
         pausaAte.current = performance.now() + 450;
         // no meio do caminho: depois do instante parado, segue para o próximo ponto
-        if (!ultimo) { const [prox, ...resto] = usePersonagem.getState().rota; usePersonagem.setState({ destino: prox, rota: resto }); minhaPos.x = o.position.x; minhaPos.z = o.position.z; minhaPos.rot = o.rotation.y; st.avisarMovimento(); return; }
+        if (!ultimo) { const [prox, ...resto] = usePersonagem.getState().rota; usePersonagem.setState({ destino: prox, rota: resto }); pronto(); st.avisarMovimento(); return; }
       }
       const pd = usePersonagem.getState().predio;
       if (pd && (pd.fase === "entrando" || pd.fase === "indo") && perto(destino, pd.espera, 0.4)) { o.rotation.y = pd.olhar; chegouNoBalcao(); }
       else if (pd && pd.fase === "saindo" && perto(destino, pd.fora, 0.4)) usePersonagem.setState({ predio: null, falaRecepcao: null });
       else if (pd && pd.fase === "dentro" && pd.liberado && !pd.liberado.chegou && ultimo && naSala(pd.chave, pd.liberado.salaId, o.position.x, o.position.z)) chegouNoSetor(o);
       paradoDesde.current = performance.now() - (st.passeio ? PAUSA_PASSEIO * 400 : 0);
-      usePersonagem.setState({ destino: null, passeio: false }); st.setPosicao(o.position.x, o.position.z, o.rotation.y); st.avisarMovimento();
+      usePersonagem.setState({ destino: null, passeio: false }); pronto(); st.setPosicao(o.position.x, o.position.z, o.rotation.y); st.avisarMovimento();
       return;
     }
-    const p = Math.min(dist, vel.current * dt); o.position.x += (dx / dist) * p; o.position.z += (dz / dist) * p;
-    const r = Math.atan2(dx, dz); let d = r - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.rotation.y += d * Math.min(1, dt * (vc ? vc.giro : 12));
-    minhaPos.x = o.position.x; minhaPos.z = o.position.z; minhaPos.rot = o.rotation.y; minhaPos.vel = vel.current;
-  });
+    // anda virando suave: nas esquinas do caminho faz um arco curto (uns 15 cm a pé) em vez de trocar de direção de uma
+    // vez; perto do ponto mira reto nele (chega sempre)
+    const alvoR = Math.atan2(dx, dz);
+    if (rumo.current == null || vel.current < 0.05 + acel * dt) rumo.current = rumo.current == null ? alvoR : o.rotation.y;
+    let dr = alvoR - rumo.current; dr = Math.atan2(Math.sin(dr), Math.cos(dr));
+    rumo.current = Math.abs(dr) < 0.02 || dist < 0.25 ? alvoR : rumo.current + dr * (1 - Math.exp(-dt * (vc ? 9 : 14)));
+    const p = Math.min(dist, vel.current * dt);
+    o.position.x += Math.sin(rumo.current) * p; o.position.z += Math.cos(rumo.current) * p;
+    girar(o, rumo.current, dt, vc ? vc.giro : 12);
+    pronto();
+  }, -3);
   if (!meu || !ativo) return null;
   const b = def(meu.boneco);
   return (
@@ -193,7 +291,7 @@ function OutroBoneco({ o }: { o: Outro }) {
     // divergiu demais (teleporte, aba que ficou parada): pula pra posição do servidor
     const g0 = g.current; if (g0 && Math.hypot(o.x - g0.position.x, o.z - g0.position.z) > 6) { g0.position.set(o.x, 0, o.z); g0.rotation.y = o.rot; }
   }, [o.x, o.z, o.rot, o.destino, o.vel]);
-  useAnimacao(h, () => (montadoRef.current ? "pedal" : vel.current > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base);
+  useAnimacao(h, () => (montadoRef.current ? "pedal" : vel.current > 0.15 ? "walk" : "idle"), fase, HIPS.procedural.base, 1, () => ritmoDoPasso(vel.current));
   usePedalar(h, g, inclina, bike, () => montadoRef.current);
   useFrame((_, dt) => {
     const g0 = g.current; if (!g0) return; dt = Math.min(dt, 0.1);
@@ -208,8 +306,8 @@ function OutroBoneco({ o }: { o: Outro }) {
     vel.current = vel.current < alvoV ? Math.min(alvoV, vel.current + 6 * dt) : Math.max(alvoV, vel.current - 8 * dt);
     if (dist > 0.05) {
       const p = Math.min(dist, vel.current * dt); g0.position.x += (dx / dist) * p; g0.position.z += (dz / dist) * p;
-      const r = Math.atan2(dx, dz); let d = r - g0.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g0.rotation.y += d * Math.min(1, dt * 12);
-    } else { vel.current = 0; let d = s.rot - g0.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g0.rotation.y += d * Math.min(1, dt * 6); }
+      girar(g0, Math.atan2(dx, dz), dt, 12);
+    } else { vel.current = 0; girar(g0, s.rot, dt, 6); }
   });
   const selecionar = () => usePersonagem.getState().selecionarOutro(o);
   // posição viva dos outros (só pra testes/prévias)
@@ -236,7 +334,8 @@ function ChaoClicavel() {
   if (!ativo || !modoMundo()) return null;
   return (
     <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} onClick={(e) => { e.stopPropagation(); usePersonagem.getState().irPara(e.point.x, e.point.z); }}>
-      <planeGeometry args={[MUNDO.x * 2, MUNDO.z * 2]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      {/* frente "editor" (21/11/2026): o chão clicável vai até a mureta da orla, que ficou andável (data/caminhos.ts) */}
+      <planeGeometry args={[MUNDO.x * 2 + 16, MUNDO.z * 2 + 16]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
   );
 }
@@ -273,9 +372,13 @@ export function Personagens() {
     if (!modoMundo()) return;
     let vivo = true;
     void carregar().then(() => { void batida(); if (new URLSearchParams(window.location.search).get("personagem") === "1") usePersonagem.getState().abrir("montar"); });
-    const t1 = setInterval(() => { if (vivo && document.visibilityState === "visible") void batida(); }, 3000);
+    // 21/11/2026: com alguém andando (o destino dele veio na batida), a próxima batida vem em 1,5 s e não em 3 s: quem olha
+    // vê o outro seguir andando, em vez de parar no ponto previsto, esperar e pular
+    let t1: ReturnType<typeof setTimeout> | null = null;
+    const ciclo = () => { if (!vivo) return; if (document.visibilityState === "visible") void batida(); t1 = setTimeout(ciclo, usePersonagem.getState().outros.some((o) => o.online && o.destino) ? 1500 : 3000); };
+    t1 = setTimeout(ciclo, 3000);
     const t2 = setInterval(() => { if (vivo && usePersonagem.getState().painel === "chat") void atualizarChat(); }, 2500);
-    return () => { vivo = false; clearInterval(t1); clearInterval(t2); };
+    return () => { vivo = false; if (t1) clearTimeout(t1); clearInterval(t2); };
   }, [carregar, batida, atualizarChat]);
   return (
     <group>

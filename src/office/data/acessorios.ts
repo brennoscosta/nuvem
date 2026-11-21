@@ -5,7 +5,9 @@
 // As roupas premium não são "usadas" como acessório: são escolhas do visual (traje ou sapato) que só valem comprando.
 // Toda cobrança passa por ITEM_PAGO_POR_ID + comprarItem (src/server/cidade.ts), num lugar só.
 export type LugarAcessorio = "cabeca" | "rosto" | "costas" | "pescoco" | "pulso" | "pulseira" | "orelha";
-export interface Acessorio { id: string; nome: string; lugar: LugarAcessorio; preco: number; cor: string; icone: string } // icone: nome do ícone próprio (ui/Icone.tsx)
+// ganho (20/11/2026, frente "visitante"): peça exclusiva, que não está à venda; o texto diz como se ganha (passaporte da
+// cidade ou caça de Natal, src/server/passaporte.ts). Ela entra na conta pela tabela item_comprado, como as compradas.
+export interface Acessorio { id: string; nome: string; lugar: LugarAcessorio; preco: number; cor: string; icone: string; ganho?: string } // icone: nome do ícone próprio (ui/Icone.tsx)
 export const PRECO_PREMIUM = 5.9;
 export const ACESSORIOS: Acessorio[] = [
   { id: "bone-workend", nome: "Boné WorkEnd", lugar: "cabeca", preco: 2.9, cor: "#0A6CFF", icone: "bone" },
@@ -31,9 +33,15 @@ export const ACESSORIOS: Acessorio[] = [
   { id: "pulseira", nome: "Pulseira", lugar: "pulseira", preco: 0, cor: "#E0A458", icone: "pulseira" },
   { id: "brinco-argola", nome: "Brinco de argola", lugar: "orelha", preco: 0, cor: "#D4A63A", icone: "brinco" },
   { id: "brinco-ponto", nome: "Brinco de ponto", lugar: "orelha", preco: 0, cor: "#E5E7EB", icone: "brinco" },
+  // exclusivos (20/11/2026, frente "visitante"): só se ganham na cidade, nunca no Pix
+  { id: "cordao-passaporte", nome: "Cordão do passaporte", lugar: "pescoco", preco: 0, cor: "#1E3A8A", icone: "cordao", ganho: "Passaporte: 3 carimbos" },
+  { id: "chapeu-explorador", nome: "Chapéu de explorador", lugar: "cabeca", preco: 0, cor: "#B08D57", icone: "chapeuExplorador", ganho: "Passaporte: 6 carimbos" },
+  { id: "mochila-expedicao", nome: "Mochila de expedição", lugar: "costas", preco: 0, cor: "#4D6B3C", icone: "mochilaExpedicao", ganho: "Passaporte: 15 carimbos" },
+  { id: "gorro-natal", nome: "Gorro de Natal", lugar: "cabeca", preco: 0, cor: "#C8102E", icone: "gorroNatal", ganho: "Caça de Natal: 12 presentes" },
 ];
 export const ACESSORIO_POR_ID: Record<string, Acessorio> = Object.fromEntries(ACESSORIOS.map((a) => [a.id, a]));
-export const ehGratis = (id: string) => ACESSORIO_POR_ID[id]?.preco === 0;
+export const ehGratis = (id: string) => ACESSORIO_POR_ID[id]?.preco === 0 && !ACESSORIO_POR_ID[id]?.ganho;
+export const ehExclusivo = (id: string) => !!ACESSORIO_POR_ID[id]?.ganho;
 // no máximo um por lugar; só ids conhecidos
 export function limparEquipados(x: unknown): string[] {
   const lista = Array.isArray(x) ? x.filter((i): i is string => typeof i === "string" && !!ACESSORIO_POR_ID[i]) : [];

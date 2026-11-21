@@ -4,7 +4,8 @@
 // casas dos lotes à venda e os outdoors. A câmera (scene/CameraMundo.tsx) testa a cada quadro um raio do boneco até ela
 // contra estas caixas: umas poucas dezenas de testes de caixa, no lugar de um raio contra todas as malhas da cena.
 // Tudo aqui é função pura (sem three.js, sem React): testável com tsx.
-import { LOTES, frenteDoLote, LOTE_POR_CHAVE, type ModeloCasa } from "./mundo";
+import { LOTES, LOTE_POR_CHAVE, type ModeloCasa } from "./mundo";
+import { poseConferida, posesDaCidade } from "./posicaoPredio"; // 21/11/2026: centro e giro de cada prédio (modo "Editar posição")
 import { DIM_LAYOUT, alturaPredio, andaresDoPredio, type Escritorio } from "./escritorio";
 import { ehKit, medidasKit } from "./predios";
 import { SEDES, alturaSede, degrausEstudio, logosModeloSede, type EstiloSede } from "./sedes";
@@ -73,9 +74,8 @@ export function caixasDaCidade(terrenos: Record<string, TerrenoCaixa>): Caixa[] 
     if (t.status !== "ativo" || !t.escritorio || t.anexoDe) continue;
     const l = LOTE_POR_CHAVE[t.chave]; if (!l) continue;
     const la = anexos[t.chave] ? LOTE_POR_CHAVE[anexos[t.chave]] : null, duplo = !!la;
-    const cx = l.centro[0] + (la ? (la.centro[0] - l.centro[0]) / 2 : 0), cz = l.centro[1];
-    const giro = t.escritorio.decor?.giro ?? 0, giroEf = duplo ? giro - (giro % 2) : giro;
-    const rot = frenteDoLote(l.k) + Math.PI + giroEf * (Math.PI / 2);
+    const pc = poseConferida(t, anexos[t.chave] ?? null); if (!pc) continue;
+    const [cx, cz] = pc.pose.centro, rot = pc.pose.rot;
     const h = alturaPredio(t.escritorio, duplo), lay = t.escritorio.layout;
     if (ehKit(lay)) {
       const m = medidasKit(lay, andaresDoPredio(t.escritorio), duplo, (t.escritorio.decor?.cobertura ?? "nenhuma") !== "nenhuma");
@@ -95,6 +95,8 @@ export function caixasDaCidade(terrenos: Record<string, TerrenoCaixa>): Caixa[] 
     const [x, z] = l.centro, frente = l.k >= 2 ? 1 : -1, e = l.lote.escala ?? 1, c = CASA[l.lote.modelo];
     out.push(caixaXZ(x, z - frente * 1.2, c.lado * e, c.lado * e, 0, c.altura * e));
   }
+  // quiosques (21/11/2026): o corpo com o toldo, até a placa do alto do chalé (scene/Quiosques.tsx)
+  for (const p of posesDaCidade(terrenos)) if (p.tipo === "quiosque") out.push({ ...p.caixa, y0: 0, y1: 4.0 });
   // outdoors das avenidas da borda
   for (const o of OUTDOORS) {
     const deLado = Math.abs(Math.sin(o.rot)) > 0.5;

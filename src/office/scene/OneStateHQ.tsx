@@ -24,6 +24,7 @@ import { useEscritorio } from "../store";
 import { cameraInfo } from "./CameraMundo";
 import { PALETAS, PORTICO, SX, SZ, pisosDe, logosDe, brilhoEstilos, comAlfa, CascaEstilo, TelaoEstudio, JardimSede, type Paleta } from "./SedeEstilos";
 import { SedeModelo } from "./SedeModelo";
+import { usePoseAoVivo, useFantasma } from "./EditorPosicao";
 
 // 17/11/2026: a mesma torre serve a todas as sedes do cadastro (data/sedes.ts): cor de destaque, logo, áreas e balão de
 // cada uma; desde 19/11/2026 é desenhada em coordenadas do lote e levada para o lote de cada sede (SedeHQ).
@@ -260,6 +261,10 @@ const comoAntes = (s: Sede): Sede => ({ ...s, estilo: s.id === "bday" ? "festa" 
 export function SedeHQ({ sede: s0 }: { sede: Sede }) {
   const sede = SEDES_ANTES ? comoAntes(s0) : s0;
   useFrame(({ clock }) => brilho(clock.elapsedTime));
+  // modo "Editar posição" pela conta admin (21/11/2026): a sede segue o rascunho e vira fantasma; a chave nunca muda
+  const lote = useRef<THREE.Group>(null);
+  usePoseAoVivo(lote, sede.chave, [sede.x, sede.z, sede.rot], (p) => [p.centro[0], p.centro[1], p.rot]);
+  useFantasma(lote, sede.chave);
   // vista por dentro (o mesmo botão que abre as lojas): a torre some e aparece a planta com a equipe (OneStateInterior)
   const fora = useEscritorio((s) => s.vista === "fora");
   const abrir = () => abrirSede(sede.id);
@@ -281,7 +286,7 @@ export function SedeHQ({ sede: s0 }: { sede: Sede }) {
   });
   // o lote da sede (data/sedes.ts: centro e giro para a rua da frente); dentro dele tudo é desenhado com a frente para +z
   return (
-    <group position={[sede.x, 0, sede.z]} rotation={[0, sede.rot, 0]}>
+    <group ref={lote} position={[sede.x, 0, sede.z]} rotation={[0, sede.rot, 0]}>
       <group {...clique}>
         <Estatico><JardimSede sede={sede} /></Estatico>
         {/* 20/11/2026: o prédio é um modelo do catálogo (data/modelos.ts), na cor e com a logo da sede (scene/SedeModelo.tsx).

@@ -360,6 +360,40 @@ function montarAcessorio(id: string): { osso: OssoAcc; obj: THREE.Group } | null
       peca(G, caixa(0.022, 0.016, 0.008), "#D4A63A", [-0.147, -0.11, 0.113], { a: "metal", rot: [0, -0.5, 0] });
       return { osso: "chest", obj: G };
     }
+    // ---- exclusivos do passaporte e do Natal (20/11/2026, frente "visitante") ----
+    case "cordao-passaporte":
+      peca(G, toroAcc(0.14, 0.008), "#C9A24A", [0, 0.29, 0.02], { rot: [Math.PI / 2 + 0.5, 0, 0], esc: [1.15, 1, 1] }); // cordão dourado
+      peca(G, caixa(0.085, 0.115, 0.016), c, [0, 0.165, 0.158], { rot: [-0.12, 0, 0] }); // o passaporte (capa azul)
+      peca(G, cilindro(0.019, 0.019, 0.005, 14), "#D7B25A", [0, 0.175, 0.168], { a: "metal", rot: [Math.PI / 2 - 0.12, 0, 0] }); // brasão
+      peca(G, caixa(0.05, 0.006, 0.005), "#D7B25A", [0, 0.135, 0.164], { a: "metal", rot: [-0.12, 0, 0] });
+      return { osso: "chest", obj: G };
+    case "chapeu-explorador":
+      peca(G, cilindro(0.34, 0.34, 0.018, 28), c, [0, 0.368, -0.01]); // aba
+      peca(G, cilindro(0.185, 0.215, 0.15, 20), c, [0, 0.448, -0.01]);
+      peca(G, meiaEsfera(0.186), c, [0, 0.52, -0.01], { esc: [1, 0.35, 1] }); // copa arredondada
+      peca(G, cilindro(0.218, 0.218, 0.04, 20), "#5B3A1E", [0, 0.398, -0.01]); // fita de couro
+      peca(G, cilindro(0.022, 0.022, 0.006, 12), "#D7B25A", [0, 0.398, 0.208], { a: "metal", rot: [Math.PI / 2, 0, 0] }); // bússola na fita
+      G.rotation.x = -0.05;
+      return { osso: "head", obj: G };
+    case "mochila-expedicao":
+      peca(G, caixa(0.29, 0.32, 0.14), c, [0, 0.1, -0.19]);
+      peca(G, caixa(0.2, 0.12, 0.045), "#3A5230", [0, 0.02, -0.275]); // bolso
+      peca(G, cilindro(0.065, 0.065, 0.34, 14), "#B5532D", [0, 0.31, -0.2], { rot: [0, 0, Math.PI / 2] }); // saco de dormir enrolado
+      for (const s of [1, -1]) {
+        peca(G, toroAcc(0.068, 0.008), "#2A2D33", [s * 0.1, 0.31, -0.2], { rot: [0, Math.PI / 2, 0] }); // tiras do saco
+        peca(G, caixa(0.03, 0.27, 0.016), "#1F2630", [s * 0.135, 0.15, 0.092]); // alça na frente
+        peca(G, caixa(0.03, 0.016, 0.28), "#1F2630", [s * 0.135, 0.312, -0.045]); // alça no ombro
+      }
+      peca(G, cilindro(0.03, 0.03, 0.008, 12), "#D7B25A", [0.08, 0.12, -0.262], { a: "metal", rot: [Math.PI / 2, 0, 0] }); // emblema
+      return { osso: "chest", obj: G };
+    case "gorro-natal": {
+      const ponta = new THREE.Group(); ponta.position.set(0, 0.41, -0.01); ponta.rotation.set(-0.55, 0, 0.18);
+      peca(ponta, conePonta(0.205, 0.36), c, [0, 0.17, 0]);
+      peca(ponta, esfera(0.055), "#F4F1EA", [0, 0.35, 0]); // pompom
+      G.add(ponta);
+      peca(G, toroAcc(0.215, 0.045), "#F4F1EA", [0, 0.395, -0.01], { rot: [Math.PI / 2, 0, 0] }); // barra branca
+      return { osso: "head", obj: G };
+    }
     case "relogio":
     case "relogio-ouro": {
       const ouro = id === "relogio-ouro", y = -S.antebracoL + 0.035;
@@ -420,10 +454,14 @@ export const BonecoGLB = forwardRef<BonecoHandle, { arquivo: string }>(function 
 });
 
 // Hook que anima um boneco a partir de uma pose
-export function useAnimacao(handle: React.RefObject<BonecoHandle | null>, pose: () => Pose, fase: number, hipsBaseY = 0.5, escalaHips = 1) {
+// ritmo (21/11/2026, opcional): o relógio da animação anda ritmo() vezes mais rápido; o personagem passa a mesma velocidade
+// em que anda, para os pés não patinarem no chão (scene/Personagens.tsx)
+export function useAnimacao(handle: React.RefObject<BonecoHandle | null>, pose: () => Pose, fase: number, hipsBaseY = 0.5, escalaHips = 1, ritmo?: () => number) {
+  const relogio = useRef(0);
   useFrame((st, dt) => {
     const h = handle.current; if (!h) return;
-    animar(h.ossos, pose(), st.clock.elapsedTime, Math.min(dt, 0.05), fase, hipsBaseY, escalaHips);
+    if (ritmo) relogio.current += Math.min(dt, 0.1) * ritmo();
+    animar(h.ossos, pose(), ritmo ? relogio.current : st.clock.elapsedTime, Math.min(dt, 0.05), fase, hipsBaseY, escalaHips);
   });
 }
 // Altura de descanso do quadril de cada tipo de boneco

@@ -27,6 +27,12 @@ export const ATALHOS: [string, string][] = [
 
 // joystick da tela no celular (modo andar): direção de -1 a 1, escrita pela interface e lida pela cena a cada quadro
 export const joystick = { x: 0, y: 0 };
+// Andar pela rua (21/11/2026, pedido do dono: "a movimentação é bugada"): a direção pedida pelo teclado ou pelo joystick,
+// já no chão do mundo (x e z de -1 a 1; o tamanho é a força do joystick). Escrita pelo CameraMundo a cada quadro e lida pelo
+// meu boneco (scene/Personagens.tsx › Meu), que anda direto por ela, com arranque, freada e colisão quadro a quadro. Antes o
+// teclado mandava o boneco até um ponto 2,6 m à frente a cada 160 ms: parava longe das paredes, cortava quinas, a bicicleta
+// pulsava de velocidade e soltar a tecla freava de uma vez.
+export const comandoAndar = { ativo: false, x: 0, z: 0 };
 
 // para onde a câmera olha (alvo no chão e direção): escrito pelo CameraMundo a cada quadro, lido pelo mini-mapa e pela névoa
 export const cameraInfo = { x: 0, z: 0, ang: 0, pronto: false };

@@ -93,6 +93,7 @@ function abrirLink(link: string) {
 export function Sino({ tema = "escuro" }: { tema?: "escuro" | "claro" }) {
   const [dados, setDados] = useState<{ avisos: Aviso[]; naoLidos: number; logado: boolean; agora: number } | null>(null);
   const [aberto, setAberto] = useState(false);
+  const [desvio, setDesvio] = useState(0); // quanto a janela de avisos anda para caber na tela (alinhar, abaixo)
   const caixa = useRef<HTMLDivElement>(null);
   const buscar = useRef<() => void>(() => {});
   useEffect(() => {
@@ -126,20 +127,23 @@ export function Sino({ tema = "escuro" }: { tema?: "escuro" | "claro" }) {
   };
   const escuro = tema === "escuro";
   const n = dados.naoLidos;
+  // 21/11/2026: no celular o sino não fica na ponta da barra (a conta vem depois), e a janela de avisos, presa à direita do
+  // sino, saía pela borda esquerda da tela. Ao abrir, ela anda para a direita até ficar a 8 px da borda da tela.
+  const alinhar = () => { const r = caixa.current?.getBoundingClientRect(); setDesvio(r ? Math.min(0, Math.round(r.right - (window.innerWidth - 8))) : 0); };
   return (
     <div ref={caixa} className="relative shrink-0" data-tour="avisos">
-      <button onClick={() => { setAberto((a) => !a); if (!aberto) buscar.current(); }} aria-label={n ? `Avisos: ${n} não lidos` : "Avisos"} aria-expanded={aberto}
+      <button onClick={() => { if (!aberto) { buscar.current(); alinhar(); } setAberto((a) => !a); }} aria-label={n ? `Avisos: ${n} não lidos` : "Avisos"} aria-expanded={aberto}
         className={`relative grid place-items-center rounded-full transition-colors ${escuro ? "h-[38px] w-[38px] !rounded-xl text-white/85 hover:bg-white/10 hover:text-white" : "h-[38px] w-[38px] bg-white/70 text-[var(--tinta)] ring-1 ring-[var(--linha)] hover:bg-white"}`}>
         <span aria-hidden className={`grid place-items-center ${n ? "sino-balanca" : ""}`}><Icone nome="sino" tamanho={escuro ? 17 : 19} /></span>
         {n > 0 && <span className={`absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[#E2575B] px-1 text-center text-[10px] font-bold leading-[18px] text-white ring-2 ${escuro ? "ring-[#0E1219]" : "ring-white"}`}>{n > 9 ? "9+" : n}</span>}
       </button>
       {aberto && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-[min(22rem,calc(100vw-1rem))] overflow-hidden rounded-2xl bg-white text-[#1D2128] shadow-2xl ring-1 ring-black/10" role="dialog" aria-label="Avisos">
+        <div className="absolute right-0 top-full z-30 mt-2 w-[min(22rem,calc(100vw-1rem))] overflow-hidden rounded-2xl bg-white text-[#1D2128] shadow-2xl ring-1 ring-black/10" style={{ right: desvio }} role="dialog" aria-label="Avisos">
           <div className="flex items-center justify-between border-b border-black/5 px-4 py-2.5">
             <b className="text-sm">Avisos</b>
             {n > 0 && <button onClick={() => marcar()} className="text-[12px] font-semibold text-[#1D4ED8]">Marcar todos como lidos</button>}
           </div>
-          <ul className="max-h-[min(26rem,65vh)] overflow-y-auto">
+          <ul className="max-h-[min(26rem,65dvh,calc(100dvh-12.5rem))] overflow-y-auto">
             {dados.avisos.length === 0 && <li className="px-4 py-6 text-center text-[13px] text-[#5B6472]">Nada novo por aqui. Candidaturas, conversas na sua loja, eventos da praça e pagamentos aparecem neste sino.</li>}
             {dados.avisos.map((a) => (
               <li key={a.id}>

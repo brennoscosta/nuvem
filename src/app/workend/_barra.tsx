@@ -9,6 +9,7 @@ import { MarcaTopo } from "./_marca";
 import { Sino } from "@/office/ui/Sino";
 import { SaldoCreditos } from "@/office/ui/SaldoCreditos";
 import { Icone, type NomeIcone } from "@/office/ui/Icone";
+import { GuiaApp, BotaoGuiaBarra } from "@/office/guia/GuiaApp"; // guia passo a passo de cada tela (21/11/2026)
 
 export type AtualApp = "app" | "equipe" | "encontrar" | "rede" | "admin" | "mapa" | "resultados";
 const ITENS: { id: AtualApp; href: string; rotulo: string; icone: NomeIcone; desc: string; logado?: boolean }[] = [
@@ -82,6 +83,7 @@ export function BarraApp({ atual, email, admin }: { atual: AtualApp; email?: str
         </nav>
 
         <div className="cab-direita">
+          <BotaoGuiaBarra />
           {email && <SaldoCreditos tema="claro" />}
           {email && <Sino tema="claro" />}
           {email ? (
@@ -138,6 +140,7 @@ export function BarraApp({ atual, email, admin }: { atual: AtualApp; email?: str
           )}
         </div>
       </div>
+      <GuiaApp />
     </header>
   );
 }

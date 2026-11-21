@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { sql, migrar } from "./db";
 import type { Usuario } from "./usuarios";
 import { terrenoDoUsuario } from "./terrenos";
+import { filtroPersonagemAtivo } from "./personagens";
 import { tipoDaFoto, MAX_FOTO } from "./vitrine";
 import { NICHOS, nomeNicho } from "@/office/data/mundo";
 import { numeroDaLoja } from "@/office/data/numeroLoja";
@@ -270,7 +271,7 @@ export async function perfilPublico(apelido: string, quemPede: Usuario | null): 
   const m = p.mostrar;
   const [t, pe] = await Promise.all([
     m.cidade3d ? terrenoDoUsuario(l.usuarioId).catch(() => null) : null,
-    m.cidade3d ? sql<{ nome: string; boneco: string; roupa: string; profissao: string; acessorios: string[] | null }[]>`SELECT nome, boneco, roupa, profissao, acessorios FROM personagem WHERE usuario_id = ${l.usuarioId} AND pago_ate > now()`.then((r) => r[0] ?? null).catch(() => null) : null,
+    m.cidade3d ? sql<{ nome: string; boneco: string; roupa: string; profissao: string; acessorios: string[] | null }[]>`SELECT nome, boneco, roupa, profissao, acessorios FROM personagem WHERE usuario_id = ${l.usuarioId} AND ${filtroPersonagemAtivo()}`.then((r) => r[0] ?? null).catch(() => null) : null,
   ]);
   const numero = t?.status === "ativo" ? numeroDaLoja(t) : null;
   return {

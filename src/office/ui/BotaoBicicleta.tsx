@@ -72,14 +72,14 @@ function ExplicaBicicleta({ logado, temPersonagem, fechar }: { logado: boolean; 
   const abrir = usePersonagem((s) => s.abrir);
   const texto = !logado ? "Entre na sua conta e crie o seu personagem para pedalar pela cidade, bem mais rápido que a pé."
     : !temPersonagem ? "Crie o seu personagem para pedalar pela cidade, bem mais rápido que a pé."
-    : "Ative o seu personagem para pedalar pela cidade, bem mais rápido que a pé.";
+    : "Crie o seu personagem grátis para pedalar pela cidade, bem mais rápido que a pé.";
   return (
     <div className="hud-pop" role="dialog" aria-label="Bicicleta">
       <b className="hud-pop-titulo"><Icone nome="bicicleta" tamanho={18} />Bicicleta grátis</b>
       <p className="mt-2 text-[13px] leading-snug text-white/80">{texto} A bicicleta vem junto, sem pagar nada a mais.</p>
       <div className="mt-3 flex justify-end">
         {logado
-          ? <button type="button" onClick={() => { fechar(); abrir("montar"); }} className="hud-btn hud-azul">{temPersonagem ? "Ativar personagem" : "Criar personagem"}</button>
+          ? <button type="button" onClick={() => { fechar(); abrir("montar"); }} className="hud-btn hud-azul">Criar personagem grátis</button>
           : <a href="/entrar" className="hud-btn hud-azul">Entrar</a>}
       </div>
     </div>

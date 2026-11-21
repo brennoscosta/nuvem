@@ -16,11 +16,12 @@ import { PixAberto, LojaNoMapa, AcoesAdminLote } from "./Lote";
 import { abrirChatEquipe } from "./ChatEquipe";
 import { useExpandir, vizinhoParaExpandir } from "./ExpandirTerreno";
 import { BotaoCobrar } from "./Cobrar";
+import { BotaoEditarPosicao } from "./EditorPosicao";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
-const COR_AREA: Record<string, string> = { praca: "#0F8A7E", comercio: "#D97706", nuvem: "#1D4ED8", rio: "#0E7490", orla: "#C2410C" };
+const COR_AREA: Record<string, string> = { orlaNorte: "#0E7490", orlaCentro: "#0F8A7E", orlaSul: "#C2410C" };
 
 // valor do quiosque para esta conta (crédito de indicação e conta admin), vindo do servidor; vale para créditos e Pix
 function useValorPix(chave: string | null, ligado: boolean, versao: string) {
@@ -134,6 +135,8 @@ export function CartaoQuiosque() {
             <>
               {pagamentoLigado && !pixAberto && <BotaoCobrar valor={valorPix ?? preco} rotuloPix={`Renovar +30 dias · ${brl(valorPix ?? preco)} no Pix`} rotuloCreditos="Renovar +30 dias" pagando={pagando} compacto onPagar={(c) => void pagar(c)} />}
               <button type="button" onClick={() => void abrirChatEquipe(chave)} className="mt-2 block w-full rounded-xl bg-[#1D2128] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-black"><Icone nome="conversar" tamanho={17} className="mr-1 inline align-[-3px]" />Falar com {atendente?.nome ?? "a atendente"}</button>
+              {/* 21/11/2026: girar e ajustar o quiosque no terreninho (modo "Editar posição", ui/EditorPosicao.tsx) */}
+              <BotaoEditarPosicao chave={chave} className="mt-2" />
               <div className="mt-2 grid grid-cols-2 gap-1.5 text-center text-[12px] font-semibold">
                 <button onClick={() => m.abrirPainel()} className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><Icone nome="brilho" tamanho={15} className="mr-1 inline align-[-3px]" />Marca e logo</button>
                 <a href={`/loja/${k.numero}`} target="_blank" rel="noreferrer" className="rounded-xl bg-[#EEF3FF] px-2 py-2 text-[#1D4ED8] hover:bg-[#dfe8ff]"><Icone nome="sacola" tamanho={15} className="mr-1 inline align-[-3px]" />Página da loja</a>
@@ -168,10 +171,12 @@ export function Quiosques2D() {
     <g>
       {QUIOSQUES.map((k) => {
         const t = terrenos[k.chave], ativo = t?.status === "ativo";
-        const w = QUIOSQUE_LARGURA * 1.5, d = QUIOSQUE_FUNDO * 1.5, rot = (-k.rot * 180) / Math.PI;
+        // 21/11/2026: no tamanho de verdade (4,2 × 3 m mais o deque) e com o terreninho de 6,4 × 6 m em volta
+        const w = QUIOSQUE_LARGURA + 0.4, d = QUIOSQUE_FUNDO + 0.6, rot = (-k.rot * 180) / Math.PI, tr = k.terreno;
         const cor = ativo ? t.cor : t ? "#E0A91B" : "#FFFFFF";
         return (
           <g key={k.chave} className="cursor-pointer" onClick={() => useMundo.getState().selecionarLote(k.chave)} role="button" aria-label={t ? `${t.empresaNome}, quiosque ${k.numero}` : `Quiosque ${k.numero} disponível`}>
+            <rect x={tr.x0} y={tr.z0} width={tr.x1 - tr.x0} height={tr.z1 - tr.z0} rx={0.4} fill="#E7E0D2" stroke="#B9AE98" strokeWidth={0.25} />
             <g transform={`translate(${k.pos[0]} ${k.pos[1]}) rotate(${rot})`}>
               <rect x={-w / 2 + 0.4} y={-d / 2 + 0.5} width={w} height={d} rx={0.6} fill="#000" opacity={0.18} />
               <rect x={-w / 2} y={-d / 2} width={w} height={d} rx={0.6} fill={cor} stroke={t ? "#FFFFFF" : "#0F766E"} strokeWidth={0.35} strokeDasharray={t && !ativo ? "1 0.6" : undefined} />

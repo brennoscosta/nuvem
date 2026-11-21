@@ -5,6 +5,8 @@ import { useSede } from "../sedeStore";
 import { usePersonagem } from "../personagemStore";
 import { useChatEquipe } from "./ChatEquipe";
 import { useMoradores } from "../moradorStore";
+import { useEdicao } from "../edicaoStore";
+import { usePassaporte } from "../passaporteStore";
 
 export function useCartaoAberto() {
   const mundo = useMundo((s) => !!s.loteSelecionado || s.painelEmpresa || s.painelEscritorio || !!s.outdoorSelecionado);
@@ -12,5 +14,7 @@ export function useCartaoAberto() {
   const personagem = usePersonagem((s) => s.painel !== null || (s.predio?.fase === "recepcao" || s.predio?.fase === "dentro"));
   const chat = useChatEquipe((s) => s.aberto);
   const morador = useMoradores((s) => s.aberto !== null); // conversa com um morador da cidade (19/11/2026)
-  return mundo || sede || personagem || chat || morador;
+  const edicao = useEdicao((s) => !!s.chave); // modo "Editar posição" (frente editor, 21/11/2026)
+  const passaporte = usePassaporte((s) => s.aberto); // janela do passaporte (frente visitante, 21/11/2026)
+  return mundo || sede || personagem || chat || morador || edicao || passaporte;
 }

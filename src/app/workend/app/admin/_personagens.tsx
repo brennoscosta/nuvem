@@ -19,7 +19,7 @@ export function PersonagensAdmin() {
   return (
     <section className="faixa mt-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h2 className="text-[1.4rem]">Personagens no mapa</h2><p className="mt-1 max-w-[70ch] text-sm text-[var(--tinta-2)]">Quem comprou um personagem pra andar pelo mundo, conversar e fazer negócios (de R$ 19,90 por R$ 5,90/mês). Aqui você vê quem está pago, quem está online e libera dias de cortesia.</p></div>
+        <div><h2 className="text-[1.4rem]">Personagens no mapa</h2><p className="mt-1 max-w-[70ch] text-sm text-[var(--tinta-2)]">Quem criou um personagem pra andar pelo mundo, conversar e fazer negócios. Desde 21/11/2026 o personagem básico é grátis; só as peças premium têm preço. Aqui você vê quem está online, quem ainda tem dias pagos do tempo em que ele era pago e libera dias de cortesia.</p></div>
         <div className="text-sm text-[var(--tinta-2)]">{lista ? `${lista.length} personagem(ns) · ${lista.filter((p) => p.pagoAte && new Date(p.pagoAte).getTime() > agora).length} ativos` : "…"}</div>
       </div>
       {aviso && <div className="mt-3 rounded-xl bg-[var(--cinza)] px-3 py-2 text-sm">{aviso} <button onClick={() => setAviso(null)} className="ml-2 underline">fechar</button></div>}

@@ -104,6 +104,8 @@ export function MiniMapa() {
   const versao = useVersaoMiniMapa();
   const [nicho, setNicho] = useState("");
   const [abertoCel, setAbertoCel] = useState(false);
+  // 21/11/2026: no celular o editor do personagem sobe até 88% da tela e cobria a metade de baixo do botão do mapa
+  const editorPersonagem = usePersonagem((s) => s.painel === "montar");
   const [minimizado, setMin] = useState(false);
   const [dica, setDica] = useState<{ u: number; v: number; texto: string } | null>(null);
   const [lugar, setLugar] = useState<LugarPainel>(() => (typeof window === "undefined" ? PADRAO : lerLugar()));
@@ -213,7 +215,7 @@ export function MiniMapa() {
   };
   return (
     <>
-      <button data-tour="mapa" onClick={() => { setAbertoCel(true); setMin(false); }} className={`hud-ilha hud-btn pointer-events-auto absolute right-2 top-[4.4rem] z-10 !h-11 !rounded-2xl !px-3.5 sm:left-3 sm:right-auto sm:top-[5.2rem] ${abertoCel ? "hidden" : "flex"} ${minimizado ? "sm:flex" : "sm:hidden"}`}><Icone nome="mapa" tamanho={18} />Mapa da cidade</button>
+      <button data-tour="mapa" onClick={() => { setAbertoCel(true); setMin(false); }} className={`hud-ilha hud-btn pointer-events-auto absolute right-2 top-[4.4rem] z-10 !h-11 !rounded-2xl !px-3.5 sm:left-3 sm:right-auto sm:top-[5.2rem] ${abertoCel || editorPersonagem ? "hidden" : "flex"} ${minimizado ? "sm:flex" : "sm:hidden"}`}><Icone nome="mapa" tamanho={18} />Mapa da cidade</button>
       <div ref={painel} data-tour="mapa" style={largo ? { left: lugar.x ?? undefined, top: lugar.y ?? undefined, width: lugar.w, ["--mm-escala" as string]: escala } : undefined} className={`mm-painel pointer-events-auto fixed inset-x-2 top-[4.2rem] z-20 max-h-[calc(100dvh-5rem)] overflow-y-auto hud-ilha p-2.5 sm:absolute sm:inset-x-auto sm:left-3 sm:top-[5.2rem] sm:z-10 sm:w-[18rem] sm:max-h-none sm:overflow-visible ${abertoCel ? "block" : "hidden"} ${minimizado ? "sm:hidden" : "sm:block"}`}>
         <div className={`mb-2 flex items-center justify-between gap-1 pl-1 ${largo ? "mm-cabeca" : ""}`} onPointerDown={comecarMover} onPointerMove={arrastar} onPointerUp={soltar} onPointerCancel={soltar} onDoubleClick={() => largo && voltarAoCanto()} title={largo ? "Arraste para levar o mapa a qualquer lugar. Duplo clique volta ao canto." : undefined}>
           <span className="flex items-center gap-2 text-[13px] font-semibold text-white/90">{largo && <Icone nome="arrastar" tamanho={15} className="-mr-1 text-white/40" />}<Icone nome="mapa" tamanho={17} className="text-[#93C5FD]" />Mapa da cidade</span>

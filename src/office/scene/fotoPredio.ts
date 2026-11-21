@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { useMundo } from "../mundoStore";
 import { useHora, type ModoHora } from "../cameraStore";
 import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
+import { poseConferida } from "../data/posicaoPredio";
 import { LAYOUT, alturaPredio } from "../data/escritorio";
 import { ehKit } from "../data/predios";
 import { ceu } from "./CicloDia";
@@ -15,6 +16,8 @@ let ponte: Ponte | null = null;
 // ?medir=1: a ponte também fica em window.__ponte (scripts de conferência movem a câmera sem recarregar a página)
 const MEDIR = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("medir");
 export function registrarPonte(p: Ponte | null) { ponte = p; if (MEDIR) (window as unknown as { __ponte?: Ponte | null }).__ponte = p; }
+// a câmera e os controles do mapa para o modo "Editar posição" (scene/EditorPosicao.tsx, 21/11/2026)
+export const ponteCamera = () => ponte;
 export type HoraFoto = "agora" | "dia" | "noite";
 export const LARGURA_FOTO = 1920, ALTURA_FOTO = 1080;
 const DUPLO_ALTURA = 1.2; // o prédio do lote duplo é 20% mais alto (scene/EscritorioCliente)
@@ -30,9 +33,10 @@ export function enquadramento(chave: string) {
   const l = t ? LOTE_POR_CHAVE[t.chave] : LOTE_POR_CHAVE[chave]; if (!l) return null;
   const anexo = t ? Object.values(terrenos).find((x) => x.anexoDe === t.chave && x.status === "ativo") : null;
   const la = anexo ? LOTE_POR_CHAVE[anexo.chave] : null;
-  const cx = la ? (l.centro[0] + la.centro[0]) / 2 : l.centro[0], cz = l.centro[1];
-  const giro = t?.escritorio?.decor?.giro ?? 0, giroEf = la ? giro - (giro % 2) : giro;
-  const rot = frenteDoLote(l.k) + Math.PI + giroEf * (Math.PI / 2);
+  // centro e giro do prédio (21/11/2026, data/posicaoPredio.ts); sem escritório, o centro do lote virado para a rua
+  const pc = t?.escritorio ? poseConferida(t, anexo?.chave ?? null) : null;
+  const [cx, cz] = pc ? pc.pose.centro : [la ? (l.centro[0] + la.centro[0]) / 2 : l.centro[0], l.centro[1]];
+  const rot = pc ? pc.pose.rot : frenteDoLote(l.k) + Math.PI;
   const e = t?.escritorio;
   const altura = e && ehKit(e.layout) ? alturaPredio(e, !!la) : (e ? LAYOUT[e.layout]?.altura ?? 9 : 7) * (la ? DUPLO_ALTURA : 1);
   // a frente local do prédio é -z: girada por rot, vira (-sen rot, -cos rot) no mapa; a foto vem de três quartos (28°)

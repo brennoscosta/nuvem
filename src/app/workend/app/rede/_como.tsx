@@ -16,7 +16,7 @@ const LUGAR: Record<string, string> = { cabeca: "cabeça", rosto: "rosto", pesco
 
 type Passo = { id: string; icone: NomeIcone; curto: string; titulo: string; texto: string; itens: [NomeIcone, string][] };
 
-export function ComoFunciona({ aberto, fechar, preco, precoCheio, rotuloFinal }: { aberto: boolean; fechar: () => void; preco: number; precoCheio: number; rotuloFinal: string }) {
+export function ComoFunciona({ aberto, fechar, rotuloFinal }: { aberto: boolean; fechar: () => void; preco: number; precoCheio: number; rotuloFinal: string }) {
   const [st, setSt] = useState({ i: 0, dir: 1 });
   const caixa = useRef<HTMLDivElement>(null);
   const PASSOS: Passo[] = [
@@ -32,8 +32,8 @@ export function ComoFunciona({ aberto, fechar, preco, precoCheio, rotuloFinal }:
     { id: "acessorios", icone: "bone", curto: "Acessórios", titulo: "Roupas e acessórios",
       texto: `${ACESSORIOS.length} itens a partir de ${brl(MENOR_ACESSORIO)}, pagos no Pix. Um por lugar do corpo: cabeça, rosto, pescoço, costas e pulso; relógio, pulseira e brincos são grátis. Comprou, é seu para sempre: tira e põe quando quiser, e quem passa por você no mapa vê o visual novo.`,
       itens: [["bone", "Boné, chapéu, cartola, coroa e fone"], ["oculosSol", "Óculos, cachecol, colar, mochila e asinhas"], ["check", "Comprou uma vez, usa sempre"]] },
-    { id: "ativar", icone: "raio", curto: "Ativar", titulo: "Ative e entre na cidade",
-      texto: `${brl(preco)} por mês na promoção de lançamento (de ${brl(precoCheio)}), no Pix e sem fidelidade. Ativo, você toca no chão para andar, entra nas lojas, fala com a equipe, conversa com quem está online, faz amigos, negocia e faz chamadas.`,
+    { id: "ativar", icone: "raio", curto: "Entrar", titulo: "Monte e entre na cidade",
+      texto: "Grátis para toda conta do WorkEnd. Montou, você toca no chão para andar, entra nas lojas, fala com a equipe, ganha carimbos no passaporte da cidade, conversa com quem está online, faz amigos, negocia e faz chamadas.",
       itens: [["pino", "Toque no chão para andar"], ["conversar", "Conversas, negócios e chamadas"], ["explorador", "Missões que viram selos"]] },
   ];
   const ultimo = PASSOS.length - 1;
@@ -61,7 +61,7 @@ export function ComoFunciona({ aberto, fechar, preco, precoCheio, rotuloFinal }:
       <div ref={caixa} className="cf" role="dialog" aria-modal="true" aria-labelledby="cf-titulo" tabIndex={-1}>
         <button type="button" className="cf-fechar" onClick={fechar} aria-label="Fechar"><Icone nome="fechar" tamanho={20} /></button>
         <div className="cf-palco" data-passo={p.id}>
-          <div key={p.id} className={`cf-cena ${st.dir > 0 ? "cf-vem-dir" : "cf-vem-esq"}`}><Cena id={p.id} preco={preco} /></div>
+          <div key={p.id} className={`cf-cena ${st.dir > 0 ? "cf-vem-dir" : "cf-vem-esq"}`}><Cena id={p.id} /></div>
         </div>
         <div className="cf-texto">
           <ol className="cf-passos" aria-label="Passos">
@@ -95,7 +95,7 @@ export function ComoFunciona({ aberto, fechar, preco, precoCheio, rotuloFinal }:
 }
 
 // ---------- as cenas de cada passo ----------
-function Cena({ id, preco }: { id: string; preco: number }) {
+function Cena({ id }: { id: string }) {
   if (id === "visual") {
     const n = TIPOS_AVATAR.length, passo = 360 / n;
     return (
@@ -164,7 +164,7 @@ function Cena({ id, preco }: { id: string; preco: number }) {
         <span className="cf-andando"><MiniAvatar boneco="coque" roupa="#DB2777" tamanho={40} /></span>
       </div>
       <div className="cf-selos-voam">{(["explorador", "conversar", "maleta"] as NomeIcone[]).map((ic, i) => <span key={ic} style={{ ["--i" as string]: i }}><Icone nome={ic} tamanho={16} /></span>)}</div>
-      <span className="cf-preco-tag">{brl(preco)} por mês</span>
+      <span className="cf-preco-tag">Grátis</span>
     </div>
   );
 }

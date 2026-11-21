@@ -14,10 +14,10 @@ export function SaldoCreditos({ tema = "claro" }: { tema?: "claro" | "escuro" })
   if (!logado || !saldo) return null;
   const cor = tema === "escuro" ? "bg-white/10 text-white hover:bg-white/15" : "bg-[#F1F3F6] text-[#1D2128] hover:bg-[#E6E9EE]";
   return (
-    <a href="/app/creditos" className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-semibold ${cor}`} title="Saldo de créditos" data-saldo-topo={saldo.total}>
+    <a href="/app/creditos" className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-semibold ${cor}`} title="Saldo de créditos" aria-label={`Saldo: ${fmtCreditos(saldo.total)} créditos`} data-saldo-topo={saldo.total}>
       <Icone nome="carteira" tamanho={16} />
-      <span>{fmtCreditos(saldo.total)}</span>
-      <span className="hidden sm:inline font-normal opacity-75">créditos</span>
+      <span className="max-[359px]:hidden">{fmtCreditos(saldo.total)}</span>
+      <span className="hidden md:inline font-normal opacity-75">créditos</span>
     </a>
   );
 }

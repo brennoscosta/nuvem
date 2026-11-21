@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { avisarClique, type TipoClique } from "./LinkRastreado";
 import { EstrelaMedia } from "./NotaEstrelas";
 import { CartaoPedido, type Pedido } from "./CartaoPedido";
+import { usePassaporte, type Atendimento } from "../passaporteStore";
 
 export type LojaInfo = {
   numero: number; chave: string; nome: string; cor: string; nicho: string; logo: string | null; donoId: string; sobre: string;
@@ -77,6 +78,7 @@ export function ChatLoja({ loja, logado, linkEntrar, alto = 320, pessoa = null }
       const j = await r.json();
       if (!r.ok) throw new Error((j as { erro?: string }).erro ?? "Não deu para enviar.");
       setMsgs((m) => [...(m ?? []), j as Msg]);
+      if ((j as { passaporte?: Atendimento }).passaporte) usePassaporte.getState().aoAtendimento((j as { passaporte: Atendimento }).passaporte, loja.numero, loja.atendente?.nome ?? null);
     } catch (e) { setErro((e as Error).message); }
     setEnviando(false);
   };

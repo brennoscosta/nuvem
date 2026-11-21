@@ -7,7 +7,8 @@ import { Balao } from "./Lotes";
 import * as THREE from "three";
 import { useLoader } from "@react-three/fiber";
 import { caixa, cilindro, esfera, mat, plano, anel, COR } from "./geo";
-import { ComFallback, Modelo, ModeloInstanciado } from "./Modelos";
+import { ComFallback, Modelo } from "./Modelos";
+import { CarrosParados, type CarroParado } from "./Transito";
 import { Estatico } from "./Estatico";
 import { Cadeira, Planta, Sofa } from "./Moveis";
 import { useEscritorio } from "../store";
@@ -275,12 +276,13 @@ function LetreiroTotem({ x, z }: { x: number; z: number }) {
 
 export function Restaurante() {
   const fora = useEscritorio((s) => s.vista === "fora");
-  // carros estacionados (modelos do Higgsfield): dois nas vagas e um na janela do drive-thru
-  const estacionados = useMemo(() => ({
-    sedan: [{ pos: [CX - 15.2, 0, CZ - 9] as [number, number, number], rot: 0, altura: 1.45 }, { pos: [CX + 9, 0, CZ + 15.2] as [number, number, number], rot: Math.PI / 2, altura: 1.45 }],
-    hatch: [{ pos: [CX - 15.2, 0, CZ + 1] as [number, number, number], rot: Math.PI, altura: 1.5 }, { pos: [CX - 1, 0, CZ + 15.2] as [number, number, number], rot: -Math.PI / 2, altura: 1.5 }],
-    suv: [{ pos: [CX + 3, 0, CZ + 6.5] as [number, number, number], rot: Math.PI, altura: 1.7 }, { pos: [CX - 15.2, 0, CZ - 4] as [number, number, number], rot: Math.PI, altura: 1.7 }],
-  }), []);
+  // carros estacionados nas vagas e na janela do drive-thru (21/11/2026: desenhados em código, scene/carros.ts, numa malha só;
+  // antes, os modelos do Higgsfield)
+  const estacionados = useMemo((): CarroParado[] => [
+    { x: CX - 15.2, z: CZ - 9, rot: 0, tipo: "sedan", cor: "#AFB5BC" }, { x: CX + 9, z: CZ + 15.2, rot: Math.PI / 2, tipo: "sedan", cor: "#A8232C" },
+    { x: CX - 15.2, z: CZ + 1, rot: Math.PI, tipo: "hatch", cor: "#F1F2F4" }, { x: CX - 1, z: CZ + 15.2, rot: -Math.PI / 2, tipo: "hatch", cor: "#1F4E8A" },
+    { x: CX + 3, z: CZ + 6.5, rot: Math.PI, tipo: "suv", cor: "#24272C" }, { x: CX - 15.2, z: CZ - 4, rot: Math.PI, tipo: "suv", cor: "#6C7279" },
+  ], []);
   return (
     <group>
       <Estatico><RestauranteFixo /></Estatico>
@@ -294,11 +296,7 @@ export function Restaurante() {
       <ComFallback fallback={null}><LetreiroTotem x={CX - 17} z={CZ + 17.5} /></ComFallback>
       <Balao position={[LANCH.centro[0], LANCH.altura + 5, LANCH.centro[1]]} nome="Burgers" cor="#4A2A1A" logo="/lanchonete/logo.webp" subtitulo="Alimentação" />
       <Estatico visivel={!fora}><LanchoneteFixa /></Estatico>
-      <ComFallback fallback={null}>
-        <ModeloInstanciado nome="carroSedan" itens={estacionados.sedan} />
-        <ModeloInstanciado nome="carroHatch" itens={estacionados.hatch} />
-        <ModeloInstanciado nome="carroSuv" itens={estacionados.suv} />
-      </ComFallback>
+      <CarrosParados itens={estacionados} />
     </group>
   );
 }

@@ -100,6 +100,9 @@
 .we .pn-barras-dias { display: flex; gap: 4px; margin-top: .35rem; }
 .we .pn-num-grande .pn-barras-dias { gap: 6px; }
 .we .pn-barras-dias span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+/* 21/11/2026: em colunas estreitas (14 dias no tablet de 1024) o rótulo ("dom", "hoje") perdia 1–2 px de cada lado:
+   ele pode passar um pouco para o vão de 4 px entre as colunas, sem encostar no vizinho */
+.we .pn-barras-dias span { overflow: visible; }
 @media (max-width: 899px) { .we .pn-num:not(.pn-num-grande):not(:last-child) .pn-barras-dias { display: none; } }
 .we .pn-num-seg .pn-delta { margin-top: auto; padding-top: 1rem; }
 .we .pn-rodape-num { margin-top: .85rem; font-size: 14.5px; color: var(--muted); }

@@ -10,7 +10,7 @@ import { useMundo, type Terreno } from "../mundoStore";
 import { TIPOS_AVATAR, bonecoDe, codificarVisual, visualCompleto, ESTILOS_CABELO, BARBAS, TRAJES_CIMA, BAIXOS, SAPATOS, ALTURAS, BIOTIPOS, OLHOS, SOBRANCELHAS, BOCAS, MARCAS, MODELOS_OCULOS, PELES, CORES_CABELO, CORES_OLHOS, CORES_ROUPA, CORES_CALCA, CORES_CALCADO, COR_JEANS, type Genero, type Visual, type Traje, type Baixo, type Sapato, type Altura, type Biotipo, type Boneco as BonecoDef } from "../data/bonecos";
 import { PixAberto } from "./Lote";
 import { BotaoCobrar } from "./Cobrar";
-import { ACESSORIOS, ACESSORIO_POR_ID, ITEM_PAGO_POR_ID, ITEM_DO_TRAJE, ITEM_DO_SAPATO, ehGratis, itensPagosDoVisual, limparEquipados, type LugarAcessorio } from "../data/acessorios";
+import { ACESSORIOS, ACESSORIO_POR_ID, ITEM_PAGO_POR_ID, ITEM_DO_TRAJE, ITEM_DO_SAPATO, ehGratis, ehExclusivo, itensPagosDoVisual, limparEquipados, type LugarAcessorio } from "../data/acessorios";
 import { MISSAO_POR_ID, type Missao } from "../data/missoes";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 import { Icone, ICONE_ACESSORIO, ICONE_MISSAO, type NomeIcone } from "./Icone";
@@ -19,7 +19,7 @@ import { PreviaBoneco } from "./PreviaBoneco";
 import { Cores, Opcoes, Interruptor, SeloPago, FiguraPeca, Silhueta } from "./EditorVisual";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR");
+
 
 // o mini avatar mora em ui/MiniAvatar.tsx (sem three.js); continua exportado daqui para quem já importava
 import { MiniAvatar } from "./MiniAvatar";
@@ -64,19 +64,17 @@ function visualAleatorio(): { visual: Visual; usando: string[] } {
     calca: baixo === "jeans" ? sortear([COR_JEANS, "#5B7DB1", "#2C3E50"]) : sortear(CORES_CALCA), calcado: COR_SAPATO[sapato] && Math.random() < 0.6 ? COR_SAPATO[sapato] : sortear(CORES_CALCADO), tenis: Math.random() < 0.5 ? "" : sortear(CORES_CALCADO),
     oculos: Math.random() < 0.22, oculosModelo: sortear(MODELOS_OCULOS).id, altura: sortear(ALTURAS).id, biotipo: sortear(BIOTIPOS).id, olhos: sortear(OLHOS).id, corOlhos: sortear(CORES_OLHOS),
     sobrancelha: sortear(SOBRANCELHAS).id, boca: sortear(BOCAS).id, marcas: Math.random() < 0.35 ? sortear(MARCAS).id : "nenhuma", baixo, sapato };
-  return { visual, usando: limparEquipados(ACESSORIOS.filter((a) => a.preco === 0 && Math.random() < 0.3).map((a) => a.id)) };
+  return { visual, usando: limparEquipados(ACESSORIOS.filter((a) => ehGratis(a.id) && Math.random() < 0.3).map((a) => a.id)) };
 }
 
 export function PainelPersonagem() {
   const painel = usePersonagem((s) => s.painel);
   const meu = usePersonagem((s) => s.meu);
   const ativo = usePersonagem((s) => s.ativo);
-  const preco = usePersonagem((s) => s.preco);
-  const precoCheio = usePersonagem((s) => s.precoCheio);
   const pagamentoLigado = usePersonagem((s) => s.pagamentoLigado);
   const itens = usePersonagem((s) => s.itens);
   const salvar = usePersonagem((s) => s.salvar);
-  const pagar = usePersonagem((s) => s.pagar);
+
   const fechar = usePersonagem((s) => s.fechar);
   const comprarItem = usePersonagem((s) => s.comprarItem);
   const carregarItens = usePersonagem((s) => s.carregarItens);
@@ -99,7 +97,7 @@ export function PainelPersonagem() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(false);
-  const [pagando, setPagando] = useState(false);
+
   const [comprando, setComprando] = useState<string | null>(null);
   const [nHist, setNHist] = useState(0);
   const historico = useRef<{ r: Rascunho; campo: string; em: number }[]>([]);
@@ -113,8 +111,8 @@ export function PainelPersonagem() {
     <div className={`${FLUTUANTE} ${ESTREITO} painel-entra overflow-y-auto p-4`} role="dialog" aria-label="Criar personagem">
       <div className="text-lg font-bold">Seu personagem no mundo</div>
       <p className="mt-1 text-sm text-[#5B6472]">Quem não tem personagem só olha. Com o seu, você anda pelo mapa, fala com a equipe das lojas, conversa com quem está online, faz amigos, negocia e faz calls.</p>
-      <div className="mt-3 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm"><span className="text-[#5B6472] line-through">{brl(precoCheio)}</span> <b className="text-[#16A34A]">{brl(preco)}/mês</b></div>
-      <a href={`/cadastro?destino=${encodeURIComponent("/mundo?personagem=1")}`} className="mt-3 block w-full rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-center text-sm font-bold text-white">Criar conta e montar meu personagem</a>
+      <div className="mt-3 rounded-2xl bg-[#E3F6EA] px-3 py-2 text-sm font-semibold text-[#166534]">Grátis: crie a sua conta e monte o seu personagem.</div>
+      <a href={`/cadastro?destino=${encodeURIComponent("/mundo?personagem=1")}`} className="mt-3 block w-full rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-center text-sm font-bold text-white">Criar conta e montar meu personagem grátis</a>
       <a href={`/entrar?destino=${encodeURIComponent("/mundo?personagem=1")}`} className="mt-1.5 block w-full text-center text-xs font-semibold text-[#1D4ED8]">Já tenho conta</a>
       <button onClick={fechar} className="mt-2 w-full rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm text-[#5B6472]">Agora não</button>
     </div>
@@ -175,13 +173,14 @@ export function PainelPersonagem() {
       visual = semVazios(v as Visual); lista = usando.filter((i) => !faltam.includes(i));
       setF({ ...f, visual }); setUsandoR(lista);
     }
+    lista = lista.filter((i) => tem(i) || !ehExclusivo(i)); // peça do passaporte que ainda não ganhou: só experimentou
     setSalvando(true); const e = await salvar({ ...f, visual, nome, acessorios: lista }); setSalvando(false);
     if (e) { setErro(e); return; }
     setUsandoR(null);
-    if (!usePersonagem.getState().ativo) { setAviso("Personagem salvo! Agora é só ativar no Pix pra entrar no mapa."); return; }
+    if (!usePersonagem.getState().ativo) { setAviso("Personagem salvo!"); return; }
     setSalvo(true); setTimeout(() => { setSalvo(false); fechar(); }, 1300);
   };
-  const clicarPagar = async (creditos = false) => { setErro(null); setPagando(true); const e1 = meu ? null : await salvar({ ...f, nome }); if (e1) { setErro(e1); setPagando(false); return; } const e = await pagar(1, creditos); setPagando(false); if (e) setErro(e); };
+
   // a cobrança de um item: sempre pela função única do personagemStore (créditos, Pix ou os dois; frente creditos)
   const comprar = async (id: string, creditos = false) => { setErro(null); if (!pagamentoLigado && !creditos) { setErro("Pagamento em instantes: estamos ligando o Mercado Pago."); return; } setComprando(id); const e = await comprarItem(id, creditos); setComprando(null); if (e) setErro(e); };
   const setRede = (k: keyof Redes, v: string) => setF({ ...f, redes: { ...f.redes, [k]: v } });
@@ -195,7 +194,8 @@ export function PainelPersonagem() {
   const pixItem = pix?.tipo === "item" && pix.status === "pendente" ? pix.lote : null;
   const fecharBotao = (cls: string) => <button onClick={fechar} aria-label="Fechar" className={`${BOTAO_PREVIA} ${cls}`}><Icone nome="fechar" tamanho={18} /></button>;
   return (
-    <div role="dialog" aria-label="Meu personagem" data-editor-personagem="" data-boneco={bonecoId} data-usando={usando.join(",")} className="painel-entra absolute inset-x-0 bottom-0 z-20 flex h-[88dvh] flex-col overflow-hidden rounded-t-3xl bg-white text-[#1D2128] shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-20 sm:h-[min(44rem,calc(100dvh-7rem))] sm:w-[min(50rem,calc(100vw-1.5rem))] sm:flex-row sm:rounded-3xl">
+    // 21/11/2026: no celular a folha para abaixo da barra de cima e do contador de pessoas (6,5rem), que ela cobria em 667 px
+    <div role="dialog" aria-label="Meu personagem" data-editor-personagem="" data-boneco={bonecoId} data-usando={usando.join(",")} className="cartao-mapa cartao-largo painel-entra absolute inset-x-0 bottom-0 z-20 flex h-[min(88dvh,calc(100dvh-6.5rem))] flex-col overflow-hidden rounded-t-3xl bg-white text-[#1D2128] shadow-2xl sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-20 sm:h-[min(44rem,calc(100dvh-7rem))] sm:w-[min(50rem,calc(100vw-1.5rem))] sm:flex-row sm:rounded-3xl">
       {salvo && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/95">
           <svg viewBox="0 0 64 64" className="salvo-pop h-20 w-20"><circle cx="32" cy="32" r="30" fill="#16A34A" /><path d="M18 33 L28 43 L46 23" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" className="salvo-risco" /></svg>
@@ -208,7 +208,7 @@ export function PainelPersonagem() {
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start gap-3 p-4">
           <div className="min-w-0 flex-1">
             <div className="truncate text-lg font-bold leading-tight">{nome.trim() || (meu ? meu.nome : "Seu personagem")}</div>
-            <div className="mt-0.5 text-xs text-[#5B6472]">{ativo ? `Ativo até ${meu?.pagoAte ? dataBR(meu.pagoAte) : "—"}` : meu ? "Falta ativar para entrar no mapa" : "Monte o seu e entre no mapa"}</div>
+            <div className="mt-0.5 text-xs text-[#5B6472]">{ativo ? "No mapa da cidade" : "Monte o seu, grátis, e entre no mapa"}</div>
           </div>
           {fecharBotao("pointer-events-auto sm:hidden")}
         </div>
@@ -299,7 +299,7 @@ export function PainelPersonagem() {
           )}
           {aba === "acessorios" && (
             <>
-              <p className="text-xs text-[#5B6472]">Um por lugar. Relógio, pulseira e brincos são grátis; os outros você experimenta aqui e, para salvar com eles, compra no Pix.</p>
+              <p className="text-xs text-[#5B6472]">Um por lugar. Relógio, pulseira e brincos são grátis; os outros você experimenta aqui e, para salvar com eles, compra no Pix. As peças do passaporte não estão à venda: você ganha visitando a cidade.</p>
               {LUGARES.map(([lugar, nomeL]) => {
                 const lista = ACESSORIOS.filter((a) => a.lugar === lugar); if (!lista.length) return null;
                 return (
@@ -313,7 +313,7 @@ export function PainelPersonagem() {
                             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white shadow-sm" style={{ color: a.cor === "#FFFFFF" || a.cor === "#EFE6CF" || a.cor === "#E5E7EB" ? "#8C97A6" : a.cor }}><Icone nome={ICONE_ACESSORIO[a.id] ?? "mais"} tamanho={20} /></span>
                             <div className="min-w-0 flex-1">
                               <div className="truncate text-[12px] font-bold">{a.nome}</div>
-                              <div className="text-[11px] text-[#5B6472]">{a.preco === 0 ? "Grátis" : seu ? "Na sua conta" : <span className="inline-flex items-center gap-0.5"><Icone nome="cadeado" tamanho={11} />{brl(a.preco)}</span>}{uso && !seu ? " · experimentando" : ""}</div>
+                              <div className="text-[11px] text-[#5B6472]">{a.ganho ? (seu ? "Na sua conta" : <span className="inline-flex items-center gap-0.5" data-exclusivo={a.id}><Icone nome="passaporte" tamanho={11} />{a.ganho}</span>) : a.preco === 0 ? "Grátis" : seu ? "Na sua conta" : <span className="inline-flex items-center gap-0.5"><Icone nome="cadeado" tamanho={11} />{brl(a.preco)}</span>}{uso && !seu ? " · experimentando" : ""}</div>
                             </div>
                             <button type="button" data-acessorio={a.id} onClick={() => mudarUsando(uso ? usando.filter((x) => x !== a.id) : [a.id, ...usando.filter((x) => ACESSORIO_POR_ID[x]?.lugar !== a.lugar)])} className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${uso ? "bg-white text-[#5B6472] ring-1 ring-black/10" : seu ? "bg-[#7C3AED] text-white" : "bg-[#1D2128] text-white"}`}>{uso ? "Tirar" : seu ? "Usar" : "Experimentar"}</button>
                           </li>
@@ -383,12 +383,7 @@ export function PainelPersonagem() {
               <div className="mt-1 text-[11px] text-[#5B6472]">Comprou, é seu para sempre. Ou salve sem eles: as peças pagas saem do visual.</div>
             </div>
           )}
-          {!ativo && !pixAberto && (
-            <div className="mb-2 flex items-center gap-3 rounded-2xl bg-[#F3FBF5] px-3 py-2">
-              <div className="min-w-0 flex-1 text-xs"><span className="text-[#5B6472] line-through">{brl(precoCheio)}</span> <b className="text-sm text-[#166534]">{brl(preco)}</b><span className="text-[#5B6472]">/mês</span><div className="truncate text-[11px] text-[#5B6472]">Entre no mapa, converse, negocie e faça calls.</div></div>
-              <BotaoCobrar classe="w-44 shrink-0" compacto valor={preco} rotuloPix="Ativar no Pix" rotuloCreditos="Ativar" pagando={pagando} pixLigado={pagamentoLigado} onPagar={(c) => void clicarPagar(c)} />
-            </div>
-          )}
+          {/* 21/11/2026: o personagem básico é grátis (server/personagens.ts › PERSONAGEM_GRATIS): sem "Ativar no Pix" aqui */}
           <div className="flex gap-2">
             <button onClick={fechar} className="rounded-xl bg-[#F1F3F6] px-4 py-2.5 text-sm font-semibold text-[#5B6472]">Fechar</button>
             <button onClick={clicarSalvar} data-salvar-personagem="" disabled={salvando || nome.trim().length < 2} title={nome.trim().length < 2 ? "Dê um nome ao seu personagem" : undefined} className="min-w-0 flex-1 truncate rounded-xl bg-[#1D4ED8] px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50">{salvando ? "Salvando…" : faltam.length ? "Salvar sem os itens pagos" : meu ? "Salvar personagem" : "Criar personagem"}</button>
@@ -466,7 +461,7 @@ export function FichaPersonagem() {
         </div>
       )}
       {!redes && !souEu && rel !== "amigos" && <div className="mt-2 text-[11px] text-[#5B6472]">As redes sociais aparecem quando vocês forem amigos.</div>}
-      {precisa && <div className="mt-3 rounded-xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">Pra conversar, negociar, fazer call e ter amigos você precisa do seu personagem (<b>de R$ 19,90 por R$ 5,90/mês</b>). <button onClick={() => abrir("montar")} className="font-bold underline">Montar agora</button></div>}
+      {precisa && <div className="mt-3 rounded-xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">Pra conversar, negociar, fazer call e ter amigos você precisa do seu personagem (<b>é grátis</b>). <button onClick={() => abrir("montar")} className="font-bold underline">Montar agora</button></div>}
       {aviso && <div className="mt-2 text-xs font-semibold text-[#166534]">{aviso}</div>}
     </div>
   );
@@ -668,7 +663,7 @@ export function ChatPersonagem() {
   const selecionarOutro = usePersonagem((s) => s.selecionarOutro);
   if (painel !== "chat" || !o) return null;
   return (
-    <div className={`${FLUTUANTE} ${LARGO} painel-entra flex h-[72vh] flex-col overflow-hidden sm:h-[min(70vh,560px)]`}>
+    <div className={`${FLUTUANTE} ${LARGO} painel-entra flex h-[72dvh] flex-col overflow-hidden sm:h-[min(70dvh,560px)]`}>
       <div className="flex items-center justify-between border-b border-black/5 p-3">
         <button onClick={() => selecionarOutro(o)} className="flex items-center gap-2 text-left"><MiniAvatar boneco={o.boneco} roupa={o.roupa} tamanho={36} /><div><div className="text-sm font-bold leading-tight">{o.nome}</div><div className="text-[11px] text-[#5B6472]">{o.online ? <span className="text-[#16A34A]">● online · ao vivo</span> : "offline · recebe quando entrar"}</div></div></button>
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5" aria-label="Fechar"><Icone nome="fechar" tamanho={16} /></button>
@@ -690,7 +685,7 @@ export function CaixaPersonagem() {
   return (
     <div className={`${FLUTUANTE} ${ESTREITO} painel-entra overflow-y-auto p-3`}>
       <div className="flex items-center justify-between px-1"><div className="text-sm font-bold">Minhas conversas</div><button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5" aria-label="Fechar"><Icone nome="fechar" tamanho={16} /></button></div>
-      <div className="mt-2 max-h-[60vh] space-y-1 overflow-y-auto">
+      <div className="mt-2 max-h-[60dvh] space-y-1 overflow-y-auto">
         {conversas.length === 0 && <div className="py-6 text-center text-xs text-[#5B6472]">Nenhuma conversa ainda. Clique num personagem no mapa.</div>}
         {conversas.map((c) => (
           <button key={c.outroId} onClick={() => abrirChat({ usuarioId: c.outroId, nome: c.nome, boneco: c.boneco, roupa: c.roupa, bio: "", x: 0, z: 0, rot: 0, online: c.online })} className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-[#F1F3F6]">

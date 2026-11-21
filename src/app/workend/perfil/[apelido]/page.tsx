@@ -11,6 +11,7 @@ import { rotuloLoja } from "@/office/data/numeroLoja";
 import { MiniAvatar } from "@/office/ui/MiniAvatar";
 import { Icone } from "@/office/ui/Icone";
 import { Topo, Rodape } from "../../_partes";
+import { InsigniasCidade } from "../_insignias";
 import { meta } from "../../seo";
 import "../perfil.css";
 
@@ -61,8 +62,8 @@ export default async function PerfilPublicoPagina({ params }: Props) {
           <div className="pg-acoes mt-5">
             {conversa && <Link href={conversa} className="btn cd-btn-branco"><Icone nome="conversar" tamanho={17} />Conversar</Link>}
             {p.whatsapp && <a href={linkWhatsapp(p.whatsapp)} target="_blank" rel="noopener nofollow" className="btn btn-linha"><Icone nome="telefone" tamanho={17} />WhatsApp</a>}
-            {p.instagram && <a href={linkInstagram(p.instagram)} target="_blank" rel="noopener nofollow" className="btn btn-linha"><Icone nome="instagram" tamanho={17} />@{p.instagram}</a>}
-            {p.site && <a href={linkSite(p.site)} target="_blank" rel="noopener nofollow" className="btn btn-linha"><Icone nome="globo" tamanho={17} />{siteCurto(p.site)}</a>}
+            {p.instagram && <a href={linkInstagram(p.instagram)} target="_blank" rel="noopener nofollow" className="btn btn-linha"><Icone nome="instagram" tamanho={17} /><span className="min-w-0 truncate">@{p.instagram}</span></a>}
+            {p.site && <a href={linkSite(p.site)} target="_blank" rel="noopener nofollow" className="btn btn-linha"><Icone nome="globo" tamanho={17} /><span className="min-w-0 truncate">{siteCurto(p.site)}</span></a>}
             {p.email && <a href={`mailto:${p.email}`} className="btn btn-linha"><Icone nome="enviar" tamanho={17} />E-mail</a>}
             {p.dono && <Link href="/app/perfil" className="btn btn-linha"><Icone nome="editar" tamanho={17} />Editar meu perfil</Link>}
           </div>
@@ -109,6 +110,7 @@ export default async function PerfilPublicoPagina({ params }: Props) {
                 )}
               </section>
             )}
+            <InsigniasCidade usuarioId={p.usuarioId} />
             <section className="pg-cartao cd-pub-bloco cd-pub-rodape">
               <p><Icone nome="perfil" tamanho={16} />No WorkEnd desde {mesAno(p.desde)}</p>
               {p.nichos.length > 0 && <p className="cd-pub-nichos">Mais em {p.nichos.map((n, i) => <span key={n.id}>{i > 0 && ", "}<Link href={`/encontrar?tipo=perfis&nicho=${n.id}`}>{n.nome}</Link></span>)}</p>}

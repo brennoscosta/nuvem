@@ -15,7 +15,7 @@ import { ComFallback, type NomeModelo } from "./Modelos";
 import { Mesa, Sofa, Planta, Balcao, MesaBaixa, Quadro, Cafe, Tapete, Estante, Poltrona, LuminariaChao, MesaLateral, Bebedouro, QuadroArte, PainelLogo, Ficus, MesaAlta, Lousa, LuzDasLuminarias } from "./Moveis";
 import { BonecoProcedural, useAnimacao, HIPS, type BonecoHandle, type Pose } from "./Boneco";
 import { BONECO } from "../data/bonecos";
-import { LOTE_POR_CHAVE, frenteDoLote } from "../data/mundo";
+import { LOTE_POR_CHAVE } from "../data/mundo";
 import { ModeloPredio, RelogioPredios, FACHADA_TESTE } from "./PredioMaterial";
 import { Torre, Cobertura } from "./PredioTopo";
 import { PredioKit, RelogioKit } from "./KitPredio";
@@ -33,6 +33,9 @@ import { useEscritorio } from "../store";
 import { usePersonagem } from "../personagemStore";
 import { catracasCliente } from "../data/escritorio";
 import { Catracas } from "./Catraca";
+import { poseConferida, conferirComEnfeites, passagemNoPatio, rotDoPatio, type LadoPatio } from "../data/posicaoPredio";
+import { usePoseAoVivo, useFantasma } from "./EditorPosicao";
+import { useEdicao } from "../edicaoStore";
 
 const FONTE = "/fonts/inter-700.woff";
 const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = PREDIO_CLIENTE;
@@ -456,14 +459,25 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
     if (p >= 1) { g.scale.y = 1; inicio.current = 0; return; }
     g.scale.y = Math.max(0.02, easeSubida(p));
   });
-  const l = LOTE_POR_CHAVE[chave]; if (!l) return null;
+  // 21/11/2026 (modo "Editar posição"): centro, giro e deslocamento do prédio vêm de data/posicaoPredio.ts (a mesma fonte
+  // da colisão e da entrada). O pátio (piso, cerca, árvores, enfeites e a faixa de promoção) fica preso ao lote, virado como
+  // o prédio; o prédio anda dentro dele. Na edição, o grupo do prédio segue o rascunho e vira fantasma (scene/EditorPosicao.tsx).
+  const grupo = useRef<THREE.Group>(null);
+  const pc = poseConferida({ chave, status: "ativo", escritorio: e }, anexo);
+  const pose = pc?.pose ?? null, tc = pose?.terreno.centro ?? [0, 0];
+  const poseEd = useEdicao((s) => (s.chave === chave ? s.pose : null)), confEd = useEdicao((s) => (s.chave === chave ? s.conf : null));
+  const confBase = useMemo(() => (pose ? conferirComEnfeites(pose, e.decor) : null), [pose, e.decor]);
+  // decoração gravada só com a posição (giro e deslocamento): o resto vem do padrão
+  const decorCompleta = useMemo(() => ({ ...DECOR_PADRAO, ...(e.decor ?? {}) }), [e.decor]);
+  usePoseAoVivo(grupo, chave, pose ? [pose.centro[0] - tc[0], pose.centro[1] - tc[1], pose.rot] : [0, 0, 0], (p) => [p.centro[0] - tc[0], p.centro[1] - tc[1], p.rot]);
+  useFantasma(grupo, chave);
+  const l = LOTE_POR_CHAVE[chave]; if (!l || !pose) return null;
   // lote duplo: o prédio vai para o meio dos dois terrenos (o vizinho do lado, mesma rua)
   const la = anexo ? LOTE_POR_CHAVE[anexo] : null; const dx = la ? (la.centro[0] - l.centro[0]) / 2 : 0;
-  const [x, z] = [l.centro[0] + dx, l.centro[1]];
-  // nossa frente local é -z; frenteDoLote usa rot 0 = frente pra +z. O dono pode girar o prédio em quartos de volta (decor.giro);
-  // no lote duplo o prédio largo só fica de frente ou de costas para a rua (meia volta)
-  const giro = e.decor?.giro ?? 0; const giroEf = la ? giro - (giro % 2) : giro;
-  const rot = frenteDoLote(l.k) + Math.PI + giroEf * (Math.PI / 2);
+  const [x, z] = tc;
+  // nossa frente local é -z (a pose já soma a frente do lote, o giro do dono e a meia volta do lote duplo)
+  const rot = pose.rot;
+  const pPatio = poseEd ?? pose, confPatio = confEd ?? confBase, rotPatio = rotDoPatio(pPatio), passagem = passagemNoPatio(pPatio, confPatio);
   const it = e.decor?.interior;
   const planta = plantaCliente(e);
   const assinatura = JSON.stringify(e) + cor + nome + (logo ?? "");
@@ -476,10 +490,12 @@ function EscritorioLote({ chave, e, cor, nome, logo, fora, nicho, anexo = null, 
   return (
     <group position={[x, 0, z]}>
     {placa && <group position={[-dx, 0, 0]}><PlacaEsquina d={{ nome, cor, nicho: nomeNicho(nicho), numero: l.numero, logo }} sx={l.k % 2 ? 1 : -1} sz={l.k >= 2 ? 1 : -1} /></group>}
-    <group rotation={[0, rot, 0]}>
-      <group ref={sobe}><group visible={fora}>{mk ? <ExteriorKit chave={chave} e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} numero={l.numero} promo={promo} /> : <Exterior e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} numero={l.numero} promo={promo} />}</group></group>
-      <DecorLote d={e.decor ?? DECOR_PADRAO} cor={cor} logo={logo} duplo={!!la} />
+    <group rotation={[0, rotPatio, 0]}>
+      <DecorLote d={decorCompleta} cor={cor} logo={logo} duplo={!!la} escondidos={confPatio?.escondidos} passagem={passagem} />
       {promo && <FaixaPromo texto={promo} duplo={!!la} />}
+    </group>
+    <group ref={grupo} position={[pose.centro[0] - x, 0, pose.centro[1] - z]} rotation={[0, rot, 0]}>
+      <group ref={sobe}><group visible={fora}>{mk ? <ExteriorKit chave={chave} e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} numero={l.numero} promo={promo} /> : <Exterior e={e} cor={cor} nome={nome} logo={logo} duplo={!!la} contratando={contratando} numero={l.numero} promo={promo} />}</group></group>
       {peca && <PecaArea tipo={peca} cor={cor} zf={zFrente} zw={zVidro} sx={la ? DUPLO.x : 1} />}
       {(festa || INAUGURAR_TESTE === chave) && <Inauguracao cor={cor} zf={zFrente} sx={la ? DUPLO.x : 1} topo={alturaPredio(e, !!la)} />}
       {!fora && (
@@ -600,19 +616,28 @@ function Toldo({ cor, y, z, largura }: { cor: string; y: number; z: number; larg
 }
 
 // Piso, cerca, árvores e itens da frente. Coordenadas locais do lote: frente da loja para -z; lote de 20 × 20.
-export function DecorLote({ d, cor, logo, duplo = false }: { d: Decoracao; cor: string; logo: string | null; duplo?: boolean }) {
+// escondidos (21/11/2026): enfeites que encostam no prédio ou ficam no caminho da porta depois de o dono mover o prédio
+// (data/posicaoPredio.ts › enfeitesDoLote, os mesmos ids); passagem: onde a cerca abre (onde o caminho da porta sai do lote)
+export function DecorLote({ d, cor, logo, duplo = false, escondidos, passagem }: { d: Decoracao; cor: string; logo: string | null; duplo?: boolean; escondidos?: string[]; passagem?: { lado: LadoPatio; c: number } }) {
   const H = 9.62; // meio lado do lote (menos o meio-fio)
   // lote duplo: o piso e a cerca cobrem os dois terrenos (40 × 20) e o que fica na frente da porta abre junto com o prédio
   const hx = duplo ? H + 10 : H, sx = duplo ? DUPLO.x : 1;
   const tex = typeof document !== "undefined" ? texturaPiso(d.piso) : null;
-  const tem = (x: ExtraLote) => d.extras.includes(x);
+  const fora = new Set(escondidos ?? []);
+  const tem = (x: ExtraLote) => d.extras.includes(x) && !fora.has(x);
+  const tem2 = (x: ExtraLote, i: number) => d.extras.includes(x) && !fora.has(`${x}-${i}`);
   const madeira = mat("#A0703C", { rough: 0.9 }), metal = mat("#2B2F36", { metal: 0.4, rough: 0.5 });
   // árvores: primeiro nos fundos, depois na frente
-  const arvores: [number, number][] = [[-hx + 1.12, 8.5], [hx - 1.12, 8.5], [-hx + 0.62, -9.0], [hx - 0.62, -9.0]].slice(0, d.arvores) as [number, number][];
-  const lados: { de: [number, number]; ate: [number, number] }[] = [
-    { de: [-hx, -H], ate: [-2.1 * sx, -H] }, { de: [2.1 * sx, -H], ate: [hx, -H] }, // frente, com a passagem da entrada
-    { de: [-hx, H], ate: [hx, H] }, { de: [-hx, -H], ate: [-hx, H] }, { de: [hx, -H], ate: [hx, H] },
-  ];
+  const arvores: [number, number][] = ([[-hx + 1.12, 8.5], [hx - 1.12, 8.5], [-hx + 0.62, -9.0], [hx - 0.62, -9.0]] as [number, number][]).slice(0, d.arvores).filter((_, i) => !fora.has(`arvore-${i}`));
+  // cerca: os quatro lados, com a passagem onde o caminho da porta sai do lote (o de sempre: no meio da frente)
+  const pas = passagem ?? { lado: "frente" as LadoPatio, c: 0 }, meia = 2.1 * sx;
+  const lado = (de: [number, number], ate: [number, number], qual: LadoPatio): { de: [number, number]; ate: [number, number] }[] => {
+    if (pas.lado !== qual) return [{ de, ate }];
+    const horiz = de[1] === ate[1], a = horiz ? de[0] : de[1], b = horiz ? ate[0] : ate[1], c0 = Math.max(a, pas.c - meia), c1 = Math.min(b, pas.c + meia);
+    const p = (v: number): [number, number] => (horiz ? [v, de[1]] : [de[0], v]);
+    return [...(c0 - a > 0.3 ? [{ de, ate: p(c0) }] : []), ...(b - c1 > 0.3 ? [{ de: p(c1), ate }] : [])];
+  };
+  const lados = [...lado([-hx, -H], [hx, -H], "frente"), ...lado([-hx, H], [hx, H], "fundo"), ...lado([-hx, -H], [-hx, H], "esq"), ...lado([hx, -H], [hx, H], "dir")];
   return (
     <group>
       {tex && (
@@ -641,14 +666,14 @@ export function DecorLote({ d, cor, logo, duplo = false }: { d: Decoracao; cor: 
           );
         })}
         {/* vasos com plantas ao lado da porta */}
-        {tem("vasos") && [-1.9 * sx, 1.9 * sx].map((x) => (
+        {[-1.9 * sx, 1.9 * sx].map((x, i) => tem2("vasos", i) && (
           <group key={x} position={[x, 0, -8.25]}>
             <mesh geometry={cilindro(0.34, 0.26, 0.6, 14)} material={mat("#C0663E", { rough: 0.85 })} position={[0, 0.3, 0]} castShadow />
             <mesh geometry={esfera(0.48, 12)} material={mat("#4E9B47", { rough: 1 })} position={[0, 0.95, 0]} castShadow />
           </group>
         ))}
         {/* bancos de praça */}
-        {tem("bancos") && (duplo ? [-8, 8] : [-5, 5]).map((x) => (
+        {(duplo ? [-8, 8] : [-5, 5]).map((x, i) => tem2("bancos", i) && (
           <group key={x} position={[x, 0, -9.0]}>
             <mesh geometry={caixa(1.6, 0.07, 0.46)} material={madeira} position={[0, 0.46, 0]} castShadow />
             <mesh geometry={caixa(1.6, 0.42, 0.06)} material={madeira} position={[0, 0.74, 0.22]} />
@@ -656,7 +681,7 @@ export function DecorLote({ d, cor, logo, duplo = false }: { d: Decoracao; cor: 
           </group>
         ))}
         {/* mesas com guarda-sol na cor da marca */}
-        {tem("mesas") && [-(hx - 2.32), hx - 2.32].map((x) => (
+        {[-(hx - 2.32), hx - 2.32].map((x, i) => tem2("mesas", i) && (
           <group key={x} position={[x, 0, -8.7]}>
             <mesh geometry={cilindro(0.48, 0.48, 0.05, 18)} material={mat("#F4F1EA", { rough: 0.6 })} position={[0, 0.76, 0]} castShadow />
             <mesh geometry={cilindro(0.04, 0.04, 2.3, 6)} material={metal} position={[0, 1.15, 0]} />
@@ -672,7 +697,7 @@ export function DecorLote({ d, cor, logo, duplo = false }: { d: Decoracao; cor: 
           </group>
         )}
         {/* bandeiras nos cantos da frente */}
-        {tem("bandeiras") && [-(hx - 0.42), hx - 0.42].map((x) => (
+        {[-(hx - 0.42), hx - 0.42].map((x, i) => tem2("bandeiras", i) && (
           <group key={x} position={[x, 0, -6.2]}>
             <mesh geometry={cilindro(0.04, 0.05, 5, 6)} material={mat("#D9DDE3", { metal: 0.6, rough: 0.35 })} position={[0, 2.5, 0]} />
             <mesh geometry={caixa(0.02, 0.85, 1.4)} material={mat(cor, { rough: 0.8 })} position={[0, 4.45, -0.72]} castShadow />
@@ -680,7 +705,7 @@ export function DecorLote({ d, cor, logo, duplo = false }: { d: Decoracao; cor: 
           </group>
         ))}
         {/* varal de luzinhas: postes na frente e fios até a fachada */}
-        {tem("luzes") && (
+        {tem("luzes") && !fora.has("luzes-0") && !fora.has("luzes-1") && (
           <>
             {[-(hx - 1.02), hx - 1.02].map((x) => <mesh key={x} geometry={cilindro(0.04, 0.05, 3.2, 6)} material={metal} position={[x, 1.6, -9.3]} />)}
             <Varal de={[-(hx - 1.02), 3.15, -9.3]} ate={[hx - 1.02, 3.15, -9.3]} n={duplo ? 20 : 11} />

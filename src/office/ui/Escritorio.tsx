@@ -13,7 +13,8 @@ import { modeloDe, modelosLiberados, type IdModelo } from "../data/modelos";
 import { CORES_SETOR, CARGOS_SUGERIDOS, MAX_SETORES, MAX_MESAS_SETOR, PRECO_TROCA_LAYOUT, TROCAS_LAYOUT_GRATIS, trocasRestantes, DECOR_PADRAO, ESTILOS_LETREIRO, PISOS, CERCAS, EXTRAS, CORES_TOLDO, INTERIOR_PADRAO, CORES_PAREDE, PISOS_INTERIOR, MOVEIS_INTERIOR, ITENS_DECORACAO, ESTILOS_INTERIOR, DECORACAO_DISCRETA, type ItemDecoracao, COBERTURAS, MATERIAIS, CORES_LED, LED_PADRAO, PECAS, PECA_POR_NICHO, andaresDoPredio, limitesAndares, type Led, type Escritorio, type Setor, type Membro, type Decoracao, type Interior } from "../data/escritorio";
 import { useEscritorio } from "../store";
 import { ehKit, KIT_TOLDO } from "../data/predios";
-import { frenteDoLote, LOTE_POR_CHAVE } from "../data/mundo";
+import { LOTE_POR_CHAVE } from "../data/mundo";
+import { useEdicao } from "../edicaoStore";
 import { natalAtivo } from "../scene/Natal";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -118,7 +119,8 @@ export function PainelEscritorio() {
         <button onClick={fechar} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5" aria-label="Fechar"><Icone nome="fechar" tamanho={16} /></button>
       </div>
       <div className="mx-4 flex gap-1 rounded-xl bg-[#F1F3F6] p-1 text-xs font-semibold">
-        {([["predio", "Prédio"], ["visual", "Fachada"], ["interior", "Interior"], ["setores", `Setores ${e.setores.length}`], ["equipe", `Equipe ${e.equipe.length}`]] as const).map(([k, t]) => <button key={k} onClick={() => setAba(k)} className={`flex-1 whitespace-nowrap rounded-lg px-1 py-1.5 ${aba === k ? "bg-white shadow" : "text-[#5B6472]"}`}>{t}</button>)}
+        {/* 21/11/2026: em 360 px as cinco abas com o número não cabiam ("Equipe 2" cortado): abaixo de 400 px o número sai */}
+        {([["predio", "Prédio", null], ["visual", "Fachada", null], ["interior", "Interior", null], ["setores", "Setores", e.setores.length], ["equipe", "Equipe", e.equipe.length]] as const).map(([k, t, n]) => <button key={k} onClick={() => setAba(k)} className={`min-w-0 flex-1 whitespace-nowrap rounded-lg px-1 py-1.5 max-sm:min-h-10 ${aba === k ? "bg-white shadow" : "text-[#5B6472]"}`}>{t}{n != null && <span className="max-[399px]:hidden"> {n}</span>}</button>)}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-3">
         {aba === "visual" && <AbaVisual e={e} set={set} corMarca={terrenoAtual?.cor ?? "#1D4ED8"} nicho={terrenoAtual?.nicho ?? "negocios"} />}
@@ -136,7 +138,7 @@ export function PainelEscritorio() {
             {restantes <= 0 && trocou && novoLiberado && pix?.tipo !== "layout" && <BotaoCobrar classe="" valor={PRECO_TROCA_LAYOUT} rotuloPix={`Pagar ${brl(PRECO_TROCA_LAYOUT)} no Pix pra trocar`} rotuloCreditos="Trocar de prédio" pagando={false} onPagar={(c) => void comprarTroca(c)} />}
             {erroPix && <div className="text-xs font-semibold text-[#E2575B]">{erroPix}</div>}
             {pix?.tipo === "layout" && vista && <PixAberto chave={vista} />}
-            {LOTE_POR_CHAVE[vista] && <PosicaoPredio k={LOTE_POR_CHAVE[vista].k} e={e} set={set} />}
+            {LOTE_POR_CHAVE[vista] && <PosicaoPredio chave={vista} e={e} />}
             <AlturaFachada e={e} set={set} corMarca={terrenoAtual?.cor ?? "#1D4ED8"} />
             <div className="rounded-xl bg-[#F1F3F6] px-3 py-2 text-[11px] text-[#5B6472]">O letreiro usa o nome, a cor e a logo da sua marca (botão “Marca e logo” no cartão do lote). Por dentro a planta é a mesma em todos: recepção, sala do CEO e até {MAX_SETORES} setores.</div>
           </div>
@@ -178,40 +180,20 @@ export function PainelEscritorio() {
   );
 }
 
-// ---------- posição do prédio no lote e aba "Fachada e lote" (11/11/2026) ----------
-// Para onde a frente olha depois do giro: rua (os lotes de esquina têm duas) ou vizinho
-const NOMES_LADO = { norte: "norte", sul: "sul", leste: "leste", oeste: "oeste" } as const;
-function frentePara(k: number, giro: number) {
-  const rot = frenteDoLote(k) + Math.PI + giro * (Math.PI / 2);
-  const fx = Math.round(-Math.sin(rot)), fz = Math.round(-Math.cos(rot));
-  const lado = fz < 0 ? "norte" : fz > 0 ? "sul" : fx > 0 ? "leste" : "oeste";
-  const temRua = (lado === "norte" && k < 2) || (lado === "sul" && k >= 2) || (lado === "oeste" && k % 2 === 0) || (lado === "leste" && k % 2 === 1);
-  return { lado, temRua, fx, fz };
-}
-function PosicaoPredio({ k, e, set }: { k: number; e: Escritorio; set: (e: Escritorio) => void }) {
-  const d = e.decor ?? DECOR_PADRAO;
-  const f = frentePara(k, d.giro);
-  const girar = (delta: number) => set({ ...e, decor: { ...d, giro: (((d.giro + delta) % 4) + 4) % 4 as Decoracao["giro"] } });
+// ---------- posição do prédio no lote (21/11/2026) ----------
+// O giro que ficava aqui (11/11/2026) virou o modo "Editar posição" no mapa (office/edicaoStore.ts): girar, arrastar dentro
+// do lote, ajuste fino, a grade e o fantasma verde ou vermelho. Daqui só abre o modo (com o escritório já salvo).
+function PosicaoPredio({ chave, e }: { chave: string; e: Escritorio }) {
+  const salvo = useMundo((s) => s.terrenos[chave]?.escritorio ?? null);
+  const pendente = !!salvo && JSON.stringify(e) !== JSON.stringify(salvo); // mudanças do painel ainda sem salvar
+  const giro = salvo?.decor?.giro ?? 0;
   return (
     <div className="rounded-xl border border-black/10 bg-white p-3">
       <div className="text-[12px] font-bold text-[#5B6472]">Posição no lote</div>
-      <div className="mt-1.5 flex items-center gap-3">
-        <button type="button" onClick={() => girar(1)} className="grid h-10 w-10 place-items-center rounded-xl bg-[#EEF3FF] text-lg font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]" title="Girar para a esquerda" aria-label="Girar o prédio para a esquerda"><Icone nome="girarEsq" tamanho={20} /></button>
-        {/* mini planta do lote: a seta mostra para onde fica a porta */}
-        <svg viewBox="-12 -12 24 24" className="h-14 w-14 shrink-0" aria-hidden="true">
-          <rect x="-10" y="-10" width="20" height="20" rx="2" fill="#F1F3F6" stroke="#C3CCD7" />
-          {k < 2 ? <rect x="-12" y="-12" width="24" height="2" fill="#4A4E55" /> : <rect x="-12" y="10" width="24" height="2" fill="#4A4E55" />}
-          {k % 2 === 0 ? <rect x="-12" y="-12" width="2" height="24" fill="#4A4E55" /> : <rect x="10" y="-12" width="2" height="24" fill="#4A4E55" />}
-          <rect x="-6" y="-5" width="12" height="10" rx="1" fill="#1D4ED8" opacity=".85" transform={`rotate(${f.fx ? 90 : 0})`} />
-          <path d={`M0 0 L${f.fx * 8} ${f.fz * 8}`} stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-          <circle cx={f.fx * 8} cy={f.fz * 8} r="2" fill="#16A34A" />
-        </svg>
-        <button type="button" onClick={() => girar(-1)} className="grid h-10 w-10 place-items-center rounded-xl bg-[#EEF3FF] text-lg font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]" title="Girar para a direita" aria-label="Girar o prédio para a direita"><Icone nome="girarDir" tamanho={20} /></button>
-        <div className="min-w-0 text-[12px] leading-snug">
-          <b>Frente para o {NOMES_LADO[f.lado as keyof typeof NOMES_LADO]}</b>
-          <div className={f.temRua ? "text-[#166534]" : "text-[#7A5A00]"}>{f.temRua ? "A porta dá para a rua: quem passa vê a sua fachada." : "A porta fica virada para o vizinho; a rua vê a lateral do prédio."}</div>
-        </div>
-      </div>
+      <p className="mt-1 text-[12px] leading-snug text-[#5B6472]">Gire de 90 em 90 graus e arraste o prédio dentro do terreno, com a grade no chão. Verde vale; vermelho mostra o motivo.{giro ? ` Hoje: girado ${giro * 90}°.` : ""}</p>
+      {pendente
+        ? <div className="mt-2 rounded-lg bg-[#FFF4D6] px-2.5 py-1.5 text-[11.5px] text-[#7A5A00]">Salve o escritório antes de mudar a posição.</div>
+        : <button type="button" data-editar-posicao onClick={() => { const erro = useEdicao.getState().abrir(chave); if (erro) window.alert(erro); }} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#EEF3FF] px-3 py-2.5 text-sm font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]"><Icone nome="posicao" tamanho={17} />Editar posição no mapa</button>}
     </div>
   );
 }

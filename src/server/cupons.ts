@@ -15,7 +15,9 @@ const limpa = (t: unknown, max: number) => (typeof t === "string" ? t : "").repl
 const somaDias = (dia: string, n: number) => new Date(new Date(`${dia}T12:00:00Z`).getTime() + n * 86400_000).toISOString().slice(0, 10);
 const prefixo = (nome: string) => (nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4) || "LOJA").padEnd(4, "X");
 
-export interface CupomDono { id: string; titulo: string; regra: string; validade: string; limite: number | null; ativo: boolean; pegos: number; usados: number; vencido: boolean; descontoPct: number | null; descontoCentavos: number | null; minimoCentavos: number | null }
+// passaporte (20/11/2026, frente "visitante", migração 0050): o cupom que a recepcionista oferece a quem chega com o
+// passaporte da cidade; fica fora da lista pública e só quem tem carimbo da loja pega (src/server/passaporte.ts)
+export interface CupomDono { id: string; titulo: string; regra: string; validade: string; limite: number | null; ativo: boolean; pegos: number; usados: number; vencido: boolean; descontoPct: number | null; descontoCentavos: number | null; minimoCentavos: number | null; passaporte: boolean }
 
 // ---------- desconto em número (17/11/2026, pedidos pela atendente; colunas na migração 0039) ----------
 // Sem número, o cupom é só de balcão (o dono confere em "Validar cupom"). Com número, a atendente aplica no pedido.
@@ -65,7 +67,7 @@ export async function cuponsDoDono(u: Usuario): Promise<CupomDono[]> {
   await migrar();
   const hoje = diaBR();
   const rows = await sql<Omit<CupomDono, "vencido">[]>`
-    SELECT c.id, c.titulo, c.regra, c.validade::text AS validade, c.limite, c.ativo, c.desconto_pct, c.desconto_centavos, c.minimo_centavos,
+    SELECT c.id, c.titulo, c.regra, c.validade::text AS validade, c.limite, c.ativo, c.desconto_pct, c.desconto_centavos, c.minimo_centavos, c.passaporte,
       (SELECT count(*)::int FROM cupom_resgate r WHERE r.cupom_id = c.id) AS pegos,
       (SELECT count(*)::int FROM cupom_resgate r WHERE r.cupom_id = c.id AND r.usado_em IS NOT NULL) AS usados
     FROM cupom c WHERE c.dono_id = ${u.id} ORDER BY c.ativo DESC, c.criado_em DESC LIMIT 30`;
@@ -104,15 +106,15 @@ export async function cuponsDaLoja(numero: number, u: Usuario | null) {
   await migrar();
   const loja = await lojaDoNumero(numero); if (!loja) return { cupons: [], ehDono: false };
   const hoje = diaBR();
-  const rows = await sql<{ id: string; titulo: string; regra: string; validade: string; limite: number | null; pegos: number; meu: string | null; usado: Date | null }[]>`
-    SELECT c.id, c.titulo, c.regra, c.validade::text AS validade, c.limite,
+  const rows = await sql<{ id: string; titulo: string; regra: string; validade: string; limite: number | null; pegos: number; meu: string | null; usado: Date | null; passaporte: boolean }[]>`
+    SELECT c.id, c.titulo, c.regra, c.validade::text AS validade, c.limite, c.passaporte,
       (SELECT count(*)::int FROM cupom_resgate r WHERE r.cupom_id = c.id) AS pegos,
       (SELECT r.codigo FROM cupom_resgate r WHERE r.cupom_id = c.id AND r.usuario_id = ${u?.id ?? ""}) AS meu,
       (SELECT r.usado_em FROM cupom_resgate r WHERE r.cupom_id = c.id AND r.usuario_id = ${u?.id ?? ""}) AS usado
     FROM cupom c WHERE c.dono_id = ${loja.donoId} AND c.ativo AND c.validade >= ${hoje}::date ORDER BY c.criado_em`;
   return {
     ehDono: u?.id === loja.donoId,
-    cupons: rows.filter((r) => r.meu || r.limite == null || r.pegos < r.limite).map((r) => ({ id: r.id, titulo: r.titulo, regra: r.regra, validade: r.validade, restam: r.limite == null ? null : Math.max(0, r.limite - r.pegos), meu: r.meu, usado: !!r.usado })),
+    cupons: rows.filter((r) => r.meu || (!r.passaporte && (r.limite == null || r.pegos < r.limite))).map((r) => ({ id: r.id, titulo: r.titulo, regra: r.regra, validade: r.validade, restam: r.limite == null ? null : Math.max(0, r.limite - r.pegos), meu: r.meu, usado: !!r.usado })),
   };
 }
 
@@ -121,11 +123,16 @@ export async function pegarCupom(u: Usuario, cupomId: string) {
   if (u.banidoEm) throw new ErroCupom("Conta suspensa.", 403);
   const hoje = diaBR();
   return sql.begin(async (tx) => {
-    const [c] = await tx<{ id: string; donoId: string; ativo: boolean; validade: string; limite: number | null }[]>`SELECT id, dono_id, ativo, validade::text AS validade, limite FROM cupom WHERE id = ${cupomId} FOR UPDATE`;
+    const [c] = await tx<{ id: string; donoId: string; ativo: boolean; validade: string; limite: number | null; passaporte: boolean }[]>`SELECT id, dono_id, ativo, validade::text AS validade, limite, passaporte FROM cupom WHERE id = ${cupomId} FOR UPDATE`;
     if (!c || !c.ativo || c.validade < hoje) throw new ErroCupom("Esse cupom não está mais valendo.", 404);
     if (c.donoId === u.id) throw new ErroCupom("Esse cupom é da sua loja.");
     const [ja] = await tx<{ codigo: string }[]>`SELECT codigo FROM cupom_resgate WHERE cupom_id = ${c.id} AND usuario_id = ${u.id}`;
     if (ja) return { codigo: ja.codigo, novo: false };
+    // cupom do passaporte: só para quem foi atendido na recepção da loja (tem o carimbo dela)
+    if (c.passaporte) {
+      const [carimbo] = await tx`SELECT 1 FROM passaporte_carimbo WHERE usuario_id = ${u.id} AND dono_id = ${c.donoId} LIMIT 1`;
+      if (!carimbo) throw new ErroCupom("Este cupom é do passaporte da cidade: a recepcionista da loja oferece para quem é atendido lá.", 403);
+    }
     const [{ n }] = await tx<{ n: number }[]>`SELECT count(*)::int AS n FROM cupom_resgate WHERE cupom_id = ${c.id}`;
     if (c.limite != null && n >= c.limite) throw new ErroCupom("Esse cupom esgotou.");
     const [t] = await tx<{ empresaNome: string }[]>`SELECT empresa_nome FROM terreno WHERE usuario_id = ${c.donoId} AND anexo_de IS NULL ORDER BY status = 'ativo' DESC LIMIT 1`;

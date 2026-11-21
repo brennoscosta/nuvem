@@ -28,6 +28,7 @@ import { Fauna } from "./Fauna";
 import { SomCena } from "./SomCena";
 import { Semaforos, Trafego, Passantes, PontosOnibus } from "./Transito";
 import { Moradores } from "./Moradores";
+import { PresentesNatal } from "./PresentesNatal";
 import { LuzesPostes } from "./CicloDia";
 import { natalAtivo, ArvoreNatal, LuzesNatalPostes, LacosPostes, NatalSedes, NatalPraca, LuzesRioNatal } from "./Natal";
 import { Outdoors } from "./Anuncios";
@@ -40,6 +41,7 @@ import { Rio } from "./Rio";
 import { Parque, ParqueChao, LAGO } from "./Parque";
 import { useMundo, type Terreno } from "../mundoStore";
 import { ehKit } from "../data/predios";
+import { EditorPosicao3D } from "./EditorPosicao"; // modo "Editar posição" (frente editor, 21/11/2026)
 
 // Lotes com prédio do kit modular (v66, 13/11/2026), inclusive o rascunho aberto no painel e a ampliação do lote duplo:
 // a árvore do terreno vazio ou do quintal da casa antiga ficaria dentro do prédio novo (mais baixo ou mais largo que os
@@ -123,6 +125,7 @@ export function Mundo() {
   const poucos = leve();
   const natal = useMemo(() => natalAtivo(), []);
   const lotesKit = useMundo((s) => lotesComKit(s.terrenos, s.loteSelecionado, s.rascunhoEscritorio));
+  const versaoSedes = useMundo((s) => s.versaoSedes); // a conta admin girou uma sede: ela e as guirlandas montam de novo (editor)
   // 20/11/2026: a câmera afasta 30% mais (até 155 m; 180 no celular): lá de cima o lado de lá da cidade continua desenhado
   const raio = poucos ? 200 : 270;
   const calcadas = useMemo(() => QUARTEIROES.map((q) => centroQuarteirao(q.i, q.j)), []);
@@ -190,8 +193,10 @@ export function Mundo() {
       <Depois etapa={2}><Rio /><ParqueChao /><Perto cx={LAGO.x} cz={LAGO.z} raio={raio + 10}><Parque /></Perto></Depois>
       {/* Natal (20/11 a 6/1, scene/Natal.tsx): árvores na praça da Nuvem e na Praça de Eventos, trenó, guirlandas nas sedes,
           laço e pisca-pisca nos postes e fios de luz no calçadão e nas pontes. ?natal=0 desliga (prévias) */}
-      {natal && <Isolado><group name="natal"><ArvoreNatal /><NatalPraca /><SoDePerto nome="natal-miudo"><LuzesNatalPostes itens={postes} /><LacosPostes itens={postes} /><NatalSedes /></SoDePerto></group></Isolado>}
+      {natal && <Isolado key={`natal-${versaoSedes}`}><group name="natal"><ArvoreNatal /><NatalPraca /><SoDePerto nome="natal-miudo"><LuzesNatalPostes itens={postes} /><LacosPostes itens={postes} /><NatalSedes /></SoDePerto></group></Isolado>}
       {natal && <Depois etapa={2}><group name="natal-rio"><SoDePerto><LuzesRioNatal /></SoDePerto></group></Depois>}
+      {/* caça aos presentes de Natal (frente visitante): 3 presentes do dia, 3 malhas instanciadas (scene/PresentesNatal.tsx) */}
+      {natal && <Depois etapa={1}><SoDePerto nome="natal-presentes-perto"><PresentesNatal /></SoDePerto></Depois>}
       {/* árvores do mundo (v63): espécies brasileiras desenhadas em código (scene/Arvores.tsx), sorteadas pela posição;
           na borda da praia (sul e leste) entram coqueiros e palmeiras imperiais */}
       <Depois etapa={2}><ArvoresMistas itens={arvoresPraia} mistura={MISTURA_PRAIA} grupo="praia" /></Depois>
@@ -210,7 +215,7 @@ export function Mundo() {
       <Perto cx={0} cz={0} raio={raio + 60}><Isolado><Entorno /></Isolado></Perto>
       <Perto cx={PASSO} cz={0} raio={raio}><Isolado><Restaurante /></Isolado></Perto>
       {/* sedes (data/sedes.ts): Social RP, AppZone, bday.fm e NUVCAM, cada uma num lote de esquina virado para o centro */}
-      {SEDES.map((sd) => <Perto key={sd.id} cx={sd.x} cz={sd.z} raio={raio}><Isolado><SedeHQ sede={sd} /></Isolado></Perto>)}
+      {SEDES.map((sd) => <Perto key={`${sd.id}-${versaoSedes}`} cx={sd.lote.x} cz={sd.lote.z} raio={raio}><Isolado><SedeHQ sede={sd} /></Isolado></Perto>)}
       <Depois etapa={2}><SoDePerto nome="gente-praia"><GentePraia /></SoDePerto></Depois>
       <Depois etapa={1}><Personagens /></Depois>
       <Perto cx={0} cz={0} raio={raio + 100}><Isolado><Lotes /></Isolado>
@@ -218,6 +223,7 @@ export function Mundo() {
       <Isolado><Quiosques /><RealceExpansao /></Isolado>
       <Isolado><EscritoriosClientes /></Isolado>
       <Isolado><PortasPredios /></Isolado>
+      <EditorPosicao3D />
       {/* praça de eventos e feira de sábado no lote 0,1,1 (12/11/2026) */}
       <Isolado><Praca /></Isolado></Perto>
     </group>

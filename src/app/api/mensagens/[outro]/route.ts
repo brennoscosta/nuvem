@@ -11,7 +11,7 @@ export async function GET(req: Request, { params }: Ctx) {
 export async function POST(req: Request, { params }: Ctx) {
   try {
     const u = await usuarioAtual(); if (!u) return erro("Entre na sua conta.", 401);
-    if (!personagemAtivo(await meuPersonagem(u.id), u)) return erro("Ative seu personagem pra conversar com outras pessoas.", 402);
+    if (!personagemAtivo(await meuPersonagem(u.id), u)) return erro("Crie o seu personagem (é grátis) pra conversar com outras pessoas.", 402);
     const { outro } = await params; const d = await corpo<{ tipo?: string; texto?: string }>(req);
     return ok(await enviarMensagem(u, outro, d.tipo ?? "chat", d.texto ?? ""));
   } catch (e) { return erro(e); }

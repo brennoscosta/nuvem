@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { circulo } from "./geo";
 
 let matSombra: THREE.MeshBasicMaterial | null = null;
-function materialSombra() {
+export function materialSombra() { // também a frota do trânsito (instâncias)
   if (matSombra) return matSombra;
   const T = 128, c = document.createElement("canvas"); c.width = c.height = T;
   const x = c.getContext("2d")!;

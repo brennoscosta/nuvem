@@ -63,7 +63,7 @@ function Janela({ m, membro, lote, destinos, fechar }: { m: MsgEquipe; membro: M
   };
   return (
     <div className="fixed inset-0 z-[90] grid place-items-center bg-[#0A0E14]/60 p-3 backdrop-blur-sm" onClick={fechar}>
-      <div className="painel-entra relative max-h-[calc(100vh-1.5rem)] w-full max-w-[600px] overflow-y-auto rounded-3xl bg-[#F2F5F8] p-5 text-[#1D2128] shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="mapa-enviar-titulo" onClick={(e) => e.stopPropagation()}>
+      <div className="painel-entra relative max-h-[calc(100dvh-1.5rem)] w-full max-w-[600px] overflow-y-auto rounded-3xl bg-[#F2F5F8] p-5 text-[#1D2128] shadow-2xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="mapa-enviar-titulo" onClick={(e) => e.stopPropagation()}>
         <button type="button" onClick={fechar} aria-label="Fechar" className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full text-[#5A6472] hover:bg-black/5"><Icone nome="fechar" tamanho={18} /></button>
         <h2 id="mapa-enviar-titulo" className="pr-10 text-[1.3rem] font-bold leading-tight">Enviar a entrega de {membro.nome}</h2>
         <p className="mt-1 text-[13.5px] text-[#5A6472]">Confira e ajuste antes. O sistema de destino recebe o conteúdo assinado pelo WorkEnd.</p>

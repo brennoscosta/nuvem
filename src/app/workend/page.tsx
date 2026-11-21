@@ -52,7 +52,7 @@ const EXTENSO = ["", "Um", "Dois", "Três", "Quatro", "Cinco", "Seis", "Sete", "
 const porExtenso = (n: number) => EXTENSO[n] ?? String(n);
 
 const PERGUNTAS: [string, string][] = [
-  ["Preciso pagar para criar a conta?", "Não. A conta é grátis. Você só paga quando reserva um lote (R$ 99 por mês) ou quando ativa o seu personagem (R$ 5,90 por mês)."],
+  ["Preciso pagar para criar a conta?", "Não. A conta é grátis e o personagem também: crie o seu e entre na cidade. Você só paga quando reserva um lote (R$ 99 por mês) ou se quiser uma roupa ou um acessório premium para o personagem."],
   ["Como funciona o pagamento?", "Por Pix, direto no mapa: o QR Code aparece no cartão do lote e a confirmação chega sozinha. A reserva segura o lote por 1 hora enquanto você paga."],
   ["E se eu não renovar?", "Depois do vencimento há 5 dias de tolerância. Sem renovação, o lote volta a ficar à venda, mas a sua marca e a sua equipe ficam guardadas na conta e voltam se você reservar outro lote."],
   ["Posso desistir da compra?", "Pode. Em até 7 dias depois da compra você recebe o valor de volta."],
@@ -69,7 +69,7 @@ function Cabecalho({ logado }: { logado: boolean }) {
         <Link href="/" aria-label="WorkEnd, início" className="wi-logo"><MarcaTopo altura={24} /></Link>
         <nav className="wi-nav" aria-label="Seções da página">{links.map(([h, t]) => <a key={h} href={h}>{t}</a>)}</nav>
         <div className="wi-topo-acoes">
-          {logado ? <Link href="/app" className="wi-btn wi-btn-tinta wi-btn-p">Meu escritório</Link> : <><Link href="/entrar" className="wi-entrar">Entrar</Link><Link href="/cadastro" className="wi-btn wi-btn-tinta wi-btn-p">Criar conta grátis</Link></>}
+          {logado ? <Link href="/app" className="wi-btn wi-btn-tinta wi-btn-p">Meu escritório</Link> : <><Link href="/entrar" className="wi-entrar">Entrar</Link><Link href="/cadastro" className="wi-btn wi-btn-tinta wi-btn-p">Criar conta<span className="wi-so-largo"> grátis</span></Link></>}
           <details className="wi-menu">
             <summary aria-label="Abrir o menu"><span /><span /></summary>
             <div>{links.map(([h, t]) => <a key={h} href={h}>{t}</a>)}{!logado && <Link href="/entrar">Entrar</Link>}</div>
@@ -172,7 +172,7 @@ export default async function Inicio() {
                 <li>Propostas de negócio com status: aberta, aceita, concluída</li>
                 <li>Chamada de áudio e vídeo direto pelo navegador</li>
               </ul>
-              <p className="wi-preco-mini">Personagem por <b>R$ 5,90 por mês</b></p>
+              <p className="wi-preco-mini">Personagem <b>grátis</b> para toda conta</p>
             </Revelar>
           </div>
           <div className="faixa">
@@ -231,14 +231,14 @@ export default async function Inicio() {
               </Revelar>
               <Revelar className="wi-plano">
                 <h3>Personagem</h3>
-                <p className="wi-valor"><b>R$ 5,90</b><span>por mês</span></p>
+                <p className="wi-valor"><b>Grátis</b><span>para toda conta</span></p>
                 <ul className="wi-lista">
                   <li>Seu boneco andando pela cidade</li>
                   <li>Perfil profissional na busca, amigos e mensagens</li>
                   <li>Propostas de negócio com avaliação dos dois lados</li>
                   <li>Chamadas de áudio e vídeo</li>
                 </ul>
-                <Link href={u ? "/app/rede" : "/cadastro"} className="wi-btn wi-btn-linha">{u ? "Ativar meu personagem" : "Criar conta grátis"}</Link>
+                <Link href={u ? "/app/rede" : "/cadastro"} className="wi-btn wi-btn-linha">{u ? "Criar meu personagem grátis" : "Criar conta grátis"}</Link>
               </Revelar>
             </div>
             <Revelar className="wi-perguntas">

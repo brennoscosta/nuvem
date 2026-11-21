@@ -167,8 +167,11 @@ export const PECA_POR_NICHO: Record<string, Exclude<PecaArea, "auto" | "nenhuma"
   servicos: "ferramentas", casa: "ferramentas", varejo: "arara", imoveis: "imobiliaria", eventos: "baloes", turismo: "malas", automotivo: "pneus",
 };
 export const pecaEfetiva = (d: Decoracao | undefined, nicho: string | null | undefined) => { const p = d?.peca ?? "auto"; return p === "nenhuma" ? null : p === "auto" ? PECA_POR_NICHO[nicho ?? "negocios"] ?? "relogio" : p; };
+// desloc (21/11/2026, modo "Editar posição", data/posicaoPredio.ts): quanto o prédio anda dentro do lote, [dx, dz] em metros
+// nos eixos do mundo, de 0,5 em 0,5 m. O giro e o deslocamento só mudam pela rota da posição (src/server/posicao.ts), que
+// confere limites e a porta; o painel do escritório não mexe neles.
 export interface Decoracao {
-  giro: 0 | 1 | 2 | 3; letreiro: EstiloLetreiro; toldo: string | null; piso: PisoLote; cerca: CercaLote; arvores: number; extras: ExtraLote[]; interior?: Interior;
+  giro: 0 | 1 | 2 | 3; desloc?: [number, number]; letreiro: EstiloLetreiro; toldo: string | null; piso: PisoLote; cerca: CercaLote; arvores: number; extras: ExtraLote[]; interior?: Interior;
   andares?: number; cobertura?: CoberturaId; material?: MaterialFachada; corFachada?: string | null; led?: Led; vitrineJanela?: boolean; peca?: PecaArea;
 }
 export const DECOR_PADRAO: Decoracao = { giro: 0, letreiro: "painel", toldo: null, piso: "grama", cerca: "nenhuma", arvores: 0, extras: [] };
@@ -203,8 +206,11 @@ export function limparDecor(x: unknown, base: Decoracao = DECOR_PADRAO): Decorac
   const andares = Math.max(0, Math.min(MAX_ANDARES_KIT, andaresIn));
   const corFachada = o.corFachada === null ? null : typeof o.corFachada === "string" && /^#[0-9a-fA-F]{6}$/.test(o.corFachada) ? o.corFachada.toUpperCase() : o.corFachada === undefined ? base.corFachada ?? null : null;
   const peca: PecaArea = o.peca === "auto" || o.peca === "nenhuma" || PECAS.some((p) => p.id === o.peca) ? (o.peca as PecaArea) : base.peca ?? "auto";
+  const dIn = Array.isArray(o.desloc) && o.desloc.length === 2 ? o.desloc.map(Number) : null;
+  const encaixe = (v: number) => Math.max(-10, Math.min(10, Math.round(v * 2) / 2));
+  const desloc: [number, number] = dIn && dIn.every(Number.isFinite) ? [encaixe(dIn[0]), encaixe(dIn[1])] : base.desloc ? [...base.desloc] : [0, 0];
   return {
-    giro, letreiro: um(o.letreiro, ESTILOS_LETREIRO, base.letreiro), toldo, piso: um(o.piso, PISOS, base.piso), cerca: um(o.cerca, CERCAS, base.cerca), arvores: Math.max(0, Math.min(4, Math.round(Number(o.arvores ?? base.arvores)) || 0)), extras, interior: limparInterior(o.interior, base.interior ?? INTERIOR_PADRAO),
+    giro, desloc, letreiro: um(o.letreiro, ESTILOS_LETREIRO, base.letreiro), toldo, piso: um(o.piso, PISOS, base.piso), cerca: um(o.cerca, CERCAS, base.cerca), arvores: Math.max(0, Math.min(4, Math.round(Number(o.arvores ?? base.arvores)) || 0)), extras, interior: limparInterior(o.interior, base.interior ?? INTERIOR_PADRAO),
     andares, cobertura: um(o.cobertura, COBERTURAS, base.cobertura ?? "nenhuma"), material: um(o.material, MATERIAIS, base.material ?? "original"), corFachada,
     led: limparLed(o.led, base.led ?? LED_PADRAO), vitrineJanela: typeof o.vitrineJanela === "boolean" ? o.vitrineJanela : base.vitrineJanela ?? true, peca,
   };
@@ -325,7 +331,10 @@ export function normalizarEscritorio(x: unknown, base: Escritorio): Escritorio {
   equipe.sort((a, b) => ordem(a.papel) - ordem(b.papel));
   // contadores de troca de layout são do servidor: o cliente não mexe neles
   const modeloFinal = modelo ?? modeloDe({ layout });
-  return { layout, setores, equipe, trocasLayout: base.trocasLayout ?? 0, creditosLayout: base.creditosLayout ?? 0, decor: limparDecor(o.decor, base.decor ?? DECOR_PADRAO),
+  // a posição do prédio (giro e deslocamento) não muda por aqui: só pela rota da posição, que confere tudo (21/11/2026)
+  const decor = limparDecor(o.decor, base.decor ?? DECOR_PADRAO);
+  decor.giro = base.decor?.giro ?? 0; decor.desloc = base.decor?.desloc ? [...base.decor.desloc] : [0, 0];
+  return { layout, setores, equipe, trocasLayout: base.trocasLayout ?? 0, creditosLayout: base.creditosLayout ?? 0, decor,
     ...(modeloFinal ? { modelo: modeloFinal } : {}), modelosComprados: [...(base.modelosComprados ?? [])] };
 }
 const ordem = (p: PapelMembro) => (p === "atendente" ? 0 : p === "ceo" ? 1 : 2);

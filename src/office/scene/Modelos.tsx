@@ -48,7 +48,8 @@ let cidadePedida = false;
 export function precarregarCidade() {
   if (cidadePedida) return; cidadePedida = true;
   // (20/11/2026: as casas dos lotes são desenhadas em código, scene/KitPredio.tsx › CasasDesenhadas: os GLB não baixam mais)
-  for (const [nome, u] of Object.entries(MODELO)) if (!nome.startsWith("escritorio") && !nome.startsWith("casa")) useGLTF.preload(u);
+  // (21/11/2026: os carros também, scene/carros.ts: os três GLB de carro, ~380 KB, não baixam mais)
+  for (const [nome, u] of Object.entries(MODELO)) if (!nome.startsWith("escritorio") && !nome.startsWith("casa") && !nome.startsWith("carro")) useGLTF.preload(u);
 }
 const pedidos = new Set<string>();
 export function precarregarModelo(nome: string) {

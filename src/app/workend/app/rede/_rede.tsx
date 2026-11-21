@@ -69,11 +69,11 @@ export function RedeDashboard({ nome }: { nome: string }) {
       </div>
       <div className="rd-heroi">
         <div className="rd-heroi-txt">
-          <h2>{meu ? `${meu.nome}, falta ativar o seu personagem` : "Crie seu personagem e entre na cidade"}</h2>
+          <h2>Crie seu personagem grátis e entre na cidade</h2>
           <p>O WorkEnd é uma rede de negócios em 3D: você entra nas lojas, fala com a equipe, conversa com quem está online, faz amigos, negocia e faz chamadas. Quem não tem personagem só olha.</p>
-          <div className="rd-preco"><s>{brl(precoCheio)}</s><b>{brl(preco)}</b><span>por mês · promoção de lançamento</span></div>
+          <div className="rd-preco"><b>Grátis</b><span>para toda conta do WorkEnd</span></div>
           <div className="rd-botoes">
-            <a href="/mundo?personagem=1" className="btn btn-azul btn-grande">{meu ? "Ativar no mapa com Pix" : "Montar meu personagem"}</a>
+            <a href="/mundo?personagem=1" className="btn btn-azul btn-grande">Montar meu personagem grátis</a>
             <button type="button" onClick={() => setComo(true)} className="btn btn-linha btn-grande"><Icone nome="ajuda" tamanho={19} />Como funciona</button>
           </div>
           <ul className="rd-fatos">
@@ -91,7 +91,7 @@ export function RedeDashboard({ nome }: { nome: string }) {
       </div>
       <Recursos />
       <PainelMissoes />
-      <ComoFunciona aberto={como} fechar={fecharComo} preco={preco} precoCheio={precoCheio} rotuloFinal={meu ? (ativo ? "Editar meu personagem" : "Ativar meu personagem") : "Montar meu personagem"} />
+      <ComoFunciona aberto={como} fechar={fecharComo} preco={preco} precoCheio={precoCheio} rotuloFinal={meu ? (ativo ? "Editar meu personagem" : "Entrar no mapa") : "Montar meu personagem"} />
     </section>
   );
   return (
@@ -154,7 +154,7 @@ export function RedeDashboard({ nome }: { nome: string }) {
         </div>
         <aside className="lg:sticky lg:top-24 lg:self-start">
           {painel === "chat" && outro ? (
-            <div className="painel-entra fixed inset-x-0 bottom-0 z-40 flex h-[78vh] flex-col overflow-hidden rounded-t-2xl border border-[var(--linha)] bg-white shadow-2xl lg:static lg:h-[min(70vh,600px)] lg:rounded-2xl lg:shadow-none">
+            <div className="painel-entra fixed inset-x-0 bottom-0 z-40 flex h-[78dvh] flex-col overflow-hidden rounded-t-2xl border border-[var(--linha)] bg-white shadow-2xl lg:static lg:h-[min(70vh,600px)] lg:rounded-2xl lg:shadow-none">
               <div className="flex items-center justify-between border-b border-[var(--linha)] p-3"><div className="flex items-center gap-2"><MiniAvatar boneco={outro.boneco} roupa={outro.roupa} tamanho={36} /><div><div className="text-sm font-bold leading-tight">{outro.nome}</div><div className="text-[11px] text-[var(--tinta-2)]">{outro.online ? <span className="text-[#16A34A]">● online · ao vivo</span> : "offline · recebe quando entrar"}</div></div></div><button onClick={() => usePersonagem.getState().fechar()} aria-label="Fechar a conversa" className="grid h-8 w-8 place-items-center rounded-full text-[var(--tinta-2)] hover:bg-[var(--cinza)]"><Icone nome="fechar" tamanho={18} /></button></div>
               <CorpoChat o={outro} altura="flex-1" />
             </div>
@@ -164,7 +164,7 @@ export function RedeDashboard({ nome }: { nome: string }) {
         </aside>
       </div>
       <JanelaChamada />
-      <ComoFunciona aberto={como} fechar={fecharComo} preco={preco} precoCheio={precoCheio} rotuloFinal={meu ? (ativo ? "Editar meu personagem" : "Ativar meu personagem") : "Montar meu personagem"} />
+      <ComoFunciona aberto={como} fechar={fecharComo} preco={preco} precoCheio={precoCheio} rotuloFinal={meu ? (ativo ? "Editar meu personagem" : "Entrar no mapa") : "Montar meu personagem"} />
     </section>
   );
 }

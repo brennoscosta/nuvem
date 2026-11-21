@@ -22,6 +22,7 @@ import { ChatLoja, useLoja } from "./ChatLoja";
 import { Icone, type NomeIcone } from "./Icone";
 import { sedeDoParametro, sedeDe } from "../data/sedes";
 import { destinosDaRecepcao, type Destino, type Assunto } from "../data/recepcao";
+import { usePassaporte, type Atendimento } from "../passaporteStore";
 
 function useEntradas() {
   const terrenos = useMundo((s) => s.terrenos);
@@ -35,9 +36,9 @@ export function BotaoEntrar({ chave, escuro = false, className = "" }: { chave: 
   const entrada = useEntradas().find((e) => e.chave === chave) ?? null;
   if (!entrada || dentroDe === chave) return null;
   const estilo = escuro ? "bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/15" : "bg-[#EEF3FF] text-[#1D4ED8] hover:bg-[#dfe8ff]";
-  if (!ativo) return <button type="button" onClick={() => usePersonagem.getState().abrir("montar")} className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold ${estilo} ${className}`}><Icone nome="pessoa" tamanho={16} />Crie seu personagem para entrar</button>;
+  if (!ativo) return <button type="button" data-guia="entrar-predio" onClick={() => usePersonagem.getState().abrir("montar")} className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold ${estilo} ${className}`}><Icone nome="pessoa" tamanho={16} />Crie seu personagem grátis</button>;
   return (
-    <button type="button" onClick={() => usePersonagem.getState().entrarNoPredio(entrada)} disabled={!!dentroDe} title={dentroDe ? "Saia do prédio em que você está primeiro" : undefined}
+    <button type="button" data-guia="entrar-predio" onClick={() => usePersonagem.getState().entrarNoPredio(entrada)} disabled={!!dentroDe} title={dentroDe ? "Saia do prédio em que você está primeiro" : undefined}
       className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-50 ${estilo} ${className}`}>
       <Icone nome="casa" tamanho={16} />Entrar no prédio
     </button>
@@ -248,8 +249,9 @@ function Triagem({ predio, nomeAt, saudacao, destinos, logado }: { predio: Predi
     setFalas((f) => [...f, { de: "eu", texto: disse }]);
     try {
       const r = await fetch(`/api/workend/loja/${predio.numero ?? 0}/recepcao`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) });
-      const j = (await r.json().catch(() => ({}))) as { erro?: string; fala?: string; destino?: Destino | null };
+      const j = (await r.json().catch(() => ({}))) as { erro?: string; fala?: string; destino?: Destino | null; passaporte?: Atendimento | null };
       if (!r.ok || !j.fala) throw new Error(j.erro ?? "Não deu para falar com a recepção agora.");
+      usePassaporte.getState().aoAtendimento(j.passaporte, predio.numero ?? 0, nomeAt); // carimbo, marco e cupom do passaporte
       setFalas((f) => [...f, { de: "recepcao", texto: j.fala! }]);
       usePersonagem.setState({ falaRecepcao: { chave: predio.chave, texto: j.fala } });
       const d = j.destino ?? null;
@@ -268,7 +270,7 @@ function Triagem({ predio, nomeAt, saudacao, destinos, logado }: { predio: Predi
   const enviarTexto = () => { const t = texto.trim(); if (!t) return; setTexto(""); void pedir({ texto: t, insistiu: semDestino > 0 }, t); };
   return (
     <div className="px-4 pb-4">
-      <div ref={lista} className="max-h-[30vh] space-y-2 overflow-y-auto pr-0.5" aria-live="polite">
+      <div ref={lista} className="max-h-[30dvh] space-y-2 overflow-y-auto pr-0.5" aria-live="polite">
         {falas.map((f, i) => (
           <p key={i} className={f.de === "recepcao" ? "max-w-[92%] rounded-2xl rounded-tl-md bg-white/[.07] px-3.5 py-2.5 text-[14px] leading-snug" : "ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-[#1D4ED8] px-3.5 py-2 text-[14px] leading-snug"}>{f.texto}</p>
         ))}

@@ -164,7 +164,8 @@ export const NORTE = {
   pontes: [0, -52, 52], // x das pontes de pedestre (a do meio é a grande, de pedra)
 };
 // até onde o centro da tela pode ir ao arrastar (Cena.tsx): ao norte vai até o meio do parque
-export const LIMITE_CAMERA = { xMin: -(MUNDO.x - 22), xMax: MUNDO.x - 22, zMin: -128, zMax: MUNDO.z - 22 };
+// 21/11/2026: a leste vai até a Rua dos Quiosques da Orla (x de 85,6 a 92), para o quiosque escolhido ficar no meio da tela
+export const LIMITE_CAMERA = { xMin: -(MUNDO.x - 22), xMax: MUNDO.x - 2, zMin: -128, zMax: MUNDO.z - 22 };
 
 // Bairros: cada quarteirão de lotes tem um tema, com piso, árvores, galhardetes nos postes e uma placa. É sugestão e
 // visual: qualquer empresa compra em qualquer bairro.

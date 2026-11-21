@@ -5,6 +5,7 @@
 import { usuarioAtual } from "@/server/usuarios";
 import { recepcaoNaLoja, statusDe } from "@/server/equipeCliente";
 import { avisar } from "@/server/avisos";
+import { aoSerAtendido } from "@/server/passaporte";
 import { ok, erro, corpo } from "@/server/http";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -20,6 +21,8 @@ export async function POST(req: Request, { params }: Ctx) {
       const pedido = typeof d.texto === "string" ? d.texto.trim() : "";
       void avisar(r.dono, { tipo: "loja", ref: `loja:${u.id}`, renovar: true, titulo: `${r.nomeVisitante.split(" ")[0] || "Um visitante"} foi encaminhado para ${r.destino.setorNome}`, texto: `${r.destino.nome} (${r.destino.cargo}) vai atender${pedido ? `: ${pedido.slice(0, 120)}` : "."}`, link: "/app/equipe" });
     }
-    return ok({ destino: r.destino, fala: r.fala, como: r.como });
+    // passaporte da cidade (frente "visitante"): encaminhado = atendido; carimba se o personagem está mesmo no balcão
+    const passaporte = r.destino ? await aoSerAtendido(u, Number(numero) | 0).catch((e: Error) => { console.error("[passaporte]", e.message); return null; }) : null;
+    return ok({ destino: r.destino, fala: r.fala, como: r.como, passaporte });
   } catch (e) { return erro(e, statusDe(e)); }
 }

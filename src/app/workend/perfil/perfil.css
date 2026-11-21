@@ -4,7 +4,7 @@
    Campos com 16 px (o iPhone não dá zoom). Em @layer components: as classes do Tailwind de cada tela continuam mandando. */
 @layer components {
   /* ---------- formulário em etapas ---------- */
-  .we .cd { min-height: 100vh; padding-bottom: 3rem; }
+  .we .cd { min-height: 100vh; min-height: 100dvh; padding-bottom: 3rem; }
   .we .cd-cab { display: flex; align-items: center; gap: .9rem; height: 64px; }
   .we .cd-cab-logo { display: flex; padding: .3rem 0; }
   .we .cd-cab-titulo { display: inline-flex; align-items: center; gap: .4rem; padding-left: .9rem; border-left: 1px solid var(--line); font-size: 14.5px; font-weight: 600; color: var(--muted); }
@@ -31,6 +31,13 @@
   .we .cd-pontos button[data-feito]::before { background: #7FB0FF; }
   .we .cd-pontos button[aria-current="step"]::before { background: var(--ink); top: 8px; height: 6px; }
   .we .cd-pontos button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; border-radius: 4px; }
+  /* toque (21/11/2026): cada etapa ganha 44 px de altura para o dedo (eram 22); a barrinha continua igual, no meio */
+  @media (pointer: coarse) {
+    .we .cd-pontos { margin-top: 0; }
+    .we .cd-pontos button { height: 44px; }
+    .we .cd-pontos button::before { top: 20px; }
+    .we .cd-pontos button[aria-current="step"]::before { top: 19px; }
+  }
 
   .we .cd-acoes { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-top: 1.8rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
   .we .cd-acoes-dir { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .4rem 1rem; margin-left: auto; }
@@ -233,4 +240,10 @@
   @keyframes cd-entra { from { opacity: 0; transform: translateY(8px); } }
   @keyframes cd-etiqueta { from { opacity: 0; transform: scale(.8); } }
   @media (prefers-reduced-motion: reduce) { .we .cd-passo, .we .cd-form, .we .cd-etiqueta { animation: none; } .we .cd-trilho i { transition: none; } }
+}
+
+@layer components {
+  /* 21/11/2026 (responsividade): na prévia do cartão, um site ou um @ comprido não quebrava e era cortado pela borda */
+  .we .cd-previa-links span { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+  .we .cd-previa-end { overflow-wrap: anywhere; }
 }

@@ -26,6 +26,7 @@ import { MESA } from "../data/layout";
 import type { Evento } from "../data/eventos";
 import { useCartaoAberto } from "../ui/cartaoAberto";
 import { RAIO_MAXIMO } from "../cameraStore";
+import { edicaoAtiva } from "../edicaoStore";
 
 // Entrega os eventos da fila pros agentes
 function Despachante() {
@@ -131,7 +132,9 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
     if (alvo.current) { c.target.lerp(alvo.current, Math.min(1, dt * 3)); if (c.target.distanceTo(alvo.current) < 0.05) alvo.current = null; }
     // trava o arrasto dentro do terreno (move câmera e alvo juntos)
     const t = c.target as THREE.Vector3;
-    const dx = THREE.MathUtils.clamp(t.x, LIMITE.xMin, LIMITE.xMax) - t.x, dz = THREE.MathUtils.clamp(t.z, LIMITE.zMin, LIMITE.zMax) - t.z;
+    // no modo "Editar posição" (frente editor, 21/11/2026) a câmera fica em cima do terreno, mesmo na beira da orla
+    const solta = edicaoAtiva();
+    const dx = solta ? 0 : THREE.MathUtils.clamp(t.x, LIMITE.xMin, LIMITE.xMax) - t.x, dz = solta ? 0 : THREE.MathUtils.clamp(t.z, LIMITE.zMin, LIMITE.zMax) - t.z;
     if (dx || dz) { const d = DESLOCA.set(dx, 0, dz); t.add(d); camera.position.add(d); }
     if (posAlvo.current || alvo.current || dx || dz) c.update();
   });
@@ -278,9 +281,10 @@ function AvisoQualidade({ tipo, aoFechar }: { tipo: "baixou" | "travou"; aoFecha
         <>
           <div className="flex items-center gap-2 font-bold"><Icone nome="raio" tamanho={16} className="text-[#FACC15]" />O mapa 3D está pesado neste aparelho</div>
           <div className="mt-0.5 text-white/75">O mapa simples mostra as mesmas lojas, em 2D, e abre na hora.</div>
-          <div className="mt-2 flex gap-2">
+          {/* 21/11/2026: no celular estreito os dois botões não cabem lado a lado: quebram em duas linhas, cada um na largura toda */}
+          <div className="mt-2 flex flex-wrap gap-2">
             <button onClick={() => escolherMapa("2d")} className="hud-btn hud-azul !h-9 flex-1 justify-center"><Icone nome="camadas" tamanho={16} />Usar o mapa simples</button>
-            <button onClick={aoFechar} className="hud-btn !h-9 bg-white/10">Continuar no 3D</button>
+            <button onClick={aoFechar} className="hud-btn !h-9 flex-1 justify-center bg-white/10">Continuar no 3D</button>
           </div>
         </>
       )}

@@ -8,6 +8,7 @@ import { avisar } from "@/server/avisos";
 import { sql } from "@/server/db";
 import { ok, erro, corpo } from "@/server/http";
 import { ipDe } from "@/server/limite";
+import { aoSerAtendido } from "@/server/passaporte";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 type Ctx = { params: Promise<{ numero: string }> };
@@ -26,7 +27,9 @@ export async function POST(req: Request, { params }: Ctx) {
     const { numero } = await params; const d = await corpo<{ texto?: string; membroId?: string }>(req);
     const r = await falarNaLoja(u, Number(numero) | 0, d.texto ?? "", ipDe(req), membroDe(d.membroId)); // IP: limite de pedidos por hora
     void avisarDono(Number(numero) | 0, u.id, u.nome, d.texto ?? "", r.setor ?? null);
-    return ok(r);
+    // passaporte (frente "visitante"): conversa com a atendente da recepção (empresa sem setor) também carimba
+    const passaporte = membroDe(d.membroId) ? null : await aoSerAtendido(u, Number(numero) | 0).catch((e: Error) => { console.error("[passaporte]", e.message); return null; });
+    return ok(passaporte ? { ...r, passaporte } : r);
   } catch (e) { return erro(e, statusDe(e)); }
 }
 // sino do dono (12/11/2026): uma conversa por visitante, que volta para o topo a cada mensagem nova

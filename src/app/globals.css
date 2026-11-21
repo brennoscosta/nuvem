@@ -153,7 +153,7 @@ html, body { height: 100%; background: var(--background); color: var(--foregroun
 }
 .hud-pop.hud-pop-baixo { top: calc(100% + 10px); bottom: auto; transform-origin: top left; }
 .hud-online-pop { width: min(300px, calc(100vw - 1.5rem)); }
-.hud-online-lista { display: grid; gap: 2px; margin-top: .7rem; max-height: min(320px, 50vh); overflow-y: auto; }
+.hud-online-lista { display: grid; gap: 2px; margin-top: .7rem; max-height: min(320px, 50dvh); overflow-y: auto; }
 .hud-online-lista li { display: flex; align-items: center; gap: .6rem; padding: .35rem .3rem; border-radius: 10px; }
 .hud-online-lista li:hover { background: rgba(255,255,255,.05); }
 .hud-online-quem { display: grid; flex: 1; min-width: 0; }
@@ -189,3 +189,60 @@ html.we-natal .hud-ilha .we-marca { margin-right: 10px; }
    que começasse num balão, num cartão ou na barra ampliava o site inteiro no celular. A rolagem dentro dos cartões continua
    (pan-x pan-y vale até a caixa que rola). */
 .mapa-raiz { touch-action: pan-x pan-y; }
+/* alvos de toque (21/11/2026): no celular e no tablet, os botões pequenos da barra do mapa (36–38 px) e os de fechar dos
+   cartões (32 px, alguns com 16 px de altura) ganham uma área de toque de pelo menos 44 × 44 px, invisível e centrada
+   neles. O desenho não muda. Só vale onde o botão é posicionado: na cidade todos os de fechar passam a ser (classes do
+   Tailwind, conferido); fora dela, só os que já têm position (.absolute, .relative, .cf-fechar). */
+@media (pointer: coarse) {
+  .hud-btn::before, .hud-online::before,
+  .mapa-raiz [aria-label^="Fechar"]:not(.sr-only)::before,
+  .we [aria-label^="Fechar"]:is(.absolute, .relative, .fixed, .cf-fechar)::before {
+    content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+  }
+  .hud-online, .mapa-raiz [aria-label^="Fechar"]:not(.absolute):not(.fixed):not(.sr-only) { position: relative; }
+  /* barra de cima do mapa e a do painel (/app): logotipo, saldo de créditos, sino, conta e menu (todos sem position) */
+  .mapa-raiz a[aria-label="WorkEnd, início"]::before, a[data-saldo-topo]::before, [data-tour="avisos"] > button::before,
+  .we .cab-logo::before, .we .cab-conta::before, .we .cab-hamburguer::before {
+    content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+  }
+  .mapa-raiz a[aria-label="WorkEnd, início"], a[data-saldo-topo], .we .cab-logo, .we .cab-conta, .we .cab-hamburguer { position: relative; }
+  /* fechar dos cartões de lote, quiosque e outdoor: o nome vem de um texto escondido (sr-only), não do aria-label */
+  .mapa-raiz button.rounded-full.px-2:has(> .sr-only)::before { content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%); }
+  .mapa-raiz button.rounded-full.px-2:has(> .sr-only) { position: relative; }
+  /* botões de texto e itens de menu: no toque a altura mínima vira 44 px de verdade (uns 6 px a mais) */
+  .we .btn, .hud-menu-item, .we .cab-pop-item { min-height: 44px; }
+  /* cabeçalho e rodapé das páginas públicas (_partes.tsx): logotipo, "Entrar" e os links do rodapé tinham 38–39 px */
+  .we > header.faixa a, .we .rodape a { display: inline-flex; align-items: center; min-height: 44px; }
+}
+/* cartões do mapa (.cartao-mapa: estilo.ts › FLUTUANTE e o editor do personagem), 21/11/2026: entre 640 e 1179 px a barra
+   da câmera (canto de baixo, uns 730 px de largura) passava por baixo do cartão aberto à direita. Ali o cartão para acima
+   dela. Em tela baixa (até 600 px de altura) a barra é que some enquanto há cartão aberto (ControlesCamera.tsx). */
+@media (min-width: 640px) and (max-width: 1179px) and (min-height: 601px) {
+  .cartao-mapa { max-height: calc(100dvh - 11.5rem) !important; }
+}
+/* os largos (conversa com a equipe, 46rem; editor do personagem, 50rem) chegam até a barra até uns 1600 px */
+@media (min-width: 1180px) and (max-width: 1599px) and (min-height: 601px) {
+  .cartao-mapa.cartao-largo { max-height: calc(100dvh - 11.5rem) !important; }
+}
+/* barra da câmera do computador entre 640 e 819 px (21/11/2026): com 15 botões de 40 px e o "Bicicleta" escrito ela tem
+   ~730 px e passava da tela em 640–740 (tablet estreito, celular grande deitado). Ali os botões ficam com 36 px e a
+   bicicleta só com o ícone; a dica com o nome continua ao passar o mouse. */
+@media (min-width: 640px) and (max-width: 819px) {
+  .hud-dock .hud-btn { width: 36px; height: 36px; }
+  .hud-dock .hud-btn.hud-btn-rotulo { padding: 0; justify-content: center; }
+  .hud-dock .hud-btn.hud-btn-rotulo > span:not(.hud-dica) { display: none; }
+}
+/* barra de baixo do celular (ControlesCamera › ControlesCameraCelular): com 8 botões ela tem 310 px e passava 2 px da
+   tela de 320. Até 340 px os botões ficam encostados e a margem de dentro diminui (294 px). */
+@media (max-width: 340px) { .dock-cel { gap: 0; padding: 2px; } }
+/* cartão largo aberto (conversa com a equipe, editor do personagem) numa tela de até ~1100 px: ele cobre quase todo o
+   mini-mapa do canto esquerdo, que fica por baixo pela metade. Enquanto ele está aberto o mini-mapa sai (21/11/2026). */
+@media (min-width: 640px) and (max-width: 1119px) { .mapa-raiz:has(.cartao-largo) .mm-painel { display: none; } }
+/* entre 640 e 767 px o mini-mapa (288 px) e um cartão aberto à direita (352 px) não cabiam lado a lado: o mini-mapa fica
+   com no máximo 15,5rem ali (a largura que a pessoa escolheu volta a valer a partir de 768 px) */
+@media (min-width: 640px) and (max-width: 767px) { .mm-painel { max-width: 15.5rem; } }
+/* faixa da visitante (caça de Natal e "acontecendo agora", ui/Visitante.tsx), 21/11/2026: com um cartão aberto por cima
+   dela, ela sai até o cartão fechar. Os cartões largos (conversa com a equipe, editor do personagem) chegam a ela em
+   qualquer largura; no celular deitado e entre 640 e 1259 px (faixa no meio, cartão à direita) qualquer cartão encosta. */
+.mapa-raiz:has(.cartao-largo) .faixa-visitante { display: none; }
+@media (max-height: 600px), (min-width: 640px) and (max-width: 1259px) { .mapa-raiz:has(.cartao-mapa) .faixa-visitante { display: none; } }

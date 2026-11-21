@@ -2,6 +2,7 @@
 // Tela dos cupons (13/11/2026): validar código, criar e encerrar cupons da loja e a lista "Meus cupons".
 // 17/11/2026: desconto em número (% ou R$, com pedido mínimo) para a atendente aplicar nos pedidos feitos na conversa.
 import { useEffect, useState } from "react";
+import { useCupomPassaporte, MarcarPassaporte } from "./_passaporte";
 
 type CupomDono = { id: string; titulo: string; regra: string; validade: string; limite: number | null; ativo: boolean; pegos: number; usados: number; vencido: boolean; descontoPct: number | null; descontoCentavos: number | null; minimoCentavos: number | null };
 const reais = (c: number) => (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -28,6 +29,7 @@ export function PainelCupons() {
   const [form, setForm] = useState(FORM_VAZIO);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const pass = useCupomPassaporte(versao); // cupom do passaporte da cidade (frente visitante)
   useEffect(() => {
     let vivo = true;
     api<Dados>("/api/workend/cupons").then((d) => vivo && setDados(d)).catch(() => vivo && setDados({ temLoja: false, daLoja: [], meus: [] }));
@@ -92,6 +94,8 @@ export function PainelCupons() {
       {dados.temLoja && dados.daLoja.length > 0 && (
         <section className="faixa mt-6">
           <h2 className="!text-[1.3rem]">Cupons da sua loja</h2>
+          <p className="mt-1 max-w-[70ch] text-[14px] text-[var(--tinta-2)]">Escolha um cupom para o passaporte da cidade: a recepcionista oferece a quem é atendido na sua recepção. É um jeito de trazer quem passeia pela cidade para dentro da sua loja.</p>
+          {pass.erro && <p className="mt-1 text-[14px] font-semibold text-[#B42318]">{pass.erro}</p>}
           <ul className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3 [&>*]:min-w-0">
             {dados.daLoja.map((c) => (
               <li key={c.id} className={`rounded-2xl border border-dashed p-4 ${c.ativo && !c.vencido ? "border-[#E11D48]/50 bg-[#FFF5F7]" : "border-[var(--linha)] bg-[var(--cinza)] opacity-70"}`}>
@@ -100,6 +104,7 @@ export function PainelCupons() {
                 <p className="mt-1 text-[12.5px] font-semibold text-[#9F1239]">{noPedido(c)}</p>
                 <p className="mt-2 text-[14px]"><b>{c.pegos}</b> pego{c.pegos === 1 ? "" : "s"} · <b>{c.usados}</b> usado{c.usados === 1 ? "" : "s"}</p>
                 <p className="mt-1 text-[12px] font-semibold text-[var(--tinta-2)]">{!c.ativo ? "Encerrado" : c.vencido ? "Vencido" : "Ativo"}</p>
+                {c.ativo && !c.vencido && <MarcarPassaporte id={c.id} marcado={pass.marcado} marcar={(x) => void pass.marcar(x)} />}
                 {c.ativo && !c.vencido && <button type="button" onClick={() => encerrar(c.id)} className="mt-2 text-[13px] font-semibold text-[#B42318] hover:underline">Encerrar cupom</button>}
               </li>
             ))}
