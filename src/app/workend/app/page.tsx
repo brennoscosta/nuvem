@@ -16,6 +16,7 @@ import { CabecalhoApp } from "../_cabecalho";
 import { Contador, ContagemReserva, CopiarLink, Catalogo } from "./_painel";
 import { Icone } from "@/office/ui/Icone";
 import { MedirUmaVez } from "../_cookies";
+import { AssinaturaPainel } from "./_assinatura"; // pagamento automático (WE-09)
 import { LembretePerfil } from "../_lembrete-perfil"; // o que falta no perfil do cadastro (20/11/2026)
 import { meta } from "../seo";
 import "./painel.css";
@@ -141,6 +142,8 @@ function LojaAberta({ chao, p, empresa, linkLote, vendas }: { chao: Terreno; p: 
           </div>}
         </div>
       </section>
+
+      {!p.sede && <AssinaturaPainel chave={chao.chave} pagoAte={chao.pagoAte ? new Date(chao.pagoAte).toISOString() : null} linkPix={linkLote} />}
 
       {/* vendas do mês (17/11/2026): a linha que leva ao "Quanto a sua equipe trouxe", em Resultados */}
       {p.vendasMes && <VendasDoMes v={p.vendasMes} />}

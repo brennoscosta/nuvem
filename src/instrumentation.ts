@@ -3,4 +3,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const { agendarEvolucao } = await import("./server/evolucao");
   agendarEvolucao();
+  // pagamento automático (WE-09): lembrete de 3 dias, conferência das cobranças e carência
+  const { agendarAssinaturas } = await import("./server/assinaturas");
+  agendarAssinaturas();
 }

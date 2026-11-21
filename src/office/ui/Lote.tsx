@@ -14,6 +14,7 @@ import { BotoesPersonagem } from "./BotoesPersonagem";
 import { Icone, type NomeIcone } from "./Icone";
 import { BotaoEditarPosicao } from "./EditorPosicao";
 import { EspacoDoLote } from "./EspacoLote";
+import { EscolhaPagamento, AssinaturaDoLote } from "./Assinatura"; // pagamento automático (WE-09)
 import { ehSede } from "../data/sedes";
 import { FLUTUANTE, LARGO, ESTREITO } from "./estilo";
 import { abrirChatEquipe } from "./ChatEquipe";
@@ -267,7 +268,7 @@ export function CartaoLote() {
           {ehMeu && !ativo && !pixAberto && (
             <>
               <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">Garanta o chão pagando o 1º mês agora. Sem pagamento, a reserva some em {resta != null ? mmss(resta) : `${minutos} min`}.</div>
-              <BotaoCobrar valor={cot?.valor ?? preco} rotuloPix={cot?.loteExtra ? `Pagar ${brl(cot.valor)} no Pix · ${cot.loteExtra.dias} dia${cot.loteExtra.dias === 1 ? "" : "s"}, até ${dataBR(cot.loteExtra.ate).slice(0, 5)}` : `Pagar ${brl(cot?.valor ?? preco)} no Pix · 1º mês`} rotuloCreditos={cot?.loteExtra ? `Pagar ${cot.loteExtra.dias} dia${cot.loteExtra.dias === 1 ? "" : "s"} com créditos` : "Pagar o 1º mês com créditos"} pagando={pagando} pixLigado={pagamentoLigado} onPagar={(c) => clicarPagar(1, c)} />
+              <EscolhaPagamento chave={chave} desligado={ehAnexo || !pagamentoLigado} sinal={`${terreno.status}|${terreno.pagoAte}`}><BotaoCobrar valor={cot?.valor ?? preco} rotuloPix={cot?.loteExtra ? `Pagar ${brl(cot.valor)} no Pix · ${cot.loteExtra.dias} dia${cot.loteExtra.dias === 1 ? "" : "s"}, até ${dataBR(cot.loteExtra.ate).slice(0, 5)}` : `Pagar ${brl(cot?.valor ?? preco)} no Pix · 1º mês`} rotuloCreditos={cot?.loteExtra ? `Pagar ${cot.loteExtra.dias} dia${cot.loteExtra.dias === 1 ? "" : "s"} com créditos` : "Pagar o 1º mês com créditos"} pagando={pagando} pixLigado={pagamentoLigado} onPagar={(c) => clicarPagar(1, c)} /></EscolhaPagamento>
               {pagamentoLigado && <ResumoPreco cot={cot} preco={preco} />}
               {pagamentoLigado && cot?.primeiroMes != null && cot.oferta?.id !== "indicado" && !cot.admin && <CodigoIndicacao aoAplicar={() => setRecargaCot((n) => n + 1)} />}
             </>
@@ -276,7 +277,7 @@ export function CartaoLote() {
             <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">{diasRestantes > 0 ? `Vence em ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"}.` : "Vencido: você tem 5 dias de tolerância antes de o lote ficar livre."}</div>
           )}
           {ehMeu && ativo && pagamentoLigado && !pixAberto && !ehAnexo && (
-            <BotaoCobrar valor={cot?.valor ?? preco} rotuloPix={`Renovar +30 dias · ${brl(cot?.valor ?? preco)} no Pix${cot?.extras ? " · com o lote extra" : ""}`} rotuloCreditos={cot?.extras ? "Renovar +30 dias com o lote extra" : "Renovar +30 dias"} pagando={pagando} compacto onPagar={(c) => clicarPagar(1, c)} />
+            <AssinaturaDoLote chave={chave} sinal={`${terreno.status}|${terreno.pagoAte}`} pagoAte={terreno.pagoAte}><BotaoCobrar valor={cot?.valor ?? preco} rotuloPix={`Renovar +30 dias · ${brl(cot?.valor ?? preco)} no Pix${cot?.extras ? " · com o lote extra" : ""}`} rotuloCreditos={cot?.extras ? "Renovar +30 dias com o lote extra" : "Renovar +30 dias"} pagando={pagando} compacto onPagar={(c) => clicarPagar(1, c)} /></AssinaturaDoLote>
           )}
           {ehMeu && ativo && pagamentoLigado && !pixAberto && !ehAnexo && <ResumoPreco cot={cot} preco={preco} />}
           {erro && <div className="mt-2 text-xs font-semibold text-[#E2575B]">{erro}</div>}

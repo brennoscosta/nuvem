@@ -212,7 +212,7 @@ export async function criarCobrancaOutdoor(u: Usuario, base: string, slot: strin
 export async function criarCobrancaGenerica(u: Usuario, base: string, o: { tipo: TipoPagamento; chave: string; valor: number; descricao: string; metadata: Record<string, unknown> }, opc: OpcoesCobranca = {}): Promise<CobrancaPix> {
   return criarPix(u, base, { ...o, meses: 1 }, opc);
 }
-interface PagamentoMP { id: number; status: string; status_detail?: string; external_reference?: string; payment_method_id?: string; payment_type_id?: string; transaction_amount?: number; date_approved?: string; metadata?: Record<string, unknown>; point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } } }
+export interface PagamentoMP { id: number; status: string; status_detail?: string; external_reference?: string; payment_method_id?: string; payment_type_id?: string; transaction_amount?: number; date_approved?: string; metadata?: Record<string, unknown>; point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } } }
 
 // Registro do pagamento lido dentro da transação (o que cada produto recebe para liberar ou reverter)
 export interface RegPagamento extends Pagamento { tipo: string; creditosCarteira: string; creditoUsado: string }
@@ -259,7 +259,8 @@ export const produtoDe = (tipo: string | null | undefined) => PRODUTOS[tipo ?? "
 // Aplica um pagamento vindo da API do Mercado Pago (webhook ou conferência). A linha do pagamento fica travada na transação:
 // o webhook e a conferência do mapa chegam juntos e só um deles pode liberar o benefício.
 type Efeito = "liberou" | "sem_lote" | "estornou" | "virou_credito" | "devolveu_reserva" | null;
-async function aplicar(p: PagamentoMP) {
+// exportada para a assinatura recorrente (WE-09, src/server/assinaturas.ts): cada cobrança aprovada passa por aqui
+export async function aplicar(p: PagamentoMP) {
   const ref = p.external_reference; if (!ref) return null;
   const statusMP = p.status === "approved" ? "aprovado" : p.status === "rejected" ? "rejeitado" : p.status === "refunded" || p.status === "charged_back" ? "estornado" : p.status === "cancelled" ? "cancelado" : "pendente";
   const feito = await sql.begin(async (tx) => {
@@ -343,7 +344,8 @@ async function posPagamento(reg: RegPagamento, efeito: Efeito, metodo: string) {
 export async function tratarWebhook(tipo: string | null, idPagamento: string | null) {
   if (tipo !== "payment" || !idPagamento) return;
   const p = await mp<PagamentoMP>(`/v1/payments/${idPagamento}`);
-  await aplicar(p);
+  // cobrança da assinatura no cartão (WE-09): não tem pagamento nosso com essa referência; assinaturas.ts acha pela assinatura
+  if (!(await aplicar(p))) { const { pagamentoDeAssinatura } = await import("./assinaturas"); await pagamentoDeAssinatura(p); }
 }
 
 // Quando o usuário volta do checkout (ou o admin pede): procura pagamentos daquela referência e aplica

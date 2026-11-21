@@ -13,6 +13,7 @@ import { CatalogoAdmin, AtividadeAdmin } from "./_catalogo";
 import { PersonagensAdmin } from "./_personagens";
 import { EvolucaoAdmin } from "./_evolucao";
 import { CreditosAdmin } from "./_creditos";
+import { AssinaturasAdmin } from "./_assinaturas"; // pagamento automático (WE-09)
 import { AnunciosPracaAdmin } from "./_praca";
 import { CadastrosAdmin } from "./_cadastros"; // o que cada conta contou no cadastro (20/11/2026)
 import { meta } from "../../seo";
@@ -40,6 +41,7 @@ export default async function Admin() {
           </section>
           <PainelAdmin config={{ preco: PRECO_LOTE, precoAdmin: precoPara(u), minutosReserva: MINUTOS_RESERVA, diasMes: DIAS_MES, diasTolerancia: DIAS_TOLERANCIA, pagamento: pagamentoLigado(), adminEmail: ADMIN_EMAIL, eu: u!.email }} />
           <CreditosAdmin />
+          <AssinaturasAdmin />
           <AnunciosPracaAdmin />
           <CadastrosAdmin />
           <AtividadeAdmin />

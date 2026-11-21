@@ -16,6 +16,7 @@ import { PixAberto, LojaNoMapa, AcoesAdminLote } from "./Lote";
 import { abrirChatEquipe } from "./ChatEquipe";
 import { useExpandir, vizinhoParaExpandir } from "./ExpandirTerreno";
 import { BotaoCobrar } from "./Cobrar";
+import { EscolhaPagamento, AssinaturaDoLote } from "./Assinatura"; // pagamento automático (WE-09)
 import { BotaoEditarPosicao } from "./EditorPosicao";
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -122,7 +123,7 @@ export function CartaoQuiosque() {
           {ehMeu && !ativo && !pixAberto && (
             <>
               <div className="mt-3 rounded-2xl bg-[#FFF4D6] px-3 py-2 text-xs text-[#7A5A00]">Garanta o quiosque pagando o 1º mês agora. Sem pagamento, a reserva some em {resta != null ? mmss(resta) : "1 hora"}.</div>
-              <BotaoCobrar valor={valorPix ?? preco} rotuloPix={`Pagar ${brl(valorPix ?? preco)} no Pix · 1º mês`} rotuloCreditos="Pagar o 1º mês com créditos" pagando={pagando} pixLigado={pagamentoLigado} onPagar={(c) => void pagar(c)} />
+              <EscolhaPagamento chave={chave} desligado={!pagamentoLigado} sinal={`${terreno.status}|${terreno.pagoAte}`}><BotaoCobrar valor={valorPix ?? preco} rotuloPix={`Pagar ${brl(valorPix ?? preco)} no Pix · 1º mês`} rotuloCreditos="Pagar o 1º mês com créditos" pagando={pagando} pixLigado={pagamentoLigado} onPagar={(c) => void pagar(c)} /></EscolhaPagamento>
               <div className="mt-2 flex gap-2">
                 <button onClick={() => m.abrirPainel()} className="flex-1 rounded-xl bg-[#F1F3F6] px-3 py-2 text-sm font-semibold text-[#1D4ED8]">Editar o letreiro</button>
                 {confirma
@@ -133,7 +134,7 @@ export function CartaoQuiosque() {
           )}
           {ehMeu && ativo && (
             <>
-              {pagamentoLigado && !pixAberto && <BotaoCobrar valor={valorPix ?? preco} rotuloPix={`Renovar +30 dias · ${brl(valorPix ?? preco)} no Pix`} rotuloCreditos="Renovar +30 dias" pagando={pagando} compacto onPagar={(c) => void pagar(c)} />}
+              {pagamentoLigado && !pixAberto && <AssinaturaDoLote chave={chave} sinal={`${terreno.status}|${terreno.pagoAte}`} pagoAte={terreno.pagoAte}><BotaoCobrar valor={valorPix ?? preco} rotuloPix={`Renovar +30 dias · ${brl(valorPix ?? preco)} no Pix`} rotuloCreditos="Renovar +30 dias" pagando={pagando} compacto onPagar={(c) => void pagar(c)} /></AssinaturaDoLote>}
               <button type="button" onClick={() => void abrirChatEquipe(chave)} className="mt-2 block w-full rounded-xl bg-[#1D2128] px-3 py-2.5 text-center text-sm font-bold text-white hover:bg-black"><Icone nome="conversar" tamanho={17} className="mr-1 inline align-[-3px]" />Falar com {atendente?.nome ?? "a atendente"}</button>
               {/* 21/11/2026: girar e ajustar o quiosque no terreninho (modo "Editar posição", ui/EditorPosicao.tsx) */}
               <BotaoEditarPosicao chave={chave} className="mt-2" />
