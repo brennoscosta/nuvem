@@ -13,9 +13,15 @@
 // assunto, ela diz para onde vai, a catraca libera só o caminho (personagemStore › encaminhar) e, na sala, a conversa
 // passa para o responsável do setor (NoSetor), com o que foi dito na recepção. Empresa sem setor: atende ali mesmo.
 // O caminho e as fases ficam no personagemStore (entrarNoPredio / sairDoPredio) e em scene/Personagens.tsx.
+// WE-14 (21/11/2026, decisão do dono: sem conta, entra na loja, vê a vitrine e fala com a recepcionista): sem personagem
+// (sem conta, ou com conta e sem personagem), "Entrar no prédio" abre a recepção na tela sem o boneco andar
+// (BalcaoSemPersonagem): a câmera vai até a porta, a recepcionista atende e, encaminhado, a conversa passa para quem
+// atende no setor. O convite para criar o personagem continua, numa linha embaixo, sem barrar.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { create } from "zustand";
 import { usePersonagem, minhaPos, type PredioAtual } from "../personagemStore";
 import { useMundo } from "../mundoStore";
+import { useSede } from "../sedeStore";
 import { entradasDaCidade, type Entrada } from "../data/entradas";
 import { abrirChatEquipe, useChatEquipe } from "./ChatEquipe";
 import { ChatLoja, useLoja } from "./ChatLoja";
@@ -29,14 +35,30 @@ function useEntradas() {
   return useMemo(() => entradasDaCidade(terrenos), [terrenos]);
 }
 
-// botão "Entrar no prédio" (cartão da loja e da sede)
+// recepção sem personagem (WE-14): em que prédio a pessoa está sendo atendida e, depois de encaminhada, com quem do setor
+type SemPersonagem = { chave: string; nome: string; numero: number | null; balcao: boolean; visita: number; setor: Destino | null };
+const useSemPersonagem = create<{ aberto: SemPersonagem | null }>()(() => ({ aberto: null }));
+function entrarSemPersonagem(e: Entrada) {
+  const antes = useSemPersonagem.getState().aberto;
+  useSemPersonagem.setState({ aberto: { chave: e.chave, nome: e.nome, numero: e.numero, balcao: !!e.balcao, visita: (antes?.visita ?? 0) + 1, setor: null } });
+  // como no entrarNoPredio: fecha o cartão e a câmera vai até a porta
+  useMundo.setState({ loteSelecionado: null, alvoCamera: [e.fora[0], 0.5, e.fora[1]] });
+  useSede.setState({ aberto: false });
+}
+function sairSemPersonagem() { useSemPersonagem.setState({ aberto: null }); usePersonagem.setState({ falaRecepcao: null }); }
+
+// botão "Entrar no prédio" (cartão da loja e da sede); sem personagem, entra do mesmo jeito (WE-14)
 export function BotaoEntrar({ chave, escuro = false, className = "" }: { chave: string; escuro?: boolean; className?: string }) {
   const ativo = usePersonagem((s) => s.ativo);
   const dentroDe = usePersonagem((s) => (s.predio && s.predio.fase !== "indo" ? s.predio.chave : null));
+  const semPersonagemEm = useSemPersonagem((s) => s.aberto?.chave ?? null);
   const entrada = useEntradas().find((e) => e.chave === chave) ?? null;
   if (!entrada || dentroDe === chave) return null;
   const estilo = escuro ? "bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/15" : "bg-[#EEF3FF] text-[#1D4ED8] hover:bg-[#dfe8ff]";
-  if (!ativo) return <button type="button" data-guia="entrar-predio" onClick={() => usePersonagem.getState().abrir("montar")} className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold ${estilo} ${className}`}><Icone nome="pessoa" tamanho={16} />Crie seu personagem grátis</button>;
+  if (!ativo) {
+    if (semPersonagemEm === chave) return null;
+    return <button type="button" data-guia="entrar-predio" onClick={() => entrarSemPersonagem(entrada)} className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold ${estilo} ${className}`}><Icone nome="casa" tamanho={16} />{entrada.balcao ? "Ir ao balcão do quiosque" : "Entrar no prédio"}</button>;
+  }
   return (
     <button type="button" data-guia="entrar-predio" onClick={() => usePersonagem.getState().entrarNoPredio(entrada)} disabled={!!dentroDe} title={dentroDe ? "Saia do prédio em que você está primeiro" : undefined}
       className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-50 ${estilo} ${className}`}>
@@ -72,7 +94,7 @@ function PertoDaPorta() {
 }
 
 // link "Entrar no prédio" das páginas públicas (/mundo?lote=…&entrar=1 ou ?sede=…&entrar=1, 17/11/2026): quando o mapa e o
-// personagem carregam, entra sozinho naquele prédio; sem personagem, abre a criação dele
+// personagem carregam, entra sozinho naquele prédio; sem personagem, abre a recepção na tela (WE-14)
 function useEntrarPeloLink() {
   useEffect(() => {
     const q = new URLSearchParams(location.search);
@@ -86,7 +108,7 @@ function useEntrarPeloLink() {
       const chave = q.get("lote") ?? sedeDoParametro(q.get("sede"))?.chave ?? null;
       const e = chave ? entradasDaCidade(m.terrenos).find((x) => x.chave === chave) : null;
       if (!e) return;
-      if (!st.ativo) { st.abrir("montar"); return; }
+      if (!st.ativo) { entrarSemPersonagem(e); return; }
       st.entrarNoPredio(e);
     }, 500);
     return () => clearInterval(t);
@@ -111,7 +133,8 @@ export function Recepcao() {
   const predio = usePersonagem((s) => s.predio);
   const andando = usePersonagem((s) => !!s.destino);
   const chatAberto = useChatEquipe((s) => s.aberto);
-  if (!predio) return <PertoDaPorta />;
+  const semPersonagem = useSemPersonagem((s) => s.aberto);
+  if (!predio) return semPersonagem ? <BalcaoSemPersonagem key={semPersonagem.visita} /> : <PertoDaPorta />;
   const lib = predio.liberado ?? null;
   // chegou no setor para onde a recepção mandou: a conversa passa para quem atende ali
   if (predio.fase === "dentro" && lib?.chegou && !chatAberto) return <><AvisoPredio /><NoSetor key={`${predio.visita}-${lib.membroId}`} /></>;
@@ -205,7 +228,7 @@ function Balcao() {
             <p className="mt-1.5 text-[12px] text-white/50">Aguardando atendimento…</p>
           </div>
         ) : destinos.length ? (
-          <Triagem predio={predio} nomeAt={nomeAt} saudacao={predio.atendido ? "Que bom te ver de novo! Posso ajudar em mais alguma coisa?" : saudacao} destinos={destinos} logado={!!usuario} />
+          <Triagem predio={predio} nomeAt={nomeAt} saudacao={predio.atendido ? "Que bom te ver de novo! Posso ajudar em mais alguma coisa?" : saudacao} destinos={destinos} />
         ) : (
           <AtendimentoVisitante numero={predio.numero ?? 0} logado={!!usuario} />
         )}
@@ -230,8 +253,9 @@ const ICONE_ASSUNTO: Record<Assunto, NomeIcone> = { vendas: "sacola", suporte: "
 type Fala = { de: "recepcao" | "eu"; texto: string };
 
 // "Em que posso ajudar?": os assuntos (os setores que a empresa tem) e o campo de texto. A recepcionista responde, diz
-// para onde vai e, um instante depois, a catraca abre e o personagem é levado até lá
-function Triagem({ predio, nomeAt, saudacao, destinos, logado }: { predio: PredioAtual; nomeAt: string; saudacao: string; destinos: Destino[]; logado: boolean }) {
+// para onde vai e, um instante depois, a catraca abre e o personagem é levado até lá. Sem conta também (WE-14). Sem
+// personagem (aoEncaminhar), ninguém anda: a conversa passa direto para quem atende no setor.
+function Triagem({ predio, nomeAt, saudacao, destinos, aoEncaminhar }: { predio: Pick<PredioAtual, "chave" | "numero">; nomeAt: string; saudacao: string; destinos: Destino[]; aoEncaminhar?: (d: Destino) => void }) {
   const [falas, setFalas] = useState<Fala[]>([{ de: "recepcao", texto: saudacao }]);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -262,6 +286,7 @@ function Triagem({ predio, nomeAt, saudacao, destinos, logado }: { predio: Predi
         setIndo(d);
         // um instante para ler a resposta; se ele saiu do balcão nesse meio tempo, não leva
         timer.current = setTimeout(() => {
+          if (aoEncaminhar) { aoEncaminhar(d); return; }
           const p = usePersonagem.getState().predio; if (!p || p.chave !== predio.chave || p.fase !== "recepcao") return;
           const falhou = usePersonagem.getState().encaminhar(d);
           if (falhou) { setIndo(null); setErro(falhou); }
@@ -281,10 +306,8 @@ function Triagem({ predio, nomeAt, saudacao, destinos, logado }: { predio: Predi
       </div>
       {indo ? (
         <div className="mt-3 flex items-center gap-2 rounded-xl bg-[#16A34A]/15 px-3 py-2.5 text-[13px] font-semibold text-[#86EFAC] ring-1 ring-[#16A34A]/35">
-          <Icone nome="catraca" tamanho={17} /><span className="min-w-0">Catraca liberada até {indo.setorNome}. Seguindo para lá…</span>
+          <Icone nome="catraca" tamanho={17} /><span className="min-w-0">{aoEncaminhar ? `${primeiroNome(indo.nome)}, de ${indo.setorNome}, vai te atender…` : `Catraca liberada até ${indo.setorNome}. Seguindo para lá…`}</span>
         </div>
-      ) : !logado ? (
-        <a href={`/entrar?destino=${encodeURIComponent("/mundo")}`} className="mt-3 block rounded-xl bg-[#E9C46A] px-3 py-2.5 text-center text-sm font-bold text-[#1A1306]">Entrar para ser atendido (é grátis)</a>
       ) : (
         <>
           <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Assuntos">
@@ -332,6 +355,66 @@ function NoSetor() {
         {erro ? <p className="px-4 pb-4 text-[13px] text-white/70">{erro}</p> : !loja ? <p className="px-4 pb-4 text-[13px] text-white/60">Abrindo a conversa…</p> : (
           <div className="bg-white px-3 pb-3 pt-2 text-[#1D2128]">
             <ChatLoja loja={loja} logado={!!usuario} linkEntrar={`/entrar?destino=${encodeURIComponent("/mundo")}`} alto={200} pessoa={{ membroId: lib.membroId, nome: lib.nome, cargo: lib.cargo, camisa: lib.camisa }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Recepção sem personagem (WE-14): a mesma triagem do balcão, na tela, sem o boneco andar. Encaminhado, a conversa passa
+// para quem atende no setor ali mesmo. O dono sem personagem é reconhecido. O convite para criar o personagem fica embaixo.
+function BalcaoSemPersonagem() {
+  const b = useSemPersonagem((s) => s.aberto)!;
+  const dono = useMundo((s) => s.meus.includes(b.chave));
+  const usuario = useMundo((s) => s.usuario);
+  const terreno = useMundo((s) => s.terrenos[b.chave]);
+  const atendente = terreno?.escritorio?.equipe.find((m) => m.papel === "atendente") ?? null;
+  const nomeAt = atendente?.nome ?? "A recepção";
+  const destinos = useMemo(() => (b.balcao ? [] : destinosDaRecepcao(terreno?.escritorio, !!sedeDe(b.chave))), [terreno?.escritorio, b.chave, b.balcao]);
+  const saudacao = (() => { const s = atendente?.treino?.saudacao || `Olá! Sou ${nomeAt}, da recepção de ${b.nome}. Em que posso ajudar?`; return s.includes("?") ? s : `${s} Em que posso ajudar?`; })();
+  const setor = b.setor;
+  const { loja, erro } = useLoja(setor ? b.numero ?? 0 : null);
+  const irPara = (d: Destino | null) => useSemPersonagem.setState((s) => (s.aberto ? { aberto: { ...s.aberto, setor: d } } : s));
+  const lugar = b.balcao ? "Quiosque" : "Recepção";
+  const linkEntrar = `/entrar?destino=${encodeURIComponent(`/mundo?lote=${b.chave}&entrar=1`)}`;
+  return (
+    <div className={CAIXA} role="dialog" aria-label={setor ? `${setor.setorNome} de ${b.nome}` : `${lugar} de ${b.nome}`}>
+      <div className="painel-entra overflow-hidden rounded-2xl bg-[#0E1013]/95 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur">
+        <div className="flex items-center gap-3 px-4 pb-2 pt-3.5">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[15px] font-bold" style={{ background: setor ? setor.camisa : atendente?.camisa ?? "#16A34A" }}>{(setor ? setor.nome : nomeAt).slice(0, 1)}</span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[12px] font-semibold text-white/55">{setor ? `${setor.setorNome} · ${b.nome}` : `${lugar} de ${b.nome}`}</div>
+            <div className="truncate text-[15px] font-bold">{setor ? setor.nome : nomeAt}{(setor ? setor.cargo : atendente?.cargo) ? <span className="ml-1.5 text-[12px] font-medium text-white/55">{setor ? setor.cargo : atendente?.cargo}</span> : null}</div>
+          </div>
+          <button type="button" onClick={sairSemPersonagem} className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-white/20">Sair</button>
+        </div>
+        {dono ? (
+          <div className="px-4 pb-4">
+            <p className="rounded-2xl rounded-tl-md bg-white/[.07] px-3.5 py-2.5 text-[14px] leading-snug">Bem-vindo de volta! A equipe te reconheceu. O que vamos fazer hoje?</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => void abrirChatEquipe(b.chave)} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#E9C46A] px-3 py-2.5 text-[13.5px] font-bold text-[#1A1306] hover:brightness-105"><Icone nome="conversar" tamanho={16} />Falar com a equipe</button>
+              <a href="/app/equipe" className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3 py-2.5 text-[13.5px] font-semibold hover:bg-white/15"><Icone nome="equipe" tamanho={16} />Minha equipe</a>
+            </div>
+          </div>
+        ) : setor ? (
+          <>
+            <div className="px-4 pb-3"><button type="button" onClick={() => irPara(null)} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold hover:bg-white/20"><Icone nome="girarEsq" tamanho={14} />Voltar à recepção</button></div>
+            {erro ? <p className="px-4 pb-4 text-[13px] text-white/70">{erro}</p> : !loja ? <p className="px-4 pb-4 text-[13px] text-white/60">Abrindo a conversa…</p> : (
+              <div className="bg-white px-3 pb-3 pt-2 text-[#1D2128]">
+                <ChatLoja loja={loja} logado={!!usuario} linkEntrar={linkEntrar} alto={200} pessoa={{ membroId: setor.membroId, nome: setor.nome, cargo: setor.cargo, camisa: setor.camisa }} />
+              </div>
+            )}
+          </>
+        ) : destinos.length ? (
+          <Triagem predio={{ chave: b.chave, numero: b.numero }} nomeAt={nomeAt} saudacao={saudacao} destinos={destinos} aoEncaminhar={irPara} />
+        ) : (
+          <AtendimentoVisitante numero={b.numero ?? 0} logado={!!usuario} />
+        )}
+        {!dono && (
+          <div className="flex items-center gap-2 border-t border-white/10 px-4 py-2.5">
+            <p className="min-w-0 flex-1 text-[12px] leading-snug text-white/60">Com o personagem grátis você vem a pé, ganha carimbos no passaporte, aparece na busca e faz propostas e chamadas.</p>
+            <button type="button" onClick={() => usePersonagem.getState().abrir("montar")} className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-semibold hover:bg-white/20">Criar personagem</button>
           </div>
         )}
       </div>

@@ -152,7 +152,7 @@ export function CartaoQuiosque() {
             <>
               {personagemAtivo
                 ? <button type="button" onClick={() => irAoBalcao(k)} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#EEF3FF] px-3 py-2 text-sm font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]"><Icone nome="pessoa" tamanho={16} />Ir ao balcão</button>
-                : <button type="button" onClick={() => usePersonagem.getState().abrir("montar")} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#EEF3FF] px-3 py-2 text-sm font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]"><Icone nome="pessoa" tamanho={16} />Crie seu personagem para ir ao balcão</button>}
+                : <button type="button" onClick={() => usePersonagem.getState().abrir("montar")} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#EEF3FF] px-3 py-2 text-sm font-bold text-[#1D4ED8] hover:bg-[#dfe8ff]"><Icone nome="pessoa" tamanho={16} />Crie seu personagem para ir a pé ao balcão</button>}
               <LojaNoMapa numero={k.numero} ativo chave={chave} />
             </>
           )}

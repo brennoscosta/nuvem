@@ -647,7 +647,7 @@ function PrimeirosPassos({ chave, reservadoEm, montar }: { chave: string; reserv
   const passos: { id: string; t: string; d: string; feito?: boolean; acao: () => void }[] = [
     { id: "montar", t: "Monte o prédio e as salas", d: "Tipo de prédio, fachada, interior e setores.", feito: vistos.includes("montar"), acao: montar },
     { id: "sobre", t: "Conte o que a empresa faz", d: "Preços, horários e serviços: a atendente responde com isso.", feito: vistos.includes("sobre"), acao: () => { window.location.href = `/app/equipe?lote=${encodeURIComponent(chave)}&aba=sobre`; } },
-    { id: "personagem", t: "Crie seu personagem", d: "Para andar pela cidade e entrar no prédio.", feito: personagem, acao: () => usePersonagem.getState().abrir("montar") },
+    { id: "personagem", t: "Crie seu personagem", d: "Para andar pela cidade, aparecer na busca e negociar.", feito: personagem, acao: () => usePersonagem.getState().abrir("montar") },
     { id: "tarefa", t: "Dê a primeira tarefa à equipe", d: "Peça ao CEO um plano da semana, por exemplo.", feito: vistos.includes("tarefa"), acao: () => void abrirChatEquipe(chave) },
   ];
   const feitos = passos.filter((p) => p.feito).length;

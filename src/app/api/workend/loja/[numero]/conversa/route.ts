@@ -1,4 +1,6 @@
-// Conversa do visitante com a atendente da loja (precisa estar logado). GET → as minhas mensagens; POST { texto }.
+// Conversa do visitante com a atendente da loja. GET → as minhas mensagens; POST { texto }.
+// WE-14 (21/11/2026): sem conta também conversa, pelo cookie de visitante sem conta (src/server/visitanteAnonimo.ts), com
+// limite menor; passaporte e carimbo continuam só para quem tem conta.
 // 20/11/2026 (recepção que encaminha, src/office/data/recepcao.ts): ?membro= no GET e membroId no POST conversam com o
 // responsável do setor para onde a recepção mandou o visitante; o sino do dono diz qual setor.
 import { usuarioAtual } from "@/server/usuarios";
@@ -9,33 +11,37 @@ import { sql } from "@/server/db";
 import { ok, erro, corpo } from "@/server/http";
 import { ipDe } from "@/server/limite";
 import { aoSerAtendido } from "@/server/passaporte";
+import { visitanteAnonimo, NOME_SEM_CONTA } from "@/server/visitanteAnonimo";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 type Ctx = { params: Promise<{ numero: string }> };
 const membroDe = (v: unknown) => (typeof v === "string" && /^[a-zA-Z0-9_-]{1,40}$/.test(v) ? v : null);
 export async function GET(req: Request, { params }: Ctx) {
   try {
-    const u = await usuarioAtual(); if (!u) return ok([]);
+    const u = (await usuarioAtual()) ?? (await visitanteAnonimo()); if (!u) return ok([]);
     const { numero } = await params;
     return ok(await conversaNaLoja(u, Number(numero) | 0, membroDe(new URL(req.url).searchParams.get("membro"))));
   } catch (e) { return erro(e, statusDe(e)); }
 }
 export async function POST(req: Request, { params }: Ctx) {
   try {
-    const u = await usuarioAtual(); if (!u) return erro("Entre na sua conta do WorkEnd para conversar com a loja.", 401);
-    if (u.banidoEm) return erro("Conta suspensa.", 403);
+    const conta = await usuarioAtual();
+    if (conta?.banidoEm) return erro("Conta suspensa.", 403);
+    const u = conta ?? (await visitanteAnonimo(true)); // sem conta: cria o cookie do visitante na primeira mensagem
+    if (!u) return erro("Não deu para abrir a conversa agora. Recarregue a página.", 500);
     const { numero } = await params; const d = await corpo<{ texto?: string; membroId?: string }>(req);
-    const r = await falarNaLoja(u, Number(numero) | 0, d.texto ?? "", ipDe(req), membroDe(d.membroId)); // IP: limite de pedidos por hora
-    void avisarDono(Number(numero) | 0, u.id, u.nome, d.texto ?? "", r.setor ?? null);
-    // passaporte (frente "visitante"): conversa com a atendente da recepção (empresa sem setor) também carimba
-    const passaporte = membroDe(d.membroId) ? null : await aoSerAtendido(u, Number(numero) | 0).catch((e: Error) => { console.error("[passaporte]", e.message); return null; });
+    const r = await falarNaLoja(u, Number(numero) | 0, d.texto ?? "", ipDe(req), membroDe(d.membroId)); // IP: limites e pedidos
+    void avisarDono(Number(numero) | 0, u.id, conta ? conta.nome : null, d.texto ?? "", r.setor ?? null);
+    // passaporte (frente "visitante"): conversa com a atendente da recepção (empresa sem setor) também carimba (só com conta)
+    const passaporte = !conta || membroDe(d.membroId) ? null : await aoSerAtendido(conta, Number(numero) | 0).catch((e: Error) => { console.error("[passaporte]", e.message); return null; });
     return ok(passaporte ? { ...r, passaporte } : r);
   } catch (e) { return erro(e, statusDe(e)); }
 }
-// sino do dono (12/11/2026): uma conversa por visitante, que volta para o topo a cada mensagem nova
-async function avisarDono(numero: number, visitanteId: string, nomeConta: string, texto: string, setor: { nome: string; quem: string } | null) {
+// sino do dono (12/11/2026): uma conversa por visitante, que volta para o topo a cada mensagem nova; nomeConta nulo =
+// visitante sem conta (WE-14)
+async function avisarDono(numero: number, visitanteId: string, nomeConta: string | null, texto: string, setor: { nome: string; quem: string } | null) {
   const loja = await lojaDoNumero(numero).catch(() => null); if (!loja || loja.donoId === visitanteId) return;
-  const [p] = await sql<{ nome: string }[]>`SELECT nome FROM personagem WHERE usuario_id = ${visitanteId}`.catch(() => []);
-  const nome = p?.nome ?? nomeConta.split(" ")[0];
+  const [p] = nomeConta === null ? [] : await sql<{ nome: string }[]>`SELECT nome FROM personagem WHERE usuario_id = ${visitanteId}`.catch(() => []);
+  const nome = p?.nome ?? (nomeConta === null ? NOME_SEM_CONTA : nomeConta.split(" ")[0]);
   await avisar(loja.donoId, { tipo: "loja", ref: `loja:${visitanteId}`, renovar: true, titulo: setor ? `${nome} falou com ${setor.quem} (${setor.nome})` : `${nome} falou com a sua atendente`, texto: texto.slice(0, 140), link: "/app/equipe" });
 }

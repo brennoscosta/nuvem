@@ -2,8 +2,12 @@
 // A loja vista por quem chega (11/11/2026): resumo (nicho, sobre, contatos, nota) e a conversa com a atendente de IA,
 // que responde só sobre a empresa e anota o contato para o dono. Usado no cartão do lote no mapa e na página /loja/N.
 // 17/11/2026: quando a atendente faz um pedido, o cartão do pedido (ui/CartaoPedido.tsx) aparece logo abaixo da resposta.
+// WE-14 (21/11/2026): conversa também sem conta (cookie de visitante sem conta, src/server/visitanteAnonimo.ts), com o
+// botão do WhatsApp da loja no topo; o convite para entrar fica numa linha pequena embaixo, sem barrar a conversa.
+// A página da loja (/loja/N, e o endereço por nome que vier depois) usa este mesmo componente.
 import { useEffect, useRef, useState } from "react";
 import { avisarClique, type TipoClique } from "./LinkRastreado";
+import { Icone } from "./Icone";
 import { EstrelaMedia } from "./NotaEstrelas";
 import { CartaoPedido, type Pedido } from "./CartaoPedido";
 import { usePassaporte, type Atendimento } from "../passaporteStore";
@@ -53,7 +57,7 @@ export type PessoaSetor = { membroId: string; nome: string; cargo: string; camis
 export function ChatLoja({ loja, logado, linkEntrar, alto = 320, pessoa = null }: { loja: LojaInfo; logado: boolean; linkEntrar: string; alto?: number; pessoa?: PessoaSetor | null }) {
   const chave = pessoa ? `${loja.numero}:${pessoa.membroId}` : String(loja.numero);
   const [conv, setConv] = useState<{ chave: string; msgs: Msg[] } | null>(null);
-  const msgs = !logado ? [] : conv?.chave === chave ? conv.msgs : null;
+  const msgs = conv?.chave === chave ? conv.msgs : null;
   const setMsgs = (f: (m: Msg[] | null) => Msg[]) => setConv((c) => ({ chave, msgs: f(c?.chave === chave ? c.msgs : null) }));
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -62,7 +66,6 @@ export function ChatLoja({ loja, logado, linkEntrar, alto = 320, pessoa = null }
   const at = pessoa ? { nome: pessoa.nome, cargo: pessoa.cargo, camisa: pessoa.camisa, saudacao: "" } : loja.atendente;
   const membroId = pessoa?.membroId ?? null;
   useEffect(() => {
-    if (!logado) return;
     let vivo = true; const numero = loja.numero, k = chave;
     fetch(`/api/workend/loja/${numero}/conversa${membroId ? `?membro=${encodeURIComponent(membroId)}` : ""}`, { cache: "no-store" }).then((r) => r.json()).then((j) => vivo && setConv({ chave: k, msgs: Array.isArray(j) ? j : [] })).catch(() => vivo && setConv({ chave: k, msgs: [] }));
     return () => { vivo = false; };
@@ -85,8 +88,9 @@ export function ChatLoja({ loja, logado, linkEntrar, alto = 320, pessoa = null }
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-black/10 bg-white">
       <div className="flex items-center gap-2 border-b border-black/5 px-3 py-2">
-        <span className="grid h-8 w-8 place-items-center rounded-full text-sm font-bold text-white" style={{ background: at.camisa }}>{at.nome.slice(0, 1)}</span>
-        <div className="min-w-0 leading-tight"><div className="truncate text-sm font-bold text-[#1D2128]">{at.nome}</div><div className="flex items-center gap-1 text-[12px] text-[#15803D]"><span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#16A34A]" /><span className="truncate">{at.cargo} · responde na hora</span></div></div>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold text-white" style={{ background: at.camisa }}>{at.nome.slice(0, 1)}</span>
+        <div className="min-w-0 flex-1 leading-tight"><div className="truncate text-sm font-bold text-[#1D2128]">{at.nome}</div><div className="flex items-center gap-1 text-[12px] text-[#15803D]"><span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#16A34A]" /><span className="truncate">{at.cargo} · responde na hora</span></div></div>
+        {loja.contatos.whatsapp && <a href={linkZap(loja.contatos.whatsapp)} target="_blank" rel="noreferrer nofollow" onClick={() => avisarClique(loja.numero, "whatsapp")} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#E8F8EE] px-2.5 py-1 text-[12px] font-bold text-[#15803D] hover:bg-[#d5f3e0]"><Icone nome="telefone" tamanho={13} />WhatsApp</a>}
       </div>
       {/* com pedido na conversa (página da loja), a área cresce para o cartão caber inteiro */}
       <div className="space-y-2 overflow-y-auto p-3" style={{ maxHeight: alto >= 300 && msgs?.some((m) => m.pedido) ? Math.max(alto, 500) : alto, minHeight: Math.min(alto, 160) }}>
@@ -102,14 +106,12 @@ export function ChatLoja({ loja, logado, linkEntrar, alto = 320, pessoa = null }
         <div ref={fim} />
       </div>
       {erro && <div className="px-3 pb-1 text-[12px] font-semibold text-[#E2575B]">{erro}</div>}
-      {logado ? (
-        <form onSubmit={(e) => { e.preventDefault(); void enviar(); }} className="flex gap-1.5 border-t border-black/5 p-2">
-          <input value={texto} onChange={(e) => setTexto(e.target.value.slice(0, 800))} placeholder={`Escreva para ${at.nome}…`} aria-label={`Mensagem para ${at.nome}`} className="min-w-0 flex-1 rounded-xl border border-black/10 px-3 py-2 text-base text-[#1D2128] outline-none focus:border-[#1D4ED8] sm:text-sm" />
-          <button type="submit" disabled={!texto.trim() || enviando} className="rounded-xl bg-[#1D4ED8] px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Enviar</button>
-        </form>
-      ) : (
-        <a href={linkEntrar} className="m-2 block rounded-xl bg-[#1D4ED8] px-3 py-2 text-center text-sm font-bold text-white">Entrar para conversar (é grátis)</a>
-      )}
+      <form onSubmit={(e) => { e.preventDefault(); void enviar(); }} className="flex gap-1.5 border-t border-black/5 p-2">
+        <input value={texto} onChange={(e) => setTexto(e.target.value.slice(0, 800))} placeholder={`Escreva para ${at.nome}…`} aria-label={`Mensagem para ${at.nome}`} className="min-w-0 flex-1 rounded-xl border border-black/10 px-3 py-2 text-base text-[#1D2128] outline-none focus:border-[#1D4ED8] sm:text-sm" />
+        <button type="submit" disabled={!texto.trim() || enviando} className="rounded-xl bg-[#1D4ED8] px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Enviar</button>
+      </form>
+      {/* sem conta: conversa normal; o convite fica aqui, pequeno (passaporte e carimbo precisam de conta) */}
+      {!logado && <p className="border-t border-black/5 px-3 py-1.5 text-[11.5px] leading-snug text-[#5B6472]">Conversando sem conta. <a href={linkEntrar} className="font-semibold text-[#1D4ED8] hover:underline">Entre ou crie a sua conta grátis</a> para ganhar carimbos no passaporte, cupons e missões.</p>}
     </div>
   );
 }

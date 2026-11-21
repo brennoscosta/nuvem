@@ -7,7 +7,7 @@ export function ConversaDaLoja({ loja, logado }: { loja: LojaInfo; logado: boole
   return (
     <section id="conversa" className="pg-cartao lj-bloco scroll-mt-6" aria-label={`Conversa com ${loja.atendente.nome}`}>
       <h2 className="!text-[1.15rem]">Converse com a recepção</h2>
-      <p className="mb-3 mt-1 text-[14px] text-[var(--tinta-2)]">{loja.atendente.nome} é a atendente de IA: responde na hora e passa o seu contato para a equipe.</p>
+      <p className="mb-3 mt-1 text-[14px] text-[var(--tinta-2)]">{loja.atendente.nome} é a atendente de IA: responde na hora, sem cadastro, e passa o seu contato para a equipe.</p>
       <ChatLoja loja={loja} logado={logado} linkEntrar={`/entrar?destino=${encodeURIComponent(`/loja/${loja.numero}`)}`} alto={340} />
     </section>
   );

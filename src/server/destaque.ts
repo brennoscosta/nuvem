@@ -35,7 +35,7 @@ async function calcular(semana: string): Promise<Destaque | null> {
         SELECT v.dono_id, count(DISTINCT v.visitante)::int AS visitas FROM visita_dia v
         WHERE v.dia BETWEEN ${semana}::date AND ${fim}::date GROUP BY v.dono_id
       ), conv AS (
-        SELECT e.usuario_id AS dono_id, count(DISTINCT m.visitante_id)::int AS conversas
+        SELECT e.usuario_id AS dono_id, count(DISTINCT COALESCE(m.visitante_anonimo, m.visitante_id))::int AS conversas
         FROM mensagem m JOIN agente a ON a.id = m.agente_id JOIN empresa e ON e.id = a.empresa_id
         WHERE m.visitante_id IS NOT NULL AND m.papel = 'user' AND (m.criado_em AT TIME ZONE ${TZ})::date BETWEEN ${semana}::date AND ${fim}::date
         GROUP BY e.usuario_id

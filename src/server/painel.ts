@@ -61,7 +61,7 @@ export async function painelDoDono(u: Usuario, t: Terreno) {
     seguro(sql<{ n: number }[]>`SELECT count(*)::int AS n FROM aviso WHERE usuario_id = ${uid} AND lido_em IS NULL`, [{ n: 0 }], "avisos"),
     seguro(gastoDoMes(empId), 0, "gasto"),
     seguro(sql<{ sobre: string; contatos: Contatos }[]>`SELECT sobre, contatos FROM empresa WHERE id = ${empId}`.then((r) => [...r]), [], "empresa"),
-    seguro(sql<{ n: number }[]>`SELECT count(DISTINCT m.visitante_id)::int AS n FROM mensagem m JOIN agente a ON a.id = m.agente_id
+    seguro(sql<{ n: number }[]>`SELECT count(DISTINCT COALESCE(m.visitante_anonimo, m.visitante_id))::int AS n FROM mensagem m JOIN agente a ON a.id = m.agente_id
       WHERE a.empresa_id = ${empId} AND m.visitante_id IS NOT NULL AND m.papel = 'user' AND m.criado_em >= now() - interval '24 hours'`, [{ n: 0 }], "visitantes"),
     // vendas do mês (17/11/2026): o cartão "Este mês: R$ X em vendas" que leva aos Resultados
     seguro(vendasDoMes(uid), null, "vendas"),

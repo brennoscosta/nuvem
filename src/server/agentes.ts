@@ -1,5 +1,6 @@
 // Acesso aos agentes e à ficha completa (perfil, conhecimento, skills, regras).
 import { sql, migrar, id } from "./db";
+import { CONTA_SEM_CONTA, ehAnonimo } from "./visitanteAnonimo";
 
 export const EMPRESA_PADRAO = { id: "emp_nuvem", slug: "nuvem", nome: "Nuvem" };
 
@@ -105,12 +106,17 @@ export async function removerRegra(agenteId: string, rid: string) { await sql`DE
 
 // ---- mensagens ----
 // visitanteId: conversa de um visitante com a equipe de uma loja (11/11/2026); nulo = conversa do dono (ou do admin)
+// visitante sem conta (WE-14, src/server/visitanteAnonimo.ts): o código anon_... vai para visitante_anonimo e a conversa
+// fica em nome da conta técnica (migração 0057); quem tem conta e o dono ficam com visitante_anonimo nulo
+const colunasDoVisitante = (v: string | null | undefined) => (ehAnonimo(v) ? { vid: CONTA_SEM_CONTA, anon: v! } : { vid: v ?? null, anon: null });
 export async function listarMensagens(agenteId: string, limite = 60, visitanteId: string | null = null) {
-  const rows = await sql<MensagemDB[]>`SELECT * FROM mensagem WHERE agente_id = ${agenteId} AND papel IN ('user','assistant') AND visitante_id IS NOT DISTINCT FROM ${visitanteId} ORDER BY criado_em DESC LIMIT ${limite}`;
+  const { vid, anon } = colunasDoVisitante(visitanteId);
+  const rows = await sql<MensagemDB[]>`SELECT * FROM mensagem WHERE agente_id = ${agenteId} AND papel IN ('user','assistant') AND visitante_id IS NOT DISTINCT FROM ${vid} AND visitante_anonimo IS NOT DISTINCT FROM ${anon} ORDER BY criado_em DESC LIMIT ${limite}`;
   return rows.reverse();
 }
 export async function gravarMensagem(d: { agenteId: string; papel: string; autor?: string; conteudo: string; custoBrl?: number; tokensIn?: number; tokensOut?: number; visitanteId?: string | null }) {
-  const [r] = await sql<MensagemDB[]>`INSERT INTO mensagem (id, agente_id, papel, autor, conteudo, custo_brl, tokens_in, tokens_out, visitante_id) VALUES (${id("msg")}, ${d.agenteId}, ${d.papel}, ${d.autor ?? "admin"}, ${d.conteudo}, ${d.custoBrl ?? 0}, ${d.tokensIn ?? 0}, ${d.tokensOut ?? 0}, ${d.visitanteId ?? null}) RETURNING *`;
+  const { vid, anon } = colunasDoVisitante(d.visitanteId);
+  const [r] = await sql<MensagemDB[]>`INSERT INTO mensagem (id, agente_id, papel, autor, conteudo, custo_brl, tokens_in, tokens_out, visitante_id, visitante_anonimo) VALUES (${id("msg")}, ${d.agenteId}, ${d.papel}, ${d.autor ?? "admin"}, ${d.conteudo}, ${d.custoBrl ?? 0}, ${d.tokensIn ?? 0}, ${d.tokensOut ?? 0}, ${vid}, ${anon}) RETURNING *`;
   return r;
 }
 export async function avaliarMensagem(agenteId: string, mensagemId: string, avaliacao: 1 | -1 | null, correcao?: string) {

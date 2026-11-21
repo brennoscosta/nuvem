@@ -32,6 +32,7 @@ import { roteiroDono, roteiroVisitante } from "./escopoEquipe";
 import { PERSONALIDADE_POR_ID, personalidadeParaIA } from "@/office/data/personalidades";
 import { escopoDe } from "@/office/data/escopo";
 import { ehPedidoDeImagem, pedirImagem, cartoesDaConversa, gerandoImagem, acaoImagem, bytesDaImagem, fazImagem, type AcaoImagem } from "./imagemEquipe";
+import { ehAnonimo, ehVisitanteAnonimo, limiteSemConta, MSG_LIMITE_SEM_CONTA, NOME_SEM_CONTA, type VisitanteAnonimo } from "./visitanteAnonimo";
 
 export const TETO_IA_MES = 10; // R$ de IA por lote por mês
 export const AVISO_TETO = 0.8; // a partir de 80% o painel avisa
@@ -39,6 +40,9 @@ export const MODELO_CLIENTE = "gpt-4.1-mini";
 const LIMITE_DONO_HORA = 60; // mensagens do dono por hora
 const LIMITE_VISITANTE_LOJA_DIA = 30; // mensagens de um visitante numa loja por dia
 const LIMITE_VISITANTE_DIA = 120; // mensagens de um visitante em todas as lojas por dia
+
+// quem fala com a recepção da loja: uma conta ou, desde a WE-14, um visitante sem conta (src/server/visitanteAnonimo.ts)
+export type QuemFala = Usuario | VisitanteAnonimo;
 
 export class ErroHttp extends Error { constructor(msg: string, public status = 400) { super(msg); } }
 export const statusDe = (e: unknown) => (e instanceof ErroHttp ? e.status : 500);
@@ -204,8 +208,9 @@ export async function painelEquipe(u: Usuario, chave?: string | null) {
   const ultimas = await sql<{ agenteId: string; conteudo: string; papel: string; criadoEm: Date }[]>`SELECT DISTINCT ON (m.agente_id) m.agente_id, m.conteudo, m.papel, m.criado_em
     FROM mensagem m JOIN agente a ON a.id = m.agente_id WHERE a.empresa_id = ${empId} AND m.visitante_id IS NULL AND m.papel IN ('user','assistant') ORDER BY m.agente_id, m.criado_em DESC`;
   const regras = await sql<(RegraDB & { agenteId: string })[]>`SELECT r.* FROM regra r JOIN agente a ON a.id = r.agente_id WHERE a.empresa_id = ${empId} AND r.ativo ORDER BY r.criado_em`;
-  const [vis] = await sql<{ n: number; hoje: number }[]>`SELECT COUNT(DISTINCT m.visitante_id)::int AS n,
-      COUNT(DISTINCT m.visitante_id) FILTER (WHERE m.criado_em >= now() - interval '24 hours')::int AS hoje
+  // visitante sem conta (WE-14): cada código anônimo conta como uma pessoa
+  const [vis] = await sql<{ n: number; hoje: number }[]>`SELECT COUNT(DISTINCT COALESCE(m.visitante_anonimo, m.visitante_id))::int AS n,
+      COUNT(DISTINCT COALESCE(m.visitante_anonimo, m.visitante_id)) FILTER (WHERE m.criado_em >= now() - interval '24 hours')::int AS hoje
     FROM mensagem m JOIN agente a ON a.id = m.agente_id WHERE a.empresa_id = ${empId} AND m.visitante_id IS NOT NULL`;
   const ia = await tetoIA(empId);
   const { gasto, teto, unidades } = ia;
@@ -391,21 +396,24 @@ export async function pedirRelatorio(u: Usuario, chave: string | null) {
   }
 }
 
+// visitante sem conta (WE-14): cada código anônimo é uma conversa, com o nome da conta técnica ("Visitante sem conta")
 export async function conversasDeVisitantes(u: Usuario, chave: string | null) {
   const t = await loteDoDono(u, chave);
   const empId = await garantirEmpresaDoLote(t);
   return sql<{ visitanteId: string; nome: string | null; n: number; ultimaEm: Date; ultimaFala: string | null }[]>`
-    SELECT m.visitante_id, COALESCE(p.nome, us.nome) AS nome, COUNT(*)::int AS n, MAX(m.criado_em) AS ultima_em,
-      (SELECT x.conteudo FROM mensagem x JOIN agente y ON y.id = x.agente_id WHERE y.empresa_id = ${empId} AND x.visitante_id = m.visitante_id AND x.papel = 'user' ORDER BY x.criado_em DESC LIMIT 1) AS ultima_fala
+    SELECT COALESCE(m.visitante_anonimo, m.visitante_id) AS visitante_id, COALESCE(p.nome, us.nome) AS nome, COUNT(*)::int AS n, MAX(m.criado_em) AS ultima_em,
+      (SELECT x.conteudo FROM mensagem x JOIN agente y ON y.id = x.agente_id WHERE y.empresa_id = ${empId} AND x.visitante_id = m.visitante_id AND x.visitante_anonimo IS NOT DISTINCT FROM m.visitante_anonimo AND x.papel = 'user' ORDER BY x.criado_em DESC LIMIT 1) AS ultima_fala
     FROM mensagem m JOIN agente a ON a.id = m.agente_id LEFT JOIN personagem p ON p.usuario_id = m.visitante_id LEFT JOIN usuario us ON us.id = m.visitante_id
     WHERE a.empresa_id = ${empId} AND m.visitante_id IS NOT NULL
-    GROUP BY m.visitante_id, p.nome, us.nome ORDER BY MAX(m.criado_em) DESC LIMIT 100`;
+    GROUP BY m.visitante_id, m.visitante_anonimo, p.nome, us.nome ORDER BY MAX(m.criado_em) DESC LIMIT 100`;
 }
 export async function conversaDeVisitante(u: Usuario, chave: string | null, visitanteId: string) {
   const t = await loteDoDono(u, chave);
   const empId = await garantirEmpresaDoLote(t);
+  const anon = ehAnonimo(visitanteId);
   return sql<{ id: string; papel: string; conteudo: string; quem: string; criadoEm: Date }[]>`SELECT m.id, m.papel, m.conteudo, a.nome AS quem, m.criado_em
-    FROM mensagem m JOIN agente a ON a.id = m.agente_id WHERE a.empresa_id = ${empId} AND m.visitante_id = ${visitanteId} ORDER BY m.criado_em LIMIT 300`;
+    FROM mensagem m JOIN agente a ON a.id = m.agente_id WHERE a.empresa_id = ${empId}
+      AND ${anon ? sql`m.visitante_anonimo = ${visitanteId}` : sql`m.visitante_id = ${visitanteId} AND m.visitante_anonimo IS NULL`} ORDER BY m.criado_em LIMIT 300`;
 }
 
 // ---------- a loja, vista por quem chega ----------
@@ -438,17 +446,28 @@ export async function lojaPublica(numero: number) {
   };
 }
 
-export async function conversaNaLoja(u: Usuario, numero: number, membroId?: string | null) {
+export async function conversaNaLoja(u: QuemFala, numero: number, membroId?: string | null) {
   const { t, empId } = await lojaPorNumero(numero);
   let quem: ReturnType<typeof quemAtende>;
   try { quem = quemAtende(t, membroId); } catch { return []; }
   const msgs = await listarMensagens(agenteIdDe(empId, quem.membro.id), 60, u.id);
-  // pedidos feitos pela atendente (17/11/2026): o cartão volta para a mensagem em que o pedido nasceu
-  const pedidos = await pedidosDasMensagens(u.id, msgs.filter((m) => m.papel === "assistant").map((m) => m.id)).catch(() => new Map());
+  // pedidos feitos pela atendente (17/11/2026): o cartão volta para a mensagem em que o pedido nasceu (só com conta)
+  const pedidos = ehVisitanteAnonimo(u) ? new Map() : await pedidosDasMensagens(u.id, msgs.filter((m) => m.papel === "assistant").map((m) => m.id)).catch(() => new Map());
   return msgs.map((m) => ({ id: m.id, papel: m.papel, conteudo: m.conteudo, em: m.criadoEm, pedido: pedidos.get(m.id) ?? null }));
 }
 
 const RECADO_SEM_IA = "Obrigado pela mensagem! A equipe não consegue responder agora, mas o seu recado ficou anotado para o dono. Se quiser retorno, deixe o seu nome e um WhatsApp ou e-mail.";
+
+// Limite por visitante, em 24 horas: com conta, por loja e no total; sem conta (WE-14), menor, e também por IP para quem
+// apaga o cookie (src/server/visitanteAnonimo.ts › limiteSemConta). O texto já chega cortado no tamanho de sempre (800).
+function limitarVisitante(u: QuemFala, numero: number, ip?: string | null) {
+  if (ehVisitanteAnonimo(u)) { if (limiteSemConta(numero, u.id, ip)) throw new ErroHttp(MSG_LIMITE_SEM_CONTA, 429); return; }
+  const kLoja = `loja:${numero}:${u.id}`, kTotal = `lojas:${u.id}`;
+  if (bloqueio(kLoja, LIMITE_VISITANTE_LOJA_DIA) || bloqueio(kTotal, LIMITE_VISITANTE_DIA)) throw new ErroHttp("Você mandou muitas mensagens hoje. Volte amanhã ou fale direto com a loja pelos contatos dela.", 429);
+  contar(kLoja, 24 * 60); contar(kTotal, 24 * 60);
+}
+// sem conta não há agenda nem pedido pela atendente (os dois precisam de conta): se a IA escrever a marcação, ela sai da fala
+const semMarcacoes = (t: string) => t.replace(/\[\[[^\]]*\]\]/g, "").replace(/\[\[[^\n]*$/, "").trim() || "Para marcar horário ou fazer pedido por aqui, entre na sua conta do WorkEnd (é grátis).";
 
 // Quem atende o visitante (20/11/2026, recepção que encaminha: src/office/data/recepcao.ts): sem membroId, a atendente da
 // recepção; com membroId, só o responsável de um setor para onde a recepção encaminha (não dá para falar com qualquer um)
@@ -472,12 +491,11 @@ async function contextoDoSetor(empId: string, t: Terreno, visitanteId: string, d
   ].join("\n");
 }
 
-export async function falarNaLoja(u: Usuario, numero: number, texto: string, ip?: string | null, membroId?: string | null) {
+export async function falarNaLoja(u: QuemFala, numero: number, texto: string, ip?: string | null, membroId?: string | null) {
   const fala = String(texto ?? "").trim().slice(0, 800);
   if (!fala) throw new ErroHttp("Escreva a sua mensagem.");
-  const kLoja = `loja:${numero}:${u.id}`, kTotal = `lojas:${u.id}`;
-  if (bloqueio(kLoja, LIMITE_VISITANTE_LOJA_DIA) || bloqueio(kTotal, LIMITE_VISITANTE_DIA)) throw new ErroHttp("Você mandou muitas mensagens hoje. Volte amanhã ou fale direto com a loja pelos contatos dela.", 429);
-  contar(kLoja, 24 * 60); contar(kTotal, 24 * 60);
+  limitarVisitante(u, numero, ip);
+  const conta = ehVisitanteAnonimo(u) ? null : u;
   const { t, empId } = await lojaPorNumero(numero);
   // conectores: visitante escreveu e-mail ou telefone → aviso visitante.contato
   const contatos = contatosNaFala(fala);
@@ -488,7 +506,7 @@ export async function falarNaLoja(u: Usuario, numero: number, texto: string, ip?
   // recado sem IA (20/11/2026): no jeito da personalidade de quem atende (recepção ou setor), com as frases fixas do treino
   // e o escopo (pedido que é de um colega vai para ele: frente creditos). No setor, o recado é o do setor (data/recepcao.ts).
   const recadoFixo = quem.destino ? recadoDoSetor(quem.destino, t.empresaNome) : RECADO_SEM_IA;
-  const recadoSemIA = () => roteiroVisitante({ empId, empresa: t.empresaNome, e: t.escritorio, atendente: quem.membro, agenteId: aid, texto: fala, visitante: u.nome.split(" ")[0] || "visitante", agenteDe: (mid) => agenteIdDe(empId, mid), recado: quem.destino ? recadoFixo : undefined }).catch((x) => { console.error("[loja] roteiro:", (x as Error).message); return recadoFixo; });
+  const recadoSemIA = () => roteiroVisitante({ empId, empresa: t.empresaNome, e: t.escritorio, atendente: quem.membro, agenteId: aid, texto: fala, visitante: conta ? conta.nome.split(" ")[0] || "visitante" : "sem conta", agenteDe: (mid) => agenteIdDe(empId, mid), recado: quem.destino ? recadoFixo : undefined }).catch((x) => { console.error("[loja] roteiro:", (x as Error).message); return recadoFixo; });
   // as unidades de IA são da empresa visitada: a conversa no setor também desconta delas (agentes.ts › registrarUso)
   const { gasto, teto } = await tetoIA(empId);
   // sem IA ou sem unidades de IA: o recado fica guardado para o dono, com uma resposta fixa (sem custo)
@@ -499,18 +517,20 @@ export async function falarNaLoja(u: Usuario, numero: number, texto: string, ip?
   }
   try {
     // agenda ligada (12/11/2026): a atendente recebe os serviços e as faixas livres e pode marcar pela conversa
-    const ctxAgenda = await contextoAgendaIA(numero, u).catch((e) => { console.error("[loja] agenda:", (e as Error).message); return null; });
+    // sem conta (WE-14): sem agenda e sem pedido pela conversa, que precisam de conta
+    const ctxAgenda = conta ? await contextoAgendaIA(numero, conta).catch((e) => { console.error("[loja] agenda:", (e as Error).message); return null; }) : null;
     // vitrine e pedidos (17/11/2026): a atendente monta o pedido e o servidor cria (src/server/pedidos.ts)
-    const ctxPedidos = await contextoPedidosIA(numero, u).catch((e) => { console.error("[loja] pedidos:", (e as Error).message); return null; });
+    const ctxPedidos = conta ? await contextoPedidosIA(numero, conta).catch((e) => { console.error("[loja] pedidos:", (e as Error).message); return null; }) : null;
     const ctxSetor = quem.destino ? await contextoDoSetor(empId, t, u.id, quem.destino).catch(() => null) : null;
     const contexto = [ctxSetor, ctxAgenda, ctxPedidos].filter(Boolean).join("\n\n");
     const r = await conversar(aid, fala, `visitante:${u.id}`, { modo: "visitante", visitanteId: u.id, tetoMes: { gasto, teto }, contexto: contexto || undefined, maxTokens: ctxAgenda && ctxPedidos ? 650 : contexto ? 500 : undefined });
     let conteudo = r.mensagem.conteudo;
     const original = conteudo;
     // as marcações [[AGENDAR ...]] e [[PEDIDO ...]] nunca ficam na conversa: o servidor valida, faz e escreve o resultado no lugar
-    if (temMarcacao(conteudo)) conteudo = await aplicarMarcacaoDaAtendente(conteudo, u, numero);
+    if (conta && temMarcacao(conteudo)) conteudo = await aplicarMarcacaoDaAtendente(conteudo, conta, numero);
     let pedido = null;
-    if (temMarcacaoPedido(conteudo)) ({ texto: conteudo, pedido } = await aplicarPedidoDaAtendente(conteudo, u, numero, r.mensagem.id, ip));
+    if (conta && temMarcacaoPedido(conteudo)) ({ texto: conteudo, pedido } = await aplicarPedidoDaAtendente(conteudo, conta, numero, r.mensagem.id, ip));
+    if (!conta) conteudo = semMarcacoes(conteudo);
     if (conteudo !== original) await sql`UPDATE mensagem SET conteudo = ${conteudo} WHERE id = ${r.mensagem.id}`;
     return { id: r.mensagem.id, papel: "assistant", conteudo, em: r.mensagem.criadoEm, pedido, setor };
   } catch (e) {
@@ -539,13 +559,12 @@ async function classificarComIA(aid: string, empresa: string, fala: string, dest
   return typeof id === "string" ? destinos.find((x) => x.id === id) ?? null : null;
 }
 
-export async function recepcaoNaLoja(u: Usuario, numero: number, d: { destino?: unknown; texto?: unknown; insistiu?: unknown }) {
+export async function recepcaoNaLoja(u: QuemFala, numero: number, d: { destino?: unknown; texto?: unknown; insistiu?: unknown }, ip?: string | null) {
   const escolha = typeof d.destino === "string" ? d.destino.trim().slice(0, 40) : "";
   const fala = typeof d.texto === "string" ? d.texto.trim().slice(0, 800) : "";
   if (!escolha && !fala) throw new ErroHttp("Escolha um assunto ou escreva o que você procura.");
-  const kLoja = `loja:${numero}:${u.id}`, kTotal = `lojas:${u.id}`;
-  if (bloqueio(kLoja, LIMITE_VISITANTE_LOJA_DIA) || bloqueio(kTotal, LIMITE_VISITANTE_DIA)) throw new ErroHttp("Você mandou muitas mensagens hoje. Volte amanhã ou fale direto com a loja pelos contatos dela.", 429);
-  contar(kLoja, 24 * 60); contar(kTotal, 24 * 60);
+  limitarVisitante(u, numero, ip);
+  const conta = ehVisitanteAnonimo(u) ? null : u;
   const { t, empId } = await lojaPorNumero(numero);
   const e = t.escritorio, atendente = e?.equipe.find((m) => m.papel === "atendente");
   if (!e || !atendente) throw new ErroHttp("Esta loja ainda não tem atendente.", 404);
@@ -572,14 +591,15 @@ export async function recepcaoNaLoja(u: Usuario, numero: number, d: { destino?: 
   await gravarMensagem({ agenteId: aid, papel: "user", autor: `visitante:${u.id}`, conteudo: disse, visitanteId: u.id });
   const resposta = destino ? falaDoEncaminhamento(destino) : FALA_SEM_DESTINO;
   const m = await gravarMensagem({ agenteId: aid, papel: "assistant", autor: `agente:${aid}`, conteudo: resposta, visitanteId: u.id });
-  let nomeVisitante = u.nome ?? "";
+  // sem conta (WE-14): o setor cumprimenta sem nome, e o sino do dono diz "Visitante sem conta"
+  let nomeVisitante = conta?.nome ?? "";
   if (destino) {
     const sid = agenteIdDe(empId, destino.membroId);
-    const [p] = await sql<{ nome: string }[]>`SELECT nome FROM personagem WHERE usuario_id = ${u.id}`.catch(() => []);
+    const [p] = conta ? await sql<{ nome: string }[]>`SELECT nome FROM personagem WHERE usuario_id = ${conta.id}`.catch(() => []) : [];
     if (p?.nome) nomeVisitante = p.nome;
     await gravarMensagem({ agenteId: sid, papel: "assistant", autor: `agente:${sid}`, conteudo: saudacaoDoSetor(destino, nomeVisitante, fala), visitanteId: u.id });
   }
-  return { id: m.id, fala: resposta, destino, como, dono: t.usuarioId, nomeVisitante };
+  return { id: m.id, fala: resposta, destino, como, dono: t.usuarioId, nomeVisitante: conta ? nomeVisitante : NOME_SEM_CONTA };
 }
 
 // ---------- busca de empresas (/encontrar) ----------

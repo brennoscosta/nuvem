@@ -103,10 +103,10 @@ export async function resultadosDoDono(u: Usuario, terreno: Terreno | null, peri
     sql<{ dia: string; n: number }[]>`SELECT dia::text AS dia, count(*)::int AS n FROM visita_dia WHERE dono_id = ${uid} AND dia >= ${desde}::date GROUP BY dia`,
     sql<{ n: number }[]>`SELECT count(*)::int AS n FROM visita_dia WHERE dono_id = ${uid} AND dia >= ${antesDe}::date AND dia < ${desde}::date`,
     sql<{ mapa: number; pagina: number; logados: number }[]>`SELECT count(*) FILTER (WHERE origem = 'mapa')::int AS mapa, count(*) FILTER (WHERE origem = 'pagina')::int AS pagina, count(*) FILTER (WHERE visitante NOT LIKE 'a:%')::int AS logados FROM visita_dia WHERE dono_id = ${uid} AND dia >= ${desde}::date`,
-    // conversa = um visitante que escreveu para a equipe da loja num dia
-    sql<{ dia: string; n: number; msgs: number }[]>`SELECT (m.criado_em AT TIME ZONE ${TZ})::date::text AS dia, count(DISTINCT m.visitante_id)::int AS n, count(*)::int AS msgs
+    // conversa = um visitante que escreveu para a equipe da loja num dia (sem conta, WE-14: cada código anônimo é um)
+    sql<{ dia: string; n: number; msgs: number }[]>`SELECT (m.criado_em AT TIME ZONE ${TZ})::date::text AS dia, count(DISTINCT COALESCE(m.visitante_anonimo, m.visitante_id))::int AS n, count(*)::int AS msgs
       FROM mensagem m JOIN agente a ON a.id = m.agente_id WHERE a.empresa_id IN (SELECT id FROM empresa WHERE usuario_id = ${uid}) AND m.visitante_id IS NOT NULL AND m.papel = 'user' AND (m.criado_em AT TIME ZONE ${TZ})::date >= ${desde}::date GROUP BY 1`,
-    sql<{ n: number }[]>`SELECT count(DISTINCT (m.visitante_id, (m.criado_em AT TIME ZONE ${TZ})::date))::int AS n FROM mensagem m JOIN agente a ON a.id = m.agente_id
+    sql<{ n: number }[]>`SELECT count(DISTINCT (COALESCE(m.visitante_anonimo, m.visitante_id), (m.criado_em AT TIME ZONE ${TZ})::date))::int AS n FROM mensagem m JOIN agente a ON a.id = m.agente_id
       WHERE a.empresa_id IN (SELECT id FROM empresa WHERE usuario_id = ${uid}) AND m.visitante_id IS NOT NULL AND m.papel = 'user' AND (m.criado_em AT TIME ZONE ${TZ})::date >= ${antesDe}::date AND (m.criado_em AT TIME ZONE ${TZ})::date < ${desde}::date`,
     sql<{ dia: string; n: number }[]>`SELECT (c.criado_em AT TIME ZONE ${TZ})::date::text AS dia, count(*)::int AS n FROM candidatura c JOIN vaga v ON v.id = c.vaga_id WHERE v.usuario_id = ${uid} AND (c.criado_em AT TIME ZONE ${TZ})::date >= ${desde}::date GROUP BY 1`,
     sql<{ n: number }[]>`SELECT count(*)::int AS n FROM candidatura c JOIN vaga v ON v.id = c.vaga_id WHERE v.usuario_id = ${uid} AND (c.criado_em AT TIME ZONE ${TZ})::date >= ${antesDe}::date AND (c.criado_em AT TIME ZONE ${TZ})::date < ${desde}::date`,
@@ -224,7 +224,7 @@ export async function vendasDoDono(u: Usuario, j: Janela): Promise<Vendas> {
     tem ? sql<Comprador[]>`SELECT DISTINCT cliente_usuario_id, cliente_contato, cliente_nome FROM pedido
       WHERE usuario_id = ${uid} AND status IN ('pago', 'entregue') AND pago_em >= (${j.desde}::timestamp AT TIME ZONE ${TZ})` : nada<Comprador>(),
     // falas de visitantes com @ ou 4 dígitos seguidos (o resto do teste é o contatosNaFala, aqui no servidor)
-    sql<{ vid: string; conteudo: string }[]>`SELECT m.visitante_id AS vid, m.conteudo FROM mensagem m JOIN agente a ON a.id = m.agente_id
+    sql<{ vid: string; conteudo: string }[]>`SELECT COALESCE(m.visitante_anonimo, m.visitante_id) AS vid, m.conteudo FROM mensagem m JOIN agente a ON a.id = m.agente_id
       WHERE a.empresa_id IN (SELECT id FROM empresa WHERE usuario_id = ${uid}) AND m.papel = 'user' AND m.visitante_id IS NOT NULL AND m.visitante_id <> ${uid}
         AND m.criado_em >= (${j.desde}::timestamp AT TIME ZONE ${TZ}) AND m.conteudo ~ '@|[0-9]{4}'`,
     sql<{ g: string }[]>`SELECT COALESCE(sum(x.custo_brl), 0)::text AS g FROM uso_ia x JOIN agente a ON a.id = x.agente_id
@@ -248,8 +248,8 @@ export async function vendasDoDono(u: Usuario, j: Janela): Promise<Vendas> {
     const fones = todas.filter((k) => k.startsWith("t:")).flatMap((k) => [k.slice(2), `55${k.slice(2)}`]);
     const nomes = todas.filter((k) => k.startsWith("n:")).map((k) => k.slice(2));
     const [falasAntes, comprasAntes] = await Promise.all([
-      vids.length ? sql<{ vid: string; conteudo: string }[]>`SELECT DISTINCT m.visitante_id AS vid, m.conteudo FROM mensagem m JOIN agente a ON a.id = m.agente_id
-        WHERE a.empresa_id IN (SELECT id FROM empresa WHERE usuario_id = ${uid}) AND m.papel = 'user' AND m.visitante_id = ANY(${sql.array(vids)}::text[])
+      vids.length ? sql<{ vid: string; conteudo: string }[]>`SELECT DISTINCT COALESCE(m.visitante_anonimo, m.visitante_id) AS vid, m.conteudo FROM mensagem m JOIN agente a ON a.id = m.agente_id
+        WHERE a.empresa_id IN (SELECT id FROM empresa WHERE usuario_id = ${uid}) AND m.papel = 'user' AND COALESCE(m.visitante_anonimo, m.visitante_id) = ANY(${sql.array(vids)}::text[])
           AND m.criado_em < (${j.desde}::timestamp AT TIME ZONE ${TZ}) AND m.conteudo ~ '@|[0-9]{4}'` : nada<{ vid: string; conteudo: string }>(),
       tem ? sql<Comprador[]>`SELECT DISTINCT cliente_usuario_id, cliente_contato, cliente_nome FROM pedido
         WHERE usuario_id = ${uid} AND status IN ('pago', 'entregue') AND pago_em < (${j.desde}::timestamp AT TIME ZONE ${TZ})

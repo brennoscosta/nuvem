@@ -62,10 +62,11 @@ export const ROTEIROS_MUNDO: Roteiro[] = [
       { id: "mapa", tipo: "manual", alvo: '[data-tour="mapa"]', titulo: "Mapa da cidade", texto: "As lojas por área. Toque num lote do mapa para voar até ele." },
       { id: "online", tipo: "manual", alvo: ".hud-online", titulo: "Quem está na cidade", texto: "Toque aqui para ver quantas pessoas estão na cidade agora, quem são e onde estão." },
       { id: "loja", tipo: "manual", antes: (pronto) => { selecionar(lojaAberta()); pronto(); }, alvo: CARTAO, titulo: "Cartão da loja", texto: "Toque num prédio para ver a empresa: o que ela faz, a vitrine, os cupons e as vagas." },
-      // ui/Recepcao.tsx › BotaoEntrar: data-guia="entrar-predio" nos dois jeitos do botão (sem personagem ativo ele diz
-      // "Crie seu personagem grátis"); o texto fica só de reserva, para um cartão que ainda não tenha o atributo
+      // ui/Recepcao.tsx › BotaoEntrar: data-guia="entrar-predio" nos dois jeitos do botão (sem personagem ativo, desde a
+      // WE-14, ele também diz "Entrar no prédio" e abre a recepção na tela); o texto fica só de reserva, para um cartão que
+      // ainda não tenha o atributo
       { id: "recepcao", tipo: "manual", alvo: () => noCartaoSel('[data-guia="entrar-predio"]')() ?? noCartao(/^(Entrar no prédio|Crie seu personagem( para entrar| grátis))$/)(), titulo: "Fale com a recepcionista",
-        texto: (c) => (c.fatos.personagem ? "Em Entrar no prédio, o seu personagem vai até a porta. Lá dentro a recepcionista pergunta o que você procura e chama o setor certo." : "Com um personagem, que é grátis, você entra no prédio a pé. Lá dentro a recepcionista pergunta o que você procura e chama o setor certo.") },
+        texto: (c) => (c.fatos.personagem ? "Em Entrar no prédio, o seu personagem vai até a porta. Lá dentro a recepcionista pergunta o que você procura e chama o setor certo." : "Em Entrar no prédio, a recepcionista te atende na hora, mesmo sem conta: pergunta o que você procura e chama o setor certo. Com um personagem grátis, você vai até lá a pé.") },
       { id: "praca", tipo: "manual", antes: (pronto) => { selecionar(PRACA_CHAVE); pronto(); },
         alvo: () => { const c = primeiro('[data-tour="praca"]'); return c ? (porTexto("b", /^Anuncie no telão/, c)?.parentElement ?? c) : null; },
         titulo: "Praça e telão", texto: "Na praça acontecem lives e lançamentos, e aos sábados tem feira. O telão passa os anúncios das empresas da cidade." },

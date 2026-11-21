@@ -65,12 +65,12 @@ export function RedeDashboard({ nome }: { nome: string }) {
     <section className="faixa rd">
       <div className="rd-topo">
         <h1>Minha rede</h1>
-        <p>Com um personagem você anda pela cidade, entra nas lojas e faz negócios com quem está online.</p>
+        <p>Com um personagem você anda pela cidade, aparece na busca e faz negócios com quem está online.</p>
       </div>
       <div className="rd-heroi">
         <div className="rd-heroi-txt">
-          <h2>Crie seu personagem grátis e entre na cidade</h2>
-          <p>O WorkEnd é uma rede de negócios em 3D: você entra nas lojas, fala com a equipe, conversa com quem está online, faz amigos, negocia e faz chamadas. Quem não tem personagem só olha.</p>
+          <h2>Crie seu personagem grátis e ande pela cidade</h2>
+          <p>O WorkEnd é uma rede de negócios em 3D. Para visitar uma loja e falar com a recepção, não precisa de personagem. Com ele você anda a pé pela cidade, ganha carimbos no passaporte, aparece na busca, conversa com quem está online, faz amigos, negocia e faz chamadas.</p>
           <div className="rd-preco"><b>Grátis</b><span>para toda conta do WorkEnd</span></div>
           <div className="rd-botoes">
             <a href="/mundo?personagem=1" className="btn btn-azul btn-grande">Montar meu personagem grátis</a>
