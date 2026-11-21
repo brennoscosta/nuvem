@@ -37,6 +37,8 @@ import { ClasseNatal } from "@/app/workend/_natal";
 import { Visitante } from "./Visitante";
 import "./ganchoMedir"; // só com ?medir=1: a ferramenta de medir as telas abre os cartões por aqui
 import { EditorPosicaoPainel } from "./EditorPosicao";
+import { useInicioMundo } from "../inicioMundo";
+import { EsqueletoBarra, EsqueletoCartao } from "./EsqueletoAbertura";
 
 // Estamos no mapa do WorkEnd (workend.online/mundo)? Só dá pra saber no navegador (sem erro de hidratação).
 const semAssinatura = () => () => {};
@@ -62,6 +64,7 @@ export function BarraTopo() {
   const luz = useEscritorio((s) => s.luz);
   const setLuz = useEscritorio((s) => s.setLuz);
   const mundo = useModoMundo();
+  const inicio = useInicioMundo();
   const temSimulados = ordem.some((id) => agentes[id] && !agentes[id].real);
   const total = ordem.length;
   const trabalhando = ordem.filter((id) => agentes[id]?.status === "trabalhando").length;
@@ -70,6 +73,9 @@ export function BarraTopo() {
   // No mundo do WorkEnd a barra é enxuta (sem os agentes nem o estado do servidor da Nuvem) e rola de lado no celular
   // No mundo do WorkEnd (16/11/2026): duas ilhas de vidro, a marca à esquerda e as ações à direita, com ícones próprios.
   // No celular as ações que não cabem rolam de lado; o som e os ajustes ficam na barra de baixo.
+  // WE-15 (21/11/2026): no HTML do servidor e na hidratação useModoMundo() ainda é false; no mapa, em vez da barra do
+  // escritório da Nuvem, vai o esqueleto da barra do mapa (ui/EsqueletoAbertura.tsx) até a barra de verdade entrar
+  if (!mundo && inicio.mundo) return <EsqueletoBarra />;
   if (mundo) return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-2 sm:p-3">
       {/* 20/11/2026: ao lado da marca (no celular, logo abaixo dela), quantas pessoas estão na cidade agora (ui/PessoasOnline) */}
@@ -264,13 +270,15 @@ function useMundoServidor() {
 }
 
 // O mural da fachada é da Nuvem (recados pro CEO); no mundo do WorkEnd ele não aparece pros visitantes
-function MuralSeNuvem() { const mundo = useModoMundo(); const admin = useEscritorio((s) => s.admin); if (mundo && !admin) return null; return <Mural />; }
+// (WE-15: inicio.mundo vale já no primeiro quadro, antes de useModoMundo() virar true)
+function MuralSeNuvem() { const mundo = useModoMundo(); const inicio = useInicioMundo(); const admin = useEscritorio((s) => s.admin); if ((mundo || inicio.mundo) && !admin) return null; return <Mural />; }
 function PainelOuCartao() {
   const admin = useEscritorio((s) => s.admin);
   const online = useEscritorio((s) => s.online);
   const mundo = useModoMundo();
+  const inicio = useInicioMundo();
   // No mundo do WorkEnd a Nuvem é só mais uma loja: ninguém vê o painel interno dos agentes, a não ser o admin da Nuvem
-  if (mundo && !admin) return <CartaoPublico />;
+  if ((mundo || inicio.mundo) && !admin) return <CartaoPublico />;
   return admin || !online ? <PainelAgente /> : <CartaoPublico />;
 }
 
@@ -305,6 +313,8 @@ export function Painel() {
       <CartaoQuiosque />
       <CartaoOutdoor />
       <CartaoOneState />
+      {/* cartão de espera da sede ou do lote pedido no link, até o mapa carregar (WE-15) */}
+      <EsqueletoCartao />
       <EditorPosicaoPainel />
       <ChatEquipe />
       <Recepcao />

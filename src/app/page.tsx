@@ -18,6 +18,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return meta({ titulo: "Mapa da cidade — WorkEnd", descricao: "Passeie pela cidade 3D do WorkEnd: entre nas lojas, converse com as atendentes de IA, conheça as empresas e reserve o endereço da sua.", caminho: "/mundo" });
 }
 
-export default function Home() {
-  return <Escritorio />;
+// WE-15 (21/11/2026): o primeiro quadro (HTML do servidor) já sabe se é o mapa e qual sede ou lote o link pede, para
+// não desenhar a barra do escritório da Nuvem antes do JavaScript (src/office/inicioMundo.ts). O proxy marca o mapa do
+// WorkEnd com x-site; ?mundo vale em qualquer domínio, igual a modoMundo() no navegador.
+export default async function Home({ searchParams }: PageProps<"/">) {
+  const [h, q] = await Promise.all([headers(), searchParams]);
+  const um = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
+  const mundo = h.get("x-site") === "workend" || q.mundo !== undefined;
+  return <Escritorio inicio={{ mundo, sede: mundo ? um(q.sede) : null, lote: mundo ? um(q.lote) : null }} />;
 }
