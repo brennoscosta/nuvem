@@ -176,6 +176,21 @@
   .we .cab-nav { display: flex; }
   .we .cab-hamburguer, .we .cab-folha { display: none !important; }
 }
+/* 21/11/2026: com o "Ver o guia" e o saldo (v95), a barra não cabia na faixa de 1180 px e os itens passavam por cima da
+   logo e do lado direito. No computador, o guia fica só com o ícone (rótulo no title), o saldo sem a palavra "créditos" e
+   os itens mais justos; até 1279 px os itens perdem o ícone. "safe center" impede que o trilho invada a logo. */
+@media (min-width: 1100px) {
+  .we .cab-nav { justify-content: safe center; }
+  .we .cab-guia { width: 40px; padding: 0; justify-content: center; }
+  .we .cab-guia-rotulo { display: none; }
+  .we [data-saldo-topo] > span:last-child { display: none; }
+  .we .cab-item { padding: .55rem .6rem; }
+}
+@media (min-width: 1100px) and (max-width: 1279px) {
+  .we .cab-linha { gap: .75rem; }
+  .we .cab-item { gap: 0; font-size: 14px; }
+  .we .cab-item .ic { display: none; }
+}
 @keyframes cab-pop { from { opacity: 0; transform: translateY(-6px) scale(.96); } }
 @keyframes cab-desce { from { opacity: 0; transform: translateY(-8px); } }
 @keyframes cab-item { from { opacity: 0; transform: translateY(8px); } }
