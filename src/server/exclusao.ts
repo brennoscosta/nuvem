@@ -15,6 +15,9 @@
 //  - PAGAMENTO AUTOMÁTICO (0054, junção v98): a assinatura no cartão é cancelada no Mercado Pago antes de apagar a conta
 //    (se o Mercado Pago falhar, nada é excluído); a assinatura e o pedido de devolução ficam com o código anônimo, e do
 //    bruto do Mercado Pago saem o pagador, o cartão e a descrição. As cobranças já estão em pagamento (acima).
+//  - WHATSAPP DA LOJA (WE-18, src/server/whatsapp.ts): apaga a conexão (com o token cifrado), quem escreveu (número
+//    cifrado), as conversas recebidas por ele e os registros de recebidas e envios; depois da transação, o aplicativo da
+//    plataforma sai da inscrição do WABA na Meta (sem esperar: falhar ali não segura a exclusão).
 //  - REGISTRA a exclusão em conta_excluida (0053), sem dado pessoal: hash do id antigo, data, motivo e contagens.
 // Não excluem por aqui: contas de administrador e as contas das sedes (titulares ou sócias de uma sede). Pix gerado e
 // ainda não pago também segura a exclusão até vencer (senão o pagamento chegaria depois, sem conta).
@@ -31,6 +34,7 @@ import { registrar } from "./eventos";
 import { SEDE_POR_CHAVE } from "@/office/data/sedes";
 import { numeroDaLoja, rotuloLoja } from "@/office/data/numeroLoja";
 import { MODELO, type IdModelo } from "@/office/data/modelos";
+import { apagarWhatsAppDaConta, desinscreverDepois, whatsAppDaConta } from "./whatsapp";
 
 type Db = typeof sql;
 
@@ -107,6 +111,8 @@ export async function resumoExclusao(u: Usuario): Promise<ResumoExclusao> {
   if (x.anuncios) outros.push(x.anuncios === 1 ? "O anúncio pago na Praça de Eventos" : `Os ${x.anuncios} anúncios pagos na Praça de Eventos`);
   const [rua] = await sql<{ nome: string }[]>`SELECT nome FROM rua_nome WHERE usuario_id = ${uid}`;
   if (rua) outros.push(`O nome que você deu à rua (${rua.nome}), que volta ao nome de antes`);
+  const wa = await whatsAppDaConta(uid).catch(() => null); // WE-18
+  if (wa) outros.push(`O WhatsApp conectado à loja${wa.numero ? ` (${wa.numero})` : ""} e as conversas recebidas por ele`);
   const [pe] = await sql<{ pagoAte: Date | null }[]>`SELECT pago_ate FROM personagem WHERE usuario_id = ${uid}`;
   if (pe?.pagoAte && new Date(pe.pagoAte).getTime() > agora) outros.push(`O personagem pago até ${dataBR(pe.pagoAte)}`);
   const s = await saldoDe(uid);
@@ -148,6 +154,7 @@ export async function excluirConta(u: Usuario, conf: { senha?: unknown; palavra?
 
   const uid = u.id, hash = hashTitular(uid), anon = codigoAnonimo(hash);
   const arquivos: string[] = [];
+  const desinscrever: { wabaId: string; tokenCifrado: string }[] = [];
   const resumo = await sql.begin(async (tx) => {
     const db = tx as unknown as Db;
     // só nesta transação: a trava dos extratos aceita trocar a identificação (migração 0053)
@@ -262,6 +269,9 @@ export async function excluirConta(u: Usuario, conf: { senha?: unknown; palavra?
     await db`DELETE FROM chave_api WHERE usuario_id = ${uid}`;
     await db`DELETE FROM agente_contratado WHERE dono_id = ${uid}`; // os da empresa desta conta; os do dono anterior de um lote dela ficam com ele
     await db`DELETE FROM seguidor_envio WHERE dono_id = ${uid}`;
+    // WhatsApp da loja (WE-18): conexão, números cifrados, conversas e registros; a Meta fica para depois da transação
+    const whats = await apagarWhatsAppDaConta(db, empresas);
+    desinscrever.push(...whats.desinscrever);
     arquivos.push(...(await db<{ caminho: string }[]>`SELECT caminho FROM arquivo WHERE empresa_id = ANY(${E}::text[])`).map((r) => r.caminho));
     await db`DELETE FROM mural WHERE empresa_id = ANY(${E}::text[])`;
     await db`DELETE FROM empresa WHERE usuario_id = ${uid}`; // agentes, conversas, conexões, conectores, chaves e tarefas (cascata)
@@ -270,11 +280,12 @@ export async function excluirConta(u: Usuario, conf: { senha?: unknown; palavra?
     if (!fim) throw new ErroExclusao("Esta conta não existe mais.", 404);
 
     // ===== 4) o registro, sem dado pessoal =====
-    const r = { lotes: terrenos.count, empresas: empresas.length, pagamentos: pagamentos.count, assinaturas: assinaturas.count, assinaturasCanceladas, extratoCreditos: creditos.count, extratoUnidades: unidades.count, avisos: avisos.count };
+    const r = { lotes: terrenos.count, empresas: empresas.length, pagamentos: pagamentos.count, assinaturas: assinaturas.count, assinaturasCanceladas, extratoCreditos: creditos.count, extratoUnidades: unidades.count, avisos: avisos.count, whatsapp: whats.conexoes, conversasWhatsapp: whats.contatos };
     await db`INSERT INTO conta_excluida (titular_hash, motivo, resumo) VALUES (${hash}, ${MOTIVO}, ${sql.json(r)}) ON CONFLICT (titular_hash) DO NOTHING`;
     return r;
   });
   for (const f of arquivos) fs.promises.unlink(f).catch(() => {}); // arquivos enviados pela empresa, se houver
+  desinscreverDepois(desinscrever); // WhatsApp (WE-18): o aplicativo da plataforma sai do WABA da loja na Meta
   void registrar("admin", "Conta excluída a pedido do titular", { dados: { detalhes: `Registro ${hash.slice(0, 12)} em conta_excluida. ${resumo.pagamentos} pagamento(s) guardado(s) sem identificação.` } });
   return { hash, codigo: anon, ...resumo };
 }
