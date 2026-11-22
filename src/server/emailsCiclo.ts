@@ -23,6 +23,8 @@ import { semanaBR } from "./avisos";
 import { mesAtual, AVISO_UNIDADES, EMPRESAS_SEM_COBRANCA } from "./unidadesIA";
 import { ehSede } from "@/office/data/sedes";
 import { numeroDaLoja, temNumero } from "@/office/data/numeroLoja";
+import { enderecoAtual } from "./enderecoLoja";
+import { empresaIdDe } from "./equipeCliente";
 
 declare global {
   var __workendEmailsTimer: ReturnType<typeof setInterval> | undefined;
@@ -93,7 +95,10 @@ async function resumoSemana(u: Usuario, agora: Date, ref: string) {
   const r = await resultadosDoDono(u, t, 7);
   const v = r.visitas.total, c = r.conversas.total, num = numeroDaLoja(t);
   const ate = new Date(new Date(`${r.desde}T12:00:00Z`).getTime() + (r.dias - 1) * DIA);
-  const dica = v === 0 && temNumero(num) ? `<p style="margin:12px 0 0">Ninguém visitou a loja nestes 7 dias. Mande o endereço <b>workend.online/loja/${num}</b> para os seus clientes no WhatsApp e nas redes.</p>` : "";
+  // endereço próprio da loja (WE-11, junção v100): workend.online/<slug>; o /loja/N só fica de reserva, se ainda não houver
+  const slug = v === 0 ? await enderecoAtual(empresaIdDe(u.id, t.chave, ehAdmin(u))).catch(() => null) : null;
+  const endereco = slug ? `workend.online/${slug}` : temNumero(num) ? `workend.online/loja/${num}` : null;
+  const dica = v === 0 && endereco ? `<p style="margin:12px 0 0">Ninguém visitou a loja nestes 7 dias. Mande o endereço <b>${endereco}</b> para os seus clientes no WhatsApp e nas redes.</p>` : "";
   await umaVez(chave, u, "resumo", {
     nome: u.nome, empresa: t.empresaNome || u.empresaNome,
     visitas: fmt(v), visitas_antes: fmt(r.visitas.anterior), visitas_texto: plural(v, "visita", "visitas"),
