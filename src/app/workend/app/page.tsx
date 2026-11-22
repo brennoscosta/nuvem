@@ -21,7 +21,7 @@ import { MedirUmaVez } from "../_cookies";
 import { AssinaturaPainel } from "./_assinatura"; // pagamento automático (WE-09)
 import { LembretePerfil } from "../_lembrete-perfil"; // o que falta no perfil do cadastro (20/11/2026)
 import { PaginaGratis, type DadosPaginaGratis } from "./_pagina-gratis"; // Plano Vitrine (WE-13)
-import { paginaDoUsuario, perfilDaConta, empresaDaConta, PRODUTOS_VITRINE_GRATIS } from "@/server/planoVitrine";
+import { paginaDoUsuario, paginaDoLoteVencido, perfilDaConta, empresaDaConta, PRODUTOS_VITRINE_GRATIS } from "@/server/planoVitrine";
 import { vitrineResumo } from "@/server/vitrine";
 import { enderecoAtual } from "@/server/enderecoLoja";
 import { RESPOSTAS_MES_VITRINE } from "@/server/unidadesIA";
@@ -454,7 +454,9 @@ function Reservado({ chao, r, linkLote }: { chao: Terreno; r: { valor: number | 
 // Sua página grátis (Plano Vitrine, WE-13): a página da conta, o "Sobre" e os contatos, o endereço e os 3 produtos
 async function dadosPaginaGratis(u: Usuario): Promise<DadosPaginaGratis> {
   const empId = empresaDaConta(u.id);
-  const [pg, perfil, endereco, vit] = await Promise.all([paginaDoUsuario(u.id), perfilDaConta(u.id), enderecoAtual(empId), vitrineResumo(u.id, PRODUTOS_VITRINE_GRATIS)]);
+  // lote vencido (WE-13b): a loja que saiu da cidade aparece aqui já no ar, como página grátis
+  const pg = (await paginaDoLoteVencido(u.id).catch(() => null)) ?? (await paginaDoUsuario(u.id));
+  const [perfil, endereco, vit] = await Promise.all([perfilDaConta(u.id), enderecoAtual(empId), vitrineResumo(u.id, PRODUTOS_VITRINE_GRATIS)]);
   const publicada = pg?.publicadaEm ? pg : null;
   return {
     pagina: publicada ? { numero: publicada.numero, empresaNome: publicada.empresaNome, cor: publicada.cor, nicho: publicada.nicho, logo: publicada.temLogo ? `/api/terrenos/pagina-${publicada.numero}/logo?v=${new Date(publicada.atualizadoEm).getTime()}` : null } : null,

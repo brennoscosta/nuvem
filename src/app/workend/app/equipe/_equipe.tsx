@@ -467,7 +467,8 @@ function Regras({ membro, lote, mudou }: { membro: Membro; lote: string; mudou: 
   );
 }
 
-function Visitantes({ q }: { q: string }) {
+// também na página grátis (WE-13b, app/_pagina-gratis.tsx)
+export function Visitantes({ q }: { q: string }) {
   const [lista, setLista] = useState<Visitante[] | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
   const [falasDe, setFalasDe] = useState<{ de: string; falas: FalaVisita[] } | null>(null);

@@ -8,6 +8,9 @@ import { useState } from "react";
 import { CopiarLink } from "./_painel";
 import { Icone } from "@/office/ui/Icone";
 import { NICHOS } from "@/office/data/mundo";
+import dynamic from "next/dynamic";
+// as conversas dos visitantes (WE-13b): a mesma lista de Minha equipe, carregada só aqui embaixo
+const Visitantes = dynamic(() => import("./equipe/_equipe").then((m) => m.Visitantes), { ssr: false, loading: () => <p className="mt-4 text-[var(--tinta-2)]">Carregando as conversas…</p> });
 
 // as mesmas cores do formulário do lote no mapa (mundoStore.ts › CORES_EMPRESA)
 const CORES = ["#1D4ED8", "#0EA5A4", "#16A34A", "#D97706", "#DC2626", "#DB2777", "#7C3AED", "#1F2937"];
@@ -27,6 +30,7 @@ export function PaginaGratis({ d }: { d: DadosPaginaGratis }) {
   if (!p || editando) return <FormPagina d={d} aoCancelar={p ? () => setEditando(false) : null} aoSalvar={() => setEditando(false)} />;
   const link = d.endereco ? `workend.online/${d.endereco}` : null;
   return (
+    <>
     <section className="faixa" id="pagina-gratis">
       <div className="pn-loja" style={{ ["--marca" as string]: p.cor }}>
         <div className="pn-loja-texto">
@@ -59,6 +63,11 @@ export function PaginaGratis({ d }: { d: DadosPaginaGratis }) {
         </div>
       </div>
     </section>
+    <section className="faixa pn-bloco scroll-mt-6" id="conversas">
+      <div className="pn-titulo"><div><h2>Quem conversou com a sua atendente</h2><p>As conversas da sua página, de quem tem conta e de quem não tem. O contato que a pessoa deixa aparece aqui.</p></div></div>
+      <Visitantes q={`lote=pagina-${p.numero}`} />
+    </section>
+    </>
   );
 }
 

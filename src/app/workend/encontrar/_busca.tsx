@@ -17,7 +17,7 @@ import { CartoesPerfil, QuemCombina } from "./_perfis";
 import type { CartaoPerfil } from "@/server/perfis";
 
 type Prof = { usuarioId: string; nome: string; boneco: string; roupa: string; bio: string; redes?: Redes; online: boolean; perfil: Perfil; nichoNome: string | null; reputacao: { media: number | null; n: number } };
-type Emp = { numero: number; chave: string; nome: string; cor: string; nicho: string; nichoNome: string; logo: string | null; sobre: string; contatos: { whatsapp?: string; instagram?: string; site?: string; email?: string }; equipe: number; atendente: string | null; reputacao: { media: number | null; n: number } };
+type Emp = { numero: number; chave: string; nome: string; cor: string; nicho: string; nichoNome: string; logo: string | null; sobre: string; contatos: { whatsapp?: string; instagram?: string; site?: string; email?: string }; equipe: number; atendente: string | null; reputacao: { media: number | null; n: number }; gratis?: boolean; endereco?: string | null }; // gratis: página grátis (WE-13b), leva ao endereço
 type Tipo = "profissionais" | "empresas" | "vagas" | "perfis";
 const ROTULO: Record<Tipo, string> = { perfis: "Perfis", profissionais: "Profissionais", empresas: "Empresas", vagas: "Vagas" };
 
@@ -144,14 +144,14 @@ export function Busca({ logado, euId, inicial }: { logado: boolean; euId: string
           <li key={e.chave} className="busca-cartao flex flex-col overflow-hidden rounded-2xl border border-[var(--linha)] bg-[var(--surface)]" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
             <div className="flex items-center gap-3 p-4 text-white" style={{ background: `linear-gradient(135deg, ${e.cor}, #161C25 140%)` }}>
               {e.logo ? <img src={e.logo} alt="" className="h-12 w-12 rounded-xl bg-white object-contain p-1" /> : <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/15 font-black">{e.nome.slice(0, 2).toUpperCase()}</span>}
-              <div className="min-w-0"><b className="block truncate text-[17px]">{e.nome}</b><span className="text-[13px] text-white/80">{rotuloLoja(e.numero)} · {e.nichoNome}</span></div>
+              <div className="min-w-0"><b className="block truncate text-[17px]">{e.nome}</b><span className="text-[13px] text-white/80">{e.gratis ? "Página" : rotuloLoja(e.numero)} · {e.nichoNome}</span></div>
             </div>
             <div className="flex flex-1 flex-col p-4">
               <div className="flex items-center justify-between gap-2"><Nota r={e.reputacao} />{e.atendente && <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#15803D]"><span className="h-1.5 w-1.5 rounded-full bg-[#16A34A]" aria-hidden />{e.atendente} atende agora</span>}</div>
               <p className="mt-2 line-clamp-3 text-[14px] text-[var(--tinta-2)]">{e.sobre || "A empresa ainda não escreveu a apresentação. A atendente responde suas dúvidas."}</p>
               <div className="mt-auto flex gap-2 pt-4">
-                <a href={`/loja/${e.numero}`} className="btn btn-azul flex-1 !py-2.5 text-sm">Abrir a loja</a>
-                <a href={`/mundo?lote=${encodeURIComponent(e.chave)}`} className="btn btn-linha flex-1 !py-2.5 text-sm">Ver no mapa</a>
+                <a href={e.gratis && e.endereco ? `/${e.endereco}` : `/loja/${e.numero}`} className="btn btn-azul flex-1 !py-2.5 text-sm">{e.gratis ? "Abrir a página" : "Abrir a loja"}</a>
+                {!e.gratis && <a href={`/mundo?lote=${encodeURIComponent(e.chave)}`} className="btn btn-linha flex-1 !py-2.5 text-sm">Ver no mapa</a>}
               </div>
             </div>
           </li>

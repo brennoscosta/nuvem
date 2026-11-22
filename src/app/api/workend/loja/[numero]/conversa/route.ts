@@ -12,6 +12,7 @@ import { ok, erro, corpo } from "@/server/http";
 import { ipDe } from "@/server/limite";
 import { aoSerAtendido } from "@/server/passaporte";
 import { visitanteAnonimo, NOME_SEM_CONTA } from "@/server/visitanteAnonimo";
+import { ehChaveDePagina } from "@/server/planoVitrine";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 type Ctx = { params: Promise<{ numero: string }> };
@@ -43,5 +44,5 @@ async function avisarDono(numero: number, visitanteId: string, nomeConta: string
   const loja = await lojaDoNumero(numero).catch(() => null); if (!loja || loja.donoId === visitanteId) return;
   const [p] = nomeConta === null ? [] : await sql<{ nome: string }[]>`SELECT nome FROM personagem WHERE usuario_id = ${visitanteId}`.catch(() => []);
   const nome = p?.nome ?? (nomeConta === null ? NOME_SEM_CONTA : nomeConta.split(" ")[0]);
-  await avisar(loja.donoId, { tipo: "loja", ref: `loja:${visitanteId}`, renovar: true, titulo: setor ? `${nome} falou com ${setor.quem} (${setor.nome})` : `${nome} falou com a sua atendente`, texto: texto.slice(0, 140), link: "/app/equipe" });
+  await avisar(loja.donoId, { tipo: "loja", ref: `loja:${visitanteId}`, renovar: true, titulo: setor ? `${nome} falou com ${setor.quem} (${setor.nome})` : `${nome} falou com a sua atendente`, texto: texto.slice(0, 140), link: ehChaveDePagina(loja.chave) ? "/app#conversas" : "/app/equipe" }); // página grátis (WE-13b): as conversas ficam em Sua página grátis
 }

@@ -16,7 +16,7 @@ import { ehAdmin, type Terreno } from "./terrenos";
 import type { Usuario } from "./usuarios";
 import { escritorioPadrao, type Escritorio } from "@/office/data/escritorio";
 import { equipeDoQuiosque, ehQuiosque } from "@/office/data/quiosques";
-import { nichoValido } from "@/office/data/mundo";
+import { nichoValido, nomeNicho } from "@/office/data/mundo";
 import { ehSede } from "@/office/data/sedes";
 
 export const PRODUTOS_VITRINE_GRATIS = 3;
@@ -130,4 +130,49 @@ export async function perfilDaConta(usuarioId: string): Promise<{ sobre: string;
   await migrar();
   const [e] = await sql<{ sobre: string; contatos: Record<string, string> | null }[]>`SELECT sobre, contatos FROM empresa WHERE id = ${empresaDaConta(usuarioId)}`;
   return { sobre: e?.sobre ?? "", contatos: e?.contatos ?? {} };
+}
+
+// ---------- WE-13b (21/11/2026): busca e lote vencido ----------
+// Lote vencido: quem tinha a loja na cidade e não tem mais continua com a página no ar, como grátis (em vez de "loja
+// fechada"). A página nasce do que ficou guardado do lote (terreno_arquivo: nome, cor, nicho, logo e a atendente, com o
+// mesmo id, então as conversas continuam). Nada é cobrado. Devolve a página publicada da conta, ou null.
+export async function paginaDoLoteVencido(usuarioId: string): Promise<PaginaGratis | null> {
+  const ja = await paginaDoUsuario(usuarioId);
+  if (ja) return ja.publicadaEm ? ja : null;
+  if (await lojaNaCidade(usuarioId)) return null;
+  const [a] = await sql<{ empresaNome: string; cor: string; nicho: string | null; logo: Uint8Array | null; logoTipo: string | null; escritorio: Escritorio | null; email: string; papel: Usuario["papel"]; banidoEm: Date | null }[]>`
+    SELECT a.empresa_nome, a.cor, a.nicho, a.logo, a.logo_tipo, a.escritorio, u.email, u.papel, u.banido_em FROM terreno_arquivo a JOIN usuario u ON u.id = a.usuario_id
+    WHERE a.usuario_id = ${usuarioId} ORDER BY a.arquivado_em DESC LIMIT 1`;
+  if (!a || a.banidoEm || ehAdmin({ email: a.email, papel: a.papel } as Usuario)) return null;
+  const nome = a.empresaNome.trim().slice(0, 60) || "Minha empresa", cor = /^#[0-9a-fA-F]{6}$/.test(a.cor) ? a.cor : COR_PADRAO;
+  const esc = equipeDoQuiosque(a.escritorio ?? escritorioPadrao(nome, cor));
+  const empId = empresaDaConta(usuarioId);
+  await sql`INSERT INTO empresa (id, slug, nome, usuario_id, atualizado_em) VALUES (${empId}, ${empId}, ${nome}, ${usuarioId}, to_timestamp(0)) ON CONFLICT (id) DO NOTHING`;
+  await sql`INSERT INTO loja_vitrine (usuario_id, empresa_id, empresa_nome, cor, nicho, logo, logo_tipo, escritorio, publicada_em)
+    VALUES (${usuarioId}, ${empId}, ${nome}, ${cor}, ${nichoValido(a.nicho)}, ${a.logo ? Buffer.from(a.logo) : null}, ${a.logo ? a.logoTipo : null}, ${sql.json(esc as unknown as Parameters<typeof sql.json>[0])}, now())
+    ON CONFLICT (usuario_id) DO NOTHING`;
+  return paginaDoUsuario(usuarioId);
+}
+
+// As páginas grátis publicadas na busca de empresas (/encontrar, aba Empresas), no mesmo formato da busca das lojas
+// (equipeCliente.ts › buscarEmpresas), com gratis e o endereço próprio. Fora das missões e dos moradores, que mandam o
+// visitante para lojas na cidade.
+export async function buscarPaginasGratis(f: { q?: string | null; nicho?: string | null }) {
+  await migrar();
+  const q = (f.q ?? "").trim().slice(0, 60).toLowerCase();
+  const rows = await sql<{ usuarioId: string; numero: number; empresaNome: string; cor: string; nicho: string; temLogo: boolean; escritorio: Escritorio | null; sobre: string; contatos: Record<string, string> | null; slug: string; media: number | null; n: number }[]>`
+    SELECT v.usuario_id, v.numero, v.empresa_nome, v.cor, v.nicho, (v.logo IS NOT NULL) AS tem_logo, v.escritorio, e.sobre, e.contatos, le.slug,
+      (SELECT AVG(nota)::float FROM avaliacao WHERE para_id = v.usuario_id) AS media, (SELECT COUNT(*)::int FROM avaliacao WHERE para_id = v.usuario_id) AS n
+    FROM loja_vitrine v JOIN usuario u ON u.id = v.usuario_id AND u.banido_em IS NULL JOIN empresa e ON e.id = v.empresa_id
+    JOIN loja_endereco le ON le.empresa_id = v.empresa_id AND le.atual
+    WHERE v.publicada_em IS NOT NULL AND (${f.nicho ?? null}::text IS NULL OR v.nicho = ${f.nicho ?? null})
+      AND NOT EXISTS (SELECT 1 FROM terreno t WHERE t.usuario_id = v.usuario_id AND t.status = 'ativo' AND t.anexo_de IS NULL)
+    ORDER BY v.publicada_em DESC LIMIT 200`;
+  return rows.map((r) => ({
+    numero: r.numero, chave: chaveDaPagina(r.numero), nome: r.empresaNome, cor: r.cor, nicho: r.nicho, nichoNome: nomeNicho(r.nicho),
+    logo: r.temLogo ? `/api/terrenos/${chaveDaPagina(r.numero)}/logo` : null, sobre: (r.sobre ?? "").slice(0, 400), contatos: r.contatos ?? {},
+    equipe: r.escritorio?.equipe.length ?? 0, atendente: r.escritorio?.equipe.find((m) => m.papel === "atendente")?.nome ?? null,
+    reputacao: { media: r.media ?? null, n: r.n ?? 0 }, gratis: true as const, endereco: r.slug,
+  })).filter((l) => !q || `${l.nome} ${l.sobre} ${l.nichoNome}`.toLowerCase().includes(q))
+    .sort((a, b) => Number(!!b.sobre) - Number(!!a.sobre) || b.reputacao.n - a.reputacao.n);
 }

@@ -12,7 +12,7 @@ import { numeroDaLoja } from "@/office/data/numeroLoja";
 import { empresaIdDe } from "./equipeCliente";
 import { ehAdmin } from "./terrenos";
 import type { Usuario } from "./usuarios";
-import { paginaDaEmpresa } from "./planoVitrine";
+import { paginaDaEmpresa, paginaDoLoteVencido } from "./planoVitrine";
 
 type Db = typeof sql;
 
@@ -94,7 +94,11 @@ export async function numeroDaEmpresa(empId: string): Promise<number | null> {
     JOIN usuario u ON u.id = t.usuario_id AND u.banido_em IS NULL WHERE e.id = ${empId} ORDER BY t.reservado_em`;
   const t = ts.filter((x) => !ehSede(x.chave)).find((x) => empresaIdDe(x.usuarioId, x.chave, ehAdmin({ email: x.email, papel: x.papel } as Usuario)) === empId);
   if (t) return numeroDaLoja({ chave: t.chave });
-  return (await paginaDaEmpresa(empId))?.numero ?? null; // página grátis (Plano Vitrine, WE-13)
+  const pg = await paginaDaEmpresa(empId); // página grátis (Plano Vitrine, WE-13)
+  if (pg) return pg.numero;
+  // lote vencido (WE-13b): a loja que saiu da cidade continua no ar como página grátis
+  const [e] = await sql<{ usuarioId: string | null }[]>`SELECT usuario_id FROM empresa WHERE id = ${empId}`;
+  return e?.usuarioId && empId === `emp_${e.usuarioId}` ? (await paginaDoLoteVencido(e.usuarioId).catch(() => null))?.numero ?? null : null;
 }
 // endereço atual da empresa, sem criar
 export async function enderecoAtual(empId: string): Promise<string | null> {
@@ -136,6 +140,11 @@ export async function lojasNoAr(): Promise<{ slug: string; atualizadoEm: string 
     }
     if (slug && !vistos.has(slug)) { vistos.add(slug); out.push({ slug, atualizadoEm: new Date(t.atualizadoEm).toISOString().slice(0, 10) }); }
   }
+  // lote vencido (WE-13b): quem tem endereço e saiu da cidade ganha a página grátis antes de entrar na lista abaixo
+  const vencidos = await sql<{ usuarioId: string }[]>`SELECT DISTINCT a.usuario_id FROM terreno_arquivo a JOIN loja_endereco le ON le.empresa_id = 'emp_' || a.usuario_id AND le.atual
+    WHERE NOT EXISTS (SELECT 1 FROM loja_vitrine v WHERE v.usuario_id = a.usuario_id)
+      AND NOT EXISTS (SELECT 1 FROM terreno t WHERE t.usuario_id = a.usuario_id AND t.status = 'ativo' AND t.anexo_de IS NULL)`;
+  for (const v of vencidos) await paginaDoLoteVencido(v.usuarioId).catch(() => null);
   // as páginas grátis publicadas (Plano Vitrine, WE-13) das contas que não têm loja na cidade
   const pgs = await sql<{ empresaId: string; empresaNome: string; atualizadoEm: Date }[]>`SELECT v.empresa_id, v.empresa_nome, v.atualizado_em FROM loja_vitrine v
     JOIN usuario u ON u.id = v.usuario_id AND u.banido_em IS NULL WHERE v.publicada_em IS NOT NULL

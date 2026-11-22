@@ -28,7 +28,7 @@ import type { AreaId, Nivel } from "@/office/data/org";
 import { avisar, contatosNaFala } from "./conectores";
 import { numeroDaLoja, chaveDaLoja } from "@/office/data/numeroLoja";
 import { tetoDaEmpresa, MSG_SEM_UNIDADES, AVISO_UNIDADES } from "./unidadesIA";
-import { ehNumeroDePagina, ehChaveDePagina, paginaPorNumero, terrenoDaPagina, lojaNaCidade } from "./planoVitrine";
+import { ehNumeroDePagina, ehChaveDePagina, paginaPorNumero, terrenoDaPagina, lojaNaCidade, paginaDoUsuario } from "./planoVitrine";
 import { roteiroDono, roteiroVisitante } from "./escopoEquipe";
 import { PERSONALIDADE_POR_ID, personalidadeParaIA } from "@/office/data/personalidades";
 import { escopoDe } from "@/office/data/escopo";
@@ -400,10 +400,18 @@ export async function pedirRelatorio(u: Usuario, chave: string | null) {
   }
 }
 
+// quem lê as conversas dos visitantes: o dono da loja (lote ou quiosque) ou, sem loja na cidade, o dono da página grátis
+// (Plano Vitrine, WE-13b), que lê as da própria página
+async function empresaDasConversas(u: Usuario, chave: string | null) {
+  try { return await garantirEmpresaDoLote(await loteDoDono(u, chave)); } catch (e) {
+    const pg = !chave || ehChaveDePagina(chave) ? await paginaDoUsuario(u.id) : null;
+    if (pg?.publicadaEm && !(await lojaNaCidade(u.id))) return garantirEmpresaDoLote(terrenoDaPagina(pg));
+    throw e;
+  }
+}
 // visitante sem conta (WE-14): cada código anônimo é uma conversa, com o nome da conta técnica ("Visitante sem conta")
 export async function conversasDeVisitantes(u: Usuario, chave: string | null) {
-  const t = await loteDoDono(u, chave);
-  const empId = await garantirEmpresaDoLote(t);
+  const empId = await empresaDasConversas(u, chave);
   return sql<{ visitanteId: string; nome: string | null; n: number; ultimaEm: Date; ultimaFala: string | null }[]>`
     SELECT COALESCE(m.visitante_anonimo, m.visitante_id) AS visitante_id, COALESCE(p.nome, us.nome) AS nome, COUNT(*)::int AS n, MAX(m.criado_em) AS ultima_em,
       (SELECT x.conteudo FROM mensagem x JOIN agente y ON y.id = x.agente_id WHERE y.empresa_id = ${empId} AND x.visitante_id = m.visitante_id AND x.visitante_anonimo IS NOT DISTINCT FROM m.visitante_anonimo AND x.papel = 'user' ORDER BY x.criado_em DESC LIMIT 1) AS ultima_fala
@@ -412,8 +420,7 @@ export async function conversasDeVisitantes(u: Usuario, chave: string | null) {
     GROUP BY m.visitante_id, m.visitante_anonimo, p.nome, us.nome ORDER BY MAX(m.criado_em) DESC LIMIT 100`;
 }
 export async function conversaDeVisitante(u: Usuario, chave: string | null, visitanteId: string) {
-  const t = await loteDoDono(u, chave);
-  const empId = await garantirEmpresaDoLote(t);
+  const empId = await empresaDasConversas(u, chave);
   const anon = ehAnonimo(visitanteId);
   return sql<{ id: string; papel: string; conteudo: string; quem: string; criadoEm: Date }[]>`SELECT m.id, m.papel, m.conteudo, a.nome AS quem, m.criado_em
     FROM mensagem m JOIN agente a ON a.id = m.agente_id WHERE a.empresa_id = ${empId}
