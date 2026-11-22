@@ -269,6 +269,9 @@ export async function excluirConta(u: Usuario, conf: { senha?: unknown; palavra?
     await db`DELETE FROM chave_api WHERE usuario_id = ${uid}`;
     await db`DELETE FROM agente_contratado WHERE dono_id = ${uid}`; // os da empresa desta conta; os do dono anterior de um lote dela ficam com ele
     await db`DELETE FROM seguidor_envio WHERE dono_id = ${uid}`;
+    // interesse num plano (WE-19, 0061, junção v101): o contato que a pessoa deixou (nome, empresa, WhatsApp ou e-mail e a
+    // mensagem) não é registro fiscal; apaga pela conta e pelo e-mail dela (o formulário também aceita quem não entrou)
+    const planos = await db`DELETE FROM plano_contato WHERE usuario_id = ${uid} OR lower(btrim(contato)) = ${eu.email.toLowerCase()}`;
     // WhatsApp da loja (WE-18): conexão, números cifrados, conversas e registros; a Meta fica para depois da transação
     const whats = await apagarWhatsAppDaConta(db, empresas);
     desinscrever.push(...whats.desinscrever);
@@ -280,7 +283,7 @@ export async function excluirConta(u: Usuario, conf: { senha?: unknown; palavra?
     if (!fim) throw new ErroExclusao("Esta conta não existe mais.", 404);
 
     // ===== 4) o registro, sem dado pessoal =====
-    const r = { lotes: terrenos.count, empresas: empresas.length, pagamentos: pagamentos.count, assinaturas: assinaturas.count, assinaturasCanceladas, extratoCreditos: creditos.count, extratoUnidades: unidades.count, avisos: avisos.count, whatsapp: whats.conexoes, conversasWhatsapp: whats.contatos };
+    const r = { lotes: terrenos.count, empresas: empresas.length, pagamentos: pagamentos.count, planos: planos.count, assinaturas: assinaturas.count, assinaturasCanceladas, extratoCreditos: creditos.count, extratoUnidades: unidades.count, avisos: avisos.count, whatsapp: whats.conexoes, conversasWhatsapp: whats.contatos };
     await db`INSERT INTO conta_excluida (titular_hash, motivo, resumo) VALUES (${hash}, ${MOTIVO}, ${sql.json(r)}) ON CONFLICT (titular_hash) DO NOTHING`;
     return r;
   });
