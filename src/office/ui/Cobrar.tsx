@@ -10,14 +10,16 @@ import { useCreditos, fmtCreditos } from "../creditosStore";
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 // dados: atributos data-* que vão no botão principal (os testes e as telas acham o botão por eles)
-export function BotaoCobrar({ valor, rotuloPix, rotuloCreditos = "Pagar com créditos", pagando, onPagar, pixLigado = true, compacto = false, classe = "mt-2", dados }: {
-  valor: number; rotuloPix: string; rotuloCreditos?: string; pagando: boolean; onPagar: (creditos: boolean) => void; pixLigado?: boolean; compacto?: boolean; classe?: string; dados?: Record<`data-${string}`, string>;
+// WE-16 (22/11/2026): saldoInicial = o saldo que a página trouxe do servidor; vale só até o saldo da conta carregar aqui
+// (sem ele, a tela que já sai pronta mostrava o botão do Pix e trocava para o de créditos depois)
+export function BotaoCobrar({ valor, rotuloPix, rotuloCreditos = "Pagar com créditos", pagando, onPagar, pixLigado = true, compacto = false, classe = "mt-2", dados, saldoInicial = null }: {
+  valor: number; rotuloPix: string; rotuloCreditos?: string; pagando: boolean; onPagar: (creditos: boolean) => void; pixLigado?: boolean; compacto?: boolean; classe?: string; dados?: Record<`data-${string}`, string>; saldoInicial?: number | null;
 }) {
   const saldo = useCreditos((s) => s.saldo);
   const carregado = useCreditos((s) => s.carregado);
   const carregar = useCreditos((s) => s.carregar);
   useEffect(() => { if (!carregado) void carregar(); }, [carregado, carregar]);
-  const total = saldo?.total ?? 0;
+  const total = saldo?.total ?? (carregado ? 0 : saldoInicial ?? 0);
   const tudo = valor > 0 && total >= valor;
   const resto = Math.round((valor - total) * 100) / 100;
   const botao = `w-full rounded-xl px-3 font-bold text-white disabled:opacity-50 ${compacto ? "py-2 text-xs" : "py-2.5 text-sm"}`;

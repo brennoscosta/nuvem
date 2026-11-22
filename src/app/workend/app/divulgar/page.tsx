@@ -10,7 +10,10 @@ import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { meta } from "../../seo";
 import { Divulgar } from "./_divulgar";
-import { AnunciarNaPraca } from "./_anunciar";
+import { AnunciarNaPraca, type Painel as PainelAnuncios } from "./_anunciar";
+import { jsonInicial } from "@/server/http";
+import { dadosAnuncios } from "@/server/telasIniciais";
+import { saldoDe } from "@/server/creditos";
 import { numeroDaLoja, temNumero } from "@/office/data/numeroLoja";
 import { Icone } from "@/office/ui/Icone";
 
@@ -27,6 +30,8 @@ export default async function PaginaDivulgar() {
   const numero = t?.status === "ativo" ? numeroDaLoja(t) : null; // 0 = a sede da Social RP
   const codigo = temNumero(numero) ? await meuCodigo(u).catch(() => null) : null;
   const promo = promocaoValendo(t?.promocao ?? null);
+  // WE-16 (22/11/2026): os anúncios da praça já vêm na página (antes: 2,2 s em "Carregando…" no 4G)
+  const [anuncios, saldo] = t?.status === "ativo" ? await Promise.all([jsonInicial<PainelAnuncios>(dadosAnuncios(u)), saldoDe(u.id).then((x) => x.total).catch(() => null)]) : [null, null];
   return (
     <>
       <CabecalhoApp atual="app" email={u.email} admin={ehAdmin(u)} />
@@ -43,7 +48,7 @@ export default async function PaginaDivulgar() {
       ) : (
         <section className="faixa mt-8"><p className="max-w-[60ch] rounded-2xl bg-[#FFF4DB] px-4 py-3 text-[#7A5200]">O material de divulgação aparece quando a sua loja estiver aberta no mapa. <Link prefetch={false} href="/mundo" className="font-semibold underline">Escolher meu lote</Link></p></section>
       )}
-      {t?.status === "ativo" && <AnunciarNaPraca marca={{ empresa: t.empresaNome, cor: t.cor, logo: t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null, numero: LOTE_POR_CHAVE[t.chave]?.numero ?? null }} />}
+      {t?.status === "ativo" && <AnunciarNaPraca marca={{ empresa: t.empresaNome, cor: t.cor, logo: t.temLogo ? `/api/terrenos/${encodeURIComponent(t.chave)}/logo` : null, numero: LOTE_POR_CHAVE[t.chave]?.numero ?? null }} inicial={anuncios} saldoInicial={saldo} />}
       <div className="h-16" />
       <Rodape />
     </>

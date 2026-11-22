@@ -14,7 +14,7 @@
 import { ehSede, sedeDe } from "@/office/data/sedes";
 import { Icone } from "@/office/ui/Icone";
 import {
-  NIVEL_COR, NIVEL_ROTULO, agruparPorDepartamento, agruparPorTarefa, andamento, apiEquipe, brl, linhaDoTempo, quando, sugestoesTarefa, TextoIA,
+  NIVEL_COR, NIVEL_ROTULO, agruparPorDepartamento, membroDeInicio, agruparPorTarefa, andamento, apiEquipe, brl, linhaDoTempo, quando, sugestoesTarefa, TextoIA,
   type ContatosEquipe, type ConversaEquipe, type GrupoTarefa, type MembroEquipe, type MsgEquipe, type PainelEquipe, type RegraEquipe, type RespostaEnvio, type TrocaInterna,
 } from "@/office/ui/equipeComum";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -42,11 +42,14 @@ function Avatar({ m, tamanho = 44 }: { m: Membro; tamanho?: number }) { return <
 const SeloNivel = ({ m }: { m: Pick<Membro, "nivel"> }) => <span className="rounded-full px-2 py-[1px] align-middle text-[10.5px] font-semibold text-white" style={{ background: NIVEL_COR[m.nivel] }}>{NIVEL_ROTULO[m.nivel]}</span>;
 
 type AbaEquipe = "conversas" | "internas" | "visitantes" | "whatsapp" | "vagas" | "sobre" | "conectores";
-export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas = [], visitanteInicial = null }: { chaveInicial: string | null; membroInicial: string | null; abaInicial?: AbaEquipe; empresas?: { chave: string; nome: string; socio: boolean }[]; visitanteInicial?: string | null }) {
-  const [p, setP] = useState<Painel | null>(null);
+// WE-16 (22/11/2026): o que a página já traz do servidor (painel, conversas internas e a conversa da pessoa aberta); as
+// buscas de sempre continuam ao abrir e atualizam em segundo plano
+export type InicioEquipe = { painel: Painel | null; internas: TrocaInterna[] | null; conversa: { de: string; c: ConversaEquipe } | null };
+export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas = [], visitanteInicial = null, inicial = null }: { chaveInicial: string | null; membroInicial: string | null; abaInicial?: AbaEquipe; empresas?: { chave: string; nome: string; socio: boolean }[]; visitanteInicial?: string | null; inicial?: InicioEquipe | null }) {
+  const [p, setP] = useState<Painel | null>(inicial?.painel ?? null);
   const [erro, setErro] = useState<string | null>(null);
   const [aba, setAba] = useState<AbaEquipe>(abaInicial ?? "conversas");
-  const [sel, setSel] = useState<string | null>(membroInicial);
+  const [sel, setSel] = useState<string | null>(() => (inicial?.painel ? membroDeInicio(membroInicial, inicial.painel) : membroInicial));
   const lote = p?.lote.chave ?? chaveInicial;
   const q = lote ? `lote=${encodeURIComponent(lote)}` : "";
 
@@ -56,7 +59,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas
   useEffect(() => {
     let vivo = true;
     api<Painel>(`/api/workend/equipe?${q}`)
-      .then((d) => { if (!vivo) return; setP(d); setErro(null); setSel((s) => (s && d.equipe.some((m) => m.membroId === s) ? s : (d.equipe.find((m) => m.nivel === "ceo") ?? d.equipe[0])?.membroId ?? null)); })
+      .then((d) => { if (!vivo) return; setP(d); setErro(null); setSel((s) => membroDeInicio(s, d)); })
       .catch((e) => vivo && setErro((e as Error).message));
     return () => { vivo = false; };
   }, [q, versao]);
@@ -65,7 +68,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas
   const fecharComo = useCallback(() => setComo(false), []);
   const [envios, setEnvios] = useState(0);
   // conversas internas para o topo e a faixa "Agora na empresa": a cada 15 s, a cada 4 s enquanto há pedido aberto
-  const [internas, setInternas] = useState<TrocaInterna[] | null>(null);
+  const [internas, setInternas] = useState<TrocaInterna[] | null>(inicial?.internas ?? null);
   const [versaoInt, setVersaoInt] = useState(0);
   useEffect(() => {
     if (!q) return;
@@ -121,7 +124,7 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas
         </div>
       )}
 
-      {aba === "conversas" && membro && <Conversas key={`${membro.membroId}-${envios}`} p={p} membro={membro} q={q} selecionar={setSel} recarregar={carregar} />}
+      {aba === "conversas" && membro && <Conversas key={`${membro.membroId}-${envios}`} p={p} membro={membro} q={q} selecionar={setSel} recarregar={carregar} inicial={envios === 0 && inicial?.conversa?.de === membro.membroId ? inicial.conversa.c : null} />}
       {aba === "internas" && <Internas p={p} q={q} abrir={abrirPessoa} />}
       {aba === "visitantes" && <Visitantes q={q} lote={p.lote.chave} inicial={visitanteInicial} />}
       {aba === "whatsapp" && p.whatsapp && <WhatsAppLoja p={p} irParaConversas={() => setAba("visitantes")} />}
@@ -181,9 +184,9 @@ function ListaEquipe({ p, membro, selecionar }: { p: Painel; membro: Membro; sel
   );
 }
 
-function Conversas({ p, membro, q, selecionar, recarregar }: { p: Painel; membro: Membro; q: string; selecionar: (id: string) => void; recarregar: () => Promise<void> }) {
+function Conversas({ p, membro, q, selecionar, recarregar, inicial = null }: { p: Painel; membro: Membro; q: string; selecionar: (id: string) => void; recarregar: () => Promise<void>; inicial?: ConversaEquipe | null }) {
   // a conversa fica guardada com o id da pessoa: trocar de pessoa mostra "carregando" sem limpar o estado no efeito
-  const [conv, setConvBruto] = useState<{ de: string; c: ConversaEquipe } | null>(null);
+  const [conv, setConvBruto] = useState<{ de: string; c: ConversaEquipe } | null>(inicial ? { de: membro.membroId, c: inicial } : null);
   const c = conv?.de === membro.membroId ? conv.c : null;
   const setC = (f: (c: ConversaEquipe | null) => ConversaEquipe | null) => setConvBruto((x) => { const n = f(x?.de === membro.membroId ? x.c : null); return n ? { de: membro.membroId, c: n } : null; });
   const [texto, setTexto] = useState("");

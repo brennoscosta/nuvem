@@ -6,12 +6,18 @@ import { terrenoDoUsuario, empresasDoUsuario, ehAdmin } from "@/server/terrenos"
 import { PRECO_LOTE, precoCurto } from "@/office/data/precosTerreno";
 import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
-import { EquipePainel } from "./_equipe";
+import { EquipePainel, type InicioEquipe } from "./_equipe";
+import { painelEquipe, internasDoDono, conversaDoDono } from "@/server/equipeCliente";
+import { jsonInicial } from "@/server/http";
+import { membroDeInicio, type ConversaEquipe, type PainelEquipe, type TrocaInterna } from "@/office/ui/equipeComum";
 import { meta } from "../../seo";
 import "./equipe.css";
 
 export const metadata = meta({ titulo: "Minha equipe — WorkEnd", caminho: "/app/equipe", indexar: false });
 export const dynamic = "force-dynamic";
+
+// as abas que abrem sem a conversa (qualquer outro valor de ?aba= abre em Conversar e dar tarefas); "whatsapp" da WE-18
+const ABAS_SEM_CONVERSA = ["vagas", "visitantes", "sobre", "internas", "conectores", "whatsapp"];
 
 export default async function Equipe({ searchParams }: { searchParams: Promise<{ lote?: string; membro?: string; aba?: string; visitante?: string }> }) {
   const u = await usuarioAtual().catch(() => null);
@@ -22,6 +28,17 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
   const empresas = await empresasDoUsuario(u.id).catch(() => []);
   const inicial = sp.lote ?? (chao?.status === "ativo" ? chao.chave : empresas[0]?.chave) ?? null;
   const semLote = !inicial;
+  // WE-16 (22/11/2026): a tela já sai com o painel, as conversas internas e a conversa da pessoa aberta (antes: 2,4 a 2,8 s
+  // em "Carregando…" no 4G). O painel vem antes porque garante a empresa do lote, que as outras duas também usam.
+  let dados: InicioEquipe | null = null;
+  if (inicial) {
+    const painel = await jsonInicial<PainelEquipe>(painelEquipe(u, inicial));
+    if (painel) {
+      const de = membroDeInicio(sp.membro ?? null, painel), lote = painel.lote.chave;
+      const [int, c] = await Promise.all([jsonInicial<{ internas: TrocaInterna[] }>(internasDoDono(u, lote)), de && !ABAS_SEM_CONVERSA.includes(sp.aba ?? "") ? jsonInicial<ConversaEquipe>(conversaDoDono(u, lote, de)) : null]);
+      dados = { painel, internas: int?.internas ?? null, conversa: de && c ? { de, c } : null };
+    }
+  }
   return (
     <>
       <CabecalhoApp atual="equipe" email={u.email} admin={ehAdmin(u)} />
@@ -36,7 +53,7 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
           </div>
         </section>
       ) : (
-        <EquipePainel chaveInicial={inicial} empresas={empresas} membroInicial={sp.membro ?? null} abaInicial={sp.aba === "vagas" || sp.aba === "visitantes" || sp.aba === "sobre" || sp.aba === "internas" || sp.aba === "conectores" || sp.aba === "whatsapp" ? sp.aba : undefined}
+        <EquipePainel chaveInicial={inicial} empresas={empresas} membroInicial={sp.membro ?? null} inicial={dados} abaInicial={sp.aba === "vagas" || sp.aba === "visitantes" || sp.aba === "sobre" || sp.aba === "internas" || sp.aba === "conectores" || sp.aba === "whatsapp" ? sp.aba : undefined}
           visitanteInicial={sp.visitante && /^[A-Za-z0-9_-]{4,60}$/.test(sp.visitante) ? sp.visitante : null} />
       )}
       <div className="h-16" />

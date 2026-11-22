@@ -31,8 +31,9 @@ export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
   );
 }
 
-export async function Rodape() {
-  const logado = !!(await usuarioAtual().catch(() => null)); // quem já entrou não vê "Criar conta" nem "Entrar" (17/11/2026)
+// WE-16 (22/11/2026): quem já leu a sessão passa logado (a página inicial não consulta a mesma sessão duas vezes)
+export async function Rodape({ logado: dado }: { logado?: boolean } = {}) {
+  const logado = dado ?? !!(await usuarioAtual().catch(() => null)); // quem já entrou não vê "Criar conta" nem "Entrar" (17/11/2026)
   return (
     <footer className="rodape">
       <div className="faixa flex flex-wrap items-start gap-x-16 gap-y-7 pb-9 pt-10 text-[15px] text-[var(--muted)]">

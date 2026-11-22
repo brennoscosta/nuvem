@@ -11,3 +11,8 @@ export function erro(e: unknown, status = 500) {
 export async function corpo<T = Record<string, unknown>>(req: Request): Promise<T> {
   try { return (await req.json()) as T; } catch { return {} as T; }
 }
+// WE-16 (22/11/2026): dados para a página já sair pronta do servidor, no mesmo formato que a tela recebe da API (passa
+// por JSON: datas viram texto). Se der erro, null: a tela abre em "Carregando…" e busca a API, como antes.
+export async function jsonInicial<T>(p: Promise<unknown>): Promise<T | null> {
+  try { return JSON.parse(JSON.stringify(await p)) as T; } catch { return null; }
+}

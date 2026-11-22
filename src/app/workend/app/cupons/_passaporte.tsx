@@ -4,8 +4,10 @@
 // passaporte da cidade (src/server/passaporte.ts). O desconto e o Pix continuam do dono: o WorkEnd não recebe nada.
 import { useCallback, useEffect, useState } from "react";
 
-export function useCupomPassaporte(versao: number) {
-  const [marcado, setMarcado] = useState<string | null>(null);
+// WE-16 (22/11/2026): inicial = o cupom marcado que a página já trouxe do servidor (sem ele, a lista saía pronta e o bloco
+// mostrava "Oferecer na recepção" em todos os cupons até esta busca voltar)
+export function useCupomPassaporte(versao: number, inicial: string | null = null) {
+  const [marcado, setMarcado] = useState<string | null>(inicial);
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => {
     let vivo = true;

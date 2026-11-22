@@ -5,6 +5,7 @@
 // evento ver_preco da WE-01.
 // Marca nova do designer (logotipo em contornos, azul #0A6CFF). Números vêm do banco.
 import Link from "next/link";
+import { preload } from "react-dom";
 import { usuarioAtual } from "@/server/usuarios";
 import { sql, migrar, temBanco } from "@/server/db";
 import { LOTES } from "@/office/data/mundo";
@@ -54,6 +55,7 @@ const CORES_PREDIO: Record<LayoutId, [string, string]> = {
   basico: ["#EEF0F3", "#B4BCC8"], varanda: ["#F3F1EC", "#C9C2B4"], estudio: ["#E4E5E8", "#6B6F78"], auditorio: ["#ECE9E3", "#A8A196"],
   mercado: ["#FBEEDC", "#E7B36A"], galeria: ["#F2F1EE", "#BDB8AE"], escola: ["#F6EEDB", "#E2B35A"],
 };
+const POSTER = "/workend/como-funciona.jpg";
 const EXTENSO = ["", "Um", "Dois", "Três", "Quatro", "Cinco", "Seis", "Sete", "Oito", "Nove", "Dez", "Onze", "Doze", "Treze", "Catorze", "Quinze", "Dezesseis", "Dezessete", "Dezoito", "Dezenove", "Vinte"];
 const porExtenso = (n: number) => EXTENSO[n] ?? String(n);
 
@@ -102,6 +104,9 @@ function CenaRede() {
 
 export default async function Inicio() {
   const u = await usuarioAtual().catch(() => null);
+  // WE-16 (22/11/2026): o pôster do vídeo é o maior elemento da abertura (LCP) no celular e no computador. Ele só era
+  // pedido ao chegar no <video>, com prioridade baixa e atrás das imagens da galeria; agora vai no <head> com prioridade alta
+  preload(POSTER, { as: "image", fetchPriority: "high" });
   const livres = await lotesLivres();
   // oferta de entrada (12/11/2026): as 10 primeiras empresas pagam R$ 49,90 no 1º mês
   const restamFundador = temBanco() ? await vagasFundador().catch(() => 0) : 0;
@@ -141,7 +146,7 @@ export default async function Inicio() {
           </div>
           <Rolagem className="faixa wh-video">
             <div className="wc-tela">
-              <VideoExplica src="/workend/como-funciona.mp4" poster="/workend/como-funciona.jpg" />
+              <VideoExplica src="/workend/como-funciona.mp4" poster={POSTER} />
               <Link prefetch={false} href="/mundo" className="wi-btn wi-btn-vidro wc-btn">Passear pelo mapa agora<span aria-hidden>→</span></Link>
             </div>
           </Rolagem>
@@ -236,7 +241,7 @@ export default async function Inicio() {
           <div className="wfim-marca" aria-hidden><Logotipo altura={240} /></div>
         </section>
       </main>
-      <Rodape />
+      <Rodape logado={!!u} />
     </div>
   );
 }

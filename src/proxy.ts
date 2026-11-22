@@ -5,13 +5,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ehHostWorkend } from "@/server/hosts";
 import { PALAVRAS_RESERVADAS, ENDERECO_SEDES, slugValido } from "@/office/data/slugLoja";
 
+// o mesmo nome de src/server/usuarios.ts (COOKIE); o proxy não importa o módulo do servidor (banco e cripto)
+const COOKIE_SESSAO = "workend_sessao";
+
 export function proxy(req: NextRequest) {
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
   if (!ehHostWorkend(host, req.nextUrl.searchParams)) return NextResponse.next();
   const r = rotaWorkend(req);
   // "Indique um vizinho" (12/11/2026): ?ind=CODIGO guarda por 30 dias quem indicou; vale no 1º pagamento do lote
   const ind = req.nextUrl.searchParams.get("ind");
-  if (ind && /^[A-Z0-9]{4,10}$/i.test(ind)) r.cookies.set("we_ind", ind.toUpperCase(), { maxAge: 30 * 86400, httpOnly: true, sameSite: "lax", secure: true, path: "/" });
+  if (ind && /^[A-Z0-9]{4,10}$/i.test(ind)) { r.cookies.set("we_ind", ind.toUpperCase(), { maxAge: 30 * 86400, httpOnly: true, sameSite: "lax", secure: true, path: "/" }); r.headers.delete("cache-control"); } // WE-16: resposta que grava cookie não vai para cache compartilhado
   return r;
 }
 
@@ -31,6 +34,17 @@ function rotaWorkend(req: NextRequest) {
   if (p === "/encontrar" || /^\/loja\/\d{1,5}$/.test(p)) { url.pathname = "/workend" + p; return reescrever(url); }
   // perfil público do cadastro (20/11/2026): /perfil/<apelido>
   if (/^\/perfil\/[a-z0-9-]{3,40}\/?$/.test(p)) { url.pathname = "/workend" + p.replace(/\/$/, ""); return reescrever(url); }
+  // WE-16 (22/11/2026): "/" sem o cookie de sessão é a mesma página para qualquer visitante (nada de quem vê): pode ir
+  // para cache compartilhado (nginx ou CDN na frente) por 60 s, servindo a velha por até 1 dia enquanto busca a nova; o
+  // navegador sempre confere de novo (max-age=0). O Next não troca um Cache-Control que já veio na resposta, mas grava o
+  // Vary por cima: o cache da frente TEM de ignorar o cache quando houver o cookie workend_sessao (ver o relatório da WE-16).
+  // Com o cookie (mesmo vencido) e na navegação interna do Next (RSC: o Next tira o cabeçalho RSC antes do proxy, mas ela
+  // não pede text/html), fica o padrão do Next: sem cache.
+  if (p === "/" && !req.cookies.has(COOKIE_SESSAO) && (req.headers.get("accept") ?? "").includes("text/html")) {
+    url.pathname = "/workend"; const r = reescrever(url);
+    r.headers.set("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=86400");
+    return r;
+  }
   // /emails: preferências dos avisos por e-mail, pelo link assinado do rodapé (WE-17, 21/11/2026); /planos: a escada de planos (WE-19)
   // /status: página pública de status dos serviços (WE-23, 22/11/2026)
   if (p === "/" || p === "/cadastro" || p === "/entrar" || p === "/politicas" || p === "/esqueci" || p === "/redefinir" || p === "/emails" || p === "/planos" || p === "/status") { url.pathname = "/workend" + (p === "/" ? "" : p); return reescrever(url); }

@@ -5,7 +5,10 @@ import { ehAdmin } from "@/server/terrenos";
 import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { meta } from "../../seo";
-import { PainelCupons } from "./_cupons";
+import { PainelCupons, type Dados as DadosCupons } from "./_cupons";
+import { jsonInicial } from "@/server/http";
+import { dadosCupons } from "@/server/telasIniciais";
+import { cupomMarcadoDoDono } from "@/server/passaporte";
 import { Icone } from "@/office/ui/Icone";
 
 export const metadata = meta({ titulo: "Cupons — WorkEnd", caminho: "/app/cupons", indexar: false });
@@ -14,6 +17,8 @@ export const dynamic = "force-dynamic";
 export default async function Cupons() {
   const u = await usuarioAtual().catch(() => null);
   if (!u) redirect("/entrar?destino=/app/cupons");
+  // WE-16 (22/11/2026): os cupons e o do passaporte já vêm na página (antes: 2,0 s em "Carregando…" no 4G)
+  const [inicial, passaporte] = await Promise.all([jsonInicial<DadosCupons>(dadosCupons(u)), cupomMarcadoDoDono(u).catch(() => null)]);
   return (
     <>
       <CabecalhoApp atual="app" email={u.email} admin={ehAdmin(u)} />
@@ -24,7 +29,7 @@ export default async function Cupons() {
         <p className="pg-sub">Crie até 3 cupons para a sua loja. Quem pega recebe um código só dele; na hora da compra, você confere o código aqui e ele fica marcado como usado.</p>
         </div>
       </section>
-      <PainelCupons />
+      <PainelCupons inicial={inicial} passaporteInicial={passaporte} />
       <div className="h-16" />
       <Rodape />
     </>

@@ -46,6 +46,9 @@ export const quando = (iso: string) => {
 };
 const semAcento = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
+// WE-16 (22/11/2026): quem abre selecionado na Minha equipe: a pessoa pedida (se está na equipe), senão o CEO, senão a
+// primeira. A página (app/workend/app/equipe/page.tsx) usa a mesma regra para já trazer do servidor a conversa dela.
+export const membroDeInicio = (pedido: string | null, p: Pick<PainelEquipe, "equipe">) => (pedido && p.equipe.some((m) => m.membroId === pedido) ? pedido : (p.equipe.find((m) => m.nivel === "ceo") ?? p.equipe[0])?.membroId ?? null);
 export async function apiEquipe<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { ...init, headers: { "content-type": "application/json", ...(init?.headers ?? {}) }, cache: "no-store" });
   const j = await r.json().catch(() => ({}));

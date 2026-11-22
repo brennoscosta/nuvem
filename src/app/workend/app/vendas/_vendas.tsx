@@ -15,7 +15,7 @@ type PedidoDono = {
   subtotal: number; desconto: number; total: number; cupom: string | null; pix: string | null; temPix: boolean; criadoEm: string; pagoEm: string | null; atualizadoEm: string;
   canceladoPor: string | null; clienteNome: string; clienteContato: string; whatsapp: string | null; email: string | null;
 };
-type Dados = { pix: Pix; contagem: Record<Status | "todos", number>; somas: { aguardando: number; recebido30: number }; pedidos: PedidoDono[] };
+export type Dados = { pix: Pix; contagem: Record<Status | "todos", number>; somas: { aguardando: number; recebido30: number }; pedidos: PedidoDono[] };
 
 const TIPOS: { id: TipoChave; nome: string; exemplo: string; teclado: "text" | "numeric" | "email" | "tel" }[] = [
   { id: "cpf", nome: "CPF", exemplo: "000.000.000-00", teclado: "numeric" },
@@ -44,8 +44,9 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return j as T;
 }
 
-export function PainelVendas({ pedidoInicial, statusInicial, temLoja }: { pedidoInicial: string | null; statusInicial: string | null; temLoja: boolean }) {
-  const [dados, setDados] = useState<Dados | null>(null);
+// WE-16 (22/11/2026): os dados já vêm do servidor (a tela não abre em "Carregando…"); a busca de sempre atualiza ao abrir
+export function PainelVendas({ pedidoInicial, statusInicial, temLoja, inicial = null }: { pedidoInicial: string | null; statusInicial: string | null; temLoja: boolean; inicial?: Dados | null }) {
+  const [dados, setDados] = useState<Dados | null>(inicial);
   const [erroLista, setErroLista] = useState<string | null>(null);
   const [versao, setVersao] = useState(0);
   const [filtro, setFiltro] = useState<Status | "todos">(FILTROS.some((f) => f.id === statusInicial) ? (statusInicial as Status) : "todos");

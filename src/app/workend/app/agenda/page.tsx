@@ -7,7 +7,9 @@ import { terrenoDoUsuario, ehAdmin } from "@/server/terrenos";
 import { PRECO_LOTE, precoCurto } from "@/office/data/precosTerreno";
 import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
-import { AgendaDono } from "./_agenda";
+import { AgendaDono, type Dados as DadosAgenda } from "./_agenda";
+import { agendaDoDono } from "@/server/agenda";
+import { jsonInicial } from "@/server/http";
 import { meta } from "../../seo";
 
 export const metadata = meta({ titulo: "Agenda da loja — WorkEnd", caminho: "/app/agenda", indexar: false });
@@ -18,6 +20,8 @@ export default async function Agenda() {
   if (!u) redirect("/entrar?destino=/app/agenda");
   const chao = await terrenoDoUsuario(u.id).catch(() => null);
   const ativo = chao?.status === "ativo";
+  // WE-16 (22/11/2026): a agenda já vem na página (antes: 2,1 s em "Carregando a agenda…" no 4G)
+  const inicial = ativo ? await jsonInicial<DadosAgenda>(agendaDoDono(u)) : null;
   return (
     <>
       <CabecalhoApp atual="app" email={u.email} admin={ehAdmin(u)} />
@@ -30,7 +34,7 @@ export default async function Agenda() {
           </div>
         </section>
       ) : (
-        <AgendaDono />
+        <AgendaDono inicial={inicial} />
       )}
       <div className="h-16" />
       <Rodape />

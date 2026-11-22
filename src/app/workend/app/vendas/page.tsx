@@ -8,7 +8,9 @@ import { terrenoDoUsuario, ehAdmin } from "@/server/terrenos";
 import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { meta } from "../../seo";
-import { PainelVendas } from "./_vendas";
+import { PainelVendas, type Dados as DadosVendas } from "./_vendas";
+import { vendasDoDono } from "@/server/pedidos";
+import { jsonInicial } from "@/server/http";
 import { Icone } from "@/office/ui/Icone";
 import { numeroDaLoja, rotuloLoja, temNumero } from "@/office/data/numeroLoja";
 
@@ -23,6 +25,9 @@ export default async function Vendas({ searchParams }: Props) {
   const chao = await terrenoDoUsuario(u.id).catch(() => null);
   const ativo = chao?.status === "ativo" ? chao : null;
   const numero = ativo ? numeroDaLoja(ativo) : null;
+  // WE-16 (22/11/2026): os pedidos já vêm na página, como o GET de /api/workend/vendas (sem filtro) os devolve (antes: 2,1 s
+  // em "Carregando as vendas…" no 4G)
+  const inicial = await jsonInicial<DadosVendas>(vendasDoDono(u, null));
   return (
     <>
       <CabecalhoApp atual="app" email={u.email} admin={ehAdmin(u)} />
@@ -41,7 +46,7 @@ export default async function Vendas({ searchParams }: Props) {
           </div>
         </div>
       </section>
-      <PainelVendas pedidoInicial={q.pedido ?? null} statusInicial={q.status ?? null} temLoja={!!ativo} />
+      <PainelVendas pedidoInicial={q.pedido ?? null} statusInicial={q.status ?? null} temLoja={!!ativo} inicial={inicial} />
       <div className="h-16" />
       <Rodape />
     </>

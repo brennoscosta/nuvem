@@ -10,11 +10,16 @@ const pc = (x: number, y: number) => ({ left: `${((x / W) * 100).toFixed(2)}%`, 
 
 const Cursor = () => <svg className="wp-cursor" viewBox="0 0 24 24" width="30" height="30"><path d="M4 2l15 11-6.5 1.2L16 21l-2.6 1.1-3-6.6L5 20z" fill="#121419" stroke="#fff" strokeWidth="1.4" strokeLinejoin="round" /></svg>;
 
+// WE-16 (22/11/2026): tamanhos certos. A cena tem ~350 px no celular (até 1050 px de tela) e ~640 px no computador; o
+// arquivo de 1600 px só é preciso no computador com tela de alta densidade. As versões de 800 e 1200 px são o mesmo desenho.
+const TAMANHO_PASSO = "(min-width: 900px) min(640px, 54vw), calc(100vw - 2.5rem)";
+const fontesPasso = (n: string) => `/workend/passos/${n}-800.webp 800w, /workend/passos/${n}-1200.webp 1200w, /workend/passos/${n}.webp 1600w`;
+
 // Passo 1: o cursor clica no lote vazio, ele acende em azul e vira "Sua empresa"
 export function CenaLote() {
   return (
     <div className="wi-cena wp-arte wp-lote" aria-hidden>
-      <img src="/workend/passos/lote.webp" alt="Quarteirão da cidade 3D do WorkEnd com um lote livre para reservar" loading="lazy" decoding="async" draggable={false} />
+      <img src="/workend/passos/lote.webp" srcSet={fontesPasso("lote")} sizes={TAMANHO_PASSO} alt="Quarteirão da cidade 3D do WorkEnd com um lote livre para reservar" loading="lazy" decoding="async" draggable={false} />
       <svg className="wp-lote-marca" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"><polygon points="1157,1025 1497,1204 1182,1407 841,1195" /></svg>
       <i className="wp-toque" style={pc(1180, 1225)} />
       <span className="wp-pino" style={pc(1172, 1105)}><b>Sua empresa</b><small>Lote 12 · livre agora</small></span>
@@ -48,7 +53,7 @@ export function CenaFachada() {
   }, []);
   return (
     <div ref={caixa} className="wi-cena wp-arte wp-fachada" aria-hidden>
-      <img src="/workend/passos/fachada.webp" alt="Fachada de um prédio do WorkEnd com o letreiro onde vai o nome da empresa" loading="lazy" decoding="async" draggable={false} />
+      <img src="/workend/passos/fachada.webp" srcSet={fontesPasso("fachada")} sizes={TAMANHO_PASSO} alt="Fachada de um prédio do WorkEnd com o letreiro onde vai o nome da empresa" loading="lazy" decoding="async" draggable={false} />
       <div className="wp-placa" style={{ width: PW, height: PH, transform: m || undefined, visibility: m ? "visible" : "hidden" }}>
         <Maquina textos={["Padaria do Bairro", "Studio Ana", "Oficina 77", "Clínica Sorriso"]} />
         <b />
@@ -68,7 +73,7 @@ export function CenaEquipe() {
   const porta = pc(870, 1270);
   return (
     <div className="wi-cena wp-arte wp-equipe" aria-hidden>
-      <img src="/workend/passos/equipe.webp" alt="Prédio por dentro, com a sala de cada setor da equipe" loading="lazy" decoding="async" draggable={false} />
+      <img src="/workend/passos/equipe.webp" srcSet={fontesPasso("equipe")} sizes={TAMANHO_PASSO} alt="Prédio por dentro, com a sala de cada setor da equipe" loading="lazy" decoding="async" draggable={false} />
       {SALAS.map((s, k) => {
         const alvo = pc(s.tx, s.ty), rot = pc(s.lx, s.ly);
         return (

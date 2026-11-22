@@ -5,6 +5,8 @@
 import * as THREE from "three";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Html, Text } from "@react-three/drei";
+import { preload as preCarregar } from "suspend-react";
+import { preloadFont } from "troika-three-text";
 import { caixa, cilindro, esfera, mat, plano, toro } from "./geo";
 import { Arvore } from "./Entorno";
 import { natalAtivo, NatalLote, NatalLetreiro } from "./Natal";
@@ -39,6 +41,13 @@ import { usePoseAoVivo, useFantasma } from "./EditorPosicao";
 import { useEdicao } from "../edicaoStore";
 
 const FONTE = "/fonts/inter-700.woff";
+// WE-16 (22/11/2026): o <Text> do drei suspende até a fonte chegar e gerar as primeiras letras (suspend com a chave
+// ["troika-text", fonte, characters]). O 1º <Text> do mapa é o letreiro de um prédio de lote, então a fonte só começava a
+// carregar quando a cena montava, e os prédios de TODOS os lotes (um só limite de carregamento em Mundo.tsx) esperavam
+// juntos: no servidor sem placa de vídeo, a fonte só era pedida com o mapa pronto e os prédios vinham 9 s depois. Aqui o pedido sai
+// quando este código é avaliado, antes de a cena montar, com a mesma chave: quando o letreiro monta, já está pronto. Se a
+// chave do drei mudar numa atualização, isto só esquenta a fonte (o letreiro espera menos, como antes). Não desenha nada.
+if (typeof window !== "undefined") preCarregar(() => new Promise<void>((pronto) => preloadFont({ font: FONTE }, pronto)), ["troika-text", FONTE, undefined]);
 const { x0: X0, x1: X1, z0: Z0, z1: Z1 } = PREDIO_CLIENTE;
 const LARG = X1 - X0, PROF = Z1 - Z0;
 

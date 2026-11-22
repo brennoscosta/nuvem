@@ -16,7 +16,7 @@ import { desenharAnuncio, desenharEventoDestaque, desenharPatrocinio, desenharPl
 
 export type MarcaDivulgar = { empresa: string; cor: string; logo: string | null; numero: number | null };
 interface Meu { id: string; tipo: TipoAnuncio; formato: FormatoAnuncio; frase: string; inicio: string; dias: number; valor: string; status: string; motivo: string; eventoTitulo: string | null; reservadoAte: string | null }
-interface Painel { anuncios: Meu[]; eventos: { id: string; titulo: string; inicio: string; fim: string; destacado: boolean }[]; patrocinioLivreDesde: string; hoje: string; pagamento: boolean }
+export interface Painel { anuncios: Meu[]; eventos: { id: string; titulo: string; inicio: string; fim: string; destacado: boolean }[]; patrocinioLivreDesde: string; hoje: string; pagamento: boolean }
 interface Pix { id: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; anuncio: string; status: "pendente" | "aprovado" | "falhou"; creditos?: number }
 type Opcao = TipoAnuncio | "outdoor";
 
@@ -78,8 +78,9 @@ function Telao({ children, rotulo }: { children: React.ReactNode; rotulo: string
   );
 }
 
-export function AnunciarNaPraca({ marca }: { marca: MarcaDivulgar }) {
-  const [painel, setPainel] = useState<Painel | null>(null);
+// WE-16 (22/11/2026): os dados já vêm do servidor (a tela não abre em "Carregando…"); a busca de sempre atualiza ao abrir
+export function AnunciarNaPraca({ marca, inicial = null, saldoInicial = null }: { marca: MarcaDivulgar; inicial?: Painel | null; saldoInicial?: number | null }) {
+  const [painel, setPainel] = useState<Painel | null>(inicial);
   const [opcao, setOpcao] = useState<Opcao>("telao");
   const [formato, setFormato] = useState<FormatoAnuncio>("modelo");
   const [frase, setFrase] = useState("");
@@ -145,7 +146,8 @@ export function AnunciarNaPraca({ marca }: { marca: MarcaDivulgar }) {
     pintar();
   }, [tipo, formato, frase, urlArquivo, marca, nomeEvento, evento]);
 
-  const saldoCreditos = useCreditos((s) => s.saldo?.total ?? 0);
+  // WE-16: até o saldo da conta carregar aqui, vale o que a página trouxe do servidor (a tela já sai pronta)
+  const saldoCreditos = useCreditos((s) => s.saldo?.total ?? (s.carregado ? 0 : saldoInicial ?? 0));
   const comprar = async (creditos = false) => {
     if (!tipo) return;
     setErro(null);
@@ -241,7 +243,7 @@ export function AnunciarNaPraca({ marca }: { marca: MarcaDivulgar }) {
                 {tipo === "patrocinio" && painel && painel.patrocinioLivreDesde > painel.hoje && <p className="mt-2 text-[13px] text-[var(--tinta-2)]">A praça já tem patrocinador até {dm(painel.patrocinioLivreDesde)}: o seu período começa a partir desse dia.</p>}
                 {erro && <div role="alert" className="mt-3 rounded-xl bg-[#FDE8E8] px-3 py-2 text-[14px] text-[#8A2A2A]">{erro}</div>}
                 <div className="mt-4 flex flex-wrap items-center gap-3">
-                  {painel && <BotaoCobrar classe="w-full max-w-xs" valor={total} rotuloPix={`Pagar ${brl(total)} no Pix`} rotuloCreditos="Pagar com créditos" pagando={enviando} pixLigado={painel.pagamento !== false} dados={{ "data-comprar": "" }} onPagar={(c) => void comprar(c)} />}
+                  {painel && <BotaoCobrar saldoInicial={saldoInicial} classe="w-full max-w-xs" valor={total} rotuloPix={`Pagar ${brl(total)} no Pix`} rotuloCreditos="Pagar com créditos" pagando={enviando} pixLigado={painel.pagamento !== false} dados={{ "data-comprar": "" }} onPagar={(c) => void comprar(c)} />}
                   <span className="text-[13px] text-[var(--tinta-2)]">{tipo === "telao" ? `${dias} dia${dias > 1 ? "s" : ""} a partir de ${dataInicio ? dm(dataInicio) : "hoje"}` : tipo === "destaque" ? (evento ? `chamada desde 48 h antes de ${quandoEvento(evento.inicio)}` : "") : `${DIAS_PATROCINIO} dias`}</span>
                 </div>
                 {pix && <PixBox pix={pix} aoMudar={mudarPix} aoFechar={() => setPix(null)} />}

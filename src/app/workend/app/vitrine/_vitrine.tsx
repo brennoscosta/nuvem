@@ -10,7 +10,7 @@ import { Icone } from "@/office/ui/Icone";
 
 type Produto = ProdutoVitrine & { ativo: boolean; ordem: number };
 // gratis: a página grátis (Plano Vitrine, WE-13), sem lote; endereco: workend.online/<slug> (WE-11)
-type Dados = { lote: { chave: string; numero: number | null; ativo: boolean; empresa: string; cor: string } | null; whatsapp: string | null; max: number; produtos: Produto[]; gratis?: boolean; endereco?: string | null };
+export type Dados = { lote: { chave: string; numero: number | null; ativo: boolean; empresa: string; cor: string } | null; whatsapp: string | null; max: number; produtos: Produto[]; gratis?: boolean; endereco?: string | null };
 type Rascunho = { id?: string; nome: string; preco: string; descricao: string; ativo: boolean; fotoNova: string | null; fotoAtual: string | null; removerFoto: boolean };
 const VAZIO: Rascunho = { nome: "", preco: "", descricao: "", ativo: true, fotoNova: null, fotoAtual: null, removerFoto: false };
 const LIMITE_FOTO = 195 * 1024; // um pouco abaixo dos 200 KB do servidor
@@ -50,8 +50,9 @@ function precoDoTexto(s: string): number | null {
   const n = Number(t); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
 }
 
-export function VitrinePainel() {
-  const [dados, setDados] = useState<Dados | null>(null);
+// WE-16 (22/11/2026): os dados já vêm do servidor (a tela não abre em "Carregando…"); a busca de sempre atualiza ao abrir
+export function VitrinePainel({ inicial = null }: { inicial?: Dados | null } = {}) {
+  const [dados, setDados] = useState<Dados | null>(inicial);
   const [erroLista, setErroLista] = useState<string | null>(null);
   const [versao, setVersao] = useState(0);
   const [r, setR] = useState<Rascunho | null>(null); // null = formulário fechado

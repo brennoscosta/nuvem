@@ -10,8 +10,8 @@ type Saldo = { comprado: number; bonus: number; total: number };
 type Lanc = { id: string; tipo: string; comprado: number; bonus: number; saldoComprado: number; saldoBonus: number; descricao: string; motivo: string | null; criadoEm: string };
 type Devolvivel = { pagamentoId: string; restante: number; valorReais: number; prazoAte: string };
 type Pacote = { id: string; creditos: number; bonus: number };
-type DadosCred = { saldo: Saldo; extrato: Lanc[]; devolviveis: Devolvivel[]; pacotes: Pacote[]; regras: string[]; diasDevolucao: number; pagamento: boolean; admin: boolean };
-type DadosIA = { semLote?: boolean; imagem?: { custoBrl: number; unidades: number }; chave?: string; empresa?: string; saldo?: { inclusa: number; comprada: number; total: number; baseMes: number; cobrada: boolean }; usadasMes?: number; respostas?: number; mensalidade?: number; aviso?: boolean; esgotado?: boolean;
+export type DadosCred = { saldo: Saldo; extrato: Lanc[]; devolviveis: Devolvivel[]; pacotes: Pacote[]; regras: string[]; diasDevolucao: number; pagamento: boolean; admin: boolean };
+export type DadosIA = { semLote?: boolean; imagem?: { custoBrl: number; unidades: number }; chave?: string; empresa?: string; saldo?: { inclusa: number; comprada: number; total: number; baseMes: number; cobrada: boolean }; usadasMes?: number; respostas?: number; mensalidade?: number; aviso?: boolean; esgotado?: boolean;
   pacotes?: { id: string; unidades: number; creditos: number }[]; porAgente?: { agenteId: string; nome: string; nomeCategoria: string; usadas: number; vezes: number }[]; extrato?: { id: string; tipo: string; unidades: number; descricao: string; criadoEm: string }[] };
 type Pix = { id: string; valor: number; codigo: string; qrBase64: string; expiraEm: string; status?: string; creditos?: number };
 
@@ -51,9 +51,10 @@ function PixDaPagina({ pix, aoPagar, fechar }: { pix: Pix; aoPagar: () => void; 
   );
 }
 
-export function PainelCreditos() {
-  const [c, setC] = useState<DadosCred | null>(null);
-  const [ia, setIa] = useState<DadosIA | null>(null);
+// WE-16 (22/11/2026): os dados já vêm do servidor (a tela não abre em "Carregando…"); a busca de sempre atualiza ao abrir
+export function PainelCreditos({ inicial = null }: { inicial?: { c: DadosCred | null; ia: DadosIA | null } | null } = {}) {
+  const [c, setC] = useState<DadosCred | null>(inicial?.c ?? null);
+  const [ia, setIa] = useState<DadosIA | null>(inicial?.ia ?? null);
   const [versao, setVersao] = useState(0);
   const [pix, setPix] = useState<(Pix & { de: string }) | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -120,7 +121,7 @@ export function PainelCreditos() {
                 {(ia.pacotes ?? []).map((p) => (
                   <li key={p.id} className="rounded-xl bg-white/[0.06] p-3" data-pacote-ia={p.id}>
                     <div className="flex items-center justify-between text-[13.5px]"><span><b>{num(p.unidades)}</b> unidades</span><span className="text-white/70">{fmtCreditos(paraAdmin(c.admin, p.creditos))} créditos</span></div>
-                    <BotaoCobrar valor={paraAdmin(c.admin, p.creditos)} rotuloPix={`Comprar · ${brl(paraAdmin(c.admin, p.creditos))} no Pix`} rotuloCreditos="Comprar" compacto pixLigado={c.pagamento} pagando={!!ocupado} onPagar={(cr) => void comprarUnidades(p.id, cr)} />
+                    <BotaoCobrar saldoInicial={c.saldo.total} valor={paraAdmin(c.admin, p.creditos)} rotuloPix={`Comprar · ${brl(paraAdmin(c.admin, p.creditos))} no Pix`} rotuloCreditos="Comprar" compacto pixLigado={c.pagamento} pagando={!!ocupado} onPagar={(cr) => void comprarUnidades(p.id, cr)} />
                   </li>
                 ))}
               </ul>

@@ -6,7 +6,7 @@ import { MAX_SERVICOS, DURACOES, PASSOS, ANTECEDENCIAS, DIAS_FRENTE, NOMES_DIAS,
 import { Icone } from "@/office/ui/Icone";
 
 type Ag = { id: string; servico: string; preco: string; inicio: string; quando: string; dia: string; nome: string; contato: string; obs: string; status: string; origem: string; canceladoPor: string | null; passou: boolean };
-type Dados = { config: ConfigAgenda; usavel: boolean; loja: { chave: string; numero: number | null; empresa: string } | null; proximos: Ag[]; historico: Ag[] };
+export type Dados = { config: ConfigAgenda; usavel: boolean; loja: { chave: string; numero: number | null; empresa: string } | null; proximos: Ag[]; historico: Ag[] };
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { ...init, headers: { "content-type": "application/json", ...(init?.headers ?? {}) }, cache: "no-store" });
@@ -28,8 +28,9 @@ function HoraSelect({ valor, mudar, rotulo }: { valor: string | undefined; mudar
 }
 const COR_STATUS: Record<string, string> = { marcado: "bg-[#EEF3FF] text-[#1D4ED8]", cancelado: "bg-[#FDECEC] text-[#9B1C1C]", concluido: "bg-[#E3F6EA] text-[#166534]", faltou: "bg-[#FFF4DB] text-[#7A5A00]" };
 
-export function AgendaDono() {
-  const [dados, setDados] = useState<Dados | null>(null);
+// WE-16 (22/11/2026): os dados já vêm do servidor (a tela não abre em "Carregando…"); a busca de sempre atualiza ao abrir
+export function AgendaDono({ inicial = null }: { inicial?: Dados | null } = {}) {
+  const [dados, setDados] = useState<Dados | null>(inicial);
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [versao, setVersao] = useState(0);
   const [rascunho, setRascunho] = useState<ConfigAgenda | null>(null);

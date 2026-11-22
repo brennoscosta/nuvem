@@ -134,9 +134,12 @@ function NovaTarefa({ p, enviado }: { p: PainelEquipe; enviado: (id: string) => 
 function Organograma({ p, internas, abrir }: { p: PainelEquipe; internas: TrocaInterna[] | null; abrir: (id: string) => void }) {
   const caixa = useRef<HTMLDivElement>(null);
   const [tam, setTam] = useState({ w: 520, h: 380 });
+  // WE-16 (22/11/2026): a equipe agora já sai do servidor (sem "Carregando…"): os nós só aparecem depois da 1ª medida da
+  // caixa, senão no celular eles ficavam na largura suposta de 520 px, para fora da tela, até o JavaScript medir
+  const [medido, setMedido] = useState(false);
   useEffect(() => {
     const el = caixa.current; if (!el) return;
-    const ro = new ResizeObserver(([e]) => setTam({ w: Math.round(e.contentRect.width), h: Math.round(e.contentRect.height) }));
+    const ro = new ResizeObserver(([e]) => { setTam({ w: Math.round(e.contentRect.width), h: Math.round(e.contentRect.height) }); setMedido(true); });
     ro.observe(el); return () => ro.disconnect();
   }, []);
   const raiz = raizDe(p);
@@ -169,6 +172,7 @@ function Organograma({ p, internas, abrir }: { p: PainelEquipe; internas: TrocaI
   return (
     <div ref={caixa} className="eq-org" style={altura ? { minHeight: altura } : undefined} aria-label="Organograma da equipe">
       <span className="eq-org-titulo"><Icone nome="equipe" tamanho={14} />Quem responde a quem</span>
+      {medido && <>
       <svg className="eq-org-linhas" viewBox={`0 0 ${w} ${h}`} aria-hidden>
         {pos.map((q, i) => {
           const y0 = raizXY.y + tamRaiz * 0.75, y1 = q.y - tamFilho * 0.35, meio = (y0 + y1) / 2;
@@ -194,6 +198,7 @@ function Organograma({ p, internas, abrir }: { p: PainelEquipe; internas: TrocaI
         );
       })}
       {!estreito && <span className="eq-org-legenda">{vivos.size ? "As linhas acesas são departamentos trabalhando agora." : "Toque em alguém para conversar ou dar uma tarefa."}</span>}
+      </>}
     </div>
   );
 }

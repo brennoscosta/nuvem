@@ -9,7 +9,7 @@ const reais = (c: number) => (c / 100).toLocaleString("pt-BR", { style: "currenc
 const noPedido = (c: CupomDono) => { const b = c.descontoPct ? `${c.descontoPct}%` : c.descontoCentavos ? reais(c.descontoCentavos) : null; return b ? `No pedido pela atendente: ${b} de desconto${c.minimoCentavos ? ` a partir de ${reais(c.minimoCentavos)}` : ""}` : "Só de balcão"; };
 const FORM_VAZIO = { titulo: "", regra: "", validade: "", limite: "", descontoTipo: "" as "" | "pct" | "valor", descontoValor: "", minimo: "" };
 type Meu = { codigo: string; titulo: string; regra: string; validade: string; usado: boolean; vencido: boolean; empresa: string; numero: number | null };
-type Dados = { temLoja: boolean; daLoja: CupomDono[]; meus: Meu[] };
+export type Dados = { temLoja: boolean; daLoja: CupomDono[]; meus: Meu[] };
 const dataBR = (d: string) => d.split("-").reverse().join("/");
 // a data de hoje no horário de Brasília (para o mínimo do campo de validade)
 const hojeBR = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
@@ -21,15 +21,16 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return j as T;
 }
 
-export function PainelCupons() {
-  const [dados, setDados] = useState<Dados | null>(null);
+// WE-16 (22/11/2026): os dados já vêm do servidor (a tela não abre em "Carregando…"); a busca de sempre atualiza ao abrir
+export function PainelCupons({ inicial = null, passaporteInicial = null }: { inicial?: Dados | null; passaporteInicial?: string | null } = {}) {
+  const [dados, setDados] = useState<Dados | null>(inicial);
   const [versao, setVersao] = useState(0);
   const [codigo, setCodigo] = useState("");
   const [resultado, setResultado] = useState<{ ok: boolean; t: string } | null>(null);
   const [form, setForm] = useState(FORM_VAZIO);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-  const pass = useCupomPassaporte(versao); // cupom do passaporte da cidade (frente visitante)
+  const pass = useCupomPassaporte(versao, passaporteInicial); // cupom do passaporte da cidade (frente visitante)
   useEffect(() => {
     let vivo = true;
     api<Dados>("/api/workend/cupons").then((d) => vivo && setDados(d)).catch(() => vivo && setDados({ temLoja: false, daLoja: [], meus: [] }));
