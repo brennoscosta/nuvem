@@ -4,7 +4,7 @@
 // consulta falhar, o painel abre do mesmo jeito (só aquela parte fica vazia).
 import { sql, migrar } from "./db";
 import type { Usuario } from "./usuarios";
-import { ehAdmin, type Terreno } from "./terrenos";
+import { ehAdmin, PRECO_LOTE, type Terreno } from "./terrenos";
 import { resultadosDoDono, vendasDoMes, type Serie } from "./resultados";
 import { vitrineResumo } from "./vitrine";
 import { cuponsDoDono } from "./cupons";
@@ -37,7 +37,7 @@ export async function ofertaDeEntrada(u: Usuario) {
 export async function painelReserva(u: Usuario, t: Terreno) {
   const c = await seguro(cotacaoLote(u, t.chave, 1), null, "cotacao");
   const ate = t.reservadoAte ? new Date(t.reservadoAte).getTime() : 0;
-  return { valor: c?.valor ?? null, base: c?.base ?? 99, oferta: c?.oferta ? { nome: c.oferta.nome, detalhe: c.oferta.detalhe } : null, creditoUsado: c?.creditoUsado ?? 0, restaMs: ate ? Math.max(0, ate - Date.now()) : null };
+  return { valor: c?.valor ?? null, base: c?.base ?? PRECO_LOTE, oferta: c?.oferta ? { nome: c.oferta.nome, detalhe: c.oferta.detalhe } : null, creditoUsado: c?.creditoUsado ?? 0, restaMs: ate ? Math.max(0, ate - Date.now()) : null };
 }
 
 export type Numero = { total: number; anterior: number; serie: { rotulo: string; n: number }[] };

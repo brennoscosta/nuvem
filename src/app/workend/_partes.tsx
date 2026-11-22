@@ -43,6 +43,7 @@ export async function Rodape() {
         <nav className="flex flex-col [&_a]:py-2" aria-label="Rodapé">
           {logado ? <Link href="/app">Meu escritório</Link> : <><Link href="/cadastro">Criar conta</Link><Link href="/entrar">Entrar</Link></>}
           <Link prefetch={false} href="/mundo">Passear pelo mapa</Link>
+          <Link href="/planos">Planos e preços</Link>
           <Link prefetch={false} href={DEMO}>Conhecer uma empresa por dentro</Link>
           <Link href="/politicas">Políticas de uso</Link>
           {/* mudar a escolha de cookies a qualquer momento (WE-01, LGPD) */}

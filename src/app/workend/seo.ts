@@ -1,5 +1,6 @@
 // SEO do WorkEnd: base dos metadados, imagem OG e dados estruturados (JSON-LD). Usado pelo layout e pelas páginas.
 import type { Metadata } from "next";
+import { PRECO_LOTE, PRECO_QUIOSQUE, precoCurto } from "@/office/data/precosTerreno";
 
 export const SITE = "https://workend.online";
 export const NOME = "WorkEnd";
@@ -37,6 +38,11 @@ export function meta(d: { titulo?: string; descricao?: string; caminho: string; 
   };
 }
 
+// oferta mensal com priceSpecification (UnitPriceSpecification, cobrança por mês)
+const oferta = (name: string, valor: number, description: string) => ({
+  "@type": "Offer", name, price: String(valor), priceCurrency: "BRL", url: `${SITE}/planos`, description,
+  priceSpecification: { "@type": "UnitPriceSpecification", price: String(valor), priceCurrency: "BRL", unitCode: "MON", referenceQuantity: { "@type": "QuantitativeValue", value: 1, unitCode: "MON" } },
+});
 // Dados estruturados da landing: organização, site e o produto (aplicação web, grátis pra entrar).
 export function jsonLdLanding() {
   const org = { "@type": "Organization", "@id": `${SITE}/#org`, name: NOME, url: SITE, logo: `${SITE}/workend/marca/workend-icone-512.png`, email: "contato@workend.online", sameAs: [] as string[] };
@@ -44,7 +50,13 @@ export function jsonLdLanding() {
   const app = {
     "@type": "SoftwareApplication", "@id": `${SITE}/#app`, name: NOME, url: SITE, applicationCategory: "BusinessApplication", operatingSystem: "Web",
     description: DESCRICAO, inLanguage: "pt-BR", image: `${SITE}${OG.url}`,
-    offers: { "@type": "Offer", price: "99", priceCurrency: "BRL", description: "Conta grátis. Lote no mapa por R$ 99 ao mês." },
+    // WE-19 (22/11/2026): a escada de planos; preços das constantes (data/precosTerreno.ts). O Equipe e a Sede não entram
+    // (o Equipe só aparece com o WhatsApp ligado e não tem cobrança; a Sede é sob consulta)
+    offers: [
+      { "@type": "Offer", name: "Vitrine", price: "0", priceCurrency: "BRL", url: `${SITE}/planos`, description: "Página da loja grátis, com 3 produtos e o botão do WhatsApp." },
+      oferta("Quiosque", PRECO_QUIOSQUE, `Quiosque na cidade por ${precoCurto(PRECO_QUIOSQUE)} ao mês.`),
+      oferta("Loja", PRECO_LOTE, `Lote no mapa por ${precoCurto(PRECO_LOTE)} ao mês, com prédio, fachada e equipe de IA.`),
+    ],
     publisher: { "@id": `${SITE}/#org` },
   };
   const pagina = { "@type": "WebPage", "@id": `${SITE}/#page`, url: SITE, name: TITULO, description: DESCRICAO, inLanguage: "pt-BR", isPartOf: { "@id": `${SITE}/#site` }, about: { "@id": `${SITE}/#app` }, primaryImageOfPage: `${SITE}${OG.url}` };

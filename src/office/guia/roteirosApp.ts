@@ -4,8 +4,9 @@
 import { cartaoDoTitulo, linkDaBarra, menuDaBarra, porTexto, primeiro } from "./alvos";
 import { PRECO_TELAO_DIA, SEGUNDOS_SLOT } from "../data/telao";
 import type { Roteiro } from "./tipos";
+import { PRECO_LOTE, precoCurto } from "../data/precosTerreno";
 
-const LOTE = "R$ 99 por mês"; // src/server/terrenos.ts › PRECO_LOTE
+const LOTE = `${precoCurto(PRECO_LOTE)} por mês`; // data/precosTerreno.ts › PRECO_LOTE (WE-19)
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const barra = (href: string) => () => linkDaBarra(href);
 const PERFIL_PAINEL = '[data-teste="perfil-falta"], [data-teste="perfil-completo"]';

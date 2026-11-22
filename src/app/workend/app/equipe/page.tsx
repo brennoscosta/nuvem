@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { usuarioAtual } from "@/server/usuarios";
 import { terrenoDoUsuario, empresasDoUsuario, ehAdmin } from "@/server/terrenos";
+import { PRECO_LOTE, precoCurto } from "@/office/data/precosTerreno";
 import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { EquipePainel } from "./_equipe";
@@ -29,7 +30,7 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
           <div className="rounded-2xl bg-[var(--cinza)] p-8">
             <h1 className="text-[2rem]">Sua equipe de IA mora no seu lote</h1>
             <p className="mt-3 max-w-[60ch] text-[var(--tinta-2)]">
-              {chao ? "Seu lote está reservado. Pague o 1º mês no mapa e a equipe começa a trabalhar na hora: CEO, atendente e os especialistas que você contratar." : "Escolha um lote no mapa (R$ 99 por mês). Ele vem com CEO e atendente de IA, e você contrata os especialistas que quiser, com R$ 10 de IA por mês incluídos."}
+              {chao ? "Seu lote está reservado. Pague o 1º mês no mapa e a equipe começa a trabalhar na hora: CEO, atendente e os especialistas que você contratar." : `Escolha um lote no mapa (${precoCurto(PRECO_LOTE)} por mês). Ele vem com CEO e atendente de IA, e você contrata os especialistas que quiser, com R$ 10 de IA por mês incluídos.`}
             </p>
             <Link href={chao ? `/mundo?lote=${encodeURIComponent(chao.chave)}` : "/mundo"} className="btn btn-azul mt-6">{chao ? "Pagar o 1º mês no mapa" : "Escolher meu lote"}</Link>
           </div>

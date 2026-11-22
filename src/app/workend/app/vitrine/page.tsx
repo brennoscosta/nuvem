@@ -8,6 +8,7 @@ import { Rodape } from "../../_partes";
 import { CabecalhoApp } from "../../_cabecalho";
 import { VitrinePainel } from "./_vitrine";
 import { paginaDoUsuario } from "@/server/planoVitrine";
+import { PRECO_LOTE, precoCurto } from "@/office/data/precosTerreno";
 import { meta } from "../../seo";
 
 export const metadata = meta({ titulo: "Vitrine — WorkEnd", caminho: "/app/vitrine", indexar: false });
@@ -27,7 +28,7 @@ export default async function Vitrine() {
           <div className="rounded-2xl bg-[var(--cinza)] p-8">
             <h1 className="text-[2rem]">A vitrine fica dentro da sua loja</h1>
             <p className="mt-3 max-w-[60ch] text-[var(--tinta-2)]">
-              {chao ? "Seu lote está reservado. Pague o 1º mês no mapa e monte a vitrine: até 12 produtos com foto e preço, e o botão Pedir no WhatsApp." : "Publique a página grátis da sua empresa em Meu escritório e mostre 3 produtos sem pagar nada. Com um lote no mapa (R$ 99 por mês), a vitrine mostra até 12, e o cliente pede direto no seu WhatsApp."}
+              {chao ? "Seu lote está reservado. Pague o 1º mês no mapa e monte a vitrine: até 12 produtos com foto e preço, e o botão Pedir no WhatsApp." : `Publique a página grátis da sua empresa em Meu escritório e mostre 3 produtos sem pagar nada. Com um lote no mapa (${precoCurto(PRECO_LOTE)} por mês), a vitrine mostra até 12, e o cliente pede direto no seu WhatsApp.`}
             </p>
             <Link href={chao ? `/mundo?lote=${encodeURIComponent(chao.chave)}` : "/app#pagina-gratis"} className="btn btn-azul mt-6">{chao ? "Pagar o 1º mês no mapa" : "Publicar a página grátis"}</Link>
           </div>

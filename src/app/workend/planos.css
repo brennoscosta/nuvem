@@ -1,0 +1,84 @@
+/* Escada de planos (WE-19, 22/11/2026): os degraus são prédios que crescem lado a lado sobre a mesma calçada, da Vitrine
+   grátis à Sede. No celular viram uma pilha, e uma barra à esquerda de cada degrau mostra a altura dele. Escopo .wi .wpl,
+   com as cores da página inicial (inicio.css). */
+.wi .wpl-escada { list-style: none; margin: 0; padding: 0; display: grid; gap: .8rem; }
+.wi .wpl-degrau { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 1.05rem; padding: 1.5rem 1.35rem 1.55rem 2rem; border-radius: 26px; background: var(--papel-3); border: 1px solid var(--linha); }
+.wi .wpl-degrau::before { content: ""; position: absolute; left: .8rem; bottom: 1.5rem; width: 5px; height: calc(16% + var(--n) * 15%); max-height: calc(100% - 3rem); border-radius: 3px; background: var(--azul); }
+.wi .wpl-cab { display: grid; gap: .35rem; }
+.wi .wpl-cab h3 { font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; color: var(--tinta-2); }
+.wi .wpl-valor { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .5rem; }
+.wi .wpl-valor b { font-weight: 700; font-size: clamp(2.5rem, 3.4vw, 3.15rem); line-height: .95; letter-spacing: -.055em; color: var(--tinta); }
+.wi .wpl-valor span { color: var(--tinta-2); font-size: .95rem; }
+.wi .wpl-frase { color: var(--tinta-2); line-height: 1.45; font-size: .98rem; }
+.wi .wpl-mais { margin-bottom: .6rem; font-size: .82rem; font-weight: 650; letter-spacing: .02em; text-transform: uppercase; color: var(--tinta-3); }
+.wi .wpl-corpo .wi-lista { gap: .6rem; font-size: .96rem; }
+.wi .wpl-acao { margin-top: auto; padding-top: .3rem; }
+.wi .wpl .wi-btn { height: auto; min-height: 50px; padding: .7rem 1.3rem; white-space: normal; text-align: center; line-height: 1.2; max-width: 100%; }
+.wi .wpl .wi-fundador { margin: 0; }
+
+/* cada degrau tem o seu acabamento: papel, areia, tinta (a Loja), azul claro (Equipe) e o traço do que é sob consulta */
+.wi .wpl-quiosque { background: var(--papel-2); border-color: rgba(18,20,25,.08); }
+.wi .wpl-loja { background: var(--tinta); border-color: var(--tinta); color: #fff; box-shadow: 0 50px 90px -50px rgba(18,20,25,.8); }
+.wi .wpl-loja::before { background: #8EBBFF; }
+.wi .wpl-loja .wpl-cab h3 { color: #8EBBFF; }
+.wi .wpl-loja .wpl-valor b { color: #fff; }
+.wi .wpl-loja .wpl-valor span, .wi .wpl-loja .wpl-frase { color: rgba(255,255,255,.72); }
+.wi .wpl-loja .wpl-mais { color: rgba(255,255,255,.5); }
+.wi .wpl-loja .wi-lista li::before { background: rgba(255,255,255,.12); }
+.wi .wpl-loja .wi-lista li::after { border-color: #8EBBFF; }
+.wi .wpl-equipe { background: var(--azul-claro); border-color: rgba(10,108,255,.18); }
+.wi .wpl-equipe .wpl-cab h3 { color: var(--azul-escuro); }
+.wi .wpl-sede { background: transparent; border: 1.5px dashed rgba(18,20,25,.3); }
+.wi .wpl-sede .wpl-valor b { font-size: clamp(1.9rem, 2.6vw, 2.3rem); letter-spacing: -.04em; }
+
+/* formulário "Fale com a gente" dentro do degrau */
+.wi .wpl-form { display: grid; gap: .7rem; }
+.wi .wpl-form .wi-campo input, .wi .wpl-form .wi-campo textarea { width: 100%; min-width: 0; font-size: 16px; }
+.wi .wpl-form .wi-campo textarea { font: inherit; font-size: 16px; font-weight: 500; color: var(--tinta); padding: .7rem 1rem; border-radius: 14px; border: 1px solid var(--linha); background: #fff; outline: none; resize: vertical; }
+.wi .wpl-form .wi-campo textarea:focus { border-color: var(--azul); box-shadow: 0 0 0 4px rgba(10,108,255,.16); }
+.wi .wpl-form .wi-btn { justify-self: start; }
+.wi .wpl-form .wi-btn[disabled] { opacity: .6; cursor: default; transform: none; }
+.wi .wpl-isca { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.wi .wpl-erro { padding: .55rem .8rem; border-radius: 12px; background: #FDE8E8; color: #8A2A2A; font-size: .9rem; line-height: 1.4; }
+.wi .wpl-feito { padding: .8rem 1rem; border-radius: 14px; background: #EAF7EE; color: #166534; font-size: .95rem; line-height: 1.45; }
+
+/* âncora: o preço de uma agência de IA ao lado do WorkEnd, na mesma régua */
+.wi .wpl-ancora { margin-top: clamp(3rem, 6vw, 4.5rem); display: grid; gap: 1.6rem; padding: clamp(1.5rem, 4vw, 2.6rem); border-radius: 32px; background: linear-gradient(135deg, var(--oceano-1), var(--oceano-2) 65%, var(--oceano-3)); color: #fff; }
+.wi .wpl-ancora h3 { color: #fff; font-size: clamp(1.45rem, 2.6vw, 2.1rem); line-height: 1.12; letter-spacing: -.035em; text-wrap: balance; }
+.wi .wpl-ancora h3 em { font-style: normal; font-weight: 300; color: #8EBBFF; }
+.wi .wpl-ancora-texto p { margin-top: .8rem; color: rgba(255,255,255,.75); line-height: 1.55; max-width: 52ch; }
+.wi .wpl-barras { display: grid; gap: 1.1rem; align-content: center; }
+.wi .wpl-barra { display: grid; grid-template-columns: 1fr auto; gap: .45rem 1rem; align-items: baseline; }
+.wi .wpl-barra-nome { font-weight: 600; font-size: .95rem; color: rgba(255,255,255,.85); }
+.wi .wpl-barra b { font-size: .95rem; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+.wi .wpl-trilho { grid-column: 1 / -1; position: relative; height: 12px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }
+.wi .wpl-trilho i { position: absolute; top: 0; bottom: 0; left: calc(var(--ini) * 100%); width: max(10px, calc((var(--fim) - var(--ini)) * 100%)); border-radius: 999px; background: rgba(255,255,255,.55); }
+.wi .wpl-barra.nossa .wpl-trilho i { background: #8EBBFF; box-shadow: 0 0 14px rgba(142,187,255,.8); }
+.wi .wpl-barra.nossa b { color: #8EBBFF; }
+
+/* avulsos: uma linha corrida, sem cartões */
+.wi .wpl-avulsos { margin-top: clamp(2.5rem, 5vw, 3.5rem); display: grid; gap: 1rem; padding-top: 1.6rem; border-top: 1px solid var(--linha); }
+.wi .wpl-avulsos h3 { font-size: 1.2rem; }
+.wi .wpl-avulsos ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem 1.6rem; color: var(--tinta-2); line-height: 1.5; }
+.wi .wpl-avulsos li b { color: var(--tinta); font-weight: 650; }
+.wi .wpl-avulsos > p { color: var(--tinta-2); line-height: 1.55; max-width: 70ch; }
+.wi .wpl-avulsos > p b { color: var(--tinta); }
+
+@media (min-width: 760px) {
+  .wi .wpl-ancora { grid-template-columns: 1fr 1.1fr; align-items: center; gap: 2.4rem; }
+}
+/* computador: os degraus lado a lado, cada um mais alto que o anterior, com a base na mesma calçada. A altura vem da
+   margem de cima (o maior degrau não tem margem), então a escada fica certa mesmo com textos de tamanhos diferentes */
+@media (min-width: 1100px) {
+  .wi .wpl-escada { grid-template-columns: repeat(var(--qtd), minmax(0, 1fr)); align-items: stretch; gap: 0; border-bottom: 2px solid var(--tinta); }
+  .wi .wpl-degrau { margin-top: calc((var(--qtd) - 1 - var(--n)) * 2.6rem); border-radius: 26px 26px 0 0; border-bottom: 0; padding: 1.6rem 1.25rem 1.7rem; }
+  .wi .wpl-degrau + .wpl-degrau { margin-left: -1px; }
+  .wi .wpl-degrau::before { display: none; }
+  .wi .wpl-sede { border-bottom: 0; }
+}
+
+/* página /planos: o título é h1 com o mesmo desenho do h2 da página inicial */
+.wi .wpl-pagina { padding-top: clamp(2rem, 5vw, 4rem); }
+.wi .wpl-titulo { font-family: var(--sans); font-weight: 680; font-size: clamp(2.2rem, 5.2vw, 4.3rem); line-height: 1.02; letter-spacing: -.048em; color: var(--tinta); text-wrap: balance; }
+.wi .wpl-titulo em { font-style: normal; font-weight: 300; color: var(--azul); }
+.wi .wpl-volta { margin-top: 1.4rem; }

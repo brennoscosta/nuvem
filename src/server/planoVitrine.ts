@@ -3,7 +3,7 @@
 //  - 3 produtos na vitrine (PRODUTOS_VITRINE_GRATIS; com lote ou quiosque, até 12: vitrine.ts › MAX_PRODUTOS);
 //  - a atendente de IA respondendo na página, com UNIDADES_MES_VITRINE unidades por mês (≈ 100 respostas: unidadesIA.ts).
 //    Acabou: o roteiro sem IA, como em qualquer loja sem unidades.
-// Não tem lote nem quiosque na cidade: o lote (R$ 99) e o quiosque (R$ 47) continuam pagos e iguais.
+// Não tem lote nem quiosque na cidade: o lote (R$ 97 desde a WE-19) e o quiosque (R$ 47) continuam pagos.
 // Modelo: tabela loja_vitrine (migração 0055_plano_vitrine), uma por conta, com a marca e a atendente enquanto não há lote.
 // A empresa é a mesma da conta (emp_<usuário>, equipeCliente.ts › empresaIdDe): o endereço, a vitrine (produto.usuario_id),
 // o "Sobre" e os contatos já são da conta. Reservar um lote ou quiosque (terrenos.ts › reservarTerreno) leva a mesma loja

@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   type Url = { loc: string; freq: string; prio: string; mod: string };
   let urls: Url[];
   if (ehHostWorkend(host)) {
-    const fixas: Url[] = [["/", "weekly", "1.0"], ["/cadastro", "monthly", "0.8"], ["/entrar", "monthly", "0.3"], ["/encontrar", "daily", "0.7"]]
+    const fixas: Url[] = [["/", "weekly", "1.0"], ["/cadastro", "monthly", "0.8"], ["/entrar", "monthly", "0.3"], ["/encontrar", "daily", "0.7"], ["/planos", "monthly", "0.7"]]
       .map(([c, freq, prio]) => ({ loc: `${SITE}${c}`, freq, prio, mod: hoje }));
     const lojas = await lojasNoAr().catch((e: Error) => { console.error("[sitemap]", e.message); return []; });
     urls = [...fixas, ...lojas.map((l) => ({ loc: `${SITE}/${l.slug}`, freq: "weekly", prio: "0.6", mod: l.atualizadoEm }))];

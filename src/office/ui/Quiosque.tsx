@@ -9,7 +9,7 @@ import { useEscritorio } from "../store";
 import { usePersonagem } from "../personagemStore";
 import { QUIOSQUES, QUIOSQUE_POR_CHAVE, NOME_AREA_QUIOSQUE, NOME_MODELO_QUIOSQUE, PRECO_QUIOSQUE, QUIOSQUE_LARGURA, QUIOSQUE_FUNDO, balcaoDoQuiosque, ehQuiosque, type QuiosqueInfo } from "../data/quiosques";
 import { nomeNicho, LOTE } from "../data/mundo";
-import { PRECO_LOTE_EXTRA } from "../data/precosTerreno";
+import { PRECO_LOTE } from "../data/precosTerreno";
 import { Icone } from "./Icone";
 import { FLUTUANTE, ESTREITO } from "./estilo";
 import { PixAberto, LojaNoMapa, AcoesAdminLote } from "./Lote";
@@ -96,7 +96,7 @@ export function CartaoQuiosque() {
           <div className="mt-2 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm">
             <div className="flex items-center justify-between"><span className="text-[#5B6472]">Mensalidade</span><span className="font-semibold">{brl(preco)}/mês</span></div>
             <div className="mt-1 flex items-center justify-between text-xs"><span className="text-[#5B6472]">Equipe</span><span className="font-semibold text-[#1D2128]">só a atendente</span></div>
-            <div className="mt-1.5 text-[11px] leading-snug text-[#5B6472]">Reserva de 1 hora para pagar com créditos ou Pix, aqui no mapa. Sem pagamento, o quiosque volta a ficar livre. Quer prédio com mais gente na equipe? O lote custa {brl(PRECO_LOTE_EXTRA)}/mês.</div>
+            <div className="mt-1.5 text-[11px] leading-snug text-[#5B6472]">Reserva de 1 hora para pagar com créditos ou Pix, aqui no mapa. Sem pagamento, o quiosque volta a ficar livre. Quer prédio com mais gente na equipe? O lote custa {brl(PRECO_LOTE)}/mês.</div>
           </div>
           {usuario?.banidoEm ? (
             <div className="mt-3 rounded-xl bg-[#FDE8E8] px-3 py-2 text-xs text-[#8A2A2A]">Sua conta está suspensa por descumprir as políticas de uso. Fale com contato@workend.online.</div>

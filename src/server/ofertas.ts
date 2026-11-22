@@ -1,7 +1,7 @@
 // Oferta de entrada e "Indique um vizinho" (12/11/2026, preços decididos pelo Claude a pedido do dono):
 //  - Preço de fundador: as 10 primeiras empresas novas pagam R$ 49,90 no 1º mês.
 //  - Da feira para o lote: quem já teve barraca paga na feira de sábado paga R$ 69,90 no 1º mês.
-//  - Indicação: quem chega pelo link de uma empresa do mapa tem 10% no 1º mês (R$ 89,10). As ofertas não somam: vale a menor.
+//  - Indicação: quem chega pelo link de uma empresa do mapa tem 10% no 1º mês (R$ 87,30 desde a WE-19). As ofertas não somam: vale a menor.
 //  - Quem indicou ganha R$ 20 de desconto por empresa indicada que pagar (o dono não quis mês grátis). O crédito é usado
 //    nas próximas mensalidades, até metade de cada pagamento; o que sobra fica para a próxima.
 // Oferta de 1º mês só vale para um lote novo (reservado, não ampliação) de quem nunca teve lote. A conta admin vê e

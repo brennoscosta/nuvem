@@ -1,4 +1,4 @@
-// Resultados da loja (12/11/2026, ideia do dono): o que o lote de R$ 99/mês trouxe — visitas por dia, conversas com a
+// Resultados da loja (12/11/2026, ideia do dono): o que o lote (PRECO_LOTE por mês) trouxe — visitas por dia, conversas com a
 // atendente de IA, candidaturas às vagas, cliques nos contatos e na vitrine e agendamentos. Mais os próximos passos
 // e o "Indique um vizinho" (link, quem chegou e o desconto acumulado).
 // 17/11/2026 (pedido do dono: vendas e resultados para as empresas): no topo, "Quanto a sua equipe trouxe" em reais —

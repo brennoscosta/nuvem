@@ -42,6 +42,7 @@ import { OUTDOOR_POR_ID, type OutdoorPublico } from "./data/outdoors";
 import { PRACA_CHAVE } from "./data/praca";
 import { useCreditos, novoIdem } from "./creditosStore";
 import { QUIOSQUE_POR_CHAVE, balcaoDoQuiosque, ehQuiosque } from "./data/quiosques";
+import { PRECO_LOTE } from "./data/precosTerreno";
 import { medir, medirUmaVez } from "@/lib/medir";
 import { aplicarPosesCidade } from "./data/posesCidade";
 // trava de seleção do modo "Editar posição" (edicaoStore liga e desliga)
@@ -176,7 +177,7 @@ export const useMundo = create<Estado>((set, get) => ({
       void get().carregarOutdoors(); return null;
     } catch (e) { return (e as Error).message; } finally { set({ pagando: false }); }
   },
-  terrenos: {}, meu: null, meus: [], usuario: null, admin: false, pagamentoLigado: false, preco: 99, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, configurarEmpresa: false, rascunho: null, alvoCamera: null, giroCamera: null, versaoSedes: 0,
+  terrenos: {}, meu: null, meus: [], usuario: null, admin: false, pagamentoLigado: false, preco: PRECO_LOTE, fundador: null, minutosReserva: 10, desvioRelogio: 0, pagando: false, pix: null, painelEscritorio: false, abaEscritorio: "predio", rascunhoEscritorio: null, salvandoEscritorio: false, carregado: false, loteSelecionado: null, loteHover: null, painelEmpresa: false, configurarEmpresa: false, rascunho: null, alvoCamera: null, giroCamera: null, versaoSedes: 0,
 
   carregar: async () => {
     void get().carregarOutdoors();
@@ -193,7 +194,7 @@ export const useMundo = create<Estado>((set, get) => ({
       // quiosques e sedes vão para a posição gravada (data/posesCidade.ts, 21/11/2026)
       const poses = aplicarPosesCidade(terrenos);
       if (poses.sedes) set({ versaoSedes: get().versaoSedes + 1 });
-      set({ terrenos, vagas: t.vagas ?? {}, meu: t.meu ?? null, meus: Array.isArray(t.meus) ? t.meus : t.meu ? [t.meu] : [], usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? 99, fundador: t.fundador ?? null, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
+      set({ terrenos, vagas: t.vagas ?? {}, meu: t.meu ?? null, meus: Array.isArray(t.meus) ? t.meus : t.meu ? [t.meu] : [], usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? PRECO_LOTE, fundador: t.fundador ?? null, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
       // veio do cadastro com ?lote=: já abre o lote escolhido
       const busca = primeira && typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
       const sedePedida = sedeDoParametro(busca?.get("sede")); // ?sede=1 (Social RP) ou ?sede=<id da sede>

@@ -7,7 +7,7 @@
 //    CRESCER DEPOIS: pôr mais um quiosque num quarto livre (até 4), o prédio médio numa metade livre, posicionar cada estrutura
 //    (modo "Editar posição") e trocar tudo pelo prédio grande. O botão "Usar este espaço" do chão (scene/QuartosLote.tsx)
 //    abre aqui o quarto escolhido.
-// Preço: nada disso cobra. O lote continua R$ 99/mês (decisão do dono) e trocar o modelo do prédio segue a regra das trocas.
+// Preço: nada disso cobra. O lote continua no preço de sempre (PRECO_LOTE, decisão do dono) e trocar o modelo do prédio segue a regra das trocas.
 // Quem confere e grava é o servidor (src/server/quartos.ts e src/server/terrenos.ts › salvarEscritorio).
 import { create } from "zustand";
 import { useState } from "react";

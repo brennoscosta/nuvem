@@ -1,7 +1,7 @@
 // Lote em quartos (21/11/2026, pedido do dono: "Quando comprarem um terreno desse, a pessoa pode usar 1/4 dessas áreas e,
 // se quiser colocar só um quiosque, a pessoa pode, e fica sobrando 3/4 do terreno para ser usado ainda"). O lote de
 // 20 × 20 m se divide em 4 quartos de 10 × 10 m (2 × 2); os quartos livres servem para CRESCER DEPOIS, sem comprar outro
-// lote (o lote continua R$ 99/mês). Três tamanhos:
+// lote (o lote continua no preço de sempre, PRECO_LOTE). Três tamanhos:
 //  - quiosque: 1 quarto, com o desenho dos quiosques da orla (data/quiosques.ts) e a atendente no balcão; até 4 por lote;
 //  - prédio médio: 2 quartos, uma das metades (norte, sul, leste ou oeste), com os modelos que cabem em meio lote
 //    (data/modelos.ts › MODELOS_MEDIO) e a planta de dentro compacta (data/escritorio.ts › PREDIO_MEDIO);

@@ -12,6 +12,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { sql, id, migrar } from "./db";
 import { segredoSessao } from "./segredo";
 import { identificacao } from "@/app/workend/_empresa";
+import { PRECO_LOTE } from "@/office/data/precosTerreno";
 
 const SITE = "https://workend.online";
 
@@ -162,7 +163,7 @@ export async function restaurarModelo(chave: ChaveEmail) { await migrar(); await
 
 // Variáveis de exemplo pra pré-visualizar e testar no admin (só exemplo: nunca vão num e-mail de verdade)
 export const EXEMPLO: Record<string, string> = {
-  nome: "Brenno", primeiro_nome: "Brenno", email: "voce@exemplo.com", empresa: "Padaria da Maria", lote: "Lote 7", descricao: "casinha térrea", valor: "R$ 99,00", prazo: "1 hora", pago_ate: "07/12/2026",
+  nome: "Brenno", primeiro_nome: "Brenno", email: "voce@exemplo.com", empresa: "Padaria da Maria", lote: "Lote 7", descricao: "casinha térrea", valor: PRECO_LOTE.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), prazo: "1 hora", pago_ate: "07/12/2026",
   link_mapa: `${SITE}/mundo`, link_pagar: `${SITE}/mundo?lote=0%2C-1%2C2`, link_painel: `${SITE}/app`,
   link_senha: `${SITE}/redefinir?t=exemplo`,
   titulo: "Novo profissional contratado", detalhes: "Rodrigo (Vendedor) entrou no setor Vendas.",

@@ -8,14 +8,14 @@
 import { useMundo, LOTES, LOTE_POR_CHAVE } from "../mundoStore";
 import { PRACA_CHAVE } from "../data/praca";
 import { QUIOSQUES, ehQuiosque } from "../data/quiosques";
-import { PRECO_QUIOSQUE } from "../data/precosTerreno";
+import { PRECO_QUIOSQUE, PRECO_LOTE, precoCurto } from "../data/precosTerreno";
 import { MODELOS } from "../data/modelos";
 import { TROCAS_LAYOUT_GRATIS, PRECO_TROCA_LAYOUT } from "../data/escritorio";
 import { sedeDe } from "../data/sedes";
 import { porTexto, primeiro } from "./alvos";
 import type { Roteiro } from "./tipos";
 
-const LOTE = "R$ 99 por mês"; // src/server/terrenos.ts › PRECO_LOTE
+const LOTE = `${precoCurto(PRECO_LOTE)} por mês`; // data/precosTerreno.ts › PRECO_LOTE (WE-19)
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const m = () => useMundo.getState();
 

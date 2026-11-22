@@ -1,5 +1,5 @@
 // Lotes do mundo WorkEnd (tabela terreno). A planta (quais lotes existem) vem do código; aqui ficam as reservas,
-// os chãos pagos e as ações do admin. Regras: a reserva vale 1 hora sem pagamento; pagar (R$ 99 por lote
+// os chãos pagos e as ações do admin. Regras: a reserva vale 1 hora sem pagamento; pagar (PRECO_LOTE, R$ 97 por lote
 // por mês) deixa o chão ativo por 30 dias, com 5 dias de tolerância depois do vencimento; um chão por conta
 // (o admin não tem essa trava); usuário banido não reserva.
 import { ehSede } from "@/office/data/sedes";
@@ -14,7 +14,7 @@ import { registrar } from "./eventos";
 import { enviarEmail, emailLigado, brl, dataBR } from "./email";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
 import { QUIOSQUE_POR_CHAVE, ehQuiosque, equipeDoQuiosque } from "@/office/data/quiosques";
-import { PRECO_QUIOSQUE } from "@/office/data/precosTerreno";
+import { PRECO_QUIOSQUE, PRECO_LOTE } from "@/office/data/precosTerreno";
 import { numeroDaLoja, rotuloLoja } from "@/office/data/numeroLoja";
 
 declare global {
@@ -35,9 +35,10 @@ export interface Terreno {
 export interface Promocao { texto: string; ate: string; desde: string }
 export interface TerrenoAdmin extends Terreno { email: string; usuarioNome: string; banidoEm: Date | null }
 
-export const PRECO_LOTE = 99; // R$ por lote por mês
+// preço do lote: a constante única fica em data/precosTerreno.ts (WE-19: R$ 97); reexportada aqui para quem já lia daqui
+export { PRECO_LOTE };
 export const ADMIN_EMAIL = "souzacostabrenno@gmail.com"; // dono do WorkEnd: entra no /app/admin com a conta ou com a senha (ADMIN_SENHA)
-// A conta admin paga 1/100 do preço (R$ 0,99) pra testar o pagamento de verdade sem gastar
+// A conta admin paga 1/100 do preço (R$ 0,97) pra testar o pagamento de verdade sem gastar
 export const precoPara = (u: Usuario | null | undefined) => (ehAdmin(u) ? Math.round(PRECO_LOTE) / 100 : PRECO_LOTE);
 export const MINUTOS_RESERVA = 60; // 1 hora pra pagar (pedido do Brenno, 07/11)
 export const DIAS_MES = 30;
@@ -272,7 +273,7 @@ export async function salvarEscritorio(u: Usuario, chave: string, dados: unknown
   // prédios que saíram do catálogo (os antigos) não voltam depois de trocados. A compra é por src/server/modelos.ts.
   const modeloAntes = modeloDe(base), modeloNovo = modeloDe(e), mudou = e.layout !== base.layout || modeloNovo !== modeloAntes;
   // lote em quartos (21/11/2026, data/quartosLote.ts): a troca só conta quando havia prédio e continua havendo (pôr o prédio
-  // médio num lote que só tinha quiosques, ou o quiosque no lugar do prédio, não gasta troca); o lote continua R$ 99
+  // médio num lote que só tinha quiosques, ou o quiosque no lugar do prédio, não gasta troca); o lote continua no preço de sempre (PRECO_LOTE)
   const qAntes = base.decor?.quartos ?? null, qNovo = e.decor?.quartos ?? null;
   const contaTroca = mudou && (!qAntes || !!qAntes.predio) && (!qNovo || !!qNovo.predio);
   if (mudou && !ehAdmin(u)) {

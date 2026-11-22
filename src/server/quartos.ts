@@ -3,7 +3,7 @@
 // quem pede (o dono ou sócio; o admin), o lote (da lista, ativo, sem lote extra do lado), o modelo do prédio médio (só os
 // que cabem em meio lote: data/modelos.ts › MODELOS_MEDIO) e as posições (cada estrutura no seu quarto ou na sua metade,
 // com a porta ou o balcão com passagem até a calçada: data/posicaoPredio.ts › conferirQuartos). Sem migração.
-// Preço: nenhum. O lote continua R$ 99/mês (decisão do dono); pôr estrutura num quarto livre não cobra nada; trocar o
+// Preço: nenhum. O lote continua no preço de sempre (PRECO_LOTE, decisão do dono); pôr estrutura num quarto livre não cobra nada; trocar o
 // modelo do prédio segue a regra das trocas de sempre (src/server/terrenos.ts › salvarEscritorio).
 import { sql, migrar } from "./db";
 import type { Usuario } from "./usuarios";

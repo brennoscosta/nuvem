@@ -2,7 +2,7 @@
 // Expandir o terreno (20/11/2026, pedido do dono: "opção de poder expandir o terreno da empresa"). No cartão do lote do dono:
 // o botão abre a escolha do vizinho, o mapa realça o lote do lado que está livre (scene/RealceExpansao.tsx) e um toque junta
 // os dois: reserva o vizinho como lote extra (o lote duplo de 12/11/2026) e já abre o Pix. O prédio cresce e passa a ocupar
-// os dois terrenos. Preço em data/precosTerreno.ts: R$ 99/mês por lote extra, renovado junto com o principal; no dia da
+// os dois terrenos. Preço em data/precosTerreno.ts: o mesmo do lote (R$ 97/mês desde a WE-19) por lote extra, renovado junto com o principal; no dia da
 // compra paga só os dias até o vencimento do principal (proporcional, mínimo R$ 9,90).
 import { useState } from "react";
 import { create } from "zustand";

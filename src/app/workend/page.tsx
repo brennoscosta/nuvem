@@ -1,6 +1,8 @@
 // Página inicial do WorkEnd (11/11/2026, noite): 5 seções, pedido do dono depois de recusar o redesign do designer.
 // 1 abertura (título líquido + vídeo de 1 minuto), 2 como funciona (3 passos em cartões que se empilham),
 // 3 prédios (galeria de arrastar + nome aceso na placa), 4 a rede e os especialistas de IA, 5 preço e perguntas.
+// WE-19 (22/11/2026): o preço virou a escada de planos (./_planos.tsx), a mesma de /planos; a seção continua #preco com o
+// evento ver_preco da WE-01.
 // Marca nova do designer (logotipo em contornos, azul #0A6CFF). Números vêm do banco.
 import Link from "next/link";
 import { usuarioAtual } from "@/server/usuarios";
@@ -18,9 +20,12 @@ import { GaleriaPredios } from "./_inicio/GaleriaPredios";
 import { VideoExplica } from "./_inicio/VideoExplica";
 import { CenaLote, CenaFachada, CenaEquipe } from "./_inicio/CenasPassos";
 import { Revelar, Contador, Rolagem } from "./_inicio/efeitos";
-import { vagasFundador, FUNDADOR } from "@/server/ofertas";
-import { brl } from "@/server/email";
+import { vagasFundador } from "@/server/ofertas";
 import { lojaDestaque } from "@/server/destaque";
+import { PRECO_LOTE, PRECO_QUIOSQUE, precoCurto } from "@/office/data/precosTerreno";
+import { planoEquipeLigado } from "@/server/planos";
+import { cartaoLigado } from "@/server/assinaturas";
+import { EscadaPlanos } from "./_planos";
 import "./inicio.css";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +58,7 @@ const EXTENSO = ["", "Um", "Dois", "Três", "Quatro", "Cinco", "Seis", "Sete", "
 const porExtenso = (n: number) => EXTENSO[n] ?? String(n);
 
 const PERGUNTAS: [string, string][] = [
-  ["Preciso pagar para criar a conta?", "Não. A conta é grátis e o personagem também: crie o seu e entre na cidade. Você só paga quando reserva um lote (R$ 99 por mês) ou se quiser uma roupa ou um acessório premium para o personagem."],
+  ["Preciso pagar para criar a conta?", `Não. A conta é grátis, a página da sua loja também (Vitrine, com 3 produtos e o botão do WhatsApp) e o personagem também. Você só paga quando leva a loja para a cidade: o quiosque por ${precoCurto(PRECO_QUIOSQUE)} ou o lote por ${precoCurto(PRECO_LOTE)} por mês. Roupas e acessórios premium do personagem são à parte.`],
   ["Como funciona o pagamento?", "Por Pix, direto no mapa: o QR Code aparece no cartão do lote e a confirmação chega sozinha. A reserva segura o lote por 1 hora enquanto você paga."],
   ["E se eu não renovar?", "Depois do vencimento há 5 dias de tolerância. Sem renovação, o lote volta a ficar à venda, mas a sua marca e a sua equipe ficam guardadas na conta e voltam se você reservar outro lote."],
   ["Posso desistir da compra?", "Pode. Em até 7 dias depois da compra você recebe o valor de volta."],
@@ -132,7 +137,7 @@ export default async function Inicio() {
                 <Link prefetch={false} href="/mundo" className="wi-seta">Passear pelo mapa<span aria-hidden>↗</span></Link>
               </div>
             </div>
-            <p className="wh-vivo"><i className="wi-vivo" aria-hidden /><b><Contador valor={livres.length} /></b> de {LOTES.length} lotes livres agora <span>·</span> R$ 99 por mês <span>·</span> Pix direto no mapa</p>
+            <p className="wh-vivo"><i className="wi-vivo" aria-hidden /><b><Contador valor={livres.length} /></b> de {LOTES.length} lotes livres agora <span>·</span> {precoCurto(PRECO_LOTE)} por mês <span>·</span> Pix direto no mapa</p>
           </div>
           <Rolagem className="faixa wh-video">
             <div className="wc-tela">
@@ -214,35 +219,9 @@ export default async function Inicio() {
           </section>
         )}
         <section id="preco" className="ws" data-medir-ver="ver_preco">
-          <Revelar className="faixa ws-cab"><h2>Preço simples, <em>sem letra miúda.</em></h2><p>Criar a conta é grátis. Você só paga pelo que usar.</p></Revelar>
+          <Revelar className="faixa ws-cab"><h2>Comece grátis. <em>Suba um degrau quando a loja pedir.</em></h2><p>A página da loja não custa nada. Quando quiser um ponto na cidade, escolha o tamanho. Sem fidelidade e sem letra miúda.</p></Revelar>
           <div className="faixa">
-            <div className="wi-planos">
-              <Revelar className="wi-plano wi-plano-forte">
-                <h3>Lote no mapa</h3>
-                <p className="wi-valor"><b>R$ 99</b><span>por mês</span></p>
-                {restamFundador > 0 && <p className="wi-fundador"><b>Preço de fundador:</b> 1º mês por {brl(FUNDADOR.valor)} para as {FUNDADOR.vagas} primeiras empresas · <b>restam {restamFundador}</b></p>}
-                <ul className="wi-lista">
-                  <li>Seu endereço com placa, nome, logomarca e cor da marca</li>
-                  <li>{LAYOUTS.length} tipos de prédio e 3 trocas de prédio grátis</li>
-                  <li>Equipe de IA que trabalha: CEO, atendente e os especialistas que você contratar</li>
-                  <li>R$ 10 de IA por mês incluídos e página própria da loja</li>
-                  <li>Pagamento por Pix, direto no mapa</li>
-                  <li>Desistiu em até 7 dias? O valor volta para você</li>
-                </ul>
-                <Link href={cta.href} className="wi-btn wi-btn-azul" data-medir="clicar_cta_principal" data-medir-local="preco">{u ? "Abrir meu escritório" : "Reservar meu lote"}<span aria-hidden>→</span></Link>
-              </Revelar>
-              <Revelar className="wi-plano">
-                <h3>Personagem</h3>
-                <p className="wi-valor"><b>Grátis</b><span>para toda conta</span></p>
-                <ul className="wi-lista">
-                  <li>Seu boneco andando pela cidade</li>
-                  <li>Perfil profissional na busca, amigos e mensagens</li>
-                  <li>Propostas de negócio com avaliação dos dois lados</li>
-                  <li>Chamadas de áudio e vídeo</li>
-                </ul>
-                <Link href={u ? "/app/rede" : "/cadastro"} className="wi-btn wi-btn-linha" data-medir={u ? undefined : "clicar_cta_principal"} data-medir-local={u ? undefined : "preco-personagem"}>{u ? "Criar meu personagem grátis" : "Criar conta grátis"}</Link>
-              </Revelar>
-            </div>
+            <Revelar><EscadaPlanos logado={!!u} ctaLoja={{ href: cta.href, texto: u ? "Abrir meu escritório" : "Reservar meu lote" }} restamFundador={restamFundador} equipe={planoEquipeLigado()} cartao={cartaoLigado()} origem="inicio" /></Revelar>
             <Revelar className="wi-perguntas">
               <h3>Perguntas frequentes</h3>
               {PERGUNTAS.map(([p, r]) => <details key={p}><summary>{p}</summary><p>{r}</p></details>)}

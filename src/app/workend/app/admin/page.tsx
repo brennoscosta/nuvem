@@ -16,6 +16,7 @@ import { CreditosAdmin } from "./_creditos";
 import { AssinaturasAdmin } from "./_assinaturas"; // pagamento automático (WE-09)
 import { AnunciosPracaAdmin } from "./_praca";
 import { CadastrosAdmin } from "./_cadastros"; // o que cada conta contou no cadastro (20/11/2026)
+import { ContatosPlanosAdmin } from "./_contatos-planos"; // "Fale com a gente" da página de planos (WE-19)
 import { meta } from "../../seo";
 
 export const metadata = meta({ titulo: "Admin — WorkEnd", caminho: "/app/admin", indexar: false });
@@ -43,6 +44,7 @@ export default async function Admin() {
           <CreditosAdmin />
           <AssinaturasAdmin />
           <AnunciosPracaAdmin />
+          <ContatosPlanosAdmin />
           <CadastrosAdmin />
           <AtividadeAdmin />
           <CatalogoAdmin />

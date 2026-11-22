@@ -14,7 +14,8 @@
 // Webhook: caixa de entrada própria (assinatura_evento), gravada antes de responder; o mesmo id de evento não processa
 // duas vezes e nada é creditado em dobro (a linha do pagamento é única por pagamento do Mercado Pago e aplicar() só libera
 // na 1ª aprovação). O ciclo (agendarAssinaturas, a cada 30 min) refaz eventos que ficaram no meio, confere cobranças
-// atrasadas, manda o lembrete de 3 dias antes, ajusta a mensalidade quando entra um lote extra e cancela no Mercado Pago a
+// atrasadas, manda o lembrete de 3 dias antes, ajusta a mensalidade quando entra um lote extra ou o preço do lote muda
+// (WE-19: de R$ 99 para R$ 97, data/precosTerreno.ts) e cancela no Mercado Pago a
 // assinatura cujo lote saiu do mapa (carência de sempre: DIAS_TOLERANCIA depois do vencimento).
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { sql, id, migrar, temBanco } from "./db";
@@ -313,7 +314,7 @@ async function ajustarMensalidade(a: Assinatura) {
   if (Math.abs(mensal - noMP) < 0.005) { if (!a.valorAjustadoEm || Number(a.valor) !== mensal) await sql`UPDATE assinatura SET valor = ${mensal}, valor_ajustado_em = COALESCE(valor_ajustado_em, now()) WHERE id = ${a.id}`; return; }
   await mp(`/preapproval/${encodeURIComponent(a.externoId)}`, { method: "PUT", body: JSON.stringify({ auto_recurring: { transaction_amount: mensal, currency_id: "BRL" } }) });
   await sql`UPDATE assinatura SET valor = ${mensal}, valor_ajustado_em = now(), atualizado_em = now() WHERE id = ${a.id}`;
-  if (noMP !== Number(a.primeiroValor) || Number(a.valor) !== mensal) void registrar("pagamento", `Mensalidade do pagamento automático: ${brl(mensal)}`, { usuarioId: a.usuarioId, terrenoChave: a.terrenoChave, dados: { detalhes: `Assinatura ${a.id}: de ${brl(noMP)} para ${brl(mensal)} (lote extra ou fim da oferta de entrada).` } });
+  if (noMP !== Number(a.primeiroValor) || Number(a.valor) !== mensal) void registrar("pagamento", `Mensalidade do pagamento automático: ${brl(mensal)}`, { usuarioId: a.usuarioId, terrenoChave: a.terrenoChave, dados: { detalhes: `Assinatura ${a.id}: de ${brl(noMP)} para ${brl(mensal)} (lote extra, fim da oferta de entrada ou preço novo do lote).` } });
 }
 
 async function registrarFalha(a: Assinatura, p: PagamentoMP, cob: CobrancaMP | null) {
