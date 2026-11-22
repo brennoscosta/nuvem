@@ -10,6 +10,7 @@ export const ROTAS_DO_SITE = new Set([
   "mundo", "app", "cadastro", "entrar", "encontrar", "loja", "politicas", "perfil", "api", "admin", "esqueci", "redefinir", "workend",
   "emails", // preferências dos avisos por e-mail (WE-17)
   "planos", // a escada de planos (WE-19); já era palavra reservada
+  "status", // a página pública de status dos serviços (WE-23); já era palavra reservada
 ]);
 // sedes (data/sedes.ts › id): o endereço delas é o id, o mesmo de /mundo?sede=<id>
 export const ENDERECO_SEDES = new Set(["socialrp", "appzone", "bday", "nuvcam"]);
