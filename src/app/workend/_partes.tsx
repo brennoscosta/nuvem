@@ -52,6 +52,8 @@ export async function Rodape() {
           {/* e-mail só quando existir (./_empresa.ts): o contato@workend.online ainda não recebe mensagens (WE-06, 21/11/2026) */}
           {EMPRESA.email && <a href={`mailto:${EMPRESA.email}`}>{EMPRESA.email}</a>}
           <span>&copy; {new Date().getFullYear()} WorkEnd</span>
+          {/* status dos serviços (WE-23, 22/11/2026): link discreto, só aqui */}
+          <Link prefetch={false} href="/status" className="text-[14px]">Status dos serviços</Link>
         </div>
       </div>
       {/* quem está por trás (WE-06, 21/11/2026): razão social e CNPJ em todas as páginas públicas; dados em ./_empresa.ts */}

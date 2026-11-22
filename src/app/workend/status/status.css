@@ -1,0 +1,51 @@
+/* Página pública de status (WE-23, 22/11/2026, ./page.tsx): uma lista só, com divisórias, e uma faixa de 24 blocos por
+   serviço (o mais antigo à esquerda). Cores de estado só aqui; o resto segue os tokens de ../workend.css. */
+.we .st { max-width: 880px; padding-block: clamp(1.5rem, 4vw, 3rem) clamp(3rem, 7vw, 5rem); }
+.we .st [data-estado="ok"] { --st-cor: #3E9B4F; }
+.we .st [data-estado="parcial"] { --st-cor: #D9892B; }
+.we .st [data-estado="falha"] { --st-cor: #C8372D; }
+.we .st [data-estado="desligado"] { --st-cor: var(--line-strong); }
+.we .st [data-estado="sem_registro"], .we .st [data-estado="vazio"] { --st-cor: #B9C2CD; }
+
+.we .st-topo { margin-bottom: 1.6rem; }
+.we .st-titulo { display: flex; align-items: center; gap: .55em; margin-top: .55rem; }
+.we .st-ponto { flex: none; width: .42em; height: .42em; border-radius: 50%; background: var(--st-cor); animation: st-pulso 2.6s ease-out infinite; }
+@keyframes st-pulso { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--st-cor) 50%, transparent); } 70%, 100% { box-shadow: 0 0 0 .45em transparent; } }
+.we .st-sub { margin-top: .8rem; max-width: 62ch; color: var(--muted); font-size: 16px; }
+
+/* período: o mesmo trilho da barra de cima (.cab-trilho) */
+.we .st-periodo { display: inline-flex; gap: 2px; margin-bottom: 1rem; padding: 4px; border-radius: 13px; background: rgba(255,255,255,.42); box-shadow: inset 0 0 0 1px rgba(195,204,215,.75); }
+.we .st-periodo a { padding: .5rem .85rem; border-radius: 9px; font-size: 14.5px; font-weight: 600; color: var(--muted); text-decoration: none; transition: color .15s ease, background .15s ease; }
+.we .st-periodo a:hover { color: var(--ink); }
+.we .st-periodo a:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+.we .st-periodo a[aria-current="page"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(22,28,37,.08), 0 8px 18px -12px rgba(22,28,37,.4); }
+
+.we .st-lista { list-style: none; margin: 0; padding: 0; border-radius: 20px; background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 0 rgba(16,24,40,.03); }
+.we .st-item { padding: 1.1rem clamp(1rem, 3vw, 1.6rem) 1rem; }
+.we .st-item + .st-item { border-top: 1px solid var(--line); }
+.we .st-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.we .st-quem { min-width: 0; }
+.we .st-nome { font-size: 1.05rem; line-height: 1.25; letter-spacing: -0.01em; }
+.we .st-desc { margin-top: .15rem; font-size: 14.5px; line-height: 1.4; color: var(--muted); }
+.we .st-agora { flex: none; display: inline-flex; align-items: center; gap: .45rem; padding-top: .1rem; font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+.we .st-agora i { width: 9px; height: 9px; border-radius: 50%; background: var(--st-cor); }
+.we .st-faixa { display: flex; gap: 3px; height: 30px; margin-top: .9rem; }
+.we .st-bloco { flex: 1 1 0; min-width: 0; border-radius: 3px; background: var(--st-cor); transform-origin: 50% 100%;
+  animation: st-bloco .5s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--k, 0) * 12ms); }
+.we .st-bloco[data-estado="vazio"] { background: repeating-linear-gradient(135deg, #D3DAE3 0 3px, var(--surface) 3px 6px); }
+.we .st-bloco:hover { filter: brightness(.9); }
+@keyframes st-bloco { from { transform: scaleY(.25); opacity: 0; } }
+.we .st-eixo { display: flex; justify-content: space-between; gap: .5rem; margin-top: .45rem; font-size: 12.5px; color: var(--muted); }
+.we .st-pct { font-weight: 600; color: var(--ink); text-align: center; }
+
+.we .st-legenda { display: flex; flex-wrap: wrap; gap: .45rem 1.1rem; margin-top: 1rem; font-size: 13.5px; color: var(--muted); }
+.we .st-legenda span { display: inline-flex; align-items: center; gap: .4rem; }
+.we .st-legenda i { width: 12px; height: 12px; border-radius: 3px; background: var(--st-cor); }
+.we .st-legenda [data-estado="vazio"] i { background: repeating-linear-gradient(135deg, #D3DAE3 0 3px, var(--surface) 3px 6px); }
+.we .st-nota { margin-top: 1.4rem; max-width: 68ch; font-size: 14.5px; color: var(--muted); }
+
+@media (max-width: 480px) {
+  .we .st-cab { flex-direction: column; gap: .35rem; }
+  .we .st-faixa { gap: 2px; height: 26px; }
+}
+@media (prefers-reduced-motion: reduce) { .we .st-ponto, .we .st-bloco { animation: none; } }

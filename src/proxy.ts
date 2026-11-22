@@ -32,7 +32,8 @@ function rotaWorkend(req: NextRequest) {
   // perfil público do cadastro (20/11/2026): /perfil/<apelido>
   if (/^\/perfil\/[a-z0-9-]{3,40}\/?$/.test(p)) { url.pathname = "/workend" + p.replace(/\/$/, ""); return reescrever(url); }
   // /emails: preferências dos avisos por e-mail, pelo link assinado do rodapé (WE-17, 21/11/2026)
-  if (p === "/" || p === "/cadastro" || p === "/entrar" || p === "/politicas" || p === "/esqueci" || p === "/redefinir" || p === "/emails") { url.pathname = "/workend" + (p === "/" ? "" : p); return reescrever(url); }
+  // /status: página pública de status dos serviços (WE-23, 22/11/2026)
+  if (p === "/" || p === "/cadastro" || p === "/entrar" || p === "/politicas" || p === "/esqueci" || p === "/redefinir" || p === "/emails" || p === "/status") { url.pathname = "/workend" + (p === "/" ? "" : p); return reescrever(url); }
   // página própria da loja (WE-11, 21/11/2026; junção v100: depois de todas as rotas do site, inclusive /emails da WE-17): workend.online/<slug> é a mesma página de /loja/N (data/slugLoja.ts);
   // com letra maiúscula, leva para o endereço em minúsculas. Palavra reservada que não é sede (/sobre, /planos…) não é
   // loja: fica para a rota do site que um dia existir
