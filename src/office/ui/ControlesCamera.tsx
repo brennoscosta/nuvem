@@ -5,6 +5,9 @@
 // "Ajustes" junta o que antes ficava espalhado: gráficos leves/completos, mapa 3D ou simples, hora do dia e som.
 // "Como mexer" mostra o mouse e os atalhos (a frase fixa embaixo virou um aviso que some sozinho).
 // 19/11/2026: botão "Bicicleta" (ui/BotaoBicicleta.tsx) logo depois de "Andar pela rua", no computador e no celular.
+// WE-22 (22/11/2026): barra simples para quem chega (ui/barraSimples.ts). O visitante novo vê só Andar, Passear, Aproximar,
+// Afastar e Ajustes, com o nome escrito; girar, vistas, girar devagar, seguir, voltar ao início, bicicleta e "Como mexer"
+// ficam dentro de Ajustes, em grupos. Quem já usa continua com a barra completa; "Mostrar todos os botões" troca à mão.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useCamera, useHora, ATALHOS, joystick, primeiraVisitaDeDia, type ComandoCamera, type ModoHora } from "../cameraStore";
 import { usePersonagem } from "../personagemStore";
@@ -12,8 +15,9 @@ import { modoMundo } from "../mundoStore";
 import { usarMapa2D, qualidade, escolherQualidade, escolherMapa } from "../scene/qualidade";
 import { alternarSom, assinarSom, somLigado } from "../som";
 import { Icone, type NomeIcone } from "./Icone";
-import { BotaoBicicleta, AvisoBicicleta } from "./BotaoBicicleta";
+import { BotaoBicicleta, AvisoBicicleta, LinhaBicicleta } from "./BotaoBicicleta";
 import { useCartaoAberto } from "./cartaoAberto";
+import { useBarraSimples, definirBarraCompleta } from "./barraSimples";
 
 // modoMundo() lê o endereço do navegador: no servidor é sempre falso. Para não dar erro de hidratação, a barra só aparece
 // depois de montar no navegador.
@@ -32,6 +36,28 @@ function Botao({ tipo, rotulo, tecla, ativo }: { tipo: ComandoCamera; rotulo: st
     <button type="button" onClick={() => pedir(tipo)} aria-label={tecla ? `${rotulo} (${tecla})` : rotulo} aria-pressed={ativo ?? undefined} className="hud-btn hud-btn-icone">
       <Icone nome={ICONE[tipo]} tamanho={19} />
       <span className="hud-dica" aria-hidden="true">{rotulo}{tecla && <kbd>{tecla}</kbd>}</span>
+    </button>
+  );
+}
+
+// barra simples (WE-22): o ícone com um nome curto embaixo (celular) ou ao lado (computador); no computador a dica com o
+// nome inteiro e a tecla continua ao passar o mouse
+function BotaoAcao({ tipo, rotulo, nome, tecla, ativo }: { tipo: ComandoCamera; rotulo: string; nome: string; tecla?: string; ativo?: boolean }) {
+  const pedir = useCamera((s) => s.pedir);
+  return (
+    <button type="button" onClick={() => pedir(tipo)} aria-label={tecla ? `${nome} (${tecla})` : nome} aria-pressed={ativo ?? undefined} className="hud-btn hud-acao">
+      <Icone nome={ICONE[tipo]} tamanho={19} /><span className="hud-acao-nome">{rotulo}</span>
+      {tecla && <span className="hud-dica" aria-hidden="true">{nome}<kbd>{tecla}</kbd></span>}
+    </button>
+  );
+}
+// o botão Ajustes das duas barras; data-guia="ajustes-mapa" é o alvo do guia para o que mora dentro dele
+function BotaoAjustes({ simples, aberto, alternar, celular = false }: { simples: boolean; aberto: boolean; alternar: () => void; celular?: boolean }) {
+  return (
+    <button type="button" data-guia="ajustes-mapa" onClick={alternar} aria-expanded={aberto} aria-label="Ajustes do mapa"
+      className={simples ? "hud-btn hud-acao" : `hud-btn hud-btn-icone ${celular ? "!h-9 !w-9" : ""}`}>
+      <Icone nome="ajustes" tamanho={celular && !simples ? 18 : 19} />
+      {simples ? <span className="hud-acao-nome">Ajustes</span> : !celular && <span className="hud-dica" aria-hidden="true">Ajustes</span>}
     </button>
   );
 }
@@ -55,38 +81,52 @@ export function ControlesCamera() {
   const fechar = useCallback(() => setAberto(null), []);
   useFecharFora(!!aberto, caixa, fechar);
   const noMundo = useNoMundo();
+  const simples = useBarraSimples();
   // tela baixa (celular deitado, 21/11/2026): com um cartão aberto a barra some, como no celular em pé; ela ficava por
   // baixo do cartão, que só tem uns 280 px de altura ali
   const cartao = useCartaoAberto();
   if (!noMundo) return null;
+  const ajustes = <BotaoAjustes simples={simples} aberto={aberto === "ajustes"} alternar={() => setAberto(aberto === "ajustes" ? null : "ajustes")} />;
   return (
     <>
       <ModoCamera />
       <AvisoMover />
       <AvisoBicicleta />
-      <div ref={caixa} data-tour="camera" className={`hud-ilha hud-dock pointer-events-auto absolute bottom-4 left-3 z-10 hidden sm:flex ${cartao ? "[@media(max-height:600px)]:!hidden" : ""}`} role="toolbar" aria-label="Câmera">
-        <Botao tipo="girarEsq" rotulo="Girar para a esquerda" tecla="Q" />
-        <Botao tipo="girarDir" rotulo="Girar para a direita" tecla="E" />
-        <span className="hud-sep" aria-hidden="true" />
-        <Botao tipo="aproximar" rotulo="Aproximar" tecla="+" />
-        <Botao tipo="afastar" rotulo="Afastar" tecla="−" />
-        <span className="hud-sep" aria-hidden="true" />
-        <Botao tipo="cima" rotulo="Ver de cima" tecla="T" ativo={cima} />
-        <Botao tipo="rua" rotulo="Ver da altura da rua" tecla="V" ativo={rua} />
-        {personagem && <Botao tipo="seguir" rotulo="Seguir meu personagem" tecla="F" ativo={seguir} />}
-        <Botao tipo="passeio" rotulo="Girar devagar" tecla="P" ativo={passeio} />
-        <Botao tipo="drone" rotulo="Voo de drone pela cidade" tecla="O" ativo={drone} />
-        <Botao tipo="andar" rotulo={personagem ? "Andar pela rua" : "Andar pela rua (crie o seu personagem)"} tecla="C" ativo={andar} />
-        <BotaoBicicleta />
-        <span className="hud-sep" aria-hidden="true" />
-        <Botao tipo="inicio" rotulo="Voltar ao início" tecla="H" />
-        <button type="button" onClick={() => setAberto(aberto === "ajustes" ? null : "ajustes")} aria-expanded={aberto === "ajustes"} aria-label="Ajustes do mapa" className="hud-btn hud-btn-icone">
-          <Icone nome="ajustes" tamanho={19} /><span className="hud-dica" aria-hidden="true">Ajustes</span>
-        </button>
-        <button type="button" onClick={() => setAberto(aberto === "ajuda" ? null : "ajuda")} aria-expanded={aberto === "ajuda"} aria-label="Como mexer no mapa" className="hud-btn hud-btn-icone">
-          <Icone nome="ajuda" tamanho={19} /><span className="hud-dica" aria-hidden="true">Como mexer</span>
-        </button>
-        {aberto === "ajustes" && <PainelAjustes />}
+      <div ref={caixa} data-tour="camera" data-barra={simples ? "simples" : "completa"} className={`hud-ilha hud-dock pointer-events-auto absolute bottom-4 left-3 z-10 hidden sm:flex ${cartao ? "[@media(max-height:600px)]:!hidden" : ""}`} role="toolbar" aria-label="Câmera">
+        {simples ? (
+          <>
+            <BotaoAcao tipo="andar" rotulo="Andar" nome={personagem ? "Andar pela rua" : "Andar pela rua (crie o seu personagem)"} tecla="C" ativo={andar} />
+            <BotaoAcao tipo="drone" rotulo="Passear" nome="Passear de drone pela cidade" tecla="O" ativo={drone} />
+            <span className="hud-sep" aria-hidden="true" />
+            <BotaoAcao tipo="aproximar" rotulo="Aproximar" nome="Aproximar" tecla="+" />
+            <BotaoAcao tipo="afastar" rotulo="Afastar" nome="Afastar" tecla="−" />
+            <span className="hud-sep" aria-hidden="true" />
+            {ajustes}
+          </>
+        ) : (
+          <>
+            <Botao tipo="girarEsq" rotulo="Girar para a esquerda" tecla="Q" />
+            <Botao tipo="girarDir" rotulo="Girar para a direita" tecla="E" />
+            <span className="hud-sep" aria-hidden="true" />
+            <Botao tipo="aproximar" rotulo="Aproximar" tecla="+" />
+            <Botao tipo="afastar" rotulo="Afastar" tecla="−" />
+            <span className="hud-sep" aria-hidden="true" />
+            <Botao tipo="cima" rotulo="Ver de cima" tecla="T" ativo={cima} />
+            <Botao tipo="rua" rotulo="Ver da altura da rua" tecla="V" ativo={rua} />
+            {personagem && <Botao tipo="seguir" rotulo="Seguir meu personagem" tecla="F" ativo={seguir} />}
+            <Botao tipo="passeio" rotulo="Girar devagar" tecla="P" ativo={passeio} />
+            <Botao tipo="drone" rotulo="Voo de drone pela cidade" tecla="O" ativo={drone} />
+            <Botao tipo="andar" rotulo={personagem ? "Andar pela rua" : "Andar pela rua (crie o seu personagem)"} tecla="C" ativo={andar} />
+            <BotaoBicicleta />
+            <span className="hud-sep" aria-hidden="true" />
+            <Botao tipo="inicio" rotulo="Voltar ao início" tecla="H" />
+            {ajustes}
+            <button type="button" onClick={() => setAberto(aberto === "ajuda" ? null : "ajuda")} aria-expanded={aberto === "ajuda"} aria-label="Como mexer no mapa" className="hud-btn hud-btn-icone">
+              <Icone nome="ajuda" tamanho={19} /><span className="hud-dica" aria-hidden="true">Como mexer</span>
+            </button>
+          </>
+        )}
+        {aberto === "ajustes" && <PainelAjustes simples={simples} fechar={fechar} verAjuda={() => setAberto("ajuda")} />}
         {aberto === "ajuda" && <PainelAjuda />}
       </div>
     </>
@@ -101,13 +141,16 @@ function Segmentos<T extends string>({ itens, atual, escolher, rotulo }: { itens
     </div>
   );
 }
-export function PainelAjustes() {
+// simples: a barra mostra só o básico e o resto da câmera vem para cá (fechar: depois de uma vista, o painel sai para a
+// pessoa ver o resultado; verAjuda: "Como mexer", só no computador, que tem mouse e teclado)
+export function PainelAjustes({ simples = false, fechar, verAjuda }: { simples?: boolean; fechar?: () => void; verAjuda?: () => void }) {
   const q = useSyncExternalStore(semAssinatura, qualidade, () => null);
   const hora = useHora((s) => s.modo), definirHora = useHora((s) => s.definir);
   const som = useSyncExternalStore(assinarSom, somLigado, () => false);
   return (
-    <div className="hud-pop" role="dialog" aria-label="Ajustes do mapa">
+    <div className="hud-pop hud-ajustes" role="dialog" aria-label="Ajustes do mapa">
       <b className="hud-pop-titulo"><Icone nome="ajustes" tamanho={18} />Ajustes do mapa</b>
+      {simples && <CameraNosAjustes fechar={fechar} />}
       <div className="hud-secao">
         <span>Gráficos</span>
         <Segmentos rotulo="Gráficos" atual={q} escolher={(v) => escolherQualidade(v)} itens={[["leve", "raio", "Leves"], ["alta", "brilho", "Completos"]]} />
@@ -126,7 +169,54 @@ export function PainelAjustes() {
         <span><Icone nome={som ? "som" : "mudo"} tamanho={18} />Som da cidade</span>
         <button type="button" role="switch" aria-checked={som} aria-label="Som da cidade" onClick={alternarSom} className="hud-chave" />
       </div>
+      {simples && verAjuda && (
+        <div className="hud-linha">
+          <span><Icone nome="mouse" tamanho={18} />Mouse e atalhos</span>
+          <button type="button" onClick={verAjuda} aria-label="Como mexer no mapa" className="hud-btn hud-btn-mini">Ver</button>
+        </div>
+      )}
+      <div className="hud-linha">
+        <span><Icone nome="camadas" tamanho={18} />Mostrar todos os botões</span>
+        <button type="button" role="switch" aria-checked={!simples} aria-label="Mostrar todos os botões" onClick={() => definirBarraCompleta(simples)} className="hud-chave" data-barra-completa="" />
+      </div>
+      <p className="hud-nota">{simples ? "Põe na barra girar, as vistas, a bicicleta e o resto da câmera." : "Desligado, a barra mostra só andar, passear, aproximar, afastar e ajustes."}</p>
     </div>
+  );
+}
+
+// barra simples: girar, vistas, seguir, voltar ao início e bicicleta, dentro de Ajustes (as mesmas teclas valem)
+function CameraNosAjustes({ fechar }: { fechar?: () => void }) {
+  const pedir = useCamera((s) => s.pedir);
+  const seguir = useCamera((s) => s.seguir), passeio = useCamera((s) => s.passeio), cima = useCamera((s) => s.cima), rua = useCamera((s) => s.rua);
+  const personagem = usePersonagem((s) => s.ativo);
+  // girar fica aberto (dá para girar de novo); as vistas fecham o painel para mostrar a cidade
+  const fazer = (t: ComandoCamera, continua = false) => () => { pedir(t); if (!continua) fechar?.(); };
+  return (
+    <>
+      <div className="hud-secao">
+        <span>Girar a cidade</span>
+        <div className="hud-seg" role="group" aria-label="Girar a cidade">
+          <button type="button" onClick={fazer("girarEsq", true)} aria-label="Girar para a esquerda (Q)"><Icone nome="girarEsq" tamanho={15} />Esquerda</button>
+          <button type="button" onClick={fazer("girarDir", true)} aria-label="Girar para a direita (E)"><Icone nome="girarDir" tamanho={15} />Direita</button>
+          <button type="button" onClick={fazer("passeio")} aria-pressed={passeio} aria-label="Girar devagar (P)"><Icone nome="orbita" tamanho={15} />Devagar</button>
+        </div>
+      </div>
+      <div className="hud-secao">
+        <span>Ver a cidade</span>
+        <div className="hud-seg" role="group" aria-label="Ver a cidade">
+          <button type="button" onClick={fazer("cima")} aria-pressed={cima} aria-label="Ver de cima (T)"><Icone nome="cubo" tamanho={15} />De cima</button>
+          <button type="button" onClick={fazer("rua")} aria-pressed={rua} aria-label="Ver da altura da rua (V)"><Icone nome="rua" tamanho={15} />Da rua</button>
+          <button type="button" onClick={fazer("inicio")} aria-label="Voltar ao início (H)"><Icone nome="casa" tamanho={15} />Início</button>
+        </div>
+      </div>
+      {personagem && (
+        <div className="hud-linha">
+          <span><Icone nome="seguir" tamanho={18} />Seguir o meu personagem</span>
+          <button type="button" role="switch" aria-checked={seguir} aria-label="Seguir meu personagem (F)" onClick={fazer("seguir")} className="hud-chave" />
+        </div>
+      )}
+      <LinhaBicicleta />
+    </>
   );
 }
 
@@ -160,7 +250,9 @@ function AvisoMover() {
 }
 
 // No celular: girar, voltar ao início, drone, andar, bicicleta e os ajustes, no canto de baixo
+// (barra simples, WE-22: Andar, Passear, Aproximar, Afastar e Ajustes, com o nome embaixo do ícone)
 const ROTULO_CEL: Partial<Record<ComandoCamera, string>> = { inicio: "Voltar ao início", girarEsq: "Girar para a esquerda", girarDir: "Girar para a direita", drone: "Voo de drone pela cidade", andar: "Andar pela rua com o meu personagem" };
+const SIMPLES_CEL: [ComandoCamera, string, string][] = [["andar", "Andar", "Andar pela rua com o meu personagem"], ["drone", "Passear", "Passear de drone pela cidade"], ["aproximar", "Aproximar", "Aproximar"], ["afastar", "Afastar", "Afastar"]];
 export function ControlesCameraCelular() {
   const pedir = useCamera((s) => s.pedir);
   const drone = useCamera((s) => s.drone), andar = useCamera((s) => s.andar);
@@ -169,17 +261,27 @@ export function ControlesCameraCelular() {
   const fechar = useCallback(() => setAjustes(false), []);
   useFecharFora(ajustes, caixa, fechar);
   const noMundo = useNoMundo();
+  const simples = useBarraSimples();
   if (!noMundo) return null;
+  const pressionado = (t: ComandoCamera) => (t === "drone" ? drone : t === "andar" ? andar : undefined);
   return (
-    <span ref={caixa} className="dock-cel hud-ilha pointer-events-auto relative flex gap-0.5 p-1 sm:hidden">
-      {(["girarEsq", "girarDir", "inicio", "drone", "andar"] as ComandoCamera[]).map((t) => (
-        <button key={t} type="button" onClick={() => pedir(t)} aria-label={ROTULO_CEL[t]} aria-pressed={t === "drone" ? drone : t === "andar" ? andar : undefined} className="hud-btn hud-btn-icone !h-9 !w-9">
-          <Icone nome={ICONE[t]} tamanho={18} />
+    <span ref={caixa} data-barra={simples ? "simples" : "completa"} className="dock-cel hud-ilha pointer-events-auto relative flex gap-0.5 p-1 sm:hidden">
+      {simples ? SIMPLES_CEL.map(([t, rotulo, nome]) => (
+        <button key={t} type="button" onClick={() => pedir(t)} aria-label={nome} aria-pressed={pressionado(t)} className="hud-btn hud-acao">
+          <Icone nome={ICONE[t]} tamanho={19} /><span className="hud-acao-nome">{rotulo}</span>
         </button>
-      ))}
-      <BotaoBicicleta celular />
-      <button type="button" onClick={() => setAjustes(!ajustes)} aria-expanded={ajustes} aria-label="Ajustes do mapa" className="hud-btn hud-btn-icone !h-9 !w-9"><Icone nome="ajustes" tamanho={18} /></button>
-      {ajustes && <PainelAjustes />}
+      )) : (
+        <>
+          {(["girarEsq", "girarDir", "inicio", "drone", "andar"] as ComandoCamera[]).map((t) => (
+            <button key={t} type="button" onClick={() => pedir(t)} aria-label={ROTULO_CEL[t]} aria-pressed={pressionado(t)} className="hud-btn hud-btn-icone !h-9 !w-9">
+              <Icone nome={ICONE[t]} tamanho={18} />
+            </button>
+          ))}
+          <BotaoBicicleta celular />
+        </>
+      )}
+      <BotaoAjustes simples={simples} aberto={ajustes} alternar={() => setAjustes(!ajustes)} celular />
+      {ajustes && <PainelAjustes simples={simples} fechar={fechar} />}
     </span>
   );
 }

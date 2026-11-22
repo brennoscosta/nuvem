@@ -34,6 +34,7 @@ import Link from "next/link";
 import { SaldoCreditos } from "./SaldoCreditos";
 import { MarcaTopo } from "@/app/workend/_marca";
 import { ContadorCidade } from "./PessoasOnline";
+import { useBarraSimples } from "./barraSimples";
 import { ClasseNatal } from "@/app/workend/_natal";
 import { Visitante } from "./Visitante";
 import "./ganchoMedir"; // só com ?medir=1: a ferramenta de medir as telas abre os cartões por aqui
@@ -71,6 +72,9 @@ export function BarraTopo() {
   const trabalhando = ordem.filter((id) => agentes[id]?.status === "trabalhando").length;
   const gasto = ordem.reduce((a, id) => a + (agentes[id]?.gastoHoje ?? 0), 0);
   const temLote = useMundo((s) => !!s.meu); // quem já tem lote não vê o convite para reservar
+  // WE-22 (22/11/2026): para quem chega (ui/barraSimples.ts) a barra de cima fica só com a marca, as pessoas na cidade, criar o
+  // personagem e entrar; o som vai para Ajustes (já estava lá) e o "Ver por dentro" da Nuvem só volta para quem já usa
+  const simples = useBarraSimples();
   // No mundo do WorkEnd a barra é enxuta (sem os agentes nem o estado do servidor da Nuvem) e rola de lado no celular
   // No mundo do WorkEnd (16/11/2026): duas ilhas de vidro, a marca à esquerda e as ações à direita, com ícones próprios.
   // No celular as ações que não cabem rolam de lado; o som e os ajustes ficam na barra de baixo.
@@ -92,17 +96,19 @@ export function BarraTopo() {
       </div>
       <div className="hud-ilha pointer-events-auto flex min-w-0 items-center gap-1 p-1.5">
         <div className="sem-barra flex min-w-0 items-center gap-1 overflow-x-auto">
-          <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório da Nuvem" : "Ver o prédio por fora"} className="hud-btn hud-so-pc">
-            <Icone nome={vista === "fora" ? "escritorio" : "predios"} tamanho={18} /><span className="hud-rotulo">{vista === "fora" ? "Ver por dentro" : "Ver por fora"}</span>
-          </button>
+          {(!simples || vista === "dentro") && (
+            <button onClick={() => setVista(vista === "fora" ? "dentro" : "fora")} title={vista === "fora" ? "Entrar no escritório da Nuvem" : "Ver o prédio por fora"} className="hud-btn hud-so-pc">
+              <Icone nome={vista === "fora" ? "escritorio" : "predios"} tamanho={18} /><span className="hud-rotulo">{vista === "fora" ? "Ver por dentro" : "Ver por fora"}</span>
+            </button>
+          )}
           {/* luz por dentro (17/11/2026): acesa ao entrar; o botão apaga e acende */}
           {vista === "dentro" && (
             <button onClick={() => setLuz(!luz)} aria-pressed={luz} title={luz ? "Apagar a luz de dentro" : "Acender a luz de dentro"} className="hud-btn">
               <Icone nome={luz ? "sol" : "lua"} tamanho={18} /><span className="hud-rotulo">{luz ? "Luz acesa" : "Acender a luz"}</span>
             </button>
           )}
-          <BotaoSom />
-          <span className="hud-sep hud-so-pc" aria-hidden="true" />
+          {!simples && <BotaoSom />}
+          {!simples && <span className="hud-sep hud-so-pc" aria-hidden="true" />}
           <ContaWorkend />
         </div>
         <SaldoCreditos tema="escuro" />

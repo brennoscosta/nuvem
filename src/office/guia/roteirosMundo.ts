@@ -13,6 +13,7 @@ import { MODELOS } from "../data/modelos";
 import { TROCAS_LAYOUT_GRATIS, PRECO_TROCA_LAYOUT } from "../data/escritorio";
 import { sedeDe } from "../data/sedes";
 import { porTexto, primeiro } from "./alvos";
+import { barraSimplesAgora } from "../ui/barraSimples";
 import type { Roteiro } from "./tipos";
 
 const LOTE = `${precoCurto(PRECO_LOTE)} por mês`; // data/precosTerreno.ts › PRECO_LOTE (WE-19)
@@ -46,6 +47,10 @@ const reservaNoMapa = () => { const s = m(); return !!s.meu && s.terrenos[s.meu]
 const PAINEL_ESC = () => porTexto(".painel-entra", /Seu prédio, do seu jeito/);
 const abaEsc = (re: RegExp) => () => { const p = PAINEL_ESC(); return p ? porTexto("button", re, p) : null; };
 const EDITOR = "[data-editor-personagem]";
+// barra simples para quem chega (WE-22, ui/barraSimples.ts): a bicicleta, girar e as vistas ficam dentro de Ajustes. O passo
+// da bicicleta acende o botão dela quando está na barra e, senão, o botão Ajustes (data-guia="ajustes-mapa")
+const BICICLETA = "button[aria-label*='icicleta']:not([aria-label='Cor da bicicleta'])";
+const AJUSTES = '[data-guia="ajustes-mapa"]';
 
 export const ROTEIROS_MUNDO: Roteiro[] = [
   // ---------- a cidade: para quem só visita e para quem acabou de chegar ----------
@@ -53,12 +58,13 @@ export const ROTEIROS_MUNDO: Roteiro[] = [
     id: "cidade", tela: "mundo", nome: "A cidade", gatilho: "entrada", aoFechar: desfazerSelecao,
     passos: [
       { id: "ola", tipo: "manual", alvo: '[data-tour="camera"]', recadoNoCelular: true, antes: (pronto) => { selecionar(null); pronto(); }, titulo: "Bem-vindo à cidade do WorkEnd",
-        texto: (c) => (c.celular ? "Cada prédio é uma empresa de verdade. Arraste com o dedo para passear e use dois dedos para aproximar." : "Cada prédio é uma empresa de verdade. Arraste para passear; esta barra gira, aproxima e mostra a cidade de cima ou da rua.") },
+        texto: (c) => (c.celular ? "Cada prédio é uma empresa de verdade. Arraste com o dedo para passear e use dois dedos para aproximar." : barraSimplesAgora() ? "Cada prédio é uma empresa de verdade. Arraste para passear; esta barra anda pela rua, passeia de drone e aproxima. Girar e as vistas de cima e da rua ficam em Ajustes."
+          : "Cada prédio é uma empresa de verdade. Arraste para passear; esta barra gira, aproxima e mostra a cidade de cima ou da rua.") },
       { id: "andar", tipo: "manual", alvo: "button[aria-label^='Andar pela rua']", titulo: "Andar pela rua",
         texto: (c) => (!c.fatos.personagem ? "Com um personagem você anda pela rua e entra nas lojas a pé. Ele é grátis: toque em Criar personagem grátis, no alto."
           : c.celular ? "Toque aqui e ande com o seu personagem pelo joystick." : "Toque aqui (ou na tecla C) e ande com o seu personagem pelas setas ou W, A, S, D.") },
-      { id: "bicicleta", tipo: "manual", alvo: "button[aria-label*='icicleta']:not([aria-label='Cor da bicicleta'])", titulo: "Bicicleta",
-        texto: (c) => `Grátis para quem tem personagem: anda mais rápido pela cidade.${c.celular ? "" : " Tecla B para subir e descer."}` },
+      { id: "bicicleta", tipo: "manual", alvo: () => primeiro(BICICLETA) ?? primeiro(AJUSTES), titulo: "Bicicleta",
+        texto: (c) => `Grátis para quem tem personagem: anda mais rápido pela cidade.${primeiro(BICICLETA) ? "" : " Ela fica aqui em Ajustes, junto com girar e as vistas."}${c.celular ? "" : " Tecla B para subir e descer."}` },
       { id: "mapa", tipo: "manual", alvo: '[data-tour="mapa"]', titulo: "Mapa da cidade", texto: "As lojas por área. Toque num lote do mapa para voar até ele." },
       { id: "online", tipo: "manual", alvo: ".hud-online", titulo: "Quem está na cidade", texto: "Toque aqui para ver quantas pessoas estão na cidade agora, quem são e onde estão." },
       { id: "loja", tipo: "manual", antes: (pronto) => { selecionar(lojaAberta()); pronto(); }, alvo: CARTAO, titulo: "Cartão da loja", texto: "Toque num prédio para ver a empresa: o que ela faz, a vitrine, os cupons e as vagas." },

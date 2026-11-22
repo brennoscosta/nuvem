@@ -102,3 +102,38 @@ export function AvisoBicicleta() {
     </div>
   );
 }
+
+// A bicicleta dentro de Ajustes (barra simples, WE-22): a chave de subir e descer e as cores do quadro na própria linha
+// (o painel de Ajustes rola no celular baixo, e uma janela por cima dele ficaria cortada). Sem personagem, o botão leva a
+// criar a conta ou o personagem, como o botão da barra completa.
+export function LinhaBicicleta() {
+  const usuario = useMundo((s) => s.usuario);
+  const meu = usePersonagem((s) => s.meu);
+  const ativo = usePersonagem((s) => s.ativo);
+  const veiculo = usePersonagem((s) => s.veiculo);
+  const cor = usePersonagem((s) => s.corBicicleta);
+  const escolher = usePersonagem((s) => s.escolherCorBicicleta);
+  const abrir = usePersonagem((s) => s.abrir);
+  const [erro, setErro] = useState<string | null>(null);
+  const pode = ativo && !!meu;
+  const montado = veiculo === "bicicleta";
+  return (
+    <>
+      <div className="hud-linha">
+        <span><Icone nome="bicicleta" tamanho={18} />{pode ? "Bicicleta" : "Bicicleta grátis"}</span>
+        {pode
+          ? <button type="button" role="switch" aria-checked={montado} aria-label={`${montado ? "Descer da bicicleta" : "Subir na bicicleta"} (B)`} onClick={() => usePersonagem.getState().alternarBicicleta()} className="hud-chave" />
+          : <button type="button" onClick={() => abrir("montar")} className="hud-btn hud-btn-mini">{usuario ? "Criar personagem" : "Criar conta"}</button>}
+      </div>
+      {pode ? (
+        <div className="hud-cores-bici" role="group" aria-label="Cores do quadro">
+          {VEICULOS.bicicleta.cores.map((c) => (
+            <button key={c.id} type="button" aria-label={c.nome} aria-pressed={cor.toUpperCase() === c.cor.toUpperCase()} title={c.nome}
+              onClick={async () => { setErro(await escolher(c.cor)); }} style={{ background: c.cor }} />
+          ))}
+        </div>
+      ) : <p className="hud-nota">Vem junto com o personagem, que também é grátis, e anda bem mais rápido que a pé.</p>}
+      {erro && <p className="hud-nota">{erro}</p>}
+    </>
+  );
+}
