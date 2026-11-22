@@ -7,10 +7,19 @@ import { PALAVRAS_RESERVADAS, ENDERECO_SEDES, slugValido } from "@/office/data/s
 
 // o mesmo nome de src/server/usuarios.ts (COOKIE); o proxy não importa o módulo do servidor (banco e cripto)
 const COOKIE_SESSAO = "workend_sessao";
+// a página inicial do visitante (WE-16): sem o cookie de sessão, navegação de verdade (pede text/html) e sem gravar cookie
+const paraVisitante = (req: NextRequest) => !req.cookies.has(COOKIE_SESSAO) && (req.headers.get("accept") ?? "").includes("text/html") && !req.nextUrl.searchParams.has("ind");
+const CACHE_VISITANTE = "public, max-age=0, s-maxage=60, stale-while-revalidate=86400";
 
 export function proxy(req: NextRequest) {
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
-  if (!ehHostWorkend(host, req.nextUrl.searchParams)) return NextResponse.next();
+  if (!ehHostWorkend(host, req.nextUrl.searchParams)) {
+    // WE-16: com HOSTNAME=127.0.0.1 (as cópias de teste; a produção usa 0.0.0.0) o Next repassa a reescrita do "/" como
+    // externa: o pedido volta aqui já como /workend e com o x-forwarded-host trocado pelo endereço do servidor. É a mesma
+    // página do visitante, então leva o mesmo cabeçalho (senão sai o no-store do Next)
+    if (req.nextUrl.pathname === "/workend" && paraVisitante(req)) { const r = NextResponse.next(); r.headers.set("cache-control", CACHE_VISITANTE); return r; }
+    return NextResponse.next();
+  }
   const r = rotaWorkend(req);
   // "Indique um vizinho" (12/11/2026): ?ind=CODIGO guarda por 30 dias quem indicou; vale no 1º pagamento do lote
   const ind = req.nextUrl.searchParams.get("ind");
@@ -40,9 +49,9 @@ function rotaWorkend(req: NextRequest) {
   // Vary por cima: o cache da frente TEM de ignorar o cache quando houver o cookie workend_sessao (ver o relatório da WE-16).
   // Com o cookie (mesmo vencido) e na navegação interna do Next (RSC: o Next tira o cabeçalho RSC antes do proxy, mas ela
   // não pede text/html), fica o padrão do Next: sem cache.
-  if (p === "/" && !req.cookies.has(COOKIE_SESSAO) && (req.headers.get("accept") ?? "").includes("text/html")) {
+  if (p === "/" && paraVisitante(req)) {
     url.pathname = "/workend"; const r = reescrever(url);
-    r.headers.set("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=86400");
+    r.headers.set("cache-control", CACHE_VISITANTE);
     return r;
   }
   // /emails: preferências dos avisos por e-mail, pelo link assinado do rodapé (WE-17, 21/11/2026); /planos: a escada de planos (WE-19)
