@@ -14,6 +14,9 @@
   .we .lj-promo { background: #E11D48; border-color: #E11D48; color: #fff; }
   .we .lj-btn-marca { background: #fff; color: var(--ink); }
   .we .lj-btn-marca:hover { background: #F2F5F8; }
+  /* plano B (WE-20): veio do mapa porque o 3D não abriu neste aparelho (?sem3d=1) */
+  .we .lj-sem3d { margin-top: 1rem; display: flex; align-items: flex-start; gap: .55rem; max-width: 60ch; border-radius: 14px; padding: .7rem .85rem; font-size: 14.5px; line-height: 1.45; background: rgba(250,204,21,.1); border: 1px solid rgba(250,204,21,.28); color: rgba(255,255,255,.88); }
+  .we .lj-sem3d svg { flex: none; margin-top: .1rem; color: #FACC15; }
 
   /* cartão da recepção dentro do topo (computador): quem atende e o atalho para a conversa */
   .we .lj-recepcao { border-radius: 20px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); padding: 1rem; backdrop-filter: blur(6px); }

@@ -8,7 +8,9 @@ import { useEffect, useRef, useState } from "react";
 import { useMundo, LOTES, useAgora, promocaoAtiva, type Terreno } from "../mundoStore";
 import { QUARTEIROES, centroQuarteirao, EIXOS_RUA, RUA, MEIO_Q, BORDA_CALCADA, PASSO, N, EIXO_RUA, LOTE, nomeNicho, arvoreDoTerrenoFica, type LoteInfo } from "../data/mundo";
 import { PRACA_CHAVE } from "../data/praca";
-import { escolherMapa } from "../scene/qualidade";
+import { escolherMapa, motivo2D } from "../scene/qualidade";
+import { Icone } from "./Icone";
+import { useCartaoAberto } from "./cartaoAberto";
 import { abrirSede } from "./CartaoOneState";
 import { SEDES, paraMundoSede, type Sede } from "../data/sedes";
 import { SEDE } from "../data/onestate";
@@ -165,6 +167,26 @@ function Rotulo({ x, z, texto, sub, cor }: { x: number; z: number; texto: string
   );
 }
 
+// Plano B (WE-20, 22/11/2026): o aparelho caiu sozinho do 3D (perdeu o contexto do WebGL ou ficou lento demais). O aviso diz
+// por quê e deixa tentar o 3D de novo; com cartão aberto ele espera (no celular cobriria o topo do cartão). No celular fica
+// abaixo da faixa do visitante (Natal e "Agora", até ~172 px do topo).
+function AvisoQueda() {
+  const [fechado, setFechado] = useState(false);
+  const cartao = useCartaoAberto();
+  const m = motivo2D();
+  if (fechado || cartao || (m !== "contexto" && m !== "lento")) return null;
+  return (
+    <div className="hud-ilha pointer-events-auto absolute left-1/2 top-48 z-20 w-[min(24rem,calc(100%-1.5rem))] -translate-x-1/2 p-3.5 text-[12.5px] sm:bottom-28 sm:top-auto" role="status">
+      <div className="flex items-center gap-2 font-bold"><Icone nome="raio" tamanho={16} className="text-[#FACC15]" />{m === "contexto" ? "O mapa 3D travou neste aparelho" : "O mapa 3D ficou lento neste aparelho"}</div>
+      <div className="mt-0.5 text-white/75">Abrimos o mapa simples: as mesmas lojas, em 2D. Toque numa loja para ver o cartão dela.</div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" onClick={() => escolherMapa("3d")} className="hud-btn hud-azul !h-9 flex-1 justify-center"><Icone nome="cubo" tamanho={16} />Tentar o 3D de novo</button>
+        <button type="button" onClick={() => setFechado(true)} className="hud-btn !h-9 flex-1 justify-center bg-white/10">Continuar no 2D</button>
+      </div>
+    </div>
+  );
+}
+
 export function Mapa2D() {
   const terrenos = useMundo((s) => s.terrenos);
   const sel = useMundo((s) => s.loteSelecionado);
@@ -271,6 +293,7 @@ export function Mapa2D() {
         <button type="button" onClick={() => setVista({ x: 0, z: 6, esc: 1.15 })} aria-label="Ver a cidade inteira" className="h-9 rounded-xl px-2.5 text-[12px] font-semibold hover:bg-white/15">Cidade inteira</button>
         <button type="button" onClick={() => escolherMapa("3d")} className="h-9 rounded-xl bg-white/15 px-2.5 text-[12px] font-bold hover:bg-white/25">Ver em 3D</button>
       </div>
+      <AvisoQueda />
       <style>{`.mapa2d-sel{animation:m2sel 1.4s ease-in-out infinite}@keyframes m2sel{50%{opacity:.35}}.mapa2d-pisca{animation:m2sel 1s ease-in-out infinite}@media (prefers-reduced-motion: reduce){.mapa2d-sel,.mapa2d-pisca{animation:none}}`}</style>
     </div>
   );

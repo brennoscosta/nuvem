@@ -10,6 +10,10 @@
 // 17/11/2026 (frente acabamento): visual novo (topo escuro na cor da marca, cartões brancos, celular primeiro, conversa logo
 // depois do topo) e uma versão própria para as SEDES (números 0, 901, 902, 903 — data/sedes.ts): site oficial em destaque,
 // áreas do site e os departamentos da equipe (contagem e chefe de cada um, sem o treino). Estilos em ../loja.css (.lj-).
+// Plano B (WE-20, 22/11/2026): com ?sem3d=1 a pessoa veio do mapa porque o 3D não abriu no aparelho dela (sem WebGL, sem
+// memória de vídeo ou lento demais, scene/qualidade.ts): um aviso diz isso, a conversa vira a ação principal e o botão
+// "Ver a loja na cidade em 3D" leva ao mapa com ?mapa=3d. "Entrar no prédio" some (ele também precisa do 3D).
+// Com ?sem3d=webgl o navegador não tem WebGL nenhum: o 3D não abriria, então o botão leva ao mapa 2D (?mapa=2d).
 import type { Metadata } from "next";
 import { cache } from "react";
 import Link from "next/link";
@@ -94,6 +98,8 @@ export default async function Pagina({ params, searchParams }: Props) {
   if (!r) notFound();
   if (r.antigo) permanentRedirect(await comBusca(`/${r.atual}`, searchParams));
   const n = r.numero;
+  const pedidoSem3d = (await searchParams).sem3d;
+  const sem3d = pedidoSem3d === "1" || pedidoSem3d === "webgl", semWebGL = pedidoSem3d === "webgl";
   // quiosque (20/11/2026): endereço próprio a partir de 101, com a mesma página
   const quiosque = QUIOSQUE_POR_NUMERO[n] ?? null;
   const lote = LOTES.find((x) => x.numero === n) ?? (quiosque ? { chave: quiosque.chave } : null);
@@ -157,11 +163,22 @@ export default async function Pagina({ params, searchParams }: Props) {
               {sede && <span className="lj-selo"><Icone nome="equipe" tamanho={14} />{l.equipe.length} agentes de IA</span>}
               {promo && <span className="lj-selo lj-promo"><Icone nome="etiqueta" tamanho={14} />{promo.texto} · até {new Date(promo.ate).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>}
             </div>
+            {sem3d && <p className="lj-sem3d" role="status"><Icone nome="raio" tamanho={16} />{semWebGL ? "Este navegador não mostra o mapa 3D" : "O mapa 3D não abriu neste aparelho"}, por isso você está na página {sede ? "da sede" : "da loja"}. {l.atendente ? "Aqui dá para conversar com a recepção e ver tudo o que " : "Aqui está tudo o que "}{sede ? "ela" : "a loja"} oferece.</p>}
             <div className="pg-acoes mt-5">
               {sede && <a href={sede.site} target="_blank" rel="noopener" className="btn lj-btn-marca"><Icone nome="globo" tamanho={17} />Abrir {sede.dominio}</a>}
               {zap && !sede && <LinkRastreado numero={l.numero} tipo="whatsapp" href={zap} target="_blank" rel="noreferrer nofollow" className="btn lj-btn-marca"><Icone nome="telefone" tamanho={17} />Chamar no WhatsApp</LinkRastreado>}
-              {!gratis && <Link prefetch={false} href={`${linkMapa}&entrar=1`} className={sede || zap ? "btn btn-linha" : "btn lj-btn-marca"}><Icone nome="casa" tamanho={17} />{sede ? "Entrar na sede" : "Entrar no prédio"}</Link>}
-              {!gratis && <Link prefetch={false} href={linkMapa} className="btn btn-linha"><Icone nome="mapa" tamanho={17} />Ver a loja na cidade</Link>}
+              {/* WE-20 (sem3d: aparelho sem 3D) junto com os botões da WE-11 e da WE-13 (página grátis não tem lote na cidade) */}
+              {sem3d
+                ? <>
+                    {l.atendente && <a href="#conversa" className={sede || zap ? "btn btn-linha" : "btn lj-btn-marca"}><Icone nome="conversar" tamanho={17} />Conversar com a recepção</a>}
+                    {!gratis && (semWebGL
+                      ? <Link prefetch={false} href={`${linkMapa}&mapa=2d`} className="btn btn-linha"><Icone nome="mapa" tamanho={17} />{sede ? "Ver a sede no mapa da cidade" : "Ver a loja no mapa da cidade"}</Link>
+                      : <Link prefetch={false} href={`${linkMapa}&mapa=3d`} className="btn btn-linha"><Icone nome="cubo" tamanho={17} />{sede ? "Ver a sede na cidade em 3D" : "Ver a loja na cidade em 3D"}</Link>)}
+                  </>
+                : <>
+                    {!gratis && <Link prefetch={false} href={`${linkMapa}&entrar=1`} className={sede || zap ? "btn btn-linha" : "btn lj-btn-marca"}><Icone nome="casa" tamanho={17} />{sede ? "Entrar na sede" : "Entrar no prédio"}</Link>}
+                    {!gratis && <Link prefetch={false} href={linkMapa} className="btn btn-linha"><Icone nome="mapa" tamanho={17} />Ver a loja na cidade</Link>}
+                  </>}
               <BotaoSeguir numero={l.numero} claro />
               {vagas.length > 0 && <a href="#vagas" className="btn btn-linha"><Icone nome="candidato" tamanho={17} />Contratando · {vagas.length} {vagas.length === 1 ? "vaga" : "vagas"}</a>}
               {ehDono && !gratis && <Link href={`/app/equipe?lote=${encodeURIComponent(l.chave)}`} className="btn btn-linha"><Icone nome="equipe" tamanho={17} />{sede ? "Esta sede é sua · equipe" : "Esta é a sua loja · equipe"}</Link>}

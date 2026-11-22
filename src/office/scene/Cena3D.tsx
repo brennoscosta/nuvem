@@ -19,7 +19,7 @@ import { Acabamento, TOM_PROPRIO } from "./Acabamento";
 import { MiniMapaRender } from "./MiniMapaRender";
 import { precarregarCidade } from "./Modelos";
 import { Agente, handlers } from "./Agente";
-import { qualidade, qualidadeManual, lembrarLeveAuto, escolherQualidade, escolherMapa } from "./qualidade";
+import { qualidade, qualidadeManual, lembrarLeveAuto, escolherQualidade, escolherMapa, cairPara2D } from "./qualidade";
 import { useEscritorio } from "../store";
 import { useMundo, modoMundo } from "../mundoStore";
 import { MESA } from "../data/layout";
@@ -216,18 +216,36 @@ const MEDIR = typeof window !== "undefined" && new URLSearchParams(window.locati
 // ---------- qualidade durante o uso ----------
 // ?simularfps=12 finge que o aparelho está rodando a 12 quadros por segundo (para testar a queda)
 const SIMULAR_FPS = (() => { if (typeof window === "undefined") return null; const v = Number(new URLSearchParams(window.location.search).get("simularfps")); return v > 0 ? v : null; })();
+// Plano B (WE-20, 22/11/2026): já nos gráficos leves e com a cidade carregada, 5 s abaixo de 20 quadros por segundo levam ao
+// mapa simples (scene/qualidade › cairPara2D). Com ?mapa=3d (a pessoa pediu o 3D de novo) a lentidão só avisa, como antes.
+// O navegador de robô dos testes desenha sem placa de vídeo, a menos de 1 quadro por segundo: só cai com ?queda2d=1.
+const QUEDA_POR_LENTIDAO = (() => {
+  if (typeof window === "undefined") return false;
+  const q = new URLSearchParams(window.location.search);
+  return q.get("mapa") !== "3d" && (navigator.webdriver !== true || q.get("queda2d") === "1");
+})();
 // nível: 0 = completo; 1 = resolução 1x e sombra sem refazer periódico; 2 = também no máximo 30 quadros por segundo (igual aos gráficos leves)
-function QualidadeViva({ nivel, maximo, aoBaixar, aoTravar }: { nivel: number; maximo: number; aoBaixar: (n: number) => void; aoTravar: () => void }) {
-  const k = useRef({ quadros: 0, desde: 0, inicio: 0, ruins: 0, avisou: false });
+function QualidadeViva({ nivel, maximo, aoBaixar, aoTravar, aoCair }: { nivel: number; maximo: number; aoBaixar: (n: number) => void; aoTravar: () => void; aoCair: () => void }) {
+  const k = useRef({ quadros: 0, desde: 0, inicio: 0, ruins: 0, avisou: false, lentas: 0, lentoDesde: 0 });
+  // quando o último modelo chegou: a cidade só conta como carregada 3 s depois (os materiais novos ainda compilam)
+  const carga = useRef(0);
+  const carregando = useProgress((s) => s.active);
+  useEffect(() => { carga.current = carregando ? Infinity : performance.now(); }, [carregando]);
   useFrame(() => {
     const agora = performance.now(), x = k.current;
     if (!x.inicio) { x.inicio = agora; x.desde = agora; }
     x.quadros++;
     if (agora - x.desde < 1000) return;
     const fps = SIMULAR_FPS ?? (x.quadros * 1000) / (agora - x.desde);
+    const comeco = x.desde; // início desta medida
     x.quadros = 0; x.desde = agora;
     // os primeiros 10 s são de carregamento (modelos chegando travam de verdade) e aba escondida não conta
-    if (agora - x.inicio < 10000 || document.visibilityState !== "visible") { x.ruins = 0; return; }
+    if (agora - x.inicio < 10000 || document.visibilityState !== "visible") { x.ruins = 0; x.lentas = 0; return; }
+    // plano B: pelo menos 2 medidas seguidas abaixo de 20, somando 5 s (um tropeço só, de um quadro longo, não derruba)
+    if (QUEDA_POR_LENTIDAO && nivel >= 2 && fps < 20 && comeco - carga.current >= 3000) {
+      if (!x.lentas++) x.lentoDesde = comeco;
+      if (x.lentas >= 2 && agora - x.lentoDesde >= 5000) { x.lentas = 0; aoCair(); return; }
+    } else x.lentas = 0;
     if (fps < (nivel >= 2 ? 18 : 24)) x.ruins++; else x.ruins = 0;
     if (x.ruins < 5) return; // 5 segundos seguidos ruins
     x.ruins = 0; x.inicio = agora - 7000; // espera 3 s antes de julgar o nível novo
@@ -245,6 +263,24 @@ function desligarSombras(gl: THREE.WebGLRenderer) {
   if (sombraEconomica) return;
   sombraEconomica = true;
   if (gl.getPixelRatio() > 1) gl.setPixelRatio(1);
+}
+// Plano B (WE-20): o aparelho perdeu o contexto do WebGL (faltou memória de vídeo e a cena fica preta). Se ele não voltar em
+// 2 s com a aba à vista, a cidade vai para o mapa simples (ou, para quem chegou por link de loja, para a página da loja).
+// Com a aba escondida a conta espera: o celular costuma soltar o contexto em segundo plano e devolver quando a pessoa volta.
+function VigiaContexto() {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    const tela = gl.domElement;
+    let t = 0, perdido = false;
+    const contar = () => { window.clearTimeout(t); if (perdido && document.visibilityState === "visible") t = window.setTimeout(() => { if (perdido) cairPara2D("contexto", useMundo.getState().terrenos); }, 2000); };
+    const perdeu = () => { perdido = true; contar(); };
+    const voltou = () => { perdido = false; window.clearTimeout(t); };
+    tela.addEventListener("webglcontextlost", perdeu);
+    tela.addEventListener("webglcontextrestored", voltou);
+    document.addEventListener("visibilitychange", contar);
+    return () => { window.clearTimeout(t); tela.removeEventListener("webglcontextlost", perdeu); tela.removeEventListener("webglcontextrestored", voltou); document.removeEventListener("visibilitychange", contar); };
+  }, [gl]);
+  return null;
 }
 function AplicarNivel({ nivel }: { nivel: number; luz?: React.RefObject<THREE.DirectionalLight | null> }) {
   const gl = useThree((s) => s.gl);
@@ -343,7 +379,8 @@ export function Cena3D() {
       onPointerMissed={() => { useEscritorio.getState().selecionar(null); if (!useMundo.getState().painelEmpresa) useMundo.getState().selecionarLote(null); }}>
       <color attach="background" args={["#CFE3F5"]} />
       <fog attach="fog" args={["#CFE3F5", 140, 360]} />
-      {modoMundo() && <QualidadeViva nivel={nivel} maximo={maximo} aoBaixar={baixar} aoTravar={() => setAviso("travou")} />}
+      {modoMundo() && <QualidadeViva nivel={nivel} maximo={maximo} aoBaixar={baixar} aoTravar={() => setAviso("travou")} aoCair={() => cairPara2D("lento", useMundo.getState().terrenos)} />}
+      {modoMundo() && <VigiaContexto />}
       <AplicarNivel nivel={nivel} luz={luz} />
       {leve ? <Limite30 /> : (
         <>
