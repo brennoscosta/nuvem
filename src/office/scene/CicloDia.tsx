@@ -1,7 +1,8 @@
 "use client";
 // Dia e noite do mapa (12/11/2026, ideia escolhida pelo dono). A cidade segue o horário de Brasília: dia, entardecer
 // (17h30–19h30), noite (estrelas, lua, postes acesos) e amanhecer (5h–6h30). O botão da barra troca entre automático,
-// sempre dia e sempre noite; ?hora=21 fixa uma hora (prévias e testes).
+// sempre dia e sempre noite; ?hora=21 fixa uma hora (prévias e testes). A primeira visita do navegador abre sempre de dia
+// (WE-21, cameraStore); a visita é marcada quando esta cena monta.
 // `ceu` é lido a cada quadro por quem acende à noite (postes, faróis dos carros, horizonte).
 // Céu e clima (12/11/2026, "vida e clima"): cúpula com degradê (azul de dia, laranja e lilás no pôr do sol, azul-marinho
 // à noite, cinza na chuva) e brilho do sol baixo no horizonte; o céu das fotos do horizonte troca de cor junto (só os
@@ -10,7 +11,7 @@
 import * as THREE from "three";
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useHora, cameraInfo } from "../cameraStore";
+import { useHora, cameraInfo, marcarVisita } from "../cameraStore";
 import { clima, iniciarClima, passoClima } from "../clima";
 import { leve } from "./qualidade";
 import { useEscritorio } from "../store";
@@ -179,7 +180,7 @@ function atualizar(scene: THREE.Scene, gl: THREE.WebGLRenderer, l: Luzes, dt: nu
 
 export function CicloDia({ luzes }: { luzes: Luzes }) {
   const scene = useThree((s) => s.scene), gl = useThree((s) => s.gl);
-  useEffect(() => { iniciarClima(); }, []);
+  useEffect(() => { iniciarClima(); marcarVisita(); }, []);
   useFrame(({ clock, camera }, dt) => atualizar(scene, gl, luzes, Math.min(dt, 0.1), clock.elapsedTime, camera));
   return <><Cupula /><Estrelas /><Lua /></>;
 }

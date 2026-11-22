@@ -42,16 +42,33 @@ export const cameraInfo = { x: 0, z: 0, ang: 0, pronto: false };
 export const RAIO_MAXIMO = typeof window !== "undefined" && window.innerWidth < window.innerHeight ? 180 : 155;
 
 // Hora do mapa (12/11/2026): automática (horário de Brasília), sempre dia ou sempre noite. Lembrada só neste navegador.
+// Primeira visita de dia (WE-21, 22/11/2026): das 18h às 6h quem chegava pela primeira vez via a cidade apagada e os
+// letreiros ilegíveis. Sem escolha salva, a PRIMEIRA visita do navegador abre sempre de dia (a troca nos ajustes continua
+// valendo); a visita fica marcada quando a cidade 3D abre (scene/CicloDia) e, da segunda em diante, vale a hora automática.
+// ?hora= continua mandando em tudo (scene/CicloDia).
 export type ModoHora = "auto" | "dia" | "noite";
 const CHAVE_HORA = "workend-hora";
+const CHAVE_VISITA = "workend-ja-entrou";
+let diaDaPrimeiraVisita = false;
 function lerModoHora(): ModoHora {
-  try { const v = typeof window !== "undefined" ? window.localStorage.getItem(CHAVE_HORA) : null; return v === "dia" || v === "noite" ? v : "auto"; } catch { return "auto"; }
+  if (typeof window === "undefined") return "auto";
+  try {
+    const v = window.localStorage.getItem(CHAVE_HORA);
+    if (v === "dia" || v === "noite" || v === "auto") return v;
+    if (window.localStorage.getItem(CHAVE_VISITA)) return "auto";
+  } catch { /* sem armazenamento: não dá para saber se já entrou; fica de dia */ }
+  diaDaPrimeiraVisita = true;
+  return "dia";
 }
+// a cidade abriu de dia por ser a primeira visita (a nota do painel de ajustes explica o "Dia" marcado)
+export const primeiraVisitaDeDia = () => diaDaPrimeiraVisita;
+export function marcarVisita() { try { window.localStorage.setItem(CHAVE_VISITA, "1"); } catch { /* sem armazenamento */ } }
 export const useHora = create<{ modo: ModoHora; proximo: () => void; definir: (m: ModoHora) => void }>((set, get) => ({
   modo: lerModoHora(),
   // escolha direta (painel de ajustes do mapa, 16/11/2026)
-  definir: (modo) => { try { window.localStorage.setItem(CHAVE_HORA, modo); } catch { /* sem armazenamento */ } set({ modo }); },
+  definir: (modo) => { diaDaPrimeiraVisita = false; try { window.localStorage.setItem(CHAVE_HORA, modo); } catch { /* sem armazenamento */ } set({ modo }); },
   proximo: () => {
+    diaDaPrimeiraVisita = false;
     const modo: ModoHora = get().modo === "auto" ? "dia" : get().modo === "dia" ? "noite" : "auto";
     try { window.localStorage.setItem(CHAVE_HORA, modo); } catch { /* sem armazenamento: vale só nesta visita */ }
     set({ modo });

@@ -6,7 +6,7 @@
 // "Como mexer" mostra o mouse e os atalhos (a frase fixa embaixo virou um aviso que some sozinho).
 // 19/11/2026: botão "Bicicleta" (ui/BotaoBicicleta.tsx) logo depois de "Andar pela rua", no computador e no celular.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useCamera, useHora, ATALHOS, joystick, type ComandoCamera, type ModoHora } from "../cameraStore";
+import { useCamera, useHora, ATALHOS, joystick, primeiraVisitaDeDia, type ComandoCamera, type ModoHora } from "../cameraStore";
 import { usePersonagem } from "../personagemStore";
 import { modoMundo } from "../mundoStore";
 import { usarMapa2D, qualidade, escolherQualidade, escolherMapa } from "../scene/qualidade";
@@ -120,7 +120,7 @@ export function PainelAjustes() {
       <div className="hud-secao">
         <span>Hora do dia</span>
         <Segmentos<ModoHora> rotulo="Hora do dia" atual={hora} escolher={definirHora} itens={[["auto", "relogio", "Automática"], ["dia", "sol", "Dia"], ["noite", "lua", "Noite"]]} />
-        <p className="hud-nota">Automática segue o horário de Brasília.</p>
+        <p className="hud-nota">{hora === "dia" && primeiraVisitaDeDia() ? "Na primeira visita a cidade abre de dia. " : ""}Automática segue o horário de Brasília.</p>
       </div>
       <div className="hud-linha">
         <span><Icone nome={som ? "som" : "mudo"} tamanho={18} />Som da cidade</span>
