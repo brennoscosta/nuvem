@@ -17,8 +17,8 @@ import { conversar, destilarRegra, temIA, completar, MODELO_BARATO } from "./mot
 import { destinosDaRecepcao, classificarPorPalavras, falaDoEncaminhamento, FALA_SEM_DESTINO, saudacaoDoSetor, recadoDoSetor, type Destino } from "@/office/data/recepcao";
 import { versoesAtivas, skillEfetiva } from "./evolucao";
 import { bloqueio, contar } from "./limite";
-import { contextoAgendaIA, aplicarMarcacaoDaAtendente, temMarcacao } from "./agenda";
-import { contextoPedidosIA, aplicarPedidoDaAtendente, temMarcacaoPedido, pedidosDasMensagens } from "./pedidos";
+import { contextoAgendaIA, aplicarMarcacaoDaAtendente, temMarcacao, contextoAgendaWhatsApp } from "./agenda";
+import { contextoPedidosIA, aplicarPedidoDaAtendente, temMarcacaoPedido, pedidosDasMensagens, contextoVitrineWhatsApp } from "./pedidos";
 import { ESPECIALISTAS_IA, ESPECIALISTA_POR_ID, type EspecialistaIA } from "@/office/data/especialistas";
 import { LOTES, LOTE_POR_CHAVE, nomeNicho } from "@/office/data/mundo";
 import { SEDE_POR_NUMERO, SEDE_SOCIALRP, ehSede } from "@/office/data/sedes";
@@ -33,7 +33,8 @@ import { roteiroDono, roteiroVisitante } from "./escopoEquipe";
 import { PERSONALIDADE_POR_ID, personalidadeParaIA } from "@/office/data/personalidades";
 import { escopoDe } from "@/office/data/escopo";
 import { ehPedidoDeImagem, pedirImagem, cartoesDaConversa, gerandoImagem, acaoImagem, bytesDaImagem, fazImagem, type AcaoImagem } from "./imagemEquipe";
-import { ehAnonimo, ehVisitanteAnonimo, limiteSemConta, MSG_LIMITE_SEM_CONTA, NOME_SEM_CONTA, type VisitanteAnonimo } from "./visitanteAnonimo";
+import { ehAnonimo, ehVisitanteAnonimo, limiteSemConta, limiteWhatsApp, MSG_LIMITE_SEM_CONTA, NOME_SEM_CONTA, type VisitanteAnonimo } from "./visitanteAnonimo";
+import { whatsappLigado } from "./whatsappMeta";
 
 export const TETO_IA_MES = 10; // R$ de IA por lote por mês
 export const AVISO_TETO = 0.8; // a partir de 80% o painel avisa
@@ -246,6 +247,7 @@ export async function painelEquipe(u: Usuario, chave?: string | null) {
     sobre: emp?.sobre ?? "", contatos: emp?.contatos ?? {}, equipe, departamentos,
     gasto: { ...tetoParaTela(ia), aviso: unidades.cobrada && unidades.baseMes > 0 && unidades.total > 0 && unidades.total <= unidades.baseMes * AVISO_UNIDADES, esgotado: gasto >= teto },
     visitantes: { total: vis?.n ?? 0, ultimas24h: vis?.hoje ?? 0 }, ia: temIA(),
+    whatsapp: whatsappLigado(), // WE-18: a aba WhatsApp só aparece com o WhatsApp ligado no servidor (src/server/whatsappMeta.ts)
   };
 }
 
@@ -410,19 +412,23 @@ async function empresaDasConversas(u: Usuario, chave: string | null) {
   }
 }
 // visitante sem conta (WE-14): cada código anônimo é uma conversa, com o nome da conta técnica ("Visitante sem conta")
+// WhatsApp (WE-18, src/server/whatsapp.ts): a conversa vem com canal "whatsapp" e o número parcialmente escondido
 export async function conversasDeVisitantes(u: Usuario, chave: string | null) {
   const empId = await empresaDasConversas(u, chave);
-  return sql<{ visitanteId: string; nome: string | null; n: number; ultimaEm: Date; ultimaFala: string | null }[]>`
-    SELECT COALESCE(m.visitante_anonimo, m.visitante_id) AS visitante_id, COALESCE(p.nome, us.nome) AS nome, COUNT(*)::int AS n, MAX(m.criado_em) AS ultima_em,
-      (SELECT x.conteudo FROM mensagem x JOIN agente y ON y.id = x.agente_id WHERE y.empresa_id = ${empId} AND x.visitante_id = m.visitante_id AND x.visitante_anonimo IS NOT DISTINCT FROM m.visitante_anonimo AND x.papel = 'user' ORDER BY x.criado_em DESC LIMIT 1) AS ultima_fala
+  return sql<{ visitanteId: string; nome: string | null; n: number; ultimaEm: Date; ultimaFala: string | null; canal: "whatsapp" | null; numero: string | null; humanoAte: Date | null }[]>`
+    SELECT COALESCE(m.visitante_anonimo, m.visitante_id) AS visitante_id, CASE WHEN w.id IS NOT NULL THEN 'Cliente do WhatsApp' ELSE COALESCE(p.nome, us.nome) END AS nome, COUNT(*)::int AS n, MAX(m.criado_em) AS ultima_em,
+      (SELECT x.conteudo FROM mensagem x JOIN agente y ON y.id = x.agente_id WHERE y.empresa_id = ${empId} AND x.visitante_id = m.visitante_id AND x.visitante_anonimo IS NOT DISTINCT FROM m.visitante_anonimo AND x.papel = 'user' ORDER BY x.criado_em DESC LIMIT 1) AS ultima_fala,
+      CASE WHEN w.id IS NOT NULL THEN 'whatsapp' END AS canal, w.numero_mascara AS numero, CASE WHEN w.humano_ate > now() THEN w.humano_ate END AS humano_ate
     FROM mensagem m JOIN agente a ON a.id = m.agente_id LEFT JOIN personagem p ON p.usuario_id = m.visitante_id LEFT JOIN usuario us ON us.id = m.visitante_id
+      LEFT JOIN whatsapp_contato w ON w.id = m.visitante_anonimo AND w.empresa_id = ${empId}
     WHERE a.empresa_id = ${empId} AND m.visitante_id IS NOT NULL
-    GROUP BY m.visitante_id, m.visitante_anonimo, p.nome, us.nome ORDER BY MAX(m.criado_em) DESC LIMIT 100`;
+    GROUP BY m.visitante_id, m.visitante_anonimo, p.nome, us.nome, w.id, w.numero_mascara, w.humano_ate ORDER BY MAX(m.criado_em) DESC LIMIT 100`;
 }
 export async function conversaDeVisitante(u: Usuario, chave: string | null, visitanteId: string) {
   const empId = await empresaDasConversas(u, chave);
   const anon = ehAnonimo(visitanteId);
-  return sql<{ id: string; papel: string; conteudo: string; quem: string; criadoEm: Date }[]>`SELECT m.id, m.papel, m.conteudo, a.nome AS quem, m.criado_em
+  // o que o dono respondeu pelo painel (WhatsApp, WE-18) aparece como "Você"
+  return sql<{ id: string; papel: string; conteudo: string; quem: string; criadoEm: Date }[]>`SELECT m.id, m.papel, m.conteudo, CASE WHEN m.autor LIKE 'dono:%' THEN 'Você' ELSE a.nome END AS quem, m.criado_em
     FROM mensagem m JOIN agente a ON a.id = m.agente_id WHERE a.empresa_id = ${empId}
       AND ${anon ? sql`m.visitante_anonimo = ${visitanteId}` : sql`m.visitante_id = ${visitanteId} AND m.visitante_anonimo IS NULL`} ORDER BY m.criado_em LIMIT 300`;
 }
@@ -478,10 +484,19 @@ export async function conversaNaLoja(u: QuemFala, numero: number, membroId?: str
 }
 
 const RECADO_SEM_IA = "Obrigado pela mensagem! A equipe não consegue responder agora, mas o seu recado ficou anotado para o dono. Se quiser retorno, deixe o seu nome e um WhatsApp ou e-mail.";
+const RECADO_WHATSAPP = "Obrigado pela mensagem! A equipe não consegue responder agora, mas o seu recado ficou anotado e o dono responde por aqui mesmo.";
+// WhatsApp (WE-18): a atendente sabe que a conversa é pelo celular e como chamar uma pessoa (src/server/whatsapp.ts)
+const CANAL_WHATSAPP = [
+  "## Canal: WhatsApp",
+  "Esta conversa chega pelo WhatsApp da loja, não pelo mapa do WorkEnd. Escreva como no WhatsApp: texto simples, frases curtas, sem títulos nem tabelas.",
+  "O cliente já está no WhatsApp: não peça o número dele. Se ele quiser falar com uma pessoa da equipe, diga que é só escrever \"falar com atendente\".",
+].join("\n");
 
 // Limite por visitante, em 24 horas: com conta, por loja e no total; sem conta (WE-14), menor, e também por IP para quem
 // apaga o cookie (src/server/visitanteAnonimo.ts › limiteSemConta). O texto já chega cortado no tamanho de sempre (800).
 function limitarVisitante(u: QuemFala, numero: number, ip?: string | null) {
+  // WhatsApp (WE-18): limite por conversa, sem cookie nem IP (a mensagem chega da Meta)
+  if (ehVisitanteAnonimo(u) && u.canal === "whatsapp") { if (limiteWhatsApp(numero, u.id)) throw new ErroHttp("Muitas mensagens nesta conversa do WhatsApp em pouco tempo.", 429); return; }
   if (ehVisitanteAnonimo(u)) { if (limiteSemConta(numero, u.id, ip)) throw new ErroHttp(MSG_LIMITE_SEM_CONTA, 429); return; }
   const kLoja = `loja:${numero}:${u.id}`, kTotal = `lojas:${u.id}`;
   if (bloqueio(kLoja, LIMITE_VISITANTE_LOJA_DIA) || bloqueio(kTotal, LIMITE_VISITANTE_DIA)) throw new ErroHttp("Você mandou muitas mensagens hoje. Volte amanhã ou fale direto com a loja pelos contatos dela.", 429);
@@ -517,6 +532,7 @@ export async function falarNaLoja(u: QuemFala, numero: number, texto: string, ip
   if (!fala) throw new ErroHttp("Escreva a sua mensagem.");
   limitarVisitante(u, numero, ip);
   const conta = ehVisitanteAnonimo(u) ? null : u;
+  const whats = ehVisitanteAnonimo(u) && u.canal === "whatsapp"; // WE-18: veio pelo WhatsApp da loja
   const { t, empId } = await lojaPorNumero(numero);
   // conectores: visitante escreveu e-mail ou telefone → aviso visitante.contato
   const contatos = contatosNaFala(fala);
@@ -526,8 +542,8 @@ export async function falarNaLoja(u: QuemFala, numero: number, texto: string, ip
   const setor = quem.destino ? { nome: quem.destino.setorNome, quem: quem.membro.nome } : null;
   // recado sem IA (20/11/2026): no jeito da personalidade de quem atende (recepção ou setor), com as frases fixas do treino
   // e o escopo (pedido que é de um colega vai para ele: frente creditos). No setor, o recado é o do setor (data/recepcao.ts).
-  const recadoFixo = quem.destino ? recadoDoSetor(quem.destino, t.empresaNome) : RECADO_SEM_IA;
-  const recadoSemIA = () => roteiroVisitante({ empId, empresa: t.empresaNome, e: t.escritorio, atendente: quem.membro, agenteId: aid, texto: fala, visitante: conta ? conta.nome.split(" ")[0] || "visitante" : "sem conta", agenteDe: (mid) => agenteIdDe(empId, mid), recado: quem.destino ? recadoFixo : undefined }).catch((x) => { console.error("[loja] roteiro:", (x as Error).message); return recadoFixo; });
+  const recadoFixo = quem.destino ? recadoDoSetor(quem.destino, t.empresaNome) : whats ? RECADO_WHATSAPP : RECADO_SEM_IA;
+  const recadoSemIA = () => roteiroVisitante({ empId, empresa: t.empresaNome, e: t.escritorio, atendente: quem.membro, agenteId: aid, texto: fala, visitante: conta ? conta.nome.split(" ")[0] || "visitante" : whats ? "do WhatsApp" : "sem conta", agenteDe: (mid) => agenteIdDe(empId, mid), recado: quem.destino || whats ? recadoFixo : undefined }).catch((x) => { console.error("[loja] roteiro:", (x as Error).message); return recadoFixo; });
   // as unidades de IA são da empresa visitada: a conversa no setor também desconta delas (agentes.ts › registrarUso)
   const { gasto, teto } = await tetoIA(empId);
   // sem IA ou sem unidades de IA: o recado fica guardado para o dono, com uma resposta fixa (sem custo)
@@ -543,7 +559,9 @@ export async function falarNaLoja(u: QuemFala, numero: number, texto: string, ip
     // vitrine e pedidos (17/11/2026): a atendente monta o pedido e o servidor cria (src/server/pedidos.ts)
     const ctxPedidos = conta ? await contextoPedidosIA(numero, conta).catch((e) => { console.error("[loja] pedidos:", (e as Error).message); return null; }) : null;
     const ctxSetor = quem.destino ? await contextoDoSetor(empId, t, u.id, quem.destino).catch(() => null) : null;
-    const contexto = [ctxSetor, ctxAgenda, ctxPedidos].filter(Boolean).join("\n\n");
+    // WhatsApp (WE-18): sem conta, a atendente consulta a vitrine, os preços, os cupons e a agenda, sem fazer pedido nem marcar
+    const ctxWhats = whats ? [CANAL_WHATSAPP, await contextoVitrineWhatsApp(numero).catch(() => null), await contextoAgendaWhatsApp(numero).catch(() => null)].filter(Boolean).join("\n\n") : null;
+    const contexto = [ctxSetor, ctxAgenda, ctxPedidos, ctxWhats].filter(Boolean).join("\n\n");
     const r = await conversar(aid, fala, `visitante:${u.id}`, { modo: "visitante", visitanteId: u.id, tetoMes: { gasto, teto }, contexto: contexto || undefined, maxTokens: ctxAgenda && ctxPedidos ? 650 : contexto ? 500 : undefined });
     let conteudo = r.mensagem.conteudo;
     const original = conteudo;

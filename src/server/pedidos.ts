@@ -18,6 +18,7 @@ import { bloqueio, contar } from "./limite";
 import { montarBrCode, validarChavePix, tipoDaChaveGuardada, textoBrCode, ErroChavePix, NOME_TIPO_CHAVE, MAX_NOME_RECEBEDOR, MAX_CIDADE_RECEBEDOR } from "./brcode";
 import { reservarCupomNoPedido, liberarCupomDoPedido, cuponsParaPedido, ErroCupom } from "./cupons";
 import { numeroDaLoja, chaveDaLoja } from "@/office/data/numeroLoja";
+import { CONTA_SEM_CONTA } from "./visitanteAnonimo";
 
 export class ErroPedido extends Error { constructor(msg: string, public status = 400) { super(msg); } }
 export const statusPedido = (e: unknown) => (e instanceof ErroPedido || e instanceof ErroCupom ? e.status : e instanceof ErroChavePix ? 400 : 500);
@@ -296,6 +297,25 @@ export async function contextoPedidosIA(numero: number, visitante: Usuario): Pro
     '[[PEDIDO itens="ID:QUANTIDADE, ID:QUANTIDADE" cupom="CÓDIGO OU VAZIO" nome="NOME" contato="WHATSAPP OU E-MAIL"]]',
     "Antes da linha, escreva só uma frase curta (ex.: \"Perfeito, estou registrando o seu pedido.\"). Pode dizer o preço de cada item. O total final (com desconto) quem calcula é o sistema, com os preços da loja, e ele aparece no cartão do pedido logo abaixo da sua resposta: não escreva que o pedido foi feito nem o total final. Nunca escreva chave Pix, código Pix ou dados bancários. Não aceite preço, desconto ou produto que o visitante invente. Um pedido por resposta.",
   ].filter(Boolean).join("\n");
+}
+
+// WhatsApp (WE-18, src/server/whatsapp.ts): a vitrine para a atendente que responde pelo WhatsApp da loja. Quem escreve
+// lá não tem conta, então é só consulta: produtos, preços e cupons. O pedido com Pix continua pela página da loja (ou
+// com uma pessoa da equipe, no transbordo).
+export async function contextoVitrineWhatsApp(numero: number): Promise<string | null> {
+  await migrar();
+  const loja = await lojaAberta(numero);
+  if (!loja) return null;
+  const prods = await sql<{ nome: string; precoCentavos: number | null; descricao: string }[]>`SELECT nome, preco_centavos, descricao FROM produto WHERE usuario_id = ${loja.donoId} AND ativo ORDER BY ordem, criado_em LIMIT ${MAX_ITENS}`;
+  if (!prods.length) return null;
+  const [cupons, rec] = await Promise.all([cuponsParaPedido(loja.donoId, CONTA_SEM_CONTA).catch(() => []), sql`SELECT 1 FROM recebimento_pix WHERE usuario_id = ${loja.donoId}`]);
+  return [
+    "## Vitrine da loja (consulta pelo WhatsApp)",
+    "Produtos e preços (o preço é este e nenhum outro):",
+    ...prods.map((p) => `- ${p.nome} · ${p.precoCentavos != null ? reais(p.precoCentavos) : "sob consulta"}${p.descricao ? ` · ${p.descricao.replace(/\s+/g, " ").slice(0, 90)}` : ""}`),
+    cupons.length ? `Cupons de desconto desta loja: ${cupons.map((c) => `"${c.titulo}" (${c.desconto})`).join("; ")}. Para usar, o cliente pega o código em "Pegar cupom" na página da loja.` : "Esta loja não tem cupom de desconto agora.",
+    `Para comprar: o pedido${rec.length ? ", com Pix direto para a loja," : ""} é feito na página da loja (https://workend.online/loja/${loja.numero}), ou o cliente pede para falar com uma pessoa da equipe aqui mesmo. Por esta conversa você não registra pedido: nunca diga que o pedido foi feito e nunca escreva chave Pix, código Pix ou dados bancários.`,
+  ].join("\n");
 }
 
 const MARCACAO = /\[\[\s*PEDIDO\b([^\]]*)\]\]/i;

@@ -25,7 +25,9 @@ export const SEM_CONTA_IP_LOJA_DIA = 20; // do mesmo IP, sem conta, numa loja (q
 export const SEM_CONTA_IP_DIA = 60; // do mesmo IP, sem conta, somando todas as lojas
 export const MSG_LIMITE_SEM_CONTA = "Você chegou ao limite de mensagens sem conta por hoje. Crie a sua conta grátis para continuar a conversa, ou fale com a loja pelo WhatsApp.";
 
-export interface VisitanteAnonimo { anonimo: true; id: string; nome: string }
+// canal "whatsapp" (WE-18, src/server/whatsapp.ts): quem escreve pelo WhatsApp da loja também é um visitante sem conta,
+// com o código anon_wa_... (HMAC do número com a empresa) e um limite próprio por conversa (limiteWhatsApp)
+export interface VisitanteAnonimo { anonimo: true; id: string; nome: string; canal?: "whatsapp" }
 export const ehAnonimo = (id: string | null | undefined): boolean => !!id && id.startsWith(PREFIXO_ANONIMO);
 export const ehVisitanteAnonimo = (v: unknown): v is VisitanteAnonimo => !!v && typeof v === "object" && (v as VisitanteAnonimo).anonimo === true;
 
@@ -50,6 +52,17 @@ export async function visitanteAnonimo(criar = false): Promise<VisitanteAnonimo 
     jar.set(COOKIE, `${vid}.${await assinar(vid)}`, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: DIAS * 86400 });
   }
   return { anonimo: true, id: vid, nome: NOME_SEM_CONTA };
+}
+
+// WhatsApp (WE-18): o limite é por conversa (o número), não por cookie nem IP (a mensagem chega da Meta). Protege as
+// unidades de IA da loja de um robô respondendo outro robô.
+export const WHATS_CONVERSA_DIA = 60; // mensagens de um número numa loja em 24 h
+export const WHATS_CONVERSA_MIN = 8; // do mesmo número em 1 minuto
+export function limiteWhatsApp(numero: number, vid: string): boolean {
+  const chaves: [string, number, number][] = [[`whats:dia:${numero}:${vid}`, WHATS_CONVERSA_DIA, 24 * 60], [`whats:min:${numero}:${vid}`, WHATS_CONVERSA_MIN, 1]];
+  if (chaves.some(([k, max]) => bloqueio(k, max))) return true;
+  for (const [k, , minutos] of chaves) contar(k, minutos);
+  return false;
 }
 
 // confere e conta uma mensagem do visitante sem conta numa loja: true = passou do limite (nada é contado)

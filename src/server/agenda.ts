@@ -313,6 +313,33 @@ export async function contextoAgendaIA(numero: number, visitante: Usuario): Prom
   ].join("\n");
 }
 
+// WhatsApp (WE-18, src/server/whatsapp.ts): a agenda para a atendente que responde pelo WhatsApp da loja. Quem escreve lá
+// não tem conta, então é só consulta (serviços e faixas livres); a marcação continua pela página da loja.
+export async function contextoAgendaWhatsApp(numero: number): Promise<string | null> {
+  await migrar();
+  const loja = await lojaAberta(numero);
+  if (!loja) return null;
+  const c = await configDe(loja.donoId);
+  if (!agendaUsavel(c)) return null;
+  const hoje = diaDe(new Date()), minimo = minimoDe(c), fimDia = ultimoDia(c);
+  const ocupados = await ocupadosDe(loja.donoId, instante(somaDias(hoje, 8), 0));
+  const dias: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const dia = somaDias(hoje, i); if (dia > fimDia) break;
+    const f = faixasLivres(c, dia, ocupados, minimo);
+    dias.push(`- ${rotuloLongo(dia)} (${dia}): ${f.length ? f.join(", ") : "sem horário livre"}`);
+  }
+  return [
+    "## Agenda da loja (consulta pelo WhatsApp)",
+    `Agora: ${rotuloLongo(hoje)}, ${horaDe(new Date())} (horário de Brasília).`,
+    "Serviços com horário marcado (preço só se estiver aqui):",
+    ...c.servicos.map((s) => `- ${s.nome} · ${duracaoTexto(s.duracao)}${s.preco ? ` · ${s.preco}` : ""}`),
+    "Faixas livres nos próximos dias:",
+    ...dias,
+    `Para marcar, o cliente escolhe o horário em "Agendar horário" na página da loja (https://workend.online/loja/${loja.numero}#agenda), ou pede para falar com uma pessoa da equipe aqui mesmo. Por esta conversa você não marca: diga só o que está livre e nunca diga que o horário está confirmado.`,
+  ].join("\n");
+}
+
 // sugestões para quando a marcação da atendente não deu certo
 async function sugestoes(numero: number, servicoId: string, dia: string | null) {
   const loja = await lojaAberta(numero); if (!loja) return "";

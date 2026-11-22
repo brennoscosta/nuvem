@@ -30,8 +30,9 @@ export const PACOTES_UNIDADES = [
 ] as const;
 export const PACOTE_UNIDADES_POR_ID: Record<string, (typeof PACOTES_UNIDADES)[number]> = Object.fromEntries(PACOTES_UNIDADES.map((p) => [p.id, p]));
 export const EMPRESAS_SEM_COBRANCA = new Set(["emp_nuvem"]);
-export type CategoriaIA = "conversa" | "tarefa" | "imagem";
-export const NOME_CATEGORIA: Record<CategoriaIA, string> = { conversa: "Conversa", tarefa: "Tarefa", imagem: "Imagem" };
+// whatsapp (WE-18): o custo da Meta por mensagem que sai pelo WhatsApp da loja (src/server/whatsappMeta.ts › custoMeta)
+export type CategoriaIA = "conversa" | "tarefa" | "imagem" | "whatsapp";
+export const NOME_CATEGORIA: Record<CategoriaIA, string> = { conversa: "Conversa", tarefa: "Tarefa", imagem: "Imagem", whatsapp: "WhatsApp" };
 
 // ceil sem o erro de ponto flutuante (0,03 / 0,01 = 3,0000000000000004)
 export const unidadesDoCusto = (custoBrl: number) => (custoBrl > 0 ? Math.ceil(Math.round((custoBrl / VALOR_UNIDADE_BRL) * 1e6) / 1e6) : 0);
