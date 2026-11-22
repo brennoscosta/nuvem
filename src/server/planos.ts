@@ -5,15 +5,17 @@ import { sql, id, migrar } from "./db";
 import { avisar } from "./avisos";
 import { ADMIN_EMAIL } from "./terrenos";
 import type { Usuario } from "./usuarios";
+import { whatsappLigado } from "./whatsappMeta";
 import { ehPlanoContato, PLANOS_CONTATO, type PlanoContato } from "@/office/data/planos";
 
-// O Equipe (R$ 297) só aparece quando o WhatsApp da atendente (WE-18) estiver ligado: a mesma variável que liga o
-// WhatsApp (WHATSAPP_VERIFY_TOKEN ou META_APP_ID) ou a chave PLANO_EQUIPE=1. PLANO_EQUIPE=0 esconde mesmo com o WhatsApp.
+// O Equipe (R$ 297) só aparece quando o WhatsApp da atendente (WE-18) estiver ligado: a mesma condição da WE-18
+// (whatsappMeta.ts › whatsappLigado, pela WHATSAPP_CHAVE; junção v101) ou a chave PLANO_EQUIPE=1. PLANO_EQUIPE=0 esconde
+// mesmo com o WhatsApp ligado.
 export function planoEquipeLigado() {
   const chave = process.env.PLANO_EQUIPE?.trim();
   if (chave === "0") return false;
   if (chave === "1") return true;
-  return !!process.env.WHATSAPP_VERIFY_TOKEN?.trim() || !!process.env.META_APP_ID?.trim();
+  return whatsappLigado();
 }
 
 const limpa = (t: unknown, max: number) => (typeof t === "string" ? t : "").replace(/\s+/g, " ").trim().slice(0, max);
