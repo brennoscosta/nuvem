@@ -17,7 +17,7 @@ export default function Politicas() {
         <h1 className="text-[2.2rem] lg:text-[2.8rem]">Políticas de uso</h1>
         <p className="mt-5 max-w-[60ch] text-[var(--tinta-2)]">O WorkEnd é um mundo compartilhado. Cada lote é uma vitrine pública: o que você coloca na placa, na fachada e no escritório é visto por todo mundo. Por isso, algumas regras simples.</p>
         <div className="mt-8 max-w-[70ch] space-y-5 text-[1.05rem] leading-relaxed">
-          <p><b>1. O chão é seu enquanto estiver pago.</b> A reserva vale 1 hora. O pagamento (R$ 99 por lote, por mês) ativa o lote por 30 dias. Depois do vencimento há 5 dias de tolerância; sem renovação, o lote volta a ficar à venda e a placa sai do mapa; sua marca e sua equipe ficam guardadas na conta e voltam se você reservar outro lote. Você pode desistir da compra em até 7 dias e receber o valor de volta. Depois desse prazo, os meses já pagos não são reembolsados.</p>
+          <p><b>1. O chão é seu enquanto estiver pago.</b> A reserva vale 1 hora. O pagamento (R$ 97 por lote, por mês) ativa o lote por 30 dias. Depois do vencimento há 5 dias de tolerância; sem renovação, o lote volta a ficar à venda e a placa sai do mapa; sua marca e sua equipe ficam guardadas na conta e voltam se você reservar outro lote. Você pode desistir da compra em até 7 dias e receber o valor de volta. Depois desse prazo, os meses já pagos não são reembolsados.</p>
           <p><b>2. Nome, logo e conteúdo.</b> Não é permitido usar marcas, nomes ou logotipos de terceiros sem autorização; conteúdo ofensivo, discriminatório, sexual ou violento; nem atividade ilegal, golpe ou promessa enganosa. A empresa precisa ser sua ou você precisa ter autorização para representá-la.</p>
           <p><b>3. Um chão por conta.</b> Nesta fase cada conta pode ter um lote. Reservar outro libera a reserva anterior.</p>
           <p><b>4. Banimento.</b> O administrador do WorkEnd pode retirar do mapa qualquer imóvel que descumpra estas regras e suspender a conta do dono, sem aviso prévio em casos graves. O motivo fica registrado na conta.</p>
@@ -51,7 +51,7 @@ export default function Politicas() {
             </ul>
             <p className="mt-3">Essas ferramentas só são carregadas depois que você aceita, no aviso de cookies. Você pode aceitar tudo, recusar tudo ou escolher por tipo (análise e anúncios). Se recusar, nenhuma delas é carregada e o site funciona do mesmo jeito. A sua escolha fica guardada por 6 meses e pode ser mudada a qualquer momento pelo link <b>Cookies</b>, no rodapé do site. Os dados que essas ferramentas coletam também são tratados pelas empresas que as oferecem, conforme a política de privacidade de cada uma, e podem ser guardados fora do Brasil.</p>
           </div>
-          <p className="text-[var(--tinta-2)]">Versão de 21/11/2026. Mudanças serão avisadas no painel.</p>
+          <p className="text-[var(--tinta-2)]">Versão de 22/11/2026. Mudanças serão avisadas no painel.</p>
         </div>
       </section>
       <Rodape />
