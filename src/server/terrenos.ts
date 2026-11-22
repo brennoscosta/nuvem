@@ -181,7 +181,7 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
       } else if (!dono.escritorio) await tx`UPDATE terreno SET escritorio = ${escJson} WHERE chave = ${chave}`;
     } else {
       // quem já teve um lote recupera a marca e a equipe guardadas
-      const [guardado] = await tx<{ logo: Uint8Array | null; logoTipo: string | null; escritorio: Escritorio | null; nicho: string | null }[]>`SELECT logo, logo_tipo, escritorio, nicho FROM terreno_arquivo WHERE usuario_id = ${u.id} ORDER BY arquivado_em DESC LIMIT 1`;
+      const [guardado] = await tx<{ chave: string; logo: Uint8Array | null; logoTipo: string | null; escritorio: Escritorio | null; nicho: string | null }[]>`SELECT chave, logo, logo_tipo, escritorio, nicho FROM terreno_arquivo WHERE usuario_id = ${u.id} ORDER BY arquivado_em DESC LIMIT 1`;
       // Plano Vitrine (WE-13): quem tem a página grátis leva a mesma loja para a cidade: a logomarca, o nicho e a atendente
       // (o mesmo id, então as conversas continuam). O endereço, a vitrine, o "Sobre" e os contatos já são da conta.
       const [pagina] = guardado ? [] : await tx<{ logo: Uint8Array | null; logoTipo: string | null; escritorio: Escritorio | null; nicho: string | null }[]>`SELECT logo, logo_tipo, escritorio, nicho FROM loja_vitrine WHERE usuario_id = ${u.id}`;
@@ -195,6 +195,10 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
       const escFinal = guardadoEsc ? sql.json(guardadoEsc as unknown as Parameters<typeof sql.json>[0]) : escPg ? sql.json(escPg as unknown as Parameters<typeof sql.json>[0]) : escJson;
       const nicho = nichoPedido ?? nichoValido(guardado?.nicho ?? pagina?.nicho); // sem nicho na reserva: o guardado (ou o da página grátis), ou "negocios"
       await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, nicho, logo, logo_tipo, status, reservado_ate, escritorio) VALUES (${chave}, ${u.id}, ${nome}, ${cor}, ${nicho}, ${logoFinal}, ${tipoFinal}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${escFinal})`;
+      // agentes comprados (correção de 22/11/2026): os contratos guardados desta conta, de lotes que já não são dela, vêm
+      // junto com a equipe guardada para o lote novo (no lote antigo, o dono novo não os vê: agentesVenda.ts)
+      if (guardado) await tx`UPDATE agente_contratado c SET terreno_chave = ${chave} WHERE c.dono_id = ${u.id} AND c.status = 'ativo' AND c.terreno_chave <> ${chave}
+        AND NOT EXISTS (SELECT 1 FROM terreno t WHERE t.chave = c.terreno_chave AND t.usuario_id = ${u.id})`;
     }
     const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${chave}`;
     if (!dono) void registrar("reserva", `${nome} reservou um lote`, { usuarioId: u.id, terrenoChave: chave, dados: { detalhes: `Reserva de 1 hora pra pagar.` } });
@@ -387,7 +391,12 @@ export async function adminTransferir(chave: string, email: string) {
   await migrar();
   const [u] = await sql<{ id: string }[]>`SELECT id FROM usuario WHERE email = ${email.trim().toLowerCase()}`;
   if (!u) throw new Error("Não existe usuário com esse e-mail.");
-  await sql`UPDATE terreno SET usuario_id = ${u.id}, atualizado_em = now() WHERE chave = ${chave}`;
+  await sql.begin(async (tx) => {
+    const [antes] = await tx<{ usuarioId: string }[]>`SELECT usuario_id FROM terreno WHERE chave = ${chave} FOR UPDATE`;
+    await tx`UPDATE terreno SET usuario_id = ${u.id}, atualizado_em = now() WHERE chave = ${chave}`;
+    // os agentes comprados para o lote vão junto (correção de 22/11/2026: o contrato é da conta titular)
+    if (antes) await tx`UPDATE agente_contratado SET dono_id = ${u.id} WHERE terreno_chave = ${chave} AND dono_id = ${antes.usuarioId}`;
+  });
 }
 // Banir um imóvel: tira a empresa do lote (o lote volta a ficar à venda) e suspende a conta do dono
 export async function adminBanir(chave: string, motivo: string) {

@@ -91,14 +91,14 @@ export async function resumoExclusao(u: Usuario): Promise<ResumoExclusao> {
   const [c] = await sql<{ senhaHash: string }[]>`SELECT senha_hash FROM usuario WHERE id = ${uid}`;
   const lotes = await sql<{ chave: string; status: string; empresaNome: string; pagoAte: Date | null; anexoDe: string | null; socios: string[] | null; escritorio: { modelosComprados?: string[] } | null }[]>`
     SELECT chave, status, empresa_nome, pago_ate, anexo_de, socios, escritorio FROM terreno WHERE usuario_id = ${uid} ORDER BY anexo_de NULLS FIRST, reservado_em`;
-  const chaves = lotes.map((t) => t.chave);
   const [x] = await sql<{ unidades: number; itens: number; pagamentos: number; barracas: number; anuncios: number }[]>`SELECT
       (SELECT COALESCE(sum(inclusa + comprada), 0)::int FROM ia_carteira WHERE empresa_id IN (SELECT id FROM empresa WHERE usuario_id = ${uid})) AS unidades,
       (SELECT count(*)::int FROM item_comprado WHERE usuario_id = ${uid}) AS itens,
       (SELECT count(*)::int FROM pagamento WHERE usuario_id = ${uid}) AS pagamentos,
       (SELECT count(*)::int FROM barraca WHERE usuario_id = ${uid} AND status = 'paga' AND dia >= (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS barracas,
       (SELECT count(*)::int FROM anuncio_praca WHERE usuario_id = ${uid} AND status IN ('em_analise', 'aprovado') AND inicio + dias > (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS anuncios`;
-  const agentes = await sql<{ nome: string; cargo: string }[]>`SELECT nome, cargo FROM agente_contratado WHERE terreno_chave = ANY(${sql.array(chaves)}::text[]) AND status = 'ativo' ORDER BY criado_em`;
+  // os da empresa desta conta (correção de 22/11/2026: pelo dono do contrato), inclusive os guardados de um lote que já saiu do mapa
+  const agentes = await sql<{ nome: string; cargo: string }[]>`SELECT nome, cargo FROM agente_contratado WHERE dono_id = ${uid} AND status = 'ativo' ORDER BY criado_em`;
   const sociedades = await sql<{ empresaNome: string }[]>`SELECT empresa_nome FROM terreno WHERE ${uid} = ANY(socios) AND usuario_id <> ${uid} AND anexo_de IS NULL ORDER BY reservado_em`;
   const outros: string[] = [];
   const [od] = await sql<{ pagoAte: Date }[]>`SELECT pago_ate FROM outdoor WHERE usuario_id = ${uid} AND pago_ate > now() ORDER BY pago_ate DESC LIMIT 1`;
@@ -233,7 +233,7 @@ export async function excluirConta(u: Usuario, conf: { senha?: unknown; palavra?
 
     // ===== 2) o que é de outras pessoas e cita esta conta: fica, sem identificar =====
     await db`UPDATE terreno SET socios = array_remove(socios, ${uid}), atualizado_em = now() WHERE ${uid} = ANY(socios)`; // sócia: só sai da sociedade
-    await db`UPDATE agente_contratado SET usuario_id = ${anon} WHERE usuario_id = ${uid} AND NOT (terreno_chave = ANY(${L}::text[]))`; // agente comprado para a loja de outra pessoa continua nela
+    await db`UPDATE agente_contratado SET usuario_id = ${anon} WHERE usuario_id = ${uid} AND dono_id IS DISTINCT FROM ${uid}`; // agente comprado para a loja de outra pessoa continua nela
     await db`UPDATE mensagem SET autor = replace(autor, ${uid}, ${anon}) WHERE visitante_id IS NULL AND position(${uid} in autor) > 0`; // o que disse à equipe da loja de outra pessoa
     await db`UPDATE agendamento SET cliente_id = NULL, nome = ${CLIENTE_EXCLUIDO}, contato = '', obs = '',
         status = CASE WHEN status = 'marcado' AND inicio > now() THEN 'cancelado' ELSE status END,
@@ -260,7 +260,7 @@ export async function excluirConta(u: Usuario, conf: { senha?: unknown; palavra?
     await db`DELETE FROM outdoor WHERE usuario_id = ${uid}`;
     await db`DELETE FROM rua_nome WHERE usuario_id = ${uid}`;
     await db`DELETE FROM chave_api WHERE usuario_id = ${uid}`;
-    await db`DELETE FROM agente_contratado WHERE terreno_chave = ANY(${L}::text[])`; // senão iria para quem comprar o lote depois
+    await db`DELETE FROM agente_contratado WHERE dono_id = ${uid}`; // os da empresa desta conta; os do dono anterior de um lote dela ficam com ele
     await db`DELETE FROM seguidor_envio WHERE dono_id = ${uid}`;
     arquivos.push(...(await db<{ caminho: string }[]>`SELECT caminho FROM arquivo WHERE empresa_id = ANY(${E}::text[])`).map((r) => r.caminho));
     await db`DELETE FROM mural WHERE empresa_id = ANY(${E}::text[])`;

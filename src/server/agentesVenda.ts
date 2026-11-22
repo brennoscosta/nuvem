@@ -10,6 +10,10 @@
 //  - As empresas que já existiam mantêm todos os agentes: só membro NOVO precisa de contrato (terrenos.ts › salvarEscritorio).
 //  - Preço pela tabela por nível (PRECO_AGENTE, fácil de mudar). Se o admin pôr um preço no catálogo, vale o dele.
 //  - Trocar a personalidade depois: PRECO_TROCA_PERSONALIDADE créditos (tipo "personalidade").
+//  - O contrato é da empresa (correção de 22/11/2026, migração 0059_agente_dono): além da chave do lote, guarda a conta
+//    titular (dono_id) e só vale no lote enquanto o titular for o mesmo. Lote vencido e vendido de novo: o comprador novo
+//    não vê nem usa os agentes do dono antigo; os contratos ficam guardados e voltam com a equipe guardada quando o dono
+//    antigo reserva de novo (terrenos.ts › reservarTerreno).
 import { randomBytes } from "node:crypto";
 import { sql, migrar, id } from "./db";
 import type { Usuario } from "./usuarios";
@@ -71,7 +75,7 @@ export async function vitrineAgentes(u: Usuario, chave: string) {
   const lista = await catalogo();
   const equipe = t.escritorio?.equipe ?? [];
   for (const a of lista) a.naEquipe = equipe.filter((m) => m.catalogoId === a.id).length;
-  const contratos = await sql<{ membroId: string; catalogoId: string; nome: string; cargo: string; personalidadeId: string | null; escopo: Membro["escopo"] | null }[]>`SELECT membro_id, catalogo_id, nome, cargo, personalidade_id, escopo FROM agente_contratado WHERE terreno_chave = ${chave} AND status = 'ativo' ORDER BY criado_em`;
+  const contratos = await sql<{ membroId: string; catalogoId: string; nome: string; cargo: string; personalidadeId: string | null; escopo: Membro["escopo"] | null }[]>`SELECT membro_id, catalogo_id, nome, cargo, personalidade_id, escopo FROM agente_contratado WHERE terreno_chave = ${chave} AND dono_id = ${t.usuarioId} AND status = 'ativo' ORDER BY criado_em`;
   const fora = contratos.filter((c) => !equipe.some((m) => m.id === c.membroId)).map((c) => {
     const a = lista.find((x) => x.id === c.catalogoId);
     return { membroId: c.membroId, catalogoId: c.catalogoId, nome: c.nome, cargo: c.cargo, setor: a?.setor ?? "Atendimento", boneco: a?.boneco ?? "classico", camisa: a?.camisa ?? "#1D4ED8", descricao: a?.descricao ?? "", personalidadeId: c.personalidadeId, escopo: c.escopo };
@@ -150,7 +154,7 @@ export async function liberarAgente(db: Db, reg: { id: string; terrenoChave: str
   e.equipe.push(m);
   if (a.id !== SOB_MEDIDA.id) especializar(e, a.id, a.cargo); // dois do mesmo cargo: focos e skills sem sobrepor
   await salvar(db, lote, e);
-  await db`INSERT INTO agente_contratado (id, terreno_chave, usuario_id, catalogo_id, membro_id, nome, cargo, preco, pagamento_id) VALUES (${id("ctr")}, ${lote}, ${reg.usuarioId}, ${a.id}, ${m.id}, ${m.nome}, ${m.cargo}, ${Number(reg.valor) + Number(reg.creditosCarteira ?? 0)}, ${reg.id})`;
+  await db`INSERT INTO agente_contratado (id, terreno_chave, usuario_id, dono_id, catalogo_id, membro_id, nome, cargo, preco, pagamento_id) VALUES (${id("ctr")}, ${lote}, ${reg.usuarioId}, ${t.usuarioId}, ${a.id}, ${m.id}, ${m.nome}, ${m.cargo}, ${Number(reg.valor) + Number(reg.creditosCarteira ?? 0)}, ${reg.id})`;
   await guardarEscopos(db, lote, e);
   return true;
 }
@@ -179,13 +183,13 @@ export async function liberarPersonalidade(db: Db, reg: { terrenoChave: string; 
   await guardarEscopos(db, lote, e);
   return true;
 }
-// membros comprados deste lote, com o que precisa voltar junto (terrenos.ts › salvarEscritorio)
+// membros comprados deste lote, com o que precisa voltar junto (terrenos.ts › salvarEscritorio); só os do titular de agora
 export async function contratadosDoLote(chave: string): Promise<Set<string>> {
   await migrar();
-  const rows = await sql<{ membroId: string }[]>`SELECT membro_id FROM agente_contratado WHERE terreno_chave = ${chave} AND status = 'ativo'`;
+  const rows = await sql<{ membroId: string }[]>`SELECT membro_id FROM agente_contratado WHERE terreno_chave = ${chave} AND status = 'ativo' AND dono_id = (SELECT usuario_id FROM terreno WHERE chave = ${chave})`;
   return new Set(rows.map((r) => r.membroId));
 }
 export async function contratosDoLote(chave: string) {
   await migrar();
-  return sql<{ membroId: string; personalidadeId: string | null; escopo: Membro["escopo"] | null }[]>`SELECT membro_id, personalidade_id, escopo FROM agente_contratado WHERE terreno_chave = ${chave} AND status = 'ativo'`;
+  return sql<{ membroId: string; personalidadeId: string | null; escopo: Membro["escopo"] | null }[]>`SELECT membro_id, personalidade_id, escopo FROM agente_contratado WHERE terreno_chave = ${chave} AND status = 'ativo' AND dono_id = (SELECT usuario_id FROM terreno WHERE chave = ${chave})`;
 }
