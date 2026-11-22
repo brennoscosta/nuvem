@@ -12,7 +12,7 @@ import "./equipe.css";
 export const metadata = meta({ titulo: "Minha equipe — WorkEnd", caminho: "/app/equipe", indexar: false });
 export const dynamic = "force-dynamic";
 
-export default async function Equipe({ searchParams }: { searchParams: Promise<{ lote?: string; membro?: string; aba?: string }> }) {
+export default async function Equipe({ searchParams }: { searchParams: Promise<{ lote?: string; membro?: string; aba?: string; visitante?: string }> }) {
   const u = await usuarioAtual().catch(() => null);
   if (!u) redirect("/entrar?destino=/app/equipe");
   const sp = await searchParams;
@@ -35,7 +35,8 @@ export default async function Equipe({ searchParams }: { searchParams: Promise<{
           </div>
         </section>
       ) : (
-        <EquipePainel chaveInicial={inicial} empresas={empresas} membroInicial={sp.membro ?? null} abaInicial={sp.aba === "vagas" || sp.aba === "visitantes" || sp.aba === "sobre" || sp.aba === "internas" || sp.aba === "conectores" ? sp.aba : undefined} />
+        <EquipePainel chaveInicial={inicial} empresas={empresas} membroInicial={sp.membro ?? null} abaInicial={sp.aba === "vagas" || sp.aba === "visitantes" || sp.aba === "sobre" || sp.aba === "internas" || sp.aba === "conectores" || sp.aba === "whatsapp" ? sp.aba : undefined}
+          visitanteInicial={sp.visitante && /^[A-Za-z0-9_-]{4,60}$/.test(sp.visitante) ? sp.visitante : null} />
       )}
       <div className="h-16" />
       <Rodape />

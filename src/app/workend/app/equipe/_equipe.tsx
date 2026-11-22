@@ -24,13 +24,15 @@ import { Rosto, RostoSede } from "./_rosto";
 import { TopoEquipe, FaixaEquipe, ComoFunciona } from "./_topo";
 import { Conectores, EnviarPara } from "./_conectores";
 import { CartaoImagemEquipe } from "@/office/ui/ImagemEquipe";
+import { WhatsAppLoja, ConversaWhatsApp } from "./_whatsapp";
 
 type Regra = RegraEquipe;
 type Membro = MembroEquipe;
 type Contatos = ContatosEquipe;
 type Painel = PainelEquipe;
 type Msg = MsgEquipe;
-type Visitante = { visitanteId: string; nome: string | null; n: number; ultimaEm: string; ultimaFala: string | null };
+// canal "whatsapp" (WE-18): a conversa veio pelo WhatsApp da loja, com o número parcialmente escondido
+type Visitante = { visitanteId: string; nome: string | null; n: number; ultimaEm: string; ultimaFala: string | null; canal?: "whatsapp" | null; numero?: string | null; humanoAte?: string | null };
 type FalaVisita = { id: string; papel: string; conteudo: string; quem: string; criadoEm: string };
 
 const api = apiEquipe;
@@ -39,8 +41,8 @@ const Texto = ({ t }: { t: string }) => <TextoIA t={t} className="text-[15px]" /
 function Avatar({ m, tamanho = 44 }: { m: Membro; tamanho?: number }) { return <Rosto m={m} tamanho={tamanho} anel={null} />; }
 const SeloNivel = ({ m }: { m: Pick<Membro, "nivel"> }) => <span className="rounded-full px-2 py-[1px] align-middle text-[10.5px] font-semibold text-white" style={{ background: NIVEL_COR[m.nivel] }}>{NIVEL_ROTULO[m.nivel]}</span>;
 
-type AbaEquipe = "conversas" | "internas" | "visitantes" | "vagas" | "sobre" | "conectores";
-export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas = [] }: { chaveInicial: string | null; membroInicial: string | null; abaInicial?: AbaEquipe; empresas?: { chave: string; nome: string; socio: boolean }[] }) {
+type AbaEquipe = "conversas" | "internas" | "visitantes" | "whatsapp" | "vagas" | "sobre" | "conectores";
+export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas = [], visitanteInicial = null }: { chaveInicial: string | null; membroInicial: string | null; abaInicial?: AbaEquipe; empresas?: { chave: string; nome: string; socio: boolean }[]; visitanteInicial?: string | null }) {
   const [p, setP] = useState<Painel | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aba, setAba] = useState<AbaEquipe>(abaInicial ?? "conversas");
@@ -87,6 +89,8 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas
     ["sobre", "Sobre a empresa", "editar", null, false],
     ["conectores", "Conectores", "plugue", null, false],
   ];
+  // WhatsApp da loja (WE-18, _whatsapp.tsx): só com o WhatsApp ligado no servidor
+  if (p.whatsapp) abas.splice(3, 0, ["whatsapp", "WhatsApp", "telefone", null, false]);
 
   return (
     <RostoSede.Provider value={sede}>
@@ -119,7 +123,8 @@ export function EquipePainel({ chaveInicial, membroInicial, abaInicial, empresas
 
       {aba === "conversas" && membro && <Conversas key={`${membro.membroId}-${envios}`} p={p} membro={membro} q={q} selecionar={setSel} recarregar={carregar} />}
       {aba === "internas" && <Internas p={p} q={q} abrir={abrirPessoa} />}
-      {aba === "visitantes" && <Visitantes q={q} />}
+      {aba === "visitantes" && <Visitantes q={q} lote={p.lote.chave} inicial={visitanteInicial} />}
+      {aba === "whatsapp" && p.whatsapp && <WhatsAppLoja p={p} irParaConversas={() => setAba("visitantes")} />}
       {aba === "vagas" && <VagasDono empresa={p.lote.empresaNome} numero={p.lote.numero} />}
       {aba === "sobre" && <Sobre p={p} lote={p.lote.chave} salvo={carregar} />}
       {aba === "conectores" && <Conectores p={p} />}
@@ -467,19 +472,30 @@ function Regras({ membro, lote, mudou }: { membro: Membro; lote: string; mudou: 
   );
 }
 
-// também na página grátis (WE-13b, app/_pagina-gratis.tsx)
-export function Visitantes({ q }: { q: string }) {
+// também na página grátis (WE-13b, app/_pagina-gratis.tsx), sem lote: lá não há WhatsApp, que é do lote (WE-18)
+export function Visitantes({ q, lote, inicial = null }: { q: string; lote?: string; inicial?: string | null }) {
   const [lista, setLista] = useState<Visitante[] | null>(null);
-  const [aberto, setAberto] = useState<string | null>(null);
+  const [aberto, setAberto] = useState<string | null>(inicial);
   const [falasDe, setFalasDe] = useState<{ de: string; falas: FalaVisita[] } | null>(null);
   const falas = aberto && falasDe?.de === aberto ? falasDe.falas : null;
-  useEffect(() => { api<Visitante[]>(`/api/workend/equipe/visitantes?${q}`).then(setLista).catch(() => setLista([])); }, [q]);
+  // WhatsApp (WE-18): a conversa aberta se atualiza sozinha (a mensagem do cliente chega pela Meta) e o dono responde daqui
+  const [versao, setVersao] = useState(0);
+  const atual = lista?.find((v) => v.visitanteId === aberto) ?? null;
+  const ehWhats = atual?.canal === "whatsapp";
+  useEffect(() => { api<Visitante[]>(`/api/workend/equipe/visitantes?${q}`).then(setLista).catch(() => setLista([])); }, [q, versao]);
   useEffect(() => {
     if (!aberto) return;
     let vivo = true;
     api<FalaVisita[]>(`/api/workend/equipe/visitantes?${q}&visitante=${encodeURIComponent(aberto)}`).then((f) => vivo && setFalasDe({ de: aberto, falas: f })).catch(() => vivo && setFalasDe({ de: aberto, falas: [] }));
     return () => { vivo = false; };
-  }, [aberto, q]);
+  }, [aberto, q, versao]);
+  useEffect(() => {
+    if (!ehWhats) return;
+    const t = setInterval(() => { if (document.visibilityState === "visible") setVersao((v) => v + 1); }, 10000);
+    return () => clearInterval(t);
+  }, [ehWhats]);
+  const mudou = useCallback(() => setVersao((v) => v + 1), []);
+  const apagada = useCallback(() => { setAberto(null); setVersao((v) => v + 1); }, []);
   if (!lista) return <p className="mt-6 text-[var(--tinta-2)]">Carregando…</p>;
   if (!lista.length) return <div className="mt-5 rounded-2xl bg-[var(--cinza)] p-7"><b>Ninguém conversou com a loja ainda.</b><p className="mt-1 text-[var(--tinta-2)]">Quando alguém clicar na sua atendente no mapa ou abrir a página da loja, a conversa aparece aqui, com o contato que a pessoa deixar.</p></div>;
   return (
@@ -487,22 +503,28 @@ export function Visitantes({ q }: { q: string }) {
       <ul className="space-y-2">
         {lista.map((v) => (
           <li key={v.visitanteId}><button type="button" onClick={() => setAberto(v.visitanteId)} className={`w-full rounded-2xl border p-3 text-left transition ${aberto === v.visitanteId ? "border-[var(--azul)] bg-[var(--surface)] shadow-md" : "border-transparent bg-[var(--cinza)] hover:border-[var(--linha)]"}`}>
-            <span className="flex min-w-0 items-baseline justify-between gap-2"><b className="truncate">{v.nome ?? "Visitante"}</b><span className="text-[11px] text-[var(--tinta-2)]">{quando(v.ultimaEm)}</span></span>
+            <span className="flex min-w-0 items-baseline justify-between gap-2"><b className="truncate">{v.canal === "whatsapp" ? v.numero ?? v.nome : v.nome ?? "Visitante"}</b><span className="text-[11px] text-[var(--tinta-2)]">{quando(v.ultimaEm)}</span></span>
+            {v.canal === "whatsapp" && <span className="mt-0.5 flex flex-wrap gap-1"><span className="eq-wa-selo"><Icone nome="telefone" tamanho={12} />WhatsApp</span>{v.humanoAte && <span className="eq-wa-com-voce">Com uma pessoa</span>}</span>}
             <span className="block truncate text-[13px] text-[var(--tinta-2)]">{v.ultimaFala ?? "—"}</span>
           </button></li>
         ))}
       </ul>
-      <div className="min-h-[360px] rounded-2xl border border-[var(--linha)] bg-[var(--surface)] p-4">
+      <div className="min-h-[360px] min-w-0 rounded-2xl border border-[var(--linha)] bg-[var(--surface)] p-4">
         {!aberto && <p className="text-[var(--tinta-2)]">Escolha uma conversa para ler.</p>}
         {aberto && !falas && <p className="text-[var(--tinta-2)]">Carregando…</p>}
-        <div className="space-y-3">
-          {falas?.map((f) => (
-            <div key={f.id} className={f.papel === "user" ? "max-w-[80%]" : "ml-auto max-w-[85%]"}>
-              <span className="text-[11px] font-semibold text-[var(--tinta-2)]">{f.papel === "user" ? "Visitante" : f.quem} · {quando(f.criadoEm)}</span>
-              <div className={`mt-0.5 rounded-2xl px-4 py-2.5 ${f.papel === "user" ? "bg-[var(--cinza)]" : "bg-[#EEF3FF]"}`}><Texto t={f.conteudo} /></div>
+        {(() => {
+          const bolhas = (
+            <div className="space-y-3">
+              {falas?.map((f) => (
+                <div key={f.id} className={f.papel === "user" ? "max-w-[80%]" : "ml-auto max-w-[85%]"}>
+                  <span className="text-[11px] font-semibold text-[var(--tinta-2)]">{f.papel === "user" ? (ehWhats ? "Cliente" : "Visitante") : f.quem} · {quando(f.criadoEm)}</span>
+                  <div className={`mt-0.5 rounded-2xl px-4 py-2.5 ${f.papel === "user" ? "bg-[var(--cinza)]" : f.quem === "Você" ? "bg-[#E7F6EC]" : "bg-[#EEF3FF]"}`}><Texto t={f.conteudo} /></div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+          return aberto && ehWhats && lote ? <ConversaWhatsApp key={aberto} lote={lote} contato={aberto} versao={versao} mudou={mudou} apagada={apagada}>{bolhas}</ConversaWhatsApp> : bolhas;
+        })()}
       </div>
     </section>
   );

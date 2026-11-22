@@ -201,3 +201,27 @@
 .we .eq-empresa[aria-current="page"] { background: #fff; color: var(--ink); border-color: #fff; }
 .we .eq-empresa small { font-size: 10.5px; font-weight: 600; padding: 0 .4rem; border-radius: 999px; background: rgba(255,255,255,.14); }
 .we .eq-empresa[aria-current="page"] small { background: var(--surface-dim); }
+
+/* WhatsApp da loja (WE-18, _whatsapp.tsx): o resumo do topo, o selo nas conversas de visitantes e a barra da conversa */
+.we .eq-wa-resumo { position: relative; display: grid; gap: .55rem; font-size: 14px; color: rgba(255,255,255,.86); }
+.we .eq-wa-resumo-linha { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.we .eq-wa-resumo b { color: #fff; }
+.we .eq-wa-passos { display: grid; gap: .5rem; counter-reset: passo; }
+.we .eq-wa-passos li { position: relative; padding-left: 2rem; font-size: 14px; color: rgba(255,255,255,.75); line-height: 1.35; counter-increment: passo; }
+.we .eq-wa-passos li::before { content: counter(passo); position: absolute; left: 0; top: -.05rem; width: 1.45rem; height: 1.45rem; border-radius: 999px; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: rgba(255,255,255,.12); color: #fff; }
+.we .eq-wa-passos b { color: #fff; }
+.we .eq-wa-link { font-size: 13.5px; font-weight: 600; color: var(--blue); text-decoration: underline; text-underline-offset: 3px; justify-self: start; }
+.we .eq-cx-intro .eq-wa-link { color: #9CC3FF; }
+.we .eq-wa-lista { margin-top: .8rem; display: grid; gap: .45rem; padding-left: 1.1rem; list-style: disc; font-size: 13.5px; color: var(--ink); line-height: 1.4; }
+.we ol.eq-wa-lista { list-style: decimal; }
+.we .eq-wa-rotulo { display: grid; gap: .3rem; font-size: 13px; font-weight: 600; color: var(--ink); min-width: 0; }
+.we .eq-wa-rotulo small { font-weight: 500; color: var(--muted); }
+.we .eq-wa-codigo { min-width: 0; flex: 1; overflow-x: auto; white-space: nowrap; border-radius: 10px; background: var(--surface-dim); padding: .35rem .6rem; font-size: 12.5px; }
+.we .eq-wa-numero { font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.we .eq-wa-selo { display: inline-flex; align-items: center; gap: .25rem; border-radius: 999px; padding: .08rem .5rem; font-size: 11px; font-weight: 700; background: #E7F6EC; color: #166534; white-space: nowrap; }
+.we .eq-wa-com-voce { display: inline-flex; border-radius: 999px; padding: .08rem .5rem; font-size: 11px; font-weight: 700; background: #FFF4E5; color: #8A4B00; white-space: nowrap; }
+.we .eq-wa-barra { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; border-bottom: 1px solid var(--line); padding-bottom: .75rem; margin-bottom: .9rem; }
+.we .eq-wa-estado { display: inline-flex; align-items: center; gap: .4rem; font-size: 13px; font-weight: 600; color: var(--ink); }
+.we .eq-wa-ponto { flex: none; width: 8px; height: 8px; border-radius: 999px; background: #16A34A; box-shadow: 0 0 0 3px rgba(22,163,74,.18); }
+.we .eq-wa-ponto-dono { background: #D97706; box-shadow: 0 0 0 3px rgba(217,119,6,.18); }
+.we .eq-wa-resposta { margin-top: 1rem; border-top: 1px solid var(--line); padding-top: .9rem; display: grid; gap: .55rem; }

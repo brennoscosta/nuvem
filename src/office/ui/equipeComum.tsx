@@ -20,6 +20,7 @@ export type PainelEquipe = {
   sobre: string; contatos: ContatosEquipe; equipe: MembroEquipe[]; departamentos: Departamento[];
   gasto: { mes: number; teto: number; aviso: boolean; esgotado: boolean };
   visitantes: { total: number; ultimas24h: number }; ia: boolean;
+  whatsapp?: boolean; // WE-18: o WhatsApp da loja está ligado no servidor (aba WhatsApp)
 };
 // autor: "dono" (você), "agente" (a própria pessoa), "chefe" (pedido interno do chefe), "equipe" (respostas da equipe juntadas)
 export type MsgEquipe = { id: string; papel: string; autor: "dono" | "agente" | "chefe" | "equipe"; deNome: string | null; conteudo: string; avaliacao: number | null; correcao: string | null; em: string; imagem?: CartaoImagem | null };
