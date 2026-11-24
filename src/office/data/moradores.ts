@@ -142,7 +142,7 @@ export const MORADORES: Morador[] = [
   {
     id: "jessica", nome: "Jéssica", curto: "Jéssica", idade: 31, genero: "f", profissao: "analista de suporte no escritório da Nuvem",
     personalidade: "prática, organizada e prestativa", jeito: "explica tudo passo a passo, adora ajudar quem está abrindo a loja no WorkEnd",
-    gostos: ["suculentas", "k-drama", "planilhas bem organizadas"], bairro: "perto da Social RP", casa: casa(1, 1, 2),
+    gostos: ["suculentas", "k-drama", "planilhas bem organizadas"], bairro: "perto da lanchonete", casa: casa(1, 1, 2),
     boneco: visual("#1E3A5F", { pele: "#E7B48C", cabelo: "#2A1E19", estiloCabelo: "longo", traje: "blazer", calca: "#22252B", calcado: "#F4F4F4", tenis: "#0A6CFF" }), roupa: "#1E3A5F",
     celular: false, base: 4, nichos: ["tecnologia", "negocios", "consultoria"], bordao: "passo a passo",
     agenda: [H(0, "casa", "dormindo"), H(7.75, "restaurante", "tomando café da manhã no restaurante"), H(8.5, "nuvem", "trabalhando no suporte da Nuvem"), H(12, "praca", "almoçando na praça"), H(13, "nuvem", "trabalhando no suporte da Nuvem"), H(18, "orla-sul", "caminhando na orla sul"), H(19.5, "casa", "em casa")],
@@ -166,7 +166,7 @@ export const MORADORES: Morador[] = [
   {
     id: "marcos", nome: "Marcos", curto: "Marcos", idade: 45, genero: "m", profissao: "chaveiro e faz-tudo da Rua do Comércio",
     personalidade: "piadista e bem-humorado, resolve qualquer coisa", jeito: "solta uma piada a cada frase e chama todo mundo de chefia",
-    gostos: ["futebol de várzea", "churrasco de domingo", "consertar rádio velho"], bairro: "perto da Social RP", casa: casa(1, 1, 1),
+    gostos: ["futebol de várzea", "churrasco de domingo", "consertar rádio velho"], bairro: "perto da lanchonete", casa: casa(1, 1, 1),
     boneco: visual("#2563EB", { pele: "#C98E68", cabelo: "#2A1E19", estiloCabelo: "careca", barba: "bigode", calca: "#3B5B8C", calcado: "#1F2227" }), roupa: "#2563EB", acessorios: ["bone-workend"],
     celular: false, base: 6, nichos: ["casa", "automotivo", "servicos"], bordao: "chefia",
     agenda: [H(0, "casa", "dormindo"), H(7.5, "comercio", "abrindo a banca de chaves na Rua do Comércio"), H(8, "comercio", "atendendo na banca de chaves"), H(12, "restaurante", "almoçando no restaurante"), H(13, "comercio", "consertando uma fechadura na banca"), H(18, "praca", "tomando um ar na praça"), H(19.5, "casa", "em casa")],
@@ -174,7 +174,7 @@ export const MORADORES: Morador[] = [
   {
     id: "taina", nome: "Tainá", curto: "Tainá", idade: 29, genero: "f", profissao: "salva-vidas e bióloga marinha",
     personalidade: "direta, protetora e apaixonada pelo mar", jeito: "fala sem rodeio, puxa a orelha de quem joga lixo e conta curiosidade de bicho do mar",
-    gostos: ["tartarugas marinhas", "mergulho", "reciclagem"], bairro: "perto do NUVCAM", casa: casa(1, -1, 1),
+    gostos: ["tartarugas marinhas", "mergulho", "reciclagem"], bairro: "perto da lanchonete", casa: casa(1, -1, 1),
     boneco: visual("#E11D48", { pele: "#6E4329", cabelo: "#14110F", estiloCabelo: "rabo", traje: "regata", calca: "#1F2329", calcado: "#FACC15" }), roupa: "#E11D48", acessorios: ["oculos-sol"],
     celular: false, base: 0, nichos: ["turismo", "saude", "eventos"], bordao: "olha só",
     agenda: [H(0, "casa", "dormindo"), H(6.5, "orla-leste", "de plantão como salva-vidas na orla"), H(12, "restaurante", "almoçando no restaurante"), H(13, "orla-sul", "de plantão como salva-vidas na orla sul"), H(17.5, "calcadao", "recolhendo lixo do calçadão do rio"), H(19, "casa", "em casa")],
@@ -190,7 +190,7 @@ export const MORADORES: Morador[] = [
   {
     id: "pedro", nome: "Pedro", curto: "Pedro", idade: 38, genero: "m", profissao: "chapeiro do restaurante drive-thru",
     personalidade: "ranzinza na hora do pico, gente boa depois do expediente", jeito: "fala de comida o tempo todo e jura que faz o melhor hambúrguer da cidade",
-    gostos: ["hambúrguer artesanal", "rock dos anos 90", "pescaria"], bairro: "perto da AppZone", casa: casa(-1, -1, 0),
+    gostos: ["hambúrguer artesanal", "rock dos anos 90", "pescaria"], bairro: "perto da Nuvem", casa: casa(-1, -1, 0),
     boneco: visual("#F4F4F0", { pele: "#F3D2B3", cabelo: "#1E1A18", estiloCabelo: "topete", barba: "rala", calca: "#1F2329", calcado: "#1F2227" }), roupa: "#F4F4F0",
     celular: true, base: -2, nichos: ["alimentacao", "eventos"], bordao: "pode crer",
     agenda: [H(0, "casa", "dormindo"), H(9, "calcadao", "caminhando antes do trabalho"), H(10, "cozinha", "trabalhando na chapa do restaurante"), H(15, "restaurante", "no intervalo, nas mesinhas do restaurante"), H(15.75, "cozinha", "trabalhando na chapa do restaurante"), H(22.5, "casa", "em casa, depois do expediente")],
@@ -198,7 +198,7 @@ export const MORADORES: Morador[] = [
   {
     id: "lucas", nome: "Lucas", curto: "Lucas", idade: 19, genero: "m", profissao: "músico de rua",
     personalidade: "sonhador, tranquilo e gentil", jeito: "fala devagar, cita letra de música e sonha em tocar no palco da praça num evento grande",
-    gostos: ["MPB", "skate", "pôr do sol"], bairro: "perto da AppZone", casa: casa(-1, -1, 2),
+    gostos: ["MPB", "skate", "pôr do sol"], bairro: "perto da Nuvem", casa: casa(-1, -1, 2),
     boneco: visual("#F59E0B", { pele: "#8D5B3E", cabelo: "#14110F", estiloCabelo: "cacheado", calca: "#3B5B8C", calcado: "#E11D48" }), roupa: "#F59E0B", acessorios: ["fone"],
     celular: true, base: 5, nichos: ["eventos", "cursos", "conteudo"], bordao: "massa",
     agenda: [H(0, "casa", "dormindo"), H(10.5, "vila", "andando de skate pela Vila dos Criativos"), H(12.5, "restaurante", "almoçando no restaurante"), H(14, "orla-sul", "tocando violão na orla sul"), H(17, "praca-palco", "tocando violão na frente do palco da praça"), H(23, "casa", "em casa")],

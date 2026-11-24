@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useMundo } from "../mundoStore";
 import { FLUTUANTE, LARGO } from "./estilo";
 import { Icone, type NomeIcone } from "./Icone";
-import { SEDE_POR_ID, SEDE_SOCIALRP, frenteDaSede, paraMundoSede, type Sede } from "../data/sedes";
+import { SEDE_POR_ID, frenteDaSede, paraMundoSede, type Sede } from "../data/sedes";
 import { centroDaSala, Z0 as ZI0, Z1 as ZI1 } from "../data/plantaSede";
 import type { Membro, Setor } from "../data/escritorio";
 import { useSede } from "../sedeStore";
@@ -25,11 +25,11 @@ import { BotaoEditarPosicao } from "./EditorPosicao";
 export function abrirSede(id: string) {
   // a câmera vai até a frente da sede e, se estiver olhando pelas costas, dá a volta (19/11/2026: cada sede num lote, de
   // frente para a rua dela; scene/Cena3D.tsx)
-  const sede = SEDE_POR_ID[id] ?? SEDE_SOCIALRP, [x, z] = frenteDaSede(sede, 0);
+  const sede = SEDE_POR_ID[id]; if (!sede) return; // desde 24/11/2026 não há sede na cidade (data/sedes.ts)
+  const [x, z] = frenteDaSede(sede, 0);
   useMundo.setState({ loteSelecionado: null, alvoCamera: [x, 0.5, z], giroCamera: sede.rot });
   useSede.setState({ aberto: true, id: sede.id });
 }
-export function abrirOneState() { abrirSede("socialrp"); }
 // texto escuro ou claro sobre a cor da sede (botões)
 const tinta = (hex: string) => { const n = parseInt(hex.slice(1), 16); const l = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255); return l > 150 ? "#1A1306" : "#FFFFFF"; };
 const fechar = () => useCartaoOneState.setState({ aberto: false });
@@ -101,10 +101,14 @@ function Departamento({ s, pessoas, dono, aberto, alternar, verSala, chave }: { 
   );
 }
 
+// o cartão só aparece com uma sede na lista (desde 24/11/2026 a lista está vazia: data/sedes.ts)
 export function CartaoOneState() {
-  const aberto = useCartaoOneState((s) => s.aberto);
   const id = useSede((s) => s.id);
-  const sd: Sede = SEDE_POR_ID[id] ?? SEDE_SOCIALRP;
+  const sd = SEDE_POR_ID[id];
+  return sd ? <CartaoDaSede sd={sd} /> : null;
+}
+function CartaoDaSede({ sd }: { sd: Sede }) {
+  const aberto = useCartaoOneState((s) => s.aberto);
   const loteAberto = useMundo((s) => !!s.loteSelecionado);
   const sede = useMundo((s) => s.terrenos[sd.chave]);
   const souDono = useMundo((s) => s.meus.includes(sd.chave));

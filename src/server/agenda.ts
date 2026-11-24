@@ -44,7 +44,7 @@ export function quando(inicio: Date, fim: Date) { const d = diaDe(inicio); retur
 
 // ---------- loja e configuração ----------
 async function lojaAberta(numero: number): Promise<{ chave: string; donoId: string; empresa: string; numero: number } | null> {
-  const chave = chaveDaLoja(numero); if (!chave) return null; // 0 = a sede da Social RP
+  const chave = chaveDaLoja(numero); if (!chave) return null; // 0 seria uma sede (número próprio)
   let t = await obterTerreno(chave);
   if (t?.anexoDe) t = await obterTerreno(t.anexoDe); // lote duplo: a ampliação usa a loja principal
   if (!t || t.status !== "ativo") return null;

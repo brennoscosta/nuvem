@@ -3,4 +3,4 @@
 // src/office/ui/CartaoOneState.tsx. `id` = qual sede está no cartão.
 import { create } from "zustand";
 
-export const useSede = create<{ aberto: boolean; id: string }>(() => ({ aberto: false, id: "socialrp" }));
+export const useSede = create<{ aberto: boolean; id: string }>(() => ({ aberto: false, id: "" }));

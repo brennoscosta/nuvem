@@ -1,7 +1,7 @@
 // Número público da loja de um terreno (17/11/2026, revisão geral): o endereço workend.online/loja/N.
 //  - lote duplo: a ampliação usa o número da loja principal (um número só por loja);
-//  - as sedes (fora da lista de lotes, data/sedes.ts) têm o próprio número: Social RP 0, AppZone 901, bday.fm 902,
-//    NUVCAM 903 — já com página e atendimento na recepção.
+//  - as sedes (fora da lista de lotes, data/sedes.ts) têm o próprio número (de 17/11 a 24/11/2026: Social RP 0,
+//    AppZone 901, bday.fm 902, NUVCAM 903; as quatro saíram da cidade).
 import { LOTES, LOTE_POR_CHAVE } from "./mundo";
 import { SEDE_POR_CHAVE, SEDE_POR_NUMERO } from "./sedes";
 // quiosques (20/11/2026, data/quiosques.ts): número próprio a partir de 101, fora da lista de lotes

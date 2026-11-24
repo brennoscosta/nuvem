@@ -215,7 +215,7 @@ export function Mundo() {
       {/* quarteirões */}
       <Perto cx={0} cz={0} raio={raio + 60}><Isolado><Entorno /></Isolado></Perto>
       <Perto cx={PASSO} cz={0} raio={raio}><Isolado><Restaurante /></Isolado></Perto>
-      {/* sedes (data/sedes.ts): Social RP, AppZone, bday.fm e NUVCAM, cada uma num lote de esquina virado para o centro */}
+      {/* sedes (data/sedes.ts): cada uma num lote de esquina virado para o centro; nenhuma desde 24/11/2026 */}
       {SEDES.map((sd) => <Perto key={`${sd.id}-${versaoSedes}`} cx={sd.lote.x} cz={sd.lote.z} raio={raio}><Isolado><SedeHQ sede={sd} /></Isolado></Perto>)}
       <Depois etapa={2}><SoDePerto nome="gente-praia"><GentePraia /></SoDePerto></Depois>
       <Depois etapa={1}><Personagens /></Depois>

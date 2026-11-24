@@ -15,7 +15,7 @@ export function PegarCupom({ numero, compacto }: { numero: number; compacto?: bo
   const [erro, setErro] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
   useEffect(() => {
-    if (numero == null) return; // 0 = a sede da Social RP
+    if (numero == null) return; // 0 seria uma sede (número próprio)
     let vivo = true;
     fetch(`/api/workend/cupons/loja/${numero}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((j) => vivo && setEstado({ numero, v: versao, d: j as Dados | null })).catch(() => vivo && setEstado({ numero, v: versao, d: null }));
     return () => { vivo = false; };

@@ -31,7 +31,7 @@ const ehRobo = (h: Headers) => { const ua = h.get("user-agent") ?? ""; return !/
 export async function lojaDoNumero(numero: number): Promise<{ chave: string; donoId: string } | null> {
   // página grátis (Plano Vitrine, WE-13): número a partir de 10001; com a loja já na cidade, conta para a loja do lote
   if (ehNumeroDePagina(numero)) { const pg = await paginaPorNumero(numero); return pg ? { chave: (await lojaNaCidade(pg.usuarioId)) ?? chaveDaPagina(numero), donoId: pg.usuarioId } : null; }
-  const chave = chaveDaLoja(numero); if (!chave) return null; // 0 = a sede da Social RP
+  const chave = chaveDaLoja(numero); if (!chave) return null; // 0 seria uma sede (número próprio)
   await migrar();
   const [t] = await sql<{ chave: string; usuarioId: string; status: string; anexoDe: string | null }[]>`SELECT chave, usuario_id, status, anexo_de FROM terreno WHERE chave = ${chave}`;
   if (!t || t.status !== "ativo") return null;

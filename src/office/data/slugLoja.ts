@@ -12,11 +12,13 @@ export const ROTAS_DO_SITE = new Set([
   "planos", // a escada de planos (WE-19); já era palavra reservada
   "status", // a página pública de status dos serviços (WE-23); já era palavra reservada
 ]);
-// sedes (data/sedes.ts › id): o endereço delas é o id, o mesmo de /mundo?sede=<id>
-export const ENDERECO_SEDES = new Set(["socialrp", "appzone", "bday", "nuvcam"]);
+// sedes (data/sedes.ts › id): o endereço delas é o id, o mesmo de /mundo?sede=<id>. Vazio desde 24/11/2026 (as sedes
+// saíram da cidade); os endereços das quatro antigas continuam reservados (EX_SEDES), para nenhuma loja usar essas marcas.
+export const ENDERECO_SEDES = new Set<string>();
+const EX_SEDES = ["socialrp", "appzone", "bday", "nuvcam"];
 // palavras que nenhuma loja recebe: as rotas, as sedes, as páginas que o site pode ganhar e as pastas de arquivos públicos
 export const PALAVRAS_RESERVADAS = new Set([
-  ...ROTAS_DO_SITE, ...ENDERECO_SEDES,
+  ...ROTAS_DO_SITE, ...ENDERECO_SEDES, ...EX_SEDES,
   "sobre", "lojas", "perfis", "sair", "conta", "minha-conta", "contato", "contatos", "ajuda", "suporte", "termos", "privacidade", "politica",
   "precos", "preco", "planos", "plano", "gratis", "vitrine", "blog", "busca", "buscar", "login", "logout", "painel", "checkout",
   "pagamento", "pagamentos", "pagar", "pix", "creditos", "cupons", "cupom", "agenda", "equipe", "rede", "vendas", "resultados",

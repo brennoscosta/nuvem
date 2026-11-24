@@ -7,8 +7,7 @@
 // para +z) e cada sede leva o desenho para o seu lote, girado para a rua da frente (paraMundoSede, rot = frenteDoLote).
 // A equipe de cada uma é gravada no terreno `chave` (scripts/sedes.mjs), que NÃO muda com o lote novo (data/mundo.ts ›
 // chaveDoLote). A Social RP é só do Layon; as outras três são divididas (titular + sócio, terreno.socios, migração 0037).
-import { cantoParaOCentro, centroLote, frenteDoLote, kDaSede } from "./mundo";
-import { AREAS_ONESTATE, CHAVE_SEDE, SITE_ONESTATE, SEDE, Z_FRENTE_SEDE, type AreaOneState } from "./onestate";
+import { SEDE, Z_FRENTE_SEDE, type AreaOneState } from "./onestate";
 import { MODELO, type IdModelo } from "./modelos";
 import { medidasKit } from "./predios";
 
@@ -37,65 +36,10 @@ export interface Sede {
   modelo: IdModelo;
 }
 
-const a = (id: string, nome: string, href: string, cor: string): AreaSede => ({ id, nome, href, cor });
-
-export const SEDES: Sede[] = [
-  {
-    id: "socialrp", nome: "Social RP", chave: CHAVE_SEDE, i: 1, j: 1, ...noLote(1, 1),
-    cor: "#D4A63A", corClara: "#F7E7B4", escura: "#14110A", logo: "/socialrp/logo.png", icone: "/socialrp/icone.png", propLogo: 240 / 809,
-    site: SITE_ONESTATE, dominio: "onestatebr.com.br", areas: AREAS_ONESTATE, tipo: "roleplay",
-    resumo: "A sede da Social RP na cidade. Lá dentro, cada departamento trabalha com a sua equipe de agentes de IA.", numeroLoja: 0, nicho: "conteudo", estilo: "classica", andares: 4, modelo: "torre",
-  },
-  {
-    id: "appzone", nome: "AppZone", chave: "-1,-1,0", i: -1, j: -1, ...noLote(-1, -1),
-    cor: "#F59E0B", corClara: "#FFE2B0", escura: "#16181C", logo: "/sedes/appzone/logo.png", icone: "/sedes/appzone/icone.png", propLogo: 297 / 900,
-    site: "https://appzone.com.br", dominio: "appzone.com.br", tipo: "aplicativo",
-    areas: [
-      a("mapa", "Mapa", "/", "#38BDF8"), a("atividades", "Atividades", "/activities", "#F59E0B"), a("grupos", "Grupos", "/groups", "#22C55E"),
-      a("chat", "Chat", "/", "#A78BFA"), a("loja", "Loja", "/", "#F472B6"), a("membros", "Membros", "/users", "#60A5FA"),
-      a("categorias", "Categorias", "/", "#FB923C"), a("perfil", "Perfil", "/profile", "#E5E7EB"), a("regras", "Regras", "/", "#94A3B8"),
-      a("denuncias", "Denúncias", "/report", "#EF4444"), a("privacidade", "Privacidade", "/privacidade", "#CBD5E1"),
-    ],
-    resumo: "A sede da AppZone na cidade. Lá dentro, engenharia, produto e atendimento trabalham com a equipe de agentes de IA.", numeroLoja: 901, nicho: "tecnologia", estilo: "tech", andares: 4, modelo: "corporativo",
-  },
-  {
-    id: "bday", nome: "bday.fm", chave: "-1,1,0", i: -1, j: 1, ...noLote(-1, 1),
-    cor: "#8B5CF6", corClara: "#E4D7FF", escura: "#170E2B", logo: "/sedes/bday/logo.png", icone: "/sedes/bday/icone.png", propLogo: 263 / 900,
-    site: "https://bday.fm", dominio: "bday.fm", tipo: "presentes",
-    areas: [
-      a("presentes", "Presentes", "/presentes", "#A78BFA"), a("lives", "Lives", "/lives", "#F43F5E"), a("feed", "Feed", "/feed", "#60A5FA"),
-      a("explorar", "Explorar", "/explorar", "#22C55E"), a("carteira", "Carteira", "/carteira", "#FACC15"), a("parceiros", "Parceiros", "/parceiro", "#FB923C"),
-      a("como", "Como funciona", "/#como-funciona", "#38BDF8"), a("sobre", "Sobre", "/sobre", "#E5E7EB"), a("termos", "Termos de uso", "/termos", "#94A3B8"),
-      a("privacidade", "Privacidade", "/privacidade", "#CBD5E1"),
-    ],
-    // 20/11/2026: saiu o estilo "festa" (cilindros, varais, bolas e letreiro de lâmpadas): moderno com varanda, sóbrio
-    resumo: "A sede do bday.fm na cidade. Lá dentro, presentes, lives e parceiros trabalham com a equipe de agentes de IA.", numeroLoja: 902, nicho: "conteudo", estilo: "tech", andares: 3, modelo: "varanda",
-  },
-  {
-    id: "nuvcam", nome: "NUVCAM", chave: "1,-1,0", i: 1, j: -1, ...noLote(1, -1),
-    cor: "#EF4444", corClara: "#FFD3D3", escura: "#1C0A0C", logo: "/sedes/nuvcam/logo.png", icone: "/sedes/nuvcam/icone.png", propLogo: 212 / 900,
-    site: "https://nuvcam.tv", dominio: "nuvcam.tv", tipo: "vídeo ao vivo",
-    areas: [
-      a("chamadas", "Chamadas de vídeo", "/home", "#F87171"), a("lives", "Lives", "/live", "#F43F5E"), a("traducao", "Tradução de voz", "/home", "#38BDF8"),
-      a("perfil", "Perfil", "/home", "#E5E7EB"), a("seguranca", "Segurança", "/termos", "#22C55E"), a("moderacao", "Moderação", "/termos", "#FACC15"),
-      a("suporte", "Suporte", "/", "#60A5FA"), a("termos", "Termos de uso", "/termos", "#94A3B8"), a("privacidade", "Privacidade", "/privacidade", "#CBD5E1"),
-    ],
-    resumo: "A sede do NUVCAM na cidade. Lá dentro, vídeo ao vivo, segurança e atendimento trabalham com a equipe de agentes de IA.", numeroLoja: 903, nicho: "tecnologia", estilo: "estudio", andares: 4, modelo: "estudio",
-  },
-];
-// o lote da sede no quarteirão (data/mundo.ts: o `null` da lista de lotes), o centro dele e o giro para a rua da frente.
-// A regra do dono (19/11/2026) é o lote de esquina virado para o centro da cidade: a lista de lotes tem de bater com ela
-function noLote(i: number, j: number) {
-  const k = kDaSede(i, j);
-  if (k == null || k !== cantoParaOCentro(i, j)) throw new Error(`O lote da sede no quarteirão ${i},${j} não é o de esquina virado para o centro (data/mundo.ts)`);
-  const [x, z] = centroLote(i, j, k), rot = frenteDoLote(k);
-  // 19/11/2026 (pedido do dono: "deixe a entrada do prédio sempre voltada para a rua"): a frente (com a porta) olha para a
-  // rua do norte ou do sul, como os outros lotes (frenteDoLote); o lote é de esquina, então um dos lados também dá para a
-  // rua (oeste nos lotes k 0 e 2, leste nos k 1 e 3). Girado o desenho, esse lado do mundo vira o "oeste" ou o "leste" local
-  const ladoMundo = k % 2 === 0 ? -1 : 1; // -1 = a rua do lado fica a oeste (-x) do lote; +1 = a leste
-  const lado: LadoSede = ladoMundo * Math.round(Math.cos(rot)) < 0 ? "oeste" : "leste";
-  return { k, x, z, rot, lado, lote: { k, x, z, rot, lado } };
-}
+// 24/11/2026 (pedido do dono: "exclua as lojas bday.fm, social rp, nuvcam, appzone"): as quatro sedes saíram da cidade e
+// os dados delas foram apagados do banco (migração 0062). Os lotes de esquina viraram lotes à venda (data/mundo.ts). O
+// código das sedes continua aqui, sem nenhuma sede na lista, para uma sede nova entrar do mesmo jeito se o dono pedir.
+export const SEDES: Sede[] = [];
 // Giro da sede pela conta admin (21/11/2026, modo "Editar posição"): leva cada sede para a pose gravada no terreno dela
 // (data/posicaoPredio.ts) e refaz o lado da esquina (a face lateral que dá para a rua, a das áreas do site). A chave do
 // terreno nunca muda. Devolve true se alguma sede mudou (quem desenha a sede é montado de novo: mundoStore › versaoSedes).
@@ -115,14 +59,13 @@ export function aplicarPosesSedes(poseDe: (chave: string) => { centro: [number, 
   return mudou;
 }
 
-export const SEDE_SOCIALRP = SEDES[0];
 export const SEDE_POR_CHAVE: Record<string, Sede> = Object.fromEntries(SEDES.map((s) => [s.chave, s]));
 export const SEDE_POR_ID: Record<string, Sede> = Object.fromEntries(SEDES.map((s) => [s.id, s]));
 export const SEDE_POR_NUMERO: Record<number, Sede> = Object.fromEntries(SEDES.map((s) => [s.numeroLoja, s]));
 export const ehSede = (chave: string | null | undefined) => !!chave && !!SEDE_POR_CHAVE[chave];
 export const sedeDe = (chave: string | null | undefined): Sede | null => (chave ? SEDE_POR_CHAVE[chave] ?? null : null);
-// ?sede=1 (link antigo) = Social RP; ?sede=<id> ou a chave
-export const sedeDoParametro = (v: string | null | undefined): Sede | null => (!v ? null : v === "1" ? SEDE_SOCIALRP : SEDE_POR_ID[v] ?? SEDE_POR_CHAVE[v] ?? null);
+// ?sede=<id> ou a chave (o ?sede=1 antigo era a Social RP, que saiu em 24/11/2026)
+export const sedeDoParametro = (v: string | null | undefined): Sede | null => (!v ? null : SEDE_POR_ID[v] ?? SEDE_POR_CHAVE[v] ?? null);
 // Tudo da torre e do interior é desenhado em coordenadas do lote (origem no centro, frente para +z); local → mundo gira por
 // rot e soma o centro, como o <group position rotation> da cena (o mesmo cálculo de data/plantaInterna.ts › paraMundo)
 export const paraMundoSede = (s: Pick<Sede, "x" | "z" | "rot">, lx: number, lz: number): [number, number] => [s.x + lx * Math.cos(s.rot) + lz * Math.sin(s.rot), s.z - lx * Math.sin(s.rot) + lz * Math.cos(s.rot)];

@@ -154,7 +154,7 @@ export function VitrineLoja({ numero, compacto }: { numero: number; compacto?: b
   // guardado com o número: trocar de loja não mostra os produtos da anterior
   const [estado, setEstado] = useState<{ numero: number; d: DadosVitrine | null } | null>(null);
   useEffect(() => {
-    if (numero == null) return; // 0 = a sede da Social RP
+    if (numero == null) return; // 0 seria uma sede (número próprio)
     let vivo = true;
     fetch(`/api/workend/loja/${numero}/vitrine`).then((r) => (r.ok ? r.json() : null)).then((j) => vivo && setEstado({ numero, d: j?.produtos ? (j as DadosVitrine) : null })).catch(() => vivo && setEstado({ numero, d: null }));
     return () => { vivo = false; };

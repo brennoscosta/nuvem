@@ -7,8 +7,6 @@ import { AREAS, AREAS_OPERACIONAIS, FUNCOES, type AreaId } from "@/office/data/o
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 import { BotaoCookies } from "./_cookies";
 
-// demonstração dentro do próprio WorkEnd (17/11/2026): a sede da Social RP, com a equipe trabalhando por dentro
-export const DEMO = "/mundo?sede=1";
 
 export function Topo({ logado, nome }: { logado?: boolean; nome?: string }) {
   return (
@@ -45,7 +43,6 @@ export async function Rodape({ logado: dado }: { logado?: boolean } = {}) {
           {logado ? <Link href="/app">Meu escritório</Link> : <><Link href="/cadastro">Criar conta</Link><Link href="/entrar">Entrar</Link></>}
           <Link prefetch={false} href="/mundo">Passear pelo mapa</Link>
           <Link href="/planos">Planos e preços</Link>
-          <Link prefetch={false} href={DEMO}>Conhecer uma empresa por dentro</Link>
           <Link href="/politicas">Políticas de uso</Link>
           {/* mudar a escolha de cookies a qualquer momento (WE-01, LGPD) */}
           <BotaoCookies className="ck-rodape" />

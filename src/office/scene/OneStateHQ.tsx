@@ -17,7 +17,7 @@ import { ComFallback } from "./Modelos";
 import { ceu } from "./CicloDia";
 import { leve } from "./qualidade";
 import { SEDE } from "../data/onestate";
-import { SEDE_SOCIALRP, areasDoAndarDe, andaresComAreas, salasNaFace, salasVazias, alturaSede, type Sede, type AreaSede, type FaceSede } from "../data/sedes";
+import { areasDoAndarDe, andaresComAreas, salasNaFace, salasVazias, alturaSede, type Sede, type AreaSede, type FaceSede } from "../data/sedes";
 import { abrirSede } from "../ui/CartaoOneState";
 import { InteriorSede } from "./OneStateInterior";
 import { useEscritorio } from "../store";
@@ -308,4 +308,3 @@ export function SedeHQ({ sede: s0 }: { sede: Sede }) {
   );
 }
 // compatibilidade: a sede da Social RP sozinha
-export function OneStateHQ() { return <SedeHQ sede={SEDE_SOCIALRP} />; }

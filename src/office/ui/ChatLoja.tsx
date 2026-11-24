@@ -25,7 +25,7 @@ export function useLoja(numero: number | null) {
   // guardado com o número da loja: trocar de loja mostra "abrindo" sem limpar o estado no efeito
   const [estado, setEstado] = useState<{ numero: number; loja: LojaInfo | null; erro: string | null } | null>(null);
   useEffect(() => {
-    if (numero === null) return; // 0 = a sede da Social RP
+    if (numero === null) return; // 0 seria uma sede (número próprio)
     let vivo = true;
     fetch(`/api/workend/loja/${numero}`, { cache: "no-store" }).then(async (r) => { const j = await r.json(); if (!vivo) return; setEstado(r.ok ? { numero, loja: j as LojaInfo, erro: null } : { numero, loja: null, erro: (j as { erro?: string }).erro ?? "Loja fechada." }); }).catch(() => vivo && setEstado({ numero, loja: null, erro: "Sem conexão." }));
     return () => { vivo = false; };

@@ -27,7 +27,7 @@ export default async function PaginaDivulgar() {
   const u = await usuarioAtual().catch(() => null);
   if (!u) redirect("/entrar?destino=/app/divulgar");
   const t = await terrenoDoUsuario(u.id).catch(() => null);
-  const numero = t?.status === "ativo" ? numeroDaLoja(t) : null; // 0 = a sede da Social RP
+  const numero = t?.status === "ativo" ? numeroDaLoja(t) : null; // 0 seria uma sede (número próprio)
   const codigo = temNumero(numero) ? await meuCodigo(u).catch(() => null) : null;
   const promo = promocaoValendo(t?.promocao ?? null);
   // WE-16 (22/11/2026): os anúncios da praça já vêm na página (antes: 2,2 s em "Carregando…" no 4G)

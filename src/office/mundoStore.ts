@@ -197,7 +197,7 @@ export const useMundo = create<Estado>((set, get) => ({
       set({ terrenos, vagas: t.vagas ?? {}, meu: t.meu ?? null, meus: Array.isArray(t.meus) ? t.meus : t.meu ? [t.meu] : [], usuario: u && u.id ? u : null, admin: !!t.admin, pagamentoLigado: !!t.pagamento, preco: t.preco ?? PRECO_LOTE, fundador: t.fundador ?? null, minutosReserva: t.minutosReserva ?? 10, desvioRelogio: t.agora ? new Date(t.agora).getTime() - Date.now() : 0, carregado: true });
       // veio do cadastro com ?lote=: já abre o lote escolhido
       const busca = primeira && typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-      const sedePedida = sedeDoParametro(busca?.get("sede")); // ?sede=1 (Social RP) ou ?sede=<id da sede>
+      const sedePedida = sedeDoParametro(busca?.get("sede")); // ?sede=<id da sede> (o ?sede=1 antigo era a Social RP, que saiu em 24/11/2026)
       if (sedePedida) get().selecionarLote(sedePedida.chave);
       const pedido = busca?.get("lote") ?? null;
       if (pedido && (LOTE_POR_CHAVE[pedido] || QUIOSQUE_POR_CHAVE[pedido]) && !get().loteSelecionado) { get().selecionarLote(pedido); if (u && u.id && !terrenos[pedido] && pedido !== PRACA_CHAVE && !busca?.get("pagamento")) get().abrirPainel(); }

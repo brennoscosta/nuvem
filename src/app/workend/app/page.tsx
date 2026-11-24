@@ -13,7 +13,7 @@ import { terrenoDoUsuario, empresasDoUsuario, ehAdmin, PRECO_LOTE, type Terreno 
 import { sedeDe } from "@/office/data/sedes";
 import { painelDoDono, painelReserva, ofertaDeEntrada, saudacaoBR, type Painel, type Numero } from "@/server/painel";
 import { resumoVendas } from "@/server/pedidos";
-import { Rodape, SETORES, ESPECIALISTAS, DEMO } from "../_partes";
+import { Rodape, SETORES, ESPECIALISTAS } from "../_partes";
 import { CabecalhoApp } from "../_cabecalho";
 import { Contador, ContagemReserva, CopiarLink, Catalogo } from "./_painel";
 import { Icone } from "@/office/ui/Icone";
@@ -146,7 +146,7 @@ function LojaAberta({ chao, p, empresa, linkLote, vendas }: { chao: Terreno; p: 
               {p.numero && <Link href={`/loja/${p.numero}`} className="btn pn-btn-vidro">Página da loja</Link>}
             </div>
           </div>
-          {p.sede ? <div className="pn-predio pn-predio-sede" aria-hidden="true"><img src={p.sedeLogo ?? "/socialrp/logo.png"} alt="" width={809} height={240} /></div> : <div className="pn-predio" aria-hidden="true">
+          {p.sede ? <div className="pn-predio pn-predio-sede" aria-hidden="true"><img src={p.sedeLogo ?? ""} alt="" width={809} height={240} /></div> : <div className="pn-predio" aria-hidden="true">
             <span className="pn-balao">{p.logo ? <img src={p.logo} alt="" /> : <i>{empresa.slice(0, 1)}</i>}<b>{empresa}</b></span>
             <img src={`/workend/predios/${p.layout}.webp`} alt="" width={420} height={400} />
           </div>}
@@ -483,7 +483,6 @@ function SemLote({ fundador, paginaNoAr = false }: { fundador: { valor: number; 
             )}
             <div className="mt-6 flex flex-wrap gap-2.5">
               <Link prefetch={false} href="/mundo" className="btn btn-azul btn-grande">Escolher meu lote no mapa</Link>
-              <a href={DEMO} target="_blank" rel="noreferrer" className="btn btn-linha btn-grande">Ver um escritório ao vivo</a>
             </div>
           </div>
           <div className="pn-chegar-img pn-rua" aria-hidden="true">

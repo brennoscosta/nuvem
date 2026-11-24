@@ -27,7 +27,7 @@ export interface Quarteirao {
   j: number; // linha (z)
   ocupante?: "nuvem" | "restaurante"; // quarteirão inteiro
   // ordem FÍSICA: noroeste, nordeste, sudoeste, sudeste (k de centroLote). null = o lote da sede de uma empresa
-  // (data/sedes.ts, 19/11/2026): fica fora da lista de lotes à venda e o número dele fica guardado
+  // (data/sedes.ts, 19/11/2026): fica fora da lista de lotes à venda e o número dele fica guardado (nenhum desde 24/11/2026)
   lotes?: [Lote | null, Lote | null, Lote | null, Lote | null];
 }
 
@@ -50,40 +50,32 @@ export const cantoParaOCentro = (i: number, j: number) => (i < 0 ? 1 : 0) + (j <
 const V = (arvore = false): Lote => ({ tipo: "vazio", arvore });
 const C = (modelo: ModeloCasa, escala = 1): Lote => ({ tipo: "casa", modelo, escala });
 
-const SEDE = null; // o lote da sede (data/sedes.ts)
-
+// 24/11/2026 (pedido do dono: "exclua as lojas bday.fm, social rp, nuvcam, appzone"): as quatro sedes saíram e o lote de
+// esquina de cada uma virou lote à venda, com uma casa que não repete a dos vizinhos. O número de cada lote não mudou.
 export const QUARTEIROES: Quarteirao[] = [
   { i: 0, j: 0, ocupante: "nuvem" },
   { i: 1, j: 0, ocupante: "restaurante" },
   { i: -1, j: 0, lotes: [C("casaTerrea"), V(true), C("casaColonial", 1.05), C("casaModerna")] },
-  // 17/11/2026: sedes da AppZone (-1,-1), do NUVCAM (1,-1) e do bday.fm (-1,1) (data/sedes.ts), cada uma no quarteirão
-  // inteiro; nenhum desses 12 lotes estava reservado ou vendido e os números deles ficaram guardados.
-  // 19/11/2026 (pedido do dono): cada sede passou a ocupar só o lote de esquina virado para o centro da cidade
-  // (cantoParaOCentro); os outros 3 lotes de cada quarteirão voltaram a ser pontos à venda, com os números de antes
-  // (o número do lote da sede continua guardado). A chave de banco dos lotes destes quarteirões está em chaveDoLote.
-  { i: -1, j: -1, lotes: [C("casaTerrea"), V(true), C("casaModerna"), SEDE] }, // AppZone no sudeste
+  // 17/11/2026 a 24/11/2026: sedes da AppZone (-1,-1), do NUVCAM (1,-1), do bday.fm (-1,1) e da Social RP (1,1), cada uma,
+  // desde 19/11/2026, no lote de esquina virado para o centro da cidade (cantoParaOCentro)
+  { i: -1, j: -1, lotes: [C("casaTerrea"), V(true), C("casaModerna"), C("casaColonial")] }, // ex-AppZone no sudeste
   { i: 0, j: -1, lotes: [V(true), C("casaTerrea", 1.05), C("casaColonial"), V()] },
-  { i: 1, j: -1, lotes: [V(true), C("casaColonial"), SEDE, V()] }, // NUVCAM no sudoeste
-  { i: -1, j: 1, lotes: [C("casaModerna"), SEDE, V(true), C("casaTerrea")] }, // bday.fm no nordeste
+  { i: 1, j: -1, lotes: [V(true), C("casaColonial"), C("casaModerna"), V()] }, // ex-NUVCAM no sudoeste
+  { i: -1, j: 1, lotes: [C("casaModerna"), C("casaColonial"), V(true), C("casaTerrea")] }, // ex-bday.fm no nordeste
   // o lote 0,1,1 (ao sul da Nuvem) virou a praça de eventos e da feira de sábado em 12/11/2026
   { i: 0, j: 1, lotes: [C("casaColonial", 0.95), { tipo: "praca" }, V(), C("casaTerrea", 1.05)] },
-  // 16/11/2026: o quarteirão 1,1 (último na ordem, então nenhum lote mudou de número) virou a sede do OneState RP
-  // (src/office/data/onestate.ts); antes tinha 4 lotes à venda, nenhum vendido. Desde 19/11/2026 a sede (Social RP)
-  // fica no noroeste e os outros 3 lotes estão à venda
-  { i: 1, j: 1, lotes: [SEDE, C("casaTerrea"), C("casaModerna"), V(true)] },
+  { i: 1, j: 1, lotes: [C("casaColonial"), C("casaTerrea"), C("casaModerna"), V(true)] }, // ex-Social RP no noroeste
 ];
-// posição física (k) do lote da sede num quarteirão, ou null
-export const kDaSede = (i: number, j: number): number | null => {
-  const k = QUARTEIROES.find((q) => q.i === i && q.j === j)?.lotes?.indexOf(SEDE) ?? -1;
-  return k >= 0 ? k : null;
-};
+// Posição física (k) do lote que foi sede de 17/11 a 24/11/2026 em cada quarteirão. As sedes saíram, mas a chave de
+// banco dos lotes destes quarteirões continua trocada (chaveDoLote): quem já comprou um lote vizinho fica com a mesma chave.
+const EX_SEDE: Record<string, number> = { "-1,-1": 3, "1,-1": 2, "-1,1": 1, "1,1": 0 };
 // Chave de banco ("i,j,c") do lote na posição física k. Até 18/11/2026 cada sede ocupava o quarteirão inteiro com a chave
-// "i,j,0", e a empresa, a equipe e as conversas dela estão gravadas nessa chave: a sede continua com "i,j,0" na posição
-// física dela, e o lote livre que ficou na posição 0 recebe a chave que sobrou ("i,j,kSede"). Fora dos quarteirões de
-// sede (e na Social RP, que está na posição 0), chave e posição são a mesma coisa. Quem acha um lote pela chave usa
-// LOTE_POR_CHAVE (o k e o centro de lá são os físicos); nunca tire a posição de dentro da chave.
+// "i,j,0"; quando ela passou para o lote de esquina, ficou com "i,j,0" na posição física dela, e o lote livre que ficou na
+// posição 0 recebeu a chave que sobrou ("i,j,kSede"). A troca continua depois que as sedes saíram (24/11/2026), para
+// nenhum lote vendido mudar de chave. Quem acha um lote pela chave usa LOTE_POR_CHAVE (o k e o centro de lá são os
+// físicos); nunca tire a posição de dentro da chave.
 export function chaveDoLote(i: number, j: number, k: number): string {
-  const s = kDaSede(i, j);
+  const s = EX_SEDE[`${i},${j}`] ?? null;
   const c = s == null ? k : k === 0 ? s : k === s ? 0 : k;
   return `${i},${j},${c}`;
 }
