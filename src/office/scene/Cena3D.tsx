@@ -19,7 +19,7 @@ import { Acabamento, TOM_PROPRIO } from "./Acabamento";
 import { MiniMapaRender } from "./MiniMapaRender";
 import { precarregarCidade } from "./Modelos";
 import { Agente, handlers } from "./Agente";
-import { qualidade, qualidadeManual, lembrarLeveAuto, escolherQualidade, escolherMapa, cairPara2D } from "./qualidade";
+import { qualidade, qualidadeManual, lembrarLeveAuto, escolherQualidade, escolherMapa, cairPara2D, aparelhoForte } from "./qualidade";
 import { useEscritorio } from "../store";
 import { useMundo, modoMundo } from "../mundoStore";
 import { MESA } from "../data/layout";
@@ -216,41 +216,65 @@ const MEDIR = typeof window !== "undefined" && new URLSearchParams(window.locati
 // ---------- qualidade durante o uso ----------
 // ?simularfps=12 finge que o aparelho está rodando a 12 quadros por segundo (para testar a queda)
 const SIMULAR_FPS = (() => { if (typeof window === "undefined") return null; const v = Number(new URLSearchParams(window.location.search).get("simularfps")); return v > 0 ? v : null; })();
-// Plano B (WE-20, 22/11/2026): já nos gráficos leves e com a cidade carregada, 5 s abaixo de 20 quadros por segundo levam ao
+// Plano B (WE-20, 22/11/2026): já nos gráficos leves e com a cidade carregada, 15 s abaixo de 20 quadros por segundo levam ao
 // mapa simples (scene/qualidade › cairPara2D). Com ?mapa=3d (a pessoa pediu o 3D de novo) a lentidão só avisa, como antes.
 // O navegador de robô dos testes desenha sem placa de vídeo, a menos de 1 quadro por segundo: só cai com ?queda2d=1.
+// Correção da queda falsa (24/11/2026): aparelho forte (qualidade › aparelhoForte) não cai por lentidão, e a lentidão tem
+// de durar 15 s em pelo menos 6 medidas seguidas, todas com a aba à vista e com foco.
 const QUEDA_POR_LENTIDAO = (() => {
   if (typeof window === "undefined") return false;
   const q = new URLSearchParams(window.location.search);
-  return q.get("mapa") !== "3d" && (navigator.webdriver !== true || q.get("queda2d") === "1");
+  return q.get("mapa") !== "3d" && !aparelhoForte() && (navigator.webdriver !== true || q.get("queda2d") === "1");
 })();
+const LENTO_MS = 15000, LENTO_MEDIDAS = 6;
+// um quadro que demora mais que isto é pausa do navegador (janela minimizada ou escondida sem aviso), não lentidão
+const QUADRO_PARADO_MS = 5000;
 // nível: 0 = completo; 1 = resolução 1x e sombra sem refazer periódico; 2 = também no máximo 30 quadros por segundo (igual aos gráficos leves)
 function QualidadeViva({ nivel, maximo, aoBaixar, aoTravar, aoCair }: { nivel: number; maximo: number; aoBaixar: (n: number) => void; aoTravar: () => void; aoCair: () => void }) {
-  const k = useRef({ quadros: 0, desde: 0, inicio: 0, ruins: 0, avisou: false, lentas: 0, lentoDesde: 0 });
+  const k = useRef({ quadros: 0, desde: 0, inicio: 0, ruins: 0, avisou: false, lentas: 0, lentoDesde: 0, ultimo: 0, solta: false, retoma: 0 });
   // quando o último modelo chegou: a cidade só conta como carregada 3 s depois (os materiais novos ainda compilam)
   const carga = useRef(0);
   const carregando = useProgress((s) => s.active);
   useEffect(() => { carga.current = carregando ? Infinity : performance.now(); }, [carregando]);
+  // Correção da queda falsa (24/11/2026): com a aba escondida, a janela minimizada ou sem foco o navegador para ou segura os
+  // quadros, e a medida que atravessava a pausa (com a aba já à vista no fim) parecia lentidão. Qualquer interrupção joga
+  // fora a medida em curso e zera as contagens; na volta, espera 3 s (o primeiro segundo costuma tropeçar).
+  useEffect(() => {
+    const parar = () => { k.current.solta = true; };
+    const ev = ["blur", "focus", "pagehide", "pageshow"] as const;
+    for (const e of ev) window.addEventListener(e, parar);
+    document.addEventListener("visibilitychange", parar);
+    return () => { for (const e of ev) window.removeEventListener(e, parar); document.removeEventListener("visibilitychange", parar); };
+  }, []);
   useFrame(() => {
     const agora = performance.now(), x = k.current;
     if (!x.inicio) { x.inicio = agora; x.desde = agora; }
+    const parado = !SIMULAR_FPS && x.ultimo > 0 && agora - x.ultimo > QUADRO_PARADO_MS;
+    x.ultimo = agora;
+    if (x.solta || parado || document.visibilityState !== "visible" || !document.hasFocus()) {
+      x.solta = false; x.retoma = agora + 3000; x.quadros = 0; x.desde = agora; x.ruins = 0; x.lentas = 0;
+      return;
+    }
+    if (agora < x.retoma) { x.quadros = 0; x.desde = agora; return; }
     x.quadros++;
     if (agora - x.desde < 1000) return;
     const fps = SIMULAR_FPS ?? (x.quadros * 1000) / (agora - x.desde);
     const comeco = x.desde; // início desta medida
     x.quadros = 0; x.desde = agora;
-    // os primeiros 10 s são de carregamento (modelos chegando travam de verdade) e aba escondida não conta
-    if (agora - x.inicio < 10000 || document.visibilityState !== "visible") { x.ruins = 0; x.lentas = 0; return; }
-    // plano B: pelo menos 2 medidas seguidas abaixo de 20, somando 5 s (um tropeço só, de um quadro longo, não derruba)
+    // os primeiros 10 s são de carregamento (modelos chegando travam de verdade); aba escondida e sem foco já saíram acima
+    if (agora - x.inicio < 10000) { x.ruins = 0; x.lentas = 0; return; }
+    // plano B: pelo menos 6 medidas seguidas abaixo de 20, somando 15 s (tropeços e pausas curtas não derrubam)
     if (QUEDA_POR_LENTIDAO && nivel >= 2 && fps < 20 && comeco - carga.current >= 3000) {
       if (!x.lentas++) x.lentoDesde = comeco;
-      if (x.lentas >= 2 && agora - x.lentoDesde >= 5000) { x.lentas = 0; aoCair(); return; }
+      if (x.lentas >= LENTO_MEDIDAS && agora - x.lentoDesde >= LENTO_MS) { x.lentas = 0; aoCair(); return; }
     } else x.lentas = 0;
     if (fps < (nivel >= 2 ? 18 : 24)) x.ruins++; else x.ruins = 0;
     if (x.ruins < 5) return; // 5 segundos seguidos ruins
-    x.ruins = 0; x.inicio = agora - 7000; // espera 3 s antes de julgar o nível novo
-    if (nivel < maximo) aoBaixar(nivel + 1);
-    else if (!x.avisou) { x.avisou = true; aoTravar(); }
+    x.ruins = 0;
+    if (nivel < maximo) { x.inicio = agora - 7000; aoBaixar(nivel + 1); } // espera 3 s antes de julgar o nível novo
+    // no nível mais leve, com a queda automática ligada, quem decide é o plano B (sem zerar a contagem dele); sem ela
+    // (aparelho forte, ?mapa=3d), o aviso de sempre
+    else if (!x.avisou && !(QUEDA_POR_LENTIDAO && nivel >= 2)) { x.avisou = true; aoTravar(); }
   });
   return null;
 }

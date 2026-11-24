@@ -9,12 +9,21 @@ import { QUIOSQUE_POR_NUMERO } from "../data/quiosques";
 export type Qualidade = "alta" | "leve";
 
 const CHAVE = "nuvem:qualidade";
-const CHAVE_AUTO = "nuvem:qualidade-auto"; // marcado pela própria cena quando o aparelho não deu conta
+// marcado pela própria cena quando o aparelho não deu conta. v2 (24/11/2026, correção da queda falsa): a marca antiga
+// também era gravada por medida falsa (a volta de uma aba escondida contava como lentidão); ela é ignorada e apagada
+const CHAVE_AUTO = "nuvem:qualidade-auto-v2";
 let atual: Qualidade | null = null;
+// marcas antigas, gravadas antes da correção de 24/11/2026: ignoradas e apagadas
+let limpou = false;
+function limparMarcasAntigas() {
+  if (limpou) return; limpou = true;
+  try { window.localStorage.removeItem("nuvem:qualidade-auto"); window.localStorage.removeItem("workend-mapa-auto"); } catch { /* sem armazenamento */ }
+}
 
 export function qualidade(): Qualidade {
   if (atual) return atual;
   if (typeof window === "undefined") return "alta";
+  limparMarcasAntigas();
   const q = new URLSearchParams(window.location.search).get("qualidade");
   if (q === "leve" || q === "alta") return (atual = q);
   if (q === "teste-alta") return (atual = "alta"); // teste: começa nos completos sem contar como escolha manual
@@ -75,24 +84,40 @@ export function lembrarLeveAuto() { try { window.localStorage.setItem(CHAVE_AUTO
 // ---------- mapa simples (2D) ----------
 // Para aparelho sem WebGL ou fraco demais: ?mapa=2d força, ?mapa=3d volta; a escolha do botão fica salva no aparelho.
 // Plano B (WE-20, 22/11/2026): a cena 3D também cai sozinha para cá quando perde o contexto do WebGL (faltou memória de
-// vídeo e a tela fica preta) ou quando passa 5 s abaixo de 20 quadros por segundo já nos gráficos leves, depois de a cidade
+// vídeo e a tela fica preta) ou quando passa 15 s abaixo de 20 quadros por segundo já nos gráficos leves, depois de a cidade
 // carregar (Cena3D). O aparelho fica marcado (CHAVE_MAPA_AUTO) e as próximas visitas já abrem no 2D, com o aviso e o botão
 // "Tentar o 3D de novo" (ui/Mapa2D). Quem chegou por link de loja aberta (?lote=, ?sede=, ?quiosque=) vai para a página da
 // loja (/loja/N?sem3d=1, feita no servidor e sem WebGL), com o botão "Ver a loja na cidade em 3D".
 const CHAVE_MAPA = "workend-mapa";
-const CHAVE_MAPA_AUTO = "workend-mapa-auto"; // por que o aparelho caiu sozinho para o 2D
+// por que o aparelho caiu sozinho para o 2D e até quando vale (correção 24/11/2026): {"m":"lento"|"contexto","ate":ms}.
+// A queda por lentidão vence em 24 h e a por perda do WebGL em 7 dias; aparelho sem WebGL nenhum não é marca, é detecção
+const CHAVE_MAPA_AUTO = "workend-mapa-auto-v2";
 export type MotivoQueda = "contexto" | "lento";
+const VALIDADE_QUEDA: Record<MotivoQueda, number> = { lento: 24 * 3600e3, contexto: 7 * 24 * 3600e3 };
+// aparelho forte (correção 24/11/2026): 8 núcleos ou mais e, quando o navegador informa, 8 GB ou mais. Nele a lentidão vem
+// de fora (outro programa, aba escondida, janela minimizada), não do aparelho: o 3D só cai para o 2D se perder o WebGL
+export function aparelhoForte() {
+  if (typeof navigator === "undefined") return false;
+  const n = navigator as Navigator & { deviceMemory?: number };
+  return (n.hardwareConcurrency ?? 0) >= 8 && (n.deviceMemory == null || n.deviceMemory >= 8);
+}
 let mapa2d: boolean | null = null;
 let motivo: MotivoQueda | "sem-webgl" | null = null; // null: o 2D foi escolha da pessoa (ou é o 3D)
 export function temWebGL() {
   try { const c = document.createElement("canvas"); const gl = (c.getContext("webgl2") ?? c.getContext("webgl")) as WebGLRenderingContext | null; if (!gl) return false; gl.getExtension("WEBGL_lose_context")?.loseContext(); return true; } catch { return false; }
 }
 function quedaSalva(): MotivoQueda | null {
-  try { const v = window.localStorage.getItem(CHAVE_MAPA_AUTO); return v === "contexto" || v === "lento" ? v : null; } catch { return null; }
+  try {
+    const v = JSON.parse(window.localStorage.getItem(CHAVE_MAPA_AUTO) ?? "null") as { m?: string; ate?: number } | null;
+    if (v && (v.m === "lento" || v.m === "contexto") && typeof v.ate === "number" && v.ate > Date.now()) return v.m;
+    if (v) window.localStorage.removeItem(CHAVE_MAPA_AUTO); // vencida ou estragada
+  } catch { /* sem armazenamento ou marca ilegível */ }
+  return null;
 }
 export function usarMapa2D(): boolean {
   if (mapa2d != null) return mapa2d;
   if (typeof window === "undefined") return false;
+  limparMarcasAntigas();
   const q = new URLSearchParams(window.location.search).get("mapa");
   if (q === "2d") return (mapa2d = true);
   if (q === "3d") return (mapa2d = false);
@@ -137,7 +162,7 @@ export function cairPara2D(m: MotivoQueda, terrenos: Record<string, TerrenoMin>)
   if (caindo || typeof window === "undefined") return;
   caindo = true;
   let guardou = false;
-  try { window.localStorage.setItem(CHAVE_MAPA_AUTO, m); guardou = true; } catch { /* sem armazenamento: vai pela URL */ }
+  try { window.localStorage.setItem(CHAVE_MAPA_AUTO, JSON.stringify({ m, ate: Date.now() + VALIDADE_QUEDA[m] })); guardou = true; } catch { /* sem armazenamento: vai pela URL */ }
   const loja = paginaDaLojaDoLink(terrenos);
   if (loja) { window.location.replace(loja); return; }
   const u = new URL(window.location.href); u.searchParams.delete("mapa");
