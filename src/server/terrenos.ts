@@ -58,7 +58,7 @@ export function loteAVenda(chave: string) {
   return !!l && l.lote.tipo !== "praca"; // a praça de eventos não está à venda
 }
 
-// Espaços de 5 × 5 m (24/11/2026, data/quiosques.ts › ESPACOS): o lote inteiro e os 4 espaços dele não convivem. Quem
+// Espaços do lote dividido em 4, de 10 × 10 m (24/11/2026, data/quiosques.ts › ESPACOS): o lote inteiro e os 4 espaços dele não convivem. Quem
 // reserva um espaço não pode pegar um lote alugado inteiro; quem reserva o lote (ou o usa para ampliar o seu) não pode
 // pegar um lote que já tem espaço alugado. A trava por lote (pg_advisory_xact_lock) faz duas reservas ao mesmo tempo,
 // uma do lote e outra de um espaço, esperarem uma pela outra dentro da transação.
@@ -72,7 +72,7 @@ async function conferirEspacosDoLote(db: Db, chave: string) {
   } else {
     const espacos = ESPACOS_DO_LOTE[lote].map((e) => e.chave);
     const [ocupado] = await db`SELECT 1 FROM terreno WHERE chave = ANY(${sql.array(espacos)}::text[]) LIMIT 1`;
-    if (ocupado) throw new Error("Esse lote já tem espaço de 5 × 5 m de outra empresa e não está à venda inteiro. Escolha um dos espaços livres dele ou outro lote.");
+    if (ocupado) throw new Error("Esse lote já está dividido em 4 espaços e tem empresa num deles, então não está à venda inteiro. Escolha um dos espaços livres dele ou outro lote.");
   }
 }
 
@@ -484,7 +484,7 @@ export async function reservarAnexo(u: Usuario, anexo: string) {
     if (ja) throw new Error("O seu lote já tem uma ampliação.");
     const [dono] = await tx<{ usuarioId: string }[]>`SELECT usuario_id FROM terreno WHERE chave = ${anexo} FOR UPDATE`;
     if (dono && dono.usuarioId !== u.id) throw new Error("Esse lote já tem dono.");
-    if (!dono) await conferirEspacosDoLote(tx as unknown as Db, anexo); // lote com espaço de 5 × 5 m alugado não serve de ampliação
+    if (!dono) await conferirEspacosDoLote(tx as unknown as Db, anexo); // lote com espaço de 10 × 10 m alugado não serve de ampliação
     if (!dono) await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, nicho, status, reservado_ate, anexo_de) VALUES (${anexo}, ${u.id}, ${principal.empresaNome}, ${principal.cor}, ${principal.nicho}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${principal.chave})`;
     void registrar("reserva", `${principal.empresaNome} reservou a ampliação do lote`, { usuarioId: u.id, terrenoChave: anexo, dados: { detalhes: `Lote duplo com ${principal.chave}.` } });
     const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${anexo}`;

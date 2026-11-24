@@ -23,7 +23,7 @@ import { CenaLote, CenaFachada, CenaEquipe } from "./_inicio/CenasPassos";
 import { Revelar, Contador, Rolagem } from "./_inicio/efeitos";
 import { vagasFundador } from "@/server/ofertas";
 import { lojaDestaque } from "@/server/destaque";
-import { PRECO_LOTE, PRECO_QUIOSQUE, precoCurto } from "@/office/data/precosTerreno";
+import { PRECO_LOTE, PRECO_QUIOSQUE, PRECO_ESPACO, precoCurto } from "@/office/data/precosTerreno";
 import { planoEquipeLigado } from "@/server/planos";
 import { cartaoLigado } from "@/server/assinaturas";
 import { EscadaPlanos } from "./_planos";
@@ -60,7 +60,7 @@ const EXTENSO = ["", "Um", "Dois", "Três", "Quatro", "Cinco", "Seis", "Sete", "
 const porExtenso = (n: number) => EXTENSO[n] ?? String(n);
 
 const PERGUNTAS: [string, string][] = [
-  ["Preciso pagar para criar a conta?", `Não. A conta é grátis, a página da sua loja também (Vitrine, com 3 produtos e o botão do WhatsApp) e o personagem também. Você só paga quando leva a loja para a cidade: o quiosque por ${precoCurto(PRECO_QUIOSQUE)} ou o lote por ${precoCurto(PRECO_LOTE)} por mês. Roupas e acessórios premium do personagem são à parte.`],
+  ["Preciso pagar para criar a conta?", `Não. A conta é grátis, a página da sua loja também (Vitrine, com 3 produtos e o botão do WhatsApp) e o personagem também. Você só paga quando leva a loja para a cidade: o quiosque por ${precoCurto(PRECO_QUIOSQUE)}, 1/4 de lote (10 × 10 m) por ${precoCurto(PRECO_ESPACO)} ou o lote inteiro por ${precoCurto(PRECO_LOTE)} por mês. Roupas e acessórios premium do personagem são à parte.`],
   ["Como funciona o pagamento?", "Por Pix, direto no mapa: o QR Code aparece no cartão do lote e a confirmação chega sozinha. A reserva segura o lote por 1 hora enquanto você paga."],
   ["E se eu não renovar?", "Depois do vencimento há 5 dias de tolerância. Sem renovação, o lote volta a ficar à venda, mas a sua marca e a sua equipe ficam guardadas na conta e voltam se você reservar outro lote."],
   ["Posso desistir da compra?", "Pode. Em até 7 dias depois da compra você recebe o valor de volta."],

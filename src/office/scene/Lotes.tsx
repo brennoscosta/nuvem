@@ -57,7 +57,7 @@ export function Lotes() {
   const anexoAtivo = useMemo(() => { const m: Record<string, string> = {}; for (const t of Object.values(reservados)) if (t.anexoDe && t.status === "ativo") m[t.anexoDe] = t.chave; return m; }, [reservados]);
   // placa "Ponto disponível" só nos lotes livres (o lote reservado ganha a placa da empresa). O lote em rascunho também perde a placa.
   const emRascunho = rascunho && selecionado ? selecionado : null;
-  // espaço de 5 × 5 m (24/11/2026): o lote com espaço reservado, alugado ou em rascunho também perde a placa, que fica
+  // lote dividido em 4 (24/11/2026): o lote com espaço reservado, alugado ou em rascunho também perde a placa, que fica
   // na faixa da frente, onde os espaços nascem (data/quiosques.ts › ESPACOS)
   const comPlaca = useMemo(() => {
     const res = new Set(chavesReservadas ? chavesReservadas.split("|") : []);

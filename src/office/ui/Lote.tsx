@@ -231,7 +231,7 @@ export function CartaoLote() {
         <button onClick={() => selecionarLote(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
       </div>
 
-      {/* lote dividido em espaços de 5 × 5 m (24/11/2026): com algum espaço alugado, o lote não aluga inteiro */}
+      {/* lote dividido em 4 espaços de 10 × 10 m (24/11/2026): com algum espaço alugado, o lote não aluga inteiro */}
       {livre && dividido && <EspacosAVenda chaveLote={chave} />}
 
       {livre && !dividido && (
@@ -253,7 +253,7 @@ export function CartaoLote() {
           )}
           {!usuario && <div className="mt-2 text-center text-[11px] text-[#5B6472]">Você cria sua conta no WorkEnd e volta direto pra este lote.{!modoMundo() && " Abre em workend.online."}</div>}
           {usuario && meu && !admin && <div className="mt-2 text-center text-[11px] text-[#5B6472]">Nesta fase cada conta tem um chão; a reserva atual (Lote {LOTE_POR_CHAVE[meu]?.numero}) fica livre.</div>}
-          {/* espaço de 5 × 5 m (24/11/2026): a outra opção, mais barata, no mesmo lote */}
+          {/* 1/4 do lote (24/11/2026): a outra opção, mais barata, no mesmo lote */}
           <EspacosAVenda chaveLote={chave} />
         </>
       )}

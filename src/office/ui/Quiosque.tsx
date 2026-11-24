@@ -71,7 +71,7 @@ export function CartaoQuiosque() {
   if (!k || !chave || painel || painelEsc || agenteSelecionado) return null;
   const m = useMundo.getState();
   const livre = !terreno, ativo = terreno?.status === "ativo";
-  const mensal = precoDoQuiosque(chave); // R$ 47 na orla, R$ 49,90 no espaço de 5 × 5 m de um lote (24/11/2026)
+  const mensal = precoDoQuiosque(chave); // R$ 47 na orla, R$ 49,90 no 1/4 de lote, 10 × 10 m (24/11/2026)
   const preco = admin ? Math.round(mensal) / 100 : mensal;
   const espaco = k.area === "lote", loteDoEspaco = espaco ? LOTE_DO_ESPACO[k.chave] : null;
   // cobrança única (frente creditos): créditos, Pix ou os dois; no servidor vira o tipo "quiosque"
@@ -82,7 +82,7 @@ export function CartaoQuiosque() {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-1 text-[12px] font-semibold text-[#1D4ED8]"><Icone nome="quiosque" tamanho={14} />{rotuloQuiosque(k)}</div>
-          <div className="text-lg font-bold">{livre ? (espaco ? "Espaço de 5 × 5 m disponível" : "Quiosque disponível") : ehMeu ? (ativo ? terreno.empresaNome : "Seu quiosque") : terreno.empresaNome}</div>
+          <div className="text-lg font-bold">{livre ? (espaco ? "1/4 de lote disponível" : "Quiosque disponível") : ehMeu ? (ativo ? terreno.empresaNome : "Seu quiosque") : terreno.empresaNome}</div>
           <div className="text-xs text-[#5B6472]">{livre ? NOME_MODELO_QUIOSQUE[k.modelo] : ativo ? `${nomeNicho(terreno.nicho)} · aberto` : "Reservado · em montagem"}</div>
           <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: COR_AREA[k.area] }}>{NOME_AREA_QUIOSQUE[k.area]}</span>
           {/* espaço de lote (24/11/2026): volta para o cartão do lote, com os 4 espaços */}

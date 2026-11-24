@@ -66,7 +66,7 @@ export async function cotacaoLote(u: Usuario, chave: string, meses = 1): Promise
   // quiosque: preço próprio e sem as ofertas de entrada do lote; o lote com extras ativos renova os extras junto
   const quiosque = ehQuiosque(chave);
   const extras = quiosque || !t || t.anexoDe ? 0 : await lotesExtrasAtivos(chave);
-  const mensal = quiosque ? precoDoQuiosque(chave) : PRECO_LOTE + extras * PRECO_LOTE_EXTRA; // espaço de 5 × 5 m: R$ 49,90
+  const mensal = quiosque ? precoDoQuiosque(chave) : PRECO_LOTE + extras * PRECO_LOTE_EXTRA; // 1/4 de lote (10 × 10 m): R$ 49,90
   const base = mensal * meses;
   const novo = !!t && t.usuarioId === u.id && t.status === "reservado" && !t.anexoDe && !quiosque;
   const restam = await vagasFundador(u.id);

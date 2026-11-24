@@ -6,7 +6,7 @@ import { temBanco } from "@/server/db";
 import { vagasFundador } from "@/server/ofertas";
 import { planoEquipeLigado } from "@/server/planos";
 import { cartaoLigado } from "@/server/assinaturas";
-import { PRECO_LOTE, PRECO_QUIOSQUE, precoCurto } from "@/office/data/precosTerreno";
+import { PRECO_LOTE, PRECO_QUIOSQUE, PRECO_ESPACO, precoCurto } from "@/office/data/precosTerreno";
 import { Topo, Rodape } from "../_partes";
 import { EscadaPlanos } from "../_planos";
 import { meta } from "../seo";
@@ -15,7 +15,7 @@ import "../inicio.css";
 export const dynamic = "force-dynamic";
 export const metadata = meta({
   titulo: "Planos e preços — WorkEnd",
-  descricao: `Página da loja grátis, quiosque por ${precoCurto(PRECO_QUIOSQUE)} e loja com prédio e equipe de IA por ${precoCurto(PRECO_LOTE)} por mês. Sem fidelidade.`,
+  descricao: `Página da loja grátis, quiosque por ${precoCurto(PRECO_QUIOSQUE)}, 1/4 de lote por ${precoCurto(PRECO_ESPACO)} e loja com prédio e equipe de IA por ${precoCurto(PRECO_LOTE)} por mês. Sem fidelidade.`,
   caminho: "/planos",
 });
 

@@ -20,7 +20,7 @@ import { ceu } from "./CicloDia";
 import { leve } from "./qualidade";
 import { BonecoProcedural, HIPS, useAnimacao, type BonecoHandle } from "./Boneco";
 import { BONECO } from "../data/bonecos";
-import { QUIOSQUES, ESPACOS, QUIOSQUE_POR_CHAVE, PRECO_QUIOSQUE, QUIOSQUE_LARGURA as LQ, QUIOSQUE_FUNDO as FQ, TOLDO_Q, balcaoDoQuiosque, precoDoQuiosque, rotuloQuiosque, type QuiosqueInfo } from "../data/quiosques";
+import { QUIOSQUES, ESPACOS, QUIOSQUE_POR_CHAVE, PRECO_QUIOSQUE, QUIOSQUE_LARGURA as LQ, QUIOSQUE_FUNDO as FQ, TOLDO_Q, balcaoDoQuiosque, precoDoQuiosque, rotuloQuiosque, corredorDoLote, ehEspacoDoFundo, LOTE_DO_ESPACO, TAMANHO_ESPACO, type QuiosqueInfo } from "../data/quiosques";
 import { useMundo, promocaoAtiva, useAgora, type Terreno, type Rascunho } from "../mundoStore";
 import { nomeNicho, LOTE_POR_CHAVE } from "../data/mundo";
 import { anexosDe, quartosDoTerreno, conferirQuartos, ID_PREDIO } from "../data/posicaoPredio";
@@ -145,7 +145,7 @@ export function Quiosques() {
   const agora = useAgora();
   const filtro = useMemo(() => nichoDestacado(), []);
   useFrame(() => { MAT_LAMPADA.emissiveIntensity = 0.2 + ceu.noite * 2.6; MAT_LUZ_DENTRO.emissiveIntensity = 0.1 + ceu.noite * 1.4; });
-  // os 14 da orla sempre; os espaços de 5 × 5 m dos lotes (24/11/2026) só quando reservados ou alugados (ou sendo reservados
+  // os 14 da orla sempre; os espaços de 10 × 10 m dos lotes (o lote dividido em 4, 24/11/2026) só quando reservados ou alugados (ou sendo reservados
   // agora, com o rascunho): o lote vazio fica só na grama. O espaço livre selecionado ganha só o contorno no chão (MarcaEspaco).
   const espacos = ESPACOS.filter((k) => terrenos[k.chave] || (sel === k.chave && rascunho));
   const dados = [...QUIOSQUES, ...espacos].map((k) => dadosDe(k, terrenos, sel, rascunho));
@@ -210,14 +210,14 @@ function Contorno({ cor, forte }: { cor: string; forte: boolean }) {
   return <group>{[[0, z0 - d / 2, w, 0.12], [0, z0 + d / 2, w, 0.12], [-w / 2, z0, 0.12, d], [w / 2, z0, 0.12, d]].map(([x, z, a, b], i) => <mesh key={i} geometry={caixa(a, 0.06, b)} material={m} position={[x, 0.05, z]} />)}</group>;
 }
 
-// espaço de 5 × 5 m livre selecionado no cartão do lote (24/11/2026): só o contorno dele no chão, com o preço por cima
+// espaço de 10 × 10 m livre selecionado no cartão do lote (24/11/2026): só o contorno dele no chão, com o preço por cima
 function MarcaEspaco({ k }: { k: QuiosqueInfo }) {
   const r = k.terreno, w = r.x1 - r.x0, d = r.z1 - r.z0, m = mat("#1D4ED8", { emissive: "#1D4ED8", ei: 0.6 });
   return (
     <group position={[(r.x0 + r.x1) / 2, 0, (r.z0 + r.z1) / 2]}>
       {[[0, -d / 2, w, 0.14], [0, d / 2, w, 0.14], [-w / 2, 0, 0.14, d], [w / 2, 0, 0.14, d]].map(([x, z, a, b], i) => <mesh key={i} geometry={caixa(a, 0.06, b)} material={m} position={[x, 0.05, z]} />)}
       <Html position={[0, 1.6, 0]} center zIndexRange={[4, 0]} style={{ pointerEvents: "none" }}>
-        <div className="w-max select-none rounded-full bg-[#1D4ED8] px-3 py-1 text-[12px] font-bold text-white shadow-lg">{rotuloQuiosque(k)} · 5 × 5 m · {brl(precoDoQuiosque(k.chave))}/mês</div>
+        <div className="w-max select-none rounded-full bg-[#1D4ED8] px-3 py-1 text-[12px] font-bold text-white shadow-lg">{rotuloQuiosque(k)} · {TAMANHO_ESPACO} · {brl(precoDoQuiosque(k.chave))}/mês</div>
       </Html>
     </group>
   );
@@ -227,9 +227,12 @@ function MarcaEspaco({ k }: { k: QuiosqueInfo }) {
 // fora (o modo de edição desenha a grade nele)
 function Terreninhos({ editando, espacos }: { editando: string | null; espacos: QuiosqueInfo[] }) {
   const pedra = mat("#E7E0D2", { rough: 0.95 }), borda = mat("#B9AE98", { rough: 0.9 }), canto = mat("#0F766E", { rough: 0.8 });
+  // lote dividido em 4 (24/11/2026): do espaço de 10 × 10 m fica só a borda no chão (o resto é a grama), e o corredor de
+  // pedra no meio do lote aparece quando C ou D (os do fundo) têm empresa
+  const corredores = [...new Set(espacos.filter(ehEspacoDoFundo).map((k) => LOTE_DO_ESPACO[k.chave]))].map((ch) => LOTE_POR_CHAVE[ch]).filter(Boolean);
   return (
     <Estatico key={`${editando ?? "-"}|${espacos.map((k) => k.chave).join(",")}`}>
-      {[...QUIOSQUES, ...espacos].filter((k) => k.chave !== editando).map((k) => {
+      {QUIOSQUES.filter((k) => k.chave !== editando).map((k) => {
         const r = k.terreno, w = r.x1 - r.x0, d = r.z1 - r.z0, cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
         return (
           <group key={k.chave} position={[cx, 0, cz]}>
@@ -238,6 +241,18 @@ function Terreninhos({ editando, espacos }: { editando: string | null; espacos: 
             {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz], i) => <mesh key={`c${i}`} geometry={caixa(0.5, 0.07, 0.5)} material={canto} position={[sx * (w / 2 - 0.25), 0.035, sz * (d / 2 - 0.25)]} />)}
           </group>
         );
+      })}
+      {espacos.filter((k) => k.chave !== editando).map((k) => {
+        const r = k.terreno, w = r.x1 - r.x0, d = r.z1 - r.z0;
+        return (
+          <group key={k.chave} position={[(r.x0 + r.x1) / 2, 0, (r.z0 + r.z1) / 2]}>
+            {[[0, -d / 2 + 0.08, w - 0.3, 0.16], [0, d / 2 - 0.08, w - 0.3, 0.16], [-w / 2 + 0.08, 0, 0.16, d - 0.3], [w / 2 - 0.08, 0, 0.16, d - 0.3]].map(([x, z, a, b], i) => <mesh key={i} geometry={caixa(a, 0.05, b)} material={borda} position={[x, 0.03, z]} receiveShadow />)}
+          </group>
+        );
+      })}
+      {corredores.map((l) => {
+        const c = corredorDoLote(l), w = c.x1 - c.x0, d = c.z1 - c.z0;
+        return <mesh key={`corr${l.chave}`} geometry={caixa(w, 0.04, d)} material={pedra} position={[(c.x0 + c.x1) / 2, 0.025, (c.z0 + c.z1) / 2]} receiveShadow />;
       })}
     </Estatico>
   );

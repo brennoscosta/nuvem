@@ -34,7 +34,7 @@ export const useExpandir = create<{ principal: string | null; abrir: (chave: str
 export function vizinhoParaExpandir(chave: string, terrenos: Record<string, unknown>): { lote: LoteInfo | null; livre: boolean } {
   const l = LOTE_POR_CHAVE[chave]; const v = l ? vizinhoDoLado(l) : null;
   if (!v || v.lote.tipo === "praca") return { lote: null, livre: false };
-  // lote com espaço de 5 × 5 m de outra empresa (24/11/2026) não serve de ampliação
+  // lote dividido em 4 com espaço de outra empresa (24/11/2026) não serve de ampliação
   return { lote: v, livre: !terrenos[v.chave] && !(ESPACOS_DO_LOTE[v.chave] ?? []).some((e) => !!terrenos[e.chave]) };
 }
 // valor do 1º pagamento (só os dias até o vencimento do principal); o Pix confirma o valor certo no servidor

@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { LAYOUTS, MAX_SETORES } from "@/office/data/escritorio";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
-import { PRECO_LOTE, PRECO_QUIOSQUE, PRECO_LOTE_EXTRA, precoCurto } from "@/office/data/precosTerreno";
+import { PRECO_LOTE, PRECO_QUIOSQUE, PRECO_ESPACO, PRECO_LOTE_EXTRA, precoCurto } from "@/office/data/precosTerreno";
 import { PRECO_EQUIPE, ANCORA_AGENCIA, EQUIPE_ITENS } from "@/office/data/planos";
 import { PRECO_MODELO } from "@/office/data/modelos";
 import { PRECO_AGENTE } from "@/server/agentesVenda";
@@ -40,9 +40,9 @@ export function EscadaPlanos({ logado, ctaLoja, restamFundador, equipe, cartao, 
       acao: <Link href={logado ? "/app" : "/cadastro"} className="wi-btn wi-btn-linha" data-medir={logado ? undefined : "clicar_cta_principal"} data-medir-local={logado ? undefined : `${local}-vitrine`}>{logado ? "Abrir minha página" : "Criar minha página grátis"}</Link>,
     },
     {
-      id: "quiosque", nome: "Quiosque", valor: precoCurto(PRECO_QUIOSQUE), unidade: "por mês", frase: "Um ponto na rua da orla, onde o movimento passa.", mais: "Tudo da Vitrine, mais:",
-      itens: ["Quiosque na cidade com a sua logo e as suas cores", `Vitrine com até ${MAX_PRODUTOS} produtos`, `Atendente de IA no balcão, com cerca de ${respostas(UNIDADES_MES_QUIOSQUE)} respostas por mês`],
-      acao: <Link prefetch={false} href="/mundo" className="wi-btn wi-btn-linha">Ver os quiosques no mapa</Link>,
+      id: "quiosque", nome: "Quiosque", valor: precoCurto(PRECO_QUIOSQUE), unidade: "por mês", frase: "Um ponto na orla ou 1/4 de um lote, onde o movimento passa.", mais: "Tudo da Vitrine, mais:",
+      itens: ["Quiosque na cidade com a sua logo e as suas cores", `Ou 1/4 de um lote (10 × 10 m), por ${precoCurto(PRECO_ESPACO)} por mês`, `Vitrine com até ${MAX_PRODUTOS} produtos`, `Atendente de IA no balcão, com cerca de ${respostas(UNIDADES_MES_QUIOSQUE)} respostas por mês`],
+      acao: <Link prefetch={false} href="/mundo" className="wi-btn wi-btn-linha">Ver quiosques e espaços no mapa</Link>,
     },
     {
       id: "loja", nome: "Loja", valor: precoCurto(PRECO_LOTE), unidade: "por mês", frase: "O prédio com a sua marca na fachada e a equipe de IA.", mais: "Tudo do Quiosque, mais:",

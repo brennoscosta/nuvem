@@ -1,6 +1,6 @@
 // SEO do WorkEnd: base dos metadados, imagem OG e dados estruturados (JSON-LD). Usado pelo layout e pelas páginas.
 import type { Metadata } from "next";
-import { PRECO_LOTE, PRECO_QUIOSQUE, precoCurto } from "@/office/data/precosTerreno";
+import { PRECO_LOTE, PRECO_QUIOSQUE, PRECO_ESPACO, precoCurto } from "@/office/data/precosTerreno";
 
 export const SITE = "https://workend.online";
 export const NOME = "WorkEnd";
@@ -55,6 +55,7 @@ export function jsonLdLanding() {
     offers: [
       { "@type": "Offer", name: "Vitrine", price: "0", priceCurrency: "BRL", url: `${SITE}/planos`, description: "Página da loja grátis, com 3 produtos e o botão do WhatsApp." },
       oferta("Quiosque", PRECO_QUIOSQUE, `Quiosque na cidade por ${precoCurto(PRECO_QUIOSQUE)} ao mês.`),
+      oferta("1/4 de lote (10 × 10 m)", PRECO_ESPACO, `Um quarto de lote (10 × 10 m) na cidade por ${precoCurto(PRECO_ESPACO)} ao mês.`),
       oferta("Loja", PRECO_LOTE, `Lote no mapa por ${precoCurto(PRECO_LOTE)} ao mês, com prédio, fachada e equipe de IA.`),
     ],
     publisher: { "@id": `${SITE}/#org` },

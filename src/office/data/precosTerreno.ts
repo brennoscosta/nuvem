@@ -12,8 +12,8 @@ export const PRECO_LOTE = 97; // R$ por lote por mês
 export const PRECO_LOTE_EXTRA = PRECO_LOTE; // R$ por mês por lote juntado: o mesmo que o lote
 export const MINIMO_LOTE_EXTRA = 9.9; // o pagamento proporcional do 1º dia nunca fica abaixo disto
 export const PRECO_QUIOSQUE = 47; // R$ por mês
-// Espaço de 5 × 5 m num lote (24/11/2026, pedido do dono: "também quero agora a possibilidade 5x5 m, valor 49,90"):
-// R$ por mês. Cada lote de 20 × 20 m tem 4 espaços na frente, para 4 clientes diferentes (data/quiosques.ts › ESPACOS).
+// 1/4 de lote (24/11/2026, pedido do dono: "valor 49,90", "quero esse quadrado dividido por 4"): R$ por mês. Cada lote
+// de 20 × 20 m se divide em 4 espaços de 10 × 10 m, para 4 clientes diferentes (data/quiosques.ts › ESPACOS).
 export const PRECO_ESPACO = 49.9;
 // preço curto para os textos ("R$ 97", "R$ 1.500"; com centavos, "R$ 97,50")
 export const precoCurto = (v: number) => `R$ ${v.toLocaleString("pt-BR", Number.isInteger(v) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
