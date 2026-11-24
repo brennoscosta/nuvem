@@ -186,7 +186,8 @@ export default async function Inicio() {
               <p className="wi-preco-mini">Personagem <b>grátis</b> para toda conta</p>
             </Revelar>
           </div>
-          <div className="faixa">
+          {/* catálogo zerado em 24/11/2026 (o dono cria os agentes um a um): a faixa dos especialistas só aparece com algum */}
+          {ESPECIALISTAS_IA.length > 0 && <div className="faixa">
             <div className="ia-faixa">
               <div className="ia-texto">
                 <h3>{ESPECIALISTAS_IA.length} especialistas de IA <em>prontos para contratar.</em></h3>
@@ -206,7 +207,7 @@ export default async function Inicio() {
                 ))}
               </div>
             </div>
-          </div>
+          </div>}
         </section>
 
         {/* 5 ---------- preço, perguntas e o convite final ---------- */}

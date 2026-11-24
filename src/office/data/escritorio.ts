@@ -271,8 +271,12 @@ const BONECOS_CEO = ["classico", "oculos", "careca", "ruivo"];
 const BONECOS_ATENDENTE = ["coque", "longo", "suporte-1", "classico"];
 const hash = (s: string) => Math.abs([...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7));
 
-// O que todo escritório tem ao nascer: 1 setor de atendimento, a atendente e o CEO. Os nomes vêm do que o dono
-// escolheu ao montar a empresa; se não escolheu, entram nomes neutros que ele troca no painel.
+// O que todo escritório tem ao nascer: 1 setor de atendimento. Até 24/11/2026 vinham também a atendente e o CEO; desde
+// então (pedido do dono: "vamos zerar agentes... quero criar 1 a 1 desde o atendente, CEO" e "[loja nova nasce] sem
+// ninguém") a equipe começa vazia e cada agente entra quando for criado. membrosPadrao guarda os dois de antes, com os
+// nomes que o dono escolheu, para quando os agentes voltarem a ser oferecidos.
+// loja nova sem ninguém (24/11/2026)
+export const SEM_EQUIPE = true;
 export function escritorioPadrao(empresaNome: string, cor: string, nomes: { ceo?: string | null; atendente?: string | null } = {}): Escritorio {
   const h = hash(empresaNome + cor);
   const ceo = (nomes.ceo ?? "").trim().slice(0, 24) || NOMES_CEO[h % NOMES_CEO.length];
@@ -283,7 +287,7 @@ export function escritorioPadrao(empresaNome: string, cor: string, nomes: { ceo?
     // 20/11/2026: toda empresa nova começa com um modelo do catálogo (o escritório básico, grátis)
     layout: MODELO[MODELO_INICIAL].base, modelo: MODELO_INICIAL,
     setores: [{ id: "atendimento", nome: "Atendimento", cor: CORES_SETOR[0], mesas: 2 }],
-    equipe: [
+    equipe: SEM_EQUIPE ? [] : [
       { id: "atendente", nome: atendente, cargo: "Atendente", papel: "atendente", setorId: null, boneco: BONECOS_ATENDENTE[(h >> 5) % BONECOS_ATENDENTE.length], camisa: cor, treino: { descricao: `Atende quem chega na ${empresaNome}: explica o que a empresa faz, tira dúvidas e anota o contato de quem quer orçamento.`, saudacao: falaDe(pAtendente, "saudacao", { nome: atendente, empresa: empresaNome }).slice(0, 160) }, personalidadeId: pAtendente.id },
       { id: "ceo", nome: ceo, cargo: `CEO da ${empresaNome}`.slice(0, 40), papel: "ceo", setorId: null, boneco: BONECOS_CEO[(h >> 7) % BONECOS_CEO.length], camisa: "#1F2630", treino: { descricao: `Comanda a ${empresaNome}: decide prioridades, fecha negócios maiores e cuida da equipe.`, saudacao: "" }, personalidadeId: pCeo.id },
     ],
@@ -328,8 +332,8 @@ export function normalizarEscritorio(x: unknown, base: Escritorio): Escritorio {
     const tr = (r.treino && typeof r.treino === "object" ? r.treino : {}) as Partial<Record<keyof Treino, unknown>>;
     equipe.push({ id, nome: texto(r.nome, 24, papel === "ceo" ? "CEO" : papel === "atendente" ? "Ana" : "Novo"), cargo: texto(r.cargo, 40, papel === "ceo" ? "CEO" : papel === "atendente" ? "Atendente" : "Profissional"), papel, setorId, boneco: bonecoOk(r.boneco), camisa: corOk(r.camisa, papel === "ceo" ? "#1F2630" : "#1D4ED8"), treino: { descricao: texto(tr.descricao, 600), saudacao: texto(tr.saudacao, 160) }, ...(papel === "profissional" && typeof r.catalogoId === "string" && /^[a-zA-Z0-9_-]{1,40}$/.test(r.catalogoId) ? { catalogoId: r.catalogoId } : {}) });
   }
-  // a atendente e o CEO são obrigatórios: se sumiram, voltam os do padrão
-  for (const p of ["atendente", "ceo"] as const) if (!equipe.some((e) => e.papel === p)) equipe.unshift(base.equipe.find((e) => e.papel === p) ?? escritorioPadrao("Empresa", "#1D4ED8").equipe.find((e) => e.papel === p)!);
+  // a atendente e o CEO eram obrigatórios (voltavam os do padrão se sumissem); desde 24/11/2026 a equipe pode ficar vazia
+  if (!SEM_EQUIPE) for (const p of ["atendente", "ceo"] as const) if (!equipe.some((e) => e.papel === p)) { const pad = base.equipe.find((e) => e.papel === p) ?? escritorioPadrao("Empresa", "#1D4ED8").equipe.find((e) => e.papel === p); if (pad) equipe.unshift(pad); }
   // personalidade e escopo são do servidor (compra e troca paga): o que vier do cliente não vale, o da base continua
   for (const m of equipe) {
     const b = base.equipe.find((x) => x.id === m.id);

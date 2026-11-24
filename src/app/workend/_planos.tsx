@@ -67,7 +67,7 @@ export function EscadaPlanos({ logado, ctaLoja, restamFundador, equipe, cartao, 
   });
   degraus.push({
     id: "sede", nome: "Sede", valor: "Sob consulta", unidade: "", frase: "Para redes, franquias e empresas com vários times.", mais: equipe ? "Tudo do Equipe, mais:" : "Tudo da Loja, mais:",
-    itens: ["Prédio de sede com departamentos", `Todos os ${ESPECIALISTAS_IA.length} especialistas de IA`, "Várias pessoas da empresa com acesso", "Unidades de IA sob medida"],
+    itens: ["Prédio de sede com departamentos", ESPECIALISTAS_IA.length ? `Todos os ${ESPECIALISTAS_IA.length} especialistas de IA` : "Especialistas de IA sob medida", "Várias pessoas da empresa com acesso", "Unidades de IA sob medida"],
     acao: <FaleComAGente plano="sede" origem={local} rotulo="Fale com a gente" />,
   });
 
