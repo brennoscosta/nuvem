@@ -43,7 +43,8 @@ async function tocar() {
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
     ctx = new AC(); mestre = ctx.createGain(); mestre.gain.value = 0; mestre.connect(ctx.destination);
-    for (const c of Object.keys(ARQUIVO) as Camada[]) void carregar(ctx, c);
+    // sem a chuva desde 24/11/2026 (céu sempre limpo: src/office/clima.ts): o arquivo nem é baixado
+    for (const c of (Object.keys(ARQUIVO) as Camada[]).filter((k) => k !== "chuva")) void carregar(ctx, c);
   }
   try { await ctx.resume(); } catch { return; }
   tocando = ctx.state === "running";

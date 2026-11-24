@@ -24,7 +24,6 @@ import { Quiosques, QuiosquesDosLotes } from "./Quiosques";
 import { RealceExpansao } from "./RealceExpansao";
 import { RealceReserva } from "./RealceReserva"; // câmera e realce do terreno no formulário de reserva (WE-07)
 import { Horizonte } from "./Horizonte";
-import { Clima } from "./Clima";
 import { Fauna } from "./Fauna";
 import { SomCena } from "./SomCena";
 import { Semaforos, Trafego, Passantes, PontosOnibus } from "./Transito";
@@ -176,7 +175,7 @@ export function Mundo() {
       {/* v67: abertura em etapas (scene/etapas.tsx). 0 = perto (ruas, calçadas, postes, Nuvem, lanchonete, lotes, prédios);
           1 = logo depois (árvores, luzes, trânsito, gente); 2 = longe (mar, serra, praia, nuvens, rio, parque, bichos, som) */}
       <MarcadorEtapas />
-      <Depois etapa={2}><Horizonte /><Clima /><SomCena /></Depois>
+      <Depois etapa={2}><Horizonte /><SomCena /></Depois>
       <Estatico>
         <Ruas />
         {calcadas.map(([cx, cz], i) => { const b = BAIRRO_DO_QUARTEIRAO[`${Math.round(cx / PASSO)},${Math.round(cz / PASSO)}`]; return b ? <CalcadaBairro key={i} cx={cx} cz={cz} b={b} /> : <Calcada key={i} cx={cx} cz={cz} />; })}

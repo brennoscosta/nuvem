@@ -43,28 +43,27 @@ export const frenteDoLote = (k: number) => (k >= 2 ? 0 : Math.PI);
 // lote de esquina de um quarteirão virado para o centro da cidade (a Nuvem, em 0,0): é onde ficam as sedes
 export const cantoParaOCentro = (i: number, j: number) => (i < 0 ? 1 : 0) + (j < 0 ? 2 : 0);
 
-// Casas distribuídas pra nunca repetir o mesmo modelo lado a lado; terrenos vazios no meio.
-// 18/11/2026 (pedido do dono: "as casas velhas, melhore o visual"): a casinha caindo aos pedaços (casaVelha) saiu dos
-// lotes 4 e 10; no lugar entraram a casa moderna (lote 4) e a casinha térrea com varanda (lote 10), bem acabadas. O sobrado
-// moderno foi testado e saiu: por trás e dos lados ele é um cubo branco liso. O modelo antigo continua no código.
-const V = (arvore = false): Lote => ({ tipo: "vazio", arvore });
-const C = (modelo: ModeloCasa, escala = 1): Lote => ({ tipo: "casa", modelo, escala });
+// 24/11/2026 (pedido do dono: "retirar as casas fakes dos terrenos que não têm uma loja... os terrenos que têm casa fake
+// ficam apenas o chão verdinho"): nenhum lote tem casa nem árvore. O lote sem loja é só a grama com a placa "À venda";
+// quem tem loja continua com o prédio dela (scene/Lotes.tsx). Antes, desde 07/11/2026, cada lote à venda tinha uma casa
+// (térrea, colonial, moderna…) ou um terreno com árvore, sem repetir o modelo do vizinho. Os moradores, que moravam
+// nessas casas, agora vão para casa pela borda da cidade (data/moradores.ts › casa).
+const V = (): Lote => ({ tipo: "vazio" });
+const LIVRE: [Lote, Lote, Lote, Lote] = [V(), V(), V(), V()];
 
-// 24/11/2026 (pedido do dono: "exclua as lojas bday.fm, social rp, nuvcam, appzone"): as quatro sedes saíram e o lote de
-// esquina de cada uma virou lote à venda, com uma casa que não repete a dos vizinhos. O número de cada lote não mudou.
 export const QUARTEIROES: Quarteirao[] = [
   { i: 0, j: 0, ocupante: "nuvem" },
   { i: 1, j: 0, ocupante: "restaurante" },
-  { i: -1, j: 0, lotes: [C("casaTerrea"), V(true), C("casaColonial", 1.05), C("casaModerna")] },
+  { i: -1, j: 0, lotes: LIVRE },
   // 17/11/2026 a 24/11/2026: sedes da AppZone (-1,-1), do NUVCAM (1,-1), do bday.fm (-1,1) e da Social RP (1,1), cada uma,
   // desde 19/11/2026, no lote de esquina virado para o centro da cidade (cantoParaOCentro)
-  { i: -1, j: -1, lotes: [C("casaTerrea"), V(true), C("casaModerna"), C("casaColonial")] }, // ex-AppZone no sudeste
-  { i: 0, j: -1, lotes: [V(true), C("casaTerrea", 1.05), C("casaColonial"), V()] },
-  { i: 1, j: -1, lotes: [V(true), C("casaColonial"), C("casaModerna"), V()] }, // ex-NUVCAM no sudoeste
-  { i: -1, j: 1, lotes: [C("casaModerna"), C("casaColonial"), V(true), C("casaTerrea")] }, // ex-bday.fm no nordeste
+  { i: -1, j: -1, lotes: LIVRE },
+  { i: 0, j: -1, lotes: LIVRE },
+  { i: 1, j: -1, lotes: LIVRE },
+  { i: -1, j: 1, lotes: LIVRE },
   // o lote 0,1,1 (ao sul da Nuvem) virou a praça de eventos e da feira de sábado em 12/11/2026
-  { i: 0, j: 1, lotes: [C("casaColonial", 0.95), { tipo: "praca" }, V(), C("casaTerrea", 1.05)] },
-  { i: 1, j: 1, lotes: [C("casaColonial"), C("casaTerrea"), C("casaModerna"), V(true)] }, // ex-Social RP no noroeste
+  { i: 0, j: 1, lotes: [V(), { tipo: "praca" }, V(), V()] },
+  { i: 1, j: 1, lotes: LIVRE },
 ];
 // Posição física (k) do lote que foi sede de 17/11 a 24/11/2026 em cada quarteirão. As sedes saíram, mas a chave de
 // banco dos lotes destes quarteirões continua trocada (chaveDoLote): quem já comprou um lote vizinho fica com a mesma chave.

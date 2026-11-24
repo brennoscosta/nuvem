@@ -84,10 +84,16 @@ export const LUGARES: Record<string, Lugar> = Object.fromEntries([
   L({ id: "vila", nome: "Vila dos Criativos", indo: "indo para a Vila dos Criativos", ancora: [-4, -PASSO + B], pontos: [[-12, -30.9], [5, -30.9], [14, -30.9]], olhar: Math.PI }),
 ].map((l) => [l.id, l]));
 
-// casa num lote (posição física i, j, k): a porta fica a uns 5 m da calçada da frente, e lá dentro a pessoa some
+// casa (24/11/2026, pedido do dono: "retirar as casas fakes dos terrenos que não têm uma loja"): os lotes sem loja ficaram
+// só com a grama, então ninguém mora mais num lote. "Voltar para casa" é sair da cidade pela borda mais perto de onde a
+// casa ficava (i, j, k: o lote de antes): o calçadão do rio ao norte, a orla sul ou a orla leste. A pessoa anda até lá e
+// some (dentro), e volta pelo mesmo caminho na hora de sair de casa. Cada morador tem um ponto próprio na borda.
 function casa(i: number, j: number, k: number): Lugar {
-  const [x] = centroLote(i, j, k); const cz = j * PASSO, s = k >= 2 ? 1 : -1;
-  return { id: `casa:${i},${j},${k}`, nome: "casa", indo: "voltando para casa", ancora: [x, cz + s * B], pontos: [[x, cz + s * 15.6]], dentro: true, olhar: s > 0 ? Math.PI : 0 };
+  const [x, z] = centroLote(i, j, k);
+  const id = `casa:${i},${j},${k}`, base = { id, nome: "casa", indo: "voltando para casa", dentro: true };
+  if (j > 0) return { ...base, ancora: [0, Z_ORLA], pontos: [[Math.max(-30, Math.min(24, x)), 96]], olhar: 0 };
+  if (i > 0 && j === 0) return { ...base, ancora: [X_ORLA, 0], pontos: [[96, Math.max(-18, Math.min(28, z))]], olhar: Math.PI / 2 };
+  return { ...base, ancora: [0, Z_CALCADAO], pontos: [[Math.max(-12, Math.min(20, x)), -86.6]], olhar: Math.PI };
 }
 
 // ---------------- moradores ----------------
