@@ -1,7 +1,7 @@
 // Agentes que o WorkEnd vende. O admin cria e treina cada um (o que sabe, skills, APIs ligadas, preço); as lojas
 // contratam do catálogo. Enquanto o admin não cadastra nenhum, vale a lista fixa do código (CATALOGO_PROFISSIONAIS).
 import { sql, id, migrar } from "./db";
-import { CATALOGO_PROFISSIONAIS } from "@/office/data/escritorio";
+import { CATALOGO_PROFISSIONAIS, SEM_EQUIPE } from "@/office/data/escritorio";
 import { ESPECIALISTAS_IA } from "@/office/data/especialistas";
 import { AREAS } from "@/office/data/org";
 
@@ -52,6 +52,8 @@ export async function catalogoAVenda(): Promise<AgenteCatalogo[]> {
   await migrar(); await sementeInicial();
   const lista = await sql<AgenteCatalogo[]>`SELECT ${CAMPOS()} FROM agente_catalogo WHERE ativo ORDER BY ordem, criado_em`;
   if (lista.length) return lista.map(normal);
+  // 24/11/2026: agentes zerados; o catálogo só tem o que o admin cria, um por um (a lista fixa não volta sozinha)
+  if (SEM_EQUIPE) return [];
   return CATALOGO_PROFISSIONAIS.map((p, i) => ({ id: p.id, nome: p.nome, cargo: p.cargo, setor: p.setor, descricao: p.treino.descricao, saudacao: p.treino.saudacao, skills: [], apis: ["chatgpt_texto"], preco: 0, boneco: p.boneco, camisa: p.camisa, ativo: true, ordem: i }));
 }
 export async function listarCatalogoAdmin(): Promise<AgenteCatalogo[]> {
