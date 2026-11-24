@@ -30,13 +30,13 @@ export interface Controles {
   update(): void; addEventListener(tipo: string, f: () => void): void; removeEventListener(tipo: string, f: () => void): void;
 }
 // o resto dos controles do drei (MapControls), mexido só no modo andar
-interface ControlesExtra { dampingFactor: number; minDistance: number; maxDistance: number; minPolarAngle: number; enablePan: boolean; mouseButtons: Record<string, number | null>; touches: Record<string, number | null> }
+interface ControlesExtra { dampingFactor: number; zoomSpeed: number; minDistance: number; maxDistance: number; minPolarAngle: number; enablePan: boolean; mouseButtons: Record<string, number | null>; touches: Record<string, number | null> }
 type Anim = { t0: number; dur: number; de: THREE.Spherical; ate: THREE.Spherical; alvoDe?: THREE.Vector3; alvoAte?: THREE.Vector3 };
 interface Rota { pos: THREE.CatmullRomCurve3; alvo: THREE.CatmullRomCurve3; comprimento: number; u: number }
 interface Ctx {
   camera: THREE.Camera; c: Controles; inicio: { pos: THREE.Vector3; alvo: THREE.Vector3 }; anim: Anim | null; teclas: Set<string>; interagindo: boolean;
   rota: Rota | null; antesAndar: Partial<ControlesExtra> & { maxPolarAngle?: number } | null; andando: boolean;
-  desvio: Desvio; seg: Segue;
+  desvio: Desvio; seg: Segue; botoes: "livre" | "seguir";
 }
 const suave = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 const segundos = () => performance.now() / 1000;
@@ -199,6 +199,7 @@ function irPara(x: Ctx, e: MouseEvent, el: HTMLElement) {
 
 const frenteV = new THREE.Vector3(), ladoV = new THREE.Vector3(), mov = new THREE.Vector3(), offV = new THREE.Vector3();
 const esfA = new THREE.Spherical();
+const EIXO_Y = new THREE.Vector3(0, 1, 0);
 // para onde a câmera olha (alvo no chão e direção), lido pelo mini-mapa a cada quadro (12/11/2026); mora no cameraStore
 // desde 20/11/2026 (a névoa do CicloDia também lê, sem importar este arquivo)
 export { cameraInfo };
@@ -287,6 +288,18 @@ function quadro(x: Ctx, dt: number) {
   const bici = !!usePersonagem.getState().veiculo;
   const alvo = st.andar ? alvoDoBoneco(x, dt, 0.25, 1.3) : st.seguir ? alvoDoBoneco(x, dt, bici ? 0.3 : 0.05, 0.6) : null;
   if (!alvo) x.seg.pronto = false;
+  // 24/11/2026 (pedido do dono: "na câmera em 3ª pessoa não conseguimos girar para ver outros lados"): seguindo o boneco,
+  // arrastar com o botão esquerdo ou com um dedo gira em volta dele (antes arrastava o mapa, e a câmera voltava para o
+  // boneco no quadro seguinte: parecia travada); o botão direito e dois dedos arrastam (longe dele, para de seguir). No modo
+  // andar quem manda nos botões é entrarAndar/sairAndar.
+  if (!st.andar) {
+    const modo = st.seguir ? "seguir" : "livre";
+    if (x.botoes !== modo) {
+      x.botoes = modo; const e = extra(c), sg = modo === "seguir";
+      e.mouseButtons = { LEFT: sg ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: sg ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE };
+      e.touches = { ONE: sg ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN, TWO: sg ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.DOLLY_ROTATE };
+    }
+  }
   if (!st.andar && comandoAndar.ativo) { comandoAndar.ativo = false; comandoAndar.x = 0; comandoAndar.z = 0; }
   // animação em andamento; seguindo o boneco, ela termina no boneco de agora (e não onde ele estava quando ela começou:
   // antes, ao fim da animação, o alvo pulava até o boneco)
@@ -428,7 +441,7 @@ export function CameraMundo({ controles, inicio }: { controles: React.RefObject<
   const drone = useCamera((s) => s.drone);
   const pegar = () => {
     const c = controles.current; if (!c) return null;
-    if (!ctx.current) ctx.current = { camera, c, inicio, anim: null, teclas: new Set(), interagindo: false, rota: null, antesAndar: null, andando: false, desvio: novoDesvio(), seg: novoSegue() };
+    if (!ctx.current) ctx.current = { camera, c, inicio, anim: null, teclas: new Set(), interagindo: false, rota: null, antesAndar: null, andando: false, desvio: novoDesvio(), seg: novoSegue(), botoes: "livre" };
     return ctx.current;
   };
 
@@ -448,6 +461,46 @@ export function CameraMundo({ controles, inicio }: { controles: React.RefObject<
     const antesDosControles = () => desfazerDesvio(x);
     const EVENTOS_CONTROLE = ["pointerdown", "pointermove", "pointerup", "wheel"] as const;
     for (const ev of EVENTOS_CONTROLE) window.addEventListener(ev, antesDosControles, { capture: true, passive: true });
+    // 24/11/2026 (pedido do dono: "a câmera fica travada, sem conseguir mexer para nenhum dos lados"): no fim de um arrasto
+    // o navegador ainda solta um clique em cima do que ficou sob o mouse, e a cena tratava esse clique como um toque: abria o
+    // lote ou mandava o boneco andar até ali (e a câmera de andar ia atrás dele, desfazendo o giro). Começou na cena e andou
+    // mais de 6 px: não é clique (o clique parado continua valendo).
+    const caixa = () => (x.c as unknown as { domElement?: HTMLElement | null }).domElement ?? gl.domElement;
+    let inicioArrasto: [number, number] | null = null, arrastou = false;
+    const desceP = (e: PointerEvent) => { if (!e.isPrimary) { arrastou = true; return; } inicioArrasto = caixa().contains(e.target as Node) ? [e.clientX, e.clientY] : null; arrastou = false; };
+    const moveP = (e: PointerEvent) => { if (inicioArrasto && e.isPrimary && !arrastou && Math.hypot(e.clientX - inicioArrasto[0], e.clientY - inicioArrasto[1]) > 6) arrastou = true; };
+    const clique = (e: MouseEvent) => { if (inicioArrasto && arrastou) e.stopPropagation(); inicioArrasto = null; arrastou = false; };
+    // a roda: os controles davam o mesmo passo (5%) a cada evento; o trackpad solta dezenas de eventos pequenos por gesto e
+    // o zoom pulava de uma ponta à outra. Numa sequência rápida (menos de 120 ms entre um e outro), o passo acompanha o tamanho
+    // do giro (até os mesmos 5%; a pinça do trackpad vem com Ctrl e números pequenos); o evento isolado, como um dente do
+    // mouse, continua com os 5%. Depois do evento, volta ao normal (a pinça na tela usa o mesmo número).
+    let ultimaRoda = 0;
+    const rodaAntes = (e: WheelEvent) => {
+      if (!caixa().contains(e.target as Node)) return; // em cima da barra, a roda volta pelo canvas (scene/roda.ts)
+      const agora = performance.now(), isolada = agora - ultimaRoda > 120; ultimaRoda = agora;
+      const px = Math.abs(e.deltaY) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1) * (e.ctrlKey ? 10 : 1);
+      extra(x.c).zoomSpeed = isolada ? 1 : Math.min(1, px / 50);
+    };
+    const rodaDepois = () => { extra(x.c).zoomSpeed = 1; };
+    // girar com dois dedos (torcer) gira a vista em volta do ponto, como nos mapas do celular; os controles do mapa só giravam
+    // arrastando os dois dedos juntos para o lado
+    const dedos = new Map<number, [number, number]>(); let angDedos: number | null = null;
+    const anguloDedos = () => { const [a, b] = [...dedos.values()]; return Math.atan2(b[1] - a[1], b[0] - a[0]); };
+    const dedoDesce = (e: PointerEvent) => { if (e.pointerType !== "touch" || !caixa().contains(e.target as Node)) return; dedos.set(e.pointerId, [e.clientX, e.clientY]); angDedos = dedos.size === 2 ? anguloDedos() : null; };
+    const dedoMove = (e: PointerEvent) => {
+      if (!dedos.has(e.pointerId)) return;
+      dedos.set(e.pointerId, [e.clientX, e.clientY]);
+      if (dedos.size !== 2 || angDedos == null) return;
+      const ang = anguloDedos(), d = angulo(ang - angDedos); angDedos = ang;
+      if (Math.abs(d) < 1e-4 || useCamera.getState().drone) return;
+      const t = x.c.target; offV.copy(x.camera.position).sub(t).applyAxisAngle(EIXO_Y, d); x.camera.position.copy(t).add(offV); x.camera.lookAt(t);
+    };
+    const dedoSobe = (e: PointerEvent) => { if (!dedos.delete(e.pointerId)) return; angDedos = dedos.size === 2 ? anguloDedos() : null; };
+    window.addEventListener("pointerdown", desceP, { capture: true, passive: true }); window.addEventListener("pointermove", moveP, { capture: true, passive: true });
+    window.addEventListener("click", clique, { capture: true });
+    window.addEventListener("wheel", rodaAntes, { capture: true, passive: true }); window.addEventListener("wheel", rodaDepois, { passive: true });
+    window.addEventListener("pointerdown", dedoDesce, { capture: true, passive: true }); window.addEventListener("pointermove", dedoMove, { capture: true, passive: true });
+    window.addEventListener("pointerup", dedoSobe, { capture: true, passive: true }); window.addEventListener("pointercancel", dedoSobe, { capture: true, passive: true });
     window.addEventListener("keydown", desce); window.addEventListener("keyup", sobe); window.addEventListener("blur", sai);
     gl.domElement.addEventListener("dblclick", dbl); gl.domElement.addEventListener("pointerdown", toque); gl.domElement.addEventListener("wheel", toque, { passive: true });
     // foto do meu prédio (ui/FotoPredio) usa a mesma câmera e o mesmo desenho
@@ -459,6 +512,11 @@ export function CameraMundo({ controles, inicio }: { controles: React.RefObject<
     return () => {
       x.c.removeEventListener("start", ini); x.c.removeEventListener("end", fim);
       for (const ev of EVENTOS_CONTROLE) window.removeEventListener(ev, antesDosControles, { capture: true });
+      window.removeEventListener("pointerdown", desceP, { capture: true }); window.removeEventListener("pointermove", moveP, { capture: true });
+      window.removeEventListener("click", clique, { capture: true });
+      window.removeEventListener("wheel", rodaAntes, { capture: true }); window.removeEventListener("wheel", rodaDepois);
+      window.removeEventListener("pointerdown", dedoDesce, { capture: true }); window.removeEventListener("pointermove", dedoMove, { capture: true });
+      window.removeEventListener("pointerup", dedoSobe, { capture: true }); window.removeEventListener("pointercancel", dedoSobe, { capture: true });
       window.removeEventListener("keydown", desce); window.removeEventListener("keyup", sobe); window.removeEventListener("blur", sai);
       gl.domElement.removeEventListener("dblclick", dbl); gl.domElement.removeEventListener("pointerdown", toque); gl.domElement.removeEventListener("wheel", toque);
       registrarPonte(null); if (tDrone) clearTimeout(tDrone);

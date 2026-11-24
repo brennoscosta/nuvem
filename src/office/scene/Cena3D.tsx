@@ -25,7 +25,7 @@ import { useMundo, modoMundo } from "../mundoStore";
 import { MESA } from "../data/layout";
 import type { Evento } from "../data/eventos";
 import { useCartaoAberto } from "../ui/cartaoAberto";
-import { RAIO_MAXIMO } from "../cameraStore";
+import { RAIO_MAXIMO, useCamera } from "../cameraStore";
 import { edicaoAtiva } from "../edicaoStore";
 
 // Entrega os eventos da fila pros agentes
@@ -88,6 +88,11 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
   useEffect(() => {
     if (!alvoLote) return;
     const c = controles.current; if (!c) return;
+    // 24/11/2026 (câmera travada): andando pela rua a câmera fica atrás do boneco (o cartão do lote abre do mesmo jeito);
+    // seguindo o boneco, ir até o lote para de seguir. Antes as duas puxavam a câmera, cada uma para um lado, sem fim.
+    const modoCam = useCamera.getState();
+    if (modoCam.andar) { useMundo.getState().limparAlvo(); return; }
+    if (modoCam.seguir) modoCam.set({ seguir: false });
     const t = c.target as THREE.Vector3;
     const novo = new THREE.Vector3(...alvoLote);
     const d = novo.clone().sub(t);
@@ -115,8 +120,17 @@ function FocoCamera({ controles }: { controles: React.RefObject<any> }) {
     const c = vista === "fora" ? (modoMundo() ? CAM_MUNDO : CAM_FORA) : CAM_DENTRO;
     alvo.current = c.alvo.clone(); posAlvo.current = c.pos.clone();
   }, [vista, controles]);
+  // 24/11/2026: pegar a câmera (arrastar, a roda, a pinça) cancela o deslize em andamento; antes ele puxava a câmera de volta
+  // enquanto a pessoa arrastava
+  useEffect(() => {
+    const c = controles.current; if (!c) return;
+    const parar = () => { alvo.current = null; posAlvo.current = null; volta.current = null; };
+    c.addEventListener("start", parar);
+    return () => c.removeEventListener("start", parar);
+  }, [controles]);
   useFrame(({ camera }, dt) => {
     const c = controles.current; if (!c) return;
+    if (useCamera.getState().andar) { alvo.current = null; posAlvo.current = null; volta.current = null; } // andando, a câmera é do boneco
     // a volta em arco até a frente de uma sede (1 s): o alvo desliza e a câmera gira em volta dele
     const v = volta.current;
     if (v) {
