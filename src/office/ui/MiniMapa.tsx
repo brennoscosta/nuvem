@@ -107,7 +107,8 @@ export function MiniMapa() {
   const [abertoCel, setAbertoCel] = useState(false);
   // 21/11/2026: no celular o editor do personagem sobe até 88% da tela e cobria a metade de baixo do botão do mapa
   const editorPersonagem = usePersonagem((s) => s.painel === "montar");
-  const [minimizado, setMin] = useState(false);
+  // 24/11/2026: no computador o mapa da cidade também começa recolhido (só o botão); abre ao tocar nele
+  const [minimizado, setMin] = useState(true);
   const [dica, setDica] = useState<{ u: number; v: number; texto: string } | null>(null);
   const [lugar, setLugar] = useState<LugarPainel>(() => (typeof window === "undefined" ? PADRAO : lerLugar()));
   const painel = useRef<HTMLDivElement>(null);
