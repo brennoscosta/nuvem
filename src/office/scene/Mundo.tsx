@@ -100,6 +100,9 @@ function Calcada({ cx, cz }: { cx: number; cz: number }) {
   );
 }
 
+// grupo com nome: não desenha nada, só deixa a medição (?medir=1, /tmp/delta.mjs) dizer o que pesa
+function G({ n, children }: { n: string; children: ReactNode }) { return <group name={n}>{children}</group>; }
+
 function Poste({ position }: { position: [number, number, number] }) {
   return (
     <group position={position}>
@@ -175,32 +178,33 @@ export function Mundo() {
       {/* v67: abertura em etapas (scene/etapas.tsx). 0 = perto (ruas, calçadas, postes, Nuvem, lanchonete, lotes, prédios);
           1 = logo depois (árvores, luzes, trânsito, gente); 2 = longe (mar, serra, praia, nuvens, rio, parque, bichos, som) */}
       <MarcadorEtapas />
-      <Depois etapa={2}><Horizonte /><SomCena /></Depois>
-      <Estatico>
+      <Depois etapa={2}><G n="horizonte"><Horizonte /><SomCena /></G></Depois>
+      <G n="ruas"><Estatico>
         <Ruas />
         {calcadas.map(([cx, cz], i) => { const b = BAIRRO_DO_QUARTEIRAO[`${Math.round(cx / PASSO)},${Math.round(cz / PASSO)}`]; return b ? <CalcadaBairro key={i} cx={cx} cz={cz} b={b} /> : <Calcada key={i} cx={cx} cz={cz} />; })}
-      </Estatico>
-      <ComFallback fallback={<Estatico>{postes.map((p, i) => <Poste key={i} position={p.pos} />)}</Estatico>}>
+      </Estatico></G>
+      <G n="postes"><ComFallback fallback={<Estatico>{postes.map((p, i) => <Poste key={i} position={p.pos} />)}</Estatico>}>
         <ModeloInstanciado nome="poste" itens={postes} />
-      </ComFallback>
+      </ComFallback></G>
       {/* à noite os postes acendem (luz no chão e lâmpada) e ganham um halo na cor do bairro */}
-      <Depois etapa={1}><LuzesPostes itens={postes} /><HalosPostes postes={postes} /></Depois>
+      <Depois etapa={1}><G n="luzes-postes"><LuzesPostes itens={postes} /><HalosPostes postes={postes} /></G></Depois>
       {/* bairros com identidade (12/11/2026): galhardetes, árvores de rua e a placa de cada bairro; placas com o nome das ruas */}
-      <Depois etapa={1}><SoDePerto nome="galhardetes"><Galhardetes postes={postes} /></SoDePerto><ArvoresDeRua /></Depois>
+      <Depois etapa={1}><SoDePerto nome="galhardetes"><Galhardetes postes={postes} /></SoDePerto><G n="arvores-de-rua"><ArvoresDeRua /></G></Depois>
       {/* SoDePerto (20/11/2026): no celular, com o zoom bem afastado, o que vira um ponto na tela não é desenhado (etapas.tsx) */}
-      <SoDePerto nome="placas"><Isolado><PlacasBairro /></Isolado><Isolado><PlacasDeRua /></Isolado></SoDePerto>
+      <SoDePerto nome="placas"><Isolado><G n="placas-bairro"><PlacasBairro /></G></Isolado><Isolado><G n="placas-rua"><PlacasDeRua /></G></Isolado></SoDePerto>
       {/* além da Avenida Beira-Rio: calçadão, rio, pontes e o Parque da Cidade (o chão aparece sempre; o resto, de perto) */}
-      <Depois etapa={2}><Rio /><ParqueChao /><Perto cx={LAGO.x} cz={LAGO.z} raio={raio + 10}><Parque /></Perto></Depois>
+      <Depois etapa={2}><G n="rio"><Rio /></G><G n="parque-chao"><ParqueChao /></G><Perto cx={LAGO.x} cz={LAGO.z} raio={raio + 10}><G n="parque"><Parque /></G></Perto></Depois>
       {/* Natal (20/11 a 6/1, scene/Natal.tsx): árvores na praça da Nuvem e na Praça de Eventos, trenó, guirlandas nas sedes,
           laço e pisca-pisca nos postes e fios de luz no calçadão e nas pontes. ?natal=0 desliga (prévias) */}
-      {natal && <Isolado key={`natal-${versaoSedes}`}><group name="natal"><ArvoreNatal /><NatalPraca /><SoDePerto nome="natal-miudo"><LuzesNatalPostes itens={postes} /><LacosPostes itens={postes} /><NatalSedes /></SoDePerto></group></Isolado>}
-      {natal && <Depois etapa={2}><group name="natal-rio"><SoDePerto><LuzesRioNatal /></SoDePerto></group></Depois>}
+      {/* 24/11/2026, gráficos leves: do Natal fica só a árvore grande da praça da Nuvem (e os presentes da caça, abaixo) */}
+      {natal && <Isolado key={`natal-${versaoSedes}`}><group name="natal"><G n="natal-arvore"><ArvoreNatal /></G>{!poucos && <><G n="natal-praca"><NatalPraca /></G><SoDePerto nome="natal-miudo"><LuzesNatalPostes itens={postes} /><LacosPostes itens={postes} /><NatalSedes /></SoDePerto></>}</group></Isolado>}
+      {natal && !poucos && <Depois etapa={2}><group name="natal-rio"><SoDePerto><LuzesRioNatal /></SoDePerto></group></Depois>}
       {/* caça aos presentes de Natal (frente visitante): 3 presentes do dia, 3 malhas instanciadas (scene/PresentesNatal.tsx) */}
       {natal && <Depois etapa={1}><SoDePerto nome="natal-presentes-perto"><PresentesNatal /></SoDePerto></Depois>}
       {/* árvores do mundo (v63): espécies brasileiras desenhadas em código (scene/Arvores.tsx), sorteadas pela posição;
           na borda da praia (sul e leste) entram coqueiros e palmeiras imperiais */}
-      <Depois etapa={2}><ArvoresMistas itens={arvoresPraia} mistura={MISTURA_PRAIA} grupo="praia" /></Depois>
-      <Depois etapa={1}><ArvoresMistas itens={arvoresRua} mistura={MISTURA_RUA} grupo="lotes" /></Depois>
+      <Depois etapa={2}><G n="arvores-praia"><ArvoresMistas itens={arvoresPraia} mistura={MISTURA_PRAIA} grupo="praia" /></G></Depois>
+      <Depois etapa={1}><G n="arvores-lotes"><ArvoresMistas itens={arvoresRua} mistura={MISTURA_RUA} grupo="lotes" /></G></Depois>
       {/* trânsito: semáforos, faixas de pedestre e carros que obedecem (11/11/2026) */}
       <SoDePerto nome="semaforos"><Semaforos /></SoDePerto>
       <Depois etapa={1}><SoDePerto nome="trafego"><Trafego /></SoDePerto></Depois>
@@ -208,24 +212,25 @@ export function Mundo() {
       <Depois etapa={1}><SoDePerto nome="passantes"><Passantes /><PontosOnibus /></SoDePerto></Depois>
       {/* moradores da cidade (19/11/2026): gente fixa com nome, casa e rotina pela hora da cidade; clicar abre a conversa */}
       <Depois etapa={1}><SoDePerto nome="moradores"><Moradores /></SoDePerto></Depois>
-      <Depois etapa={2}><SoDePerto nome="fauna"><Fauna /></SoDePerto></Depois>
+      {/* gráficos leves (24/11/2026): sem os bichos (pássaros e cães) */}
+      {!poucos && <Depois etapa={2}><SoDePerto nome="fauna"><Fauna /></SoDePerto></Depois>}
       {/* outdoors nas avenidas da borda (aluguel de 30 dias) */}
-      <Depois etapa={2}><Outdoors /></Depois>
+      <Depois etapa={2}><G n="outdoors"><Outdoors /></G></Depois>
       {/* quarteirões */}
-      <Perto cx={0} cz={0} raio={raio + 60}><Isolado><Entorno /></Isolado></Perto>
-      <Perto cx={PASSO} cz={0} raio={raio}><Isolado><Restaurante /></Isolado></Perto>
+      <Perto cx={0} cz={0} raio={raio + 60}><Isolado><G n="entorno"><Entorno /></G></Isolado></Perto>
+      <Perto cx={PASSO} cz={0} raio={raio}><Isolado><G n="restaurante"><Restaurante /></G></Isolado></Perto>
       {/* sedes (data/sedes.ts): cada uma num lote de esquina virado para o centro; nenhuma desde 24/11/2026 */}
       {SEDES.map((sd) => <Perto key={`${sd.id}-${versaoSedes}`} cx={sd.lote.x} cz={sd.lote.z} raio={raio}><Isolado><SedeHQ sede={sd} /></Isolado></Perto>)}
-      <Depois etapa={2}><SoDePerto nome="gente-praia"><GentePraia /></SoDePerto></Depois>
-      <Depois etapa={1}><Personagens /></Depois>
-      <Perto cx={0} cz={0} raio={raio + 100}><Isolado><Lotes /></Isolado>
+      {!poucos && <Depois etapa={2}><SoDePerto nome="gente-praia"><GentePraia /></SoDePerto></Depois>}
+      <Depois etapa={1}><G n="personagens"><Personagens /></G></Depois>
+      <Perto cx={0} cz={0} raio={raio + 100}><Isolado><G n="lotes"><Lotes /></G></Isolado>
       {/* quiosques, quiosques dos lotes em quartos, o realce do vizinho ao expandir o terreno (20/11/2026) e o do terreno em reserva (WE-07, 21/11/2026) */}
-      <Isolado><Quiosques /><QuiosquesDosLotes /><RealceExpansao /><RealceReserva /></Isolado>
-      <Isolado><EscritoriosClientes /></Isolado>
-      <Isolado><PortasPredios /></Isolado>
+      <Isolado><G n="quiosques"><Quiosques /><QuiosquesDosLotes /></G><RealceExpansao /><RealceReserva /></Isolado>
+      <Isolado><G n="escritorios"><EscritoriosClientes /></G></Isolado>
+      <Isolado><G n="portas"><PortasPredios /></G></Isolado>
       <EditorPosicao3D />
       {/* praça de eventos e feira de sábado no lote 0,1,1 (12/11/2026) */}
-      <Isolado><Praca /></Isolado></Perto>
+      <Isolado><G n="praca"><Praca /></G></Isolado></Perto>
     </group>
   );
 }

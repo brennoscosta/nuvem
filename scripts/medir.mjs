@@ -2,13 +2,14 @@
 // Uso: node scripts/medir.mjs <url-base> [esperaMs]
 import { chromium } from "playwright";
 const [, , base = "http://localhost:3077/?qualidade=alta&medir=1", esperaMs = "20000"] = process.argv;
-const CAMS = { nuvem: "8,23,28,0,0,0.5", mundo: "40,70,95,20,0,0", restaurante: "20,22,38,52,0,-2", longe: "0,95,140,0,0,0" };
+const CAMS = { inicial: "", nuvem: "8,23,28,0,0,0.5", mundo: "40,70,95,20,0,0", restaurante: "20,22,38,52,0,-2", longe: "0,95,140,0,0,0" };
 const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--enable-webgl"] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+// CELULAR=1: tela de 390×844 com toque (o mapa trata como celular: corta o que fica longe, ui/qualidade › celular)
+const page = await browser.newPage(process.env.CELULAR ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true } : { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
 const out = {};
 for (const [nome, cam] of Object.entries(CAMS)) {
-  await page.goto(`${base}&cam=${cam}`, { waitUntil: "domcontentloaded", timeout: 120000 });
-  await page.waitForSelector("canvas", { timeout: 120000 });
+  await page.goto(cam ? `${base}&cam=${cam}` : base, { waitUntil: "domcontentloaded", timeout: 120000 });
+  await page.waitForSelector("canvas", { state: "attached", timeout: 120000 });
   await page.waitForTimeout(+esperaMs);
   out[nome] = await page.evaluate(() => new Promise((res) => {
     const r = window.__cena;

@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { mat, cilindro, caixa } from "./geo";
+import { juntarPecas, matriz, montarAtlas, type Peca } from "./atlas";
 import { leve } from "./qualidade";
 import { ceu, texturaLuz } from "./CicloDia";
 import { type ItemInstancia } from "./Modelos";
@@ -234,10 +235,11 @@ function GalhardetesDoBairro({ b, itens }: { b: Bairro; itens: ItemInstancia[] }
 }
 
 // ---------- placa do bairro (no lado do quarteirão que dá para o centro da cidade) ----------
-const TEX_PLACA = new Map<string, THREE.CanvasTexture>();
-function texturaPlacaBairro(b: Bairro) {
-  if (TEX_PLACA.has(b.id) || typeof document === "undefined") return TEX_PLACA.get(b.id) ?? null;
-  const W = 1024, H = 248, c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d")!;
+// 24/11/2026 (mapa lento): as artes de todos os bairros numa textura só e as placas em duas malhas (faces e ferro); antes
+// eram cinco desenhos por placa (scene/atlas.ts)
+const PLACA_W = 1024, PLACA_H = 248;
+function desenharPlacaBairro(g: CanvasRenderingContext2D, b: Bairro) {
+  const W = PLACA_W, H = PLACA_H;
   const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, b.cor); gr.addColorStop(1, new THREE.Color(b.cor).multiplyScalar(0.62).getStyle());
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
   g.fillStyle = "rgba(255,255,255,.95)"; g.fillRect(0, 0, W, 10); g.fillRect(0, H - 10, W, 10);
@@ -245,7 +247,6 @@ function texturaPlacaBairro(b: Bairro) {
   g.font = "600 34px Inter, Arial, sans-serif"; g.globalAlpha = 0.8; g.fillText("BAIRRO", 48, 64); g.globalAlpha = 1;
   g.font = "900 92px Inter, Arial, sans-serif"; g.fillText(b.nome, 44, 138, W - 90);
   g.font = "500 34px Inter, Arial, sans-serif"; g.globalAlpha = 0.88; g.fillText(b.lema, 48, 202, W - 96); g.globalAlpha = 1;
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; TEX_PLACA.set(b.id, t); return t;
 }
 export function ladoDaPlaca(b: Bairro): { dx: number; dz: number } {
   // lado que olha para o centro (Nuvem): pelo eixo de maior distância
@@ -253,24 +254,33 @@ export function ladoDaPlaca(b: Bairro): { dx: number; dz: number } {
   return { dx: 0, dz: -Math.sign(b.j) };
 }
 const GEO_PLACA_B = new THREE.PlaneGeometry(5.16, 1.25);
-function PlacaBairro({ b }: { b: Bairro }) {
-  const tex = useMemo(() => texturaPlacaBairro(b), [b]);
-  const m = useMemo(() => (tex ? new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }) : null), [tex]);
-  const { dx, dz } = ladoDaPlaca(b);
-  const off = BORDA_CALCADA - 0.32, ao = -6; // perto do meio-fio, entre a árvore e o poste do meio
-  const cx = b.i * PASSO + dx * off + (dz !== 0 ? ao : 0), cz = b.j * PASSO + dz * off + (dx !== 0 ? ao : 0);
-  const rot = Math.atan2(dx, dz); // a frente da placa (+z local) olha para a rua
+export function PlacasBairro() {
   const ferro = mat("#2B2F36", { metal: 0.4, rough: 0.5 });
+  const montado = useMemo(() => {
+    const atlas = montarAtlas(BAIRROS.length, PLACA_W, PLACA_H, (g, i) => desenharPlacaBairro(g, BAIRROS[i]));
+    if (!atlas) return null;
+    const faces: Peca[] = [], ferros: Peca[] = [], poste = cilindro(0.07, 0.08, 4.25, 8), quadro = caixa(5.3, 1.38, 0.12);
+    BAIRROS.forEach((b, i) => {
+      const { dx, dz } = ladoDaPlaca(b);
+      const off = BORDA_CALCADA - 0.32, ao = -6; // perto do meio-fio, entre a árvore e o poste do meio
+      const cx = b.i * PASSO + dx * off + (dz !== 0 ? ao : 0), cz = b.j * PASSO + dz * off + (dx !== 0 ? ao : 0);
+      const base = matriz([cx, 0, cz], Math.atan2(dx, dz)); // a frente da placa (+z local) olha para a rua
+      for (const x of [-2.35, 2.35]) ferros.push({ geo: poste, m: matriz([x, 2.12, 0], 0, base) });
+      ferros.push({ geo: quadro, m: matriz([0, 3.45, 0], 0, base) });
+      faces.push({ geo: GEO_PLACA_B, m: matriz([0, 3.45, 0.065], 0, base), celula: i });
+      faces.push({ geo: GEO_PLACA_B, m: matriz([0, 3.45, -0.065], Math.PI, base), celula: i });
+    });
+    return { atlas, faces: juntarPecas(faces, atlas), ferro: juntarPecas(ferros), material: new THREE.MeshBasicMaterial({ map: atlas.textura, toneMapped: false }) };
+  }, []);
+  useEffect(() => () => { if (!montado) return; montado.atlas.textura.dispose(); montado.material.dispose(); montado.faces?.dispose(); montado.ferro?.dispose(); }, [montado]);
+  if (!montado) return null;
   return (
-    <group position={[cx, 0, cz]} rotation={[0, rot, 0]}>
-      {[-2.35, 2.35].map((x) => <mesh key={x} geometry={cilindro(0.07, 0.08, 4.25, 8)} material={ferro} position={[x, 2.12, 0]} castShadow />)}
-      <mesh geometry={caixa(5.3, 1.38, 0.12)} material={ferro} position={[0, 3.45, 0]} castShadow />
-      {m && <mesh geometry={GEO_PLACA_B} material={m} position={[0, 3.45, 0.065]} />}
-      {m && <mesh geometry={GEO_PLACA_B} material={m} position={[0, 3.45, -0.065]} rotation={[0, Math.PI, 0]} />}
+    <group>
+      {montado.ferro && <mesh geometry={montado.ferro} material={ferro} castShadow />}
+      {montado.faces && <mesh geometry={montado.faces} material={montado.material} />}
     </group>
   );
 }
-export function PlacasBairro() { return <group>{BAIRROS.map((b) => <PlacaBairro key={b.id} b={b} />)}</group>; }
 
 // ---------- halos dos postes à noite ----------
 // Um ponto de luz (sprite somado) em cada lâmpada, na cor de luz do bairro (fora dos bairros, a luz quente de sempre).

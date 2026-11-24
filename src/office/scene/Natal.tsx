@@ -19,6 +19,7 @@ import { cilindro, mat } from "./geo";
 import { ceu, texturaHalo } from "./CicloDia";
 import { leve, celular } from "./qualidade";
 import { SoDePerto } from "./etapas";
+import { Estatico } from "./Estatico";
 import type { ItemInstancia } from "./Modelos";
 import { logosDe } from "./SedeEstilos";
 import { postesDoCalcadao, PONTE_DADOS } from "./Rio";
@@ -167,8 +168,11 @@ export function ArvoreNatal({ position = [0.5, 0, 17.4], escala = 1, presentes =
   useFrame(({ clock }) => { piscar(clock.elapsedTime); if (estrela.current) estrela.current.rotation.y = clock.elapsedTime * 0.6; });
   return (
     <group position={position} scale={escala}>
-      <mesh geometry={cilindro(0.28, 0.36, 1.1, 10)} material={mat("#6B4A2B", { rough: 0.95 })} position={[0, 0.55, 0]} castShadow />
-      {CAMADAS.map(([r, h, y], i) => <mesh key={i} geometry={coneGeo(r, h)} material={i % 2 ? verde2 : verde} position={[0, y, 0]} castShadow />)}
+      {/* tronco e camadas numa malha só (24/11/2026, mapa lento; a árvore também enfeita a entrada de cada loja) */}
+      <Estatico>
+        <mesh geometry={cilindro(0.28, 0.36, 1.1, 10)} material={mat("#6B4A2B", { rough: 0.95 })} position={[0, 0.55, 0]} castShadow />
+        {CAMADAS.map(([r, h, y], i) => <mesh key={i} geometry={coneGeo(r, h)} material={i % 2 ? verde2 : verde} position={[0, y, 0]} castShadow />)}
+      </Estatico>
       <mesh ref={estrela} geometry={geos().estrela} material={MAT_ESTRELA} position={[0, 7.1, 0]} scale={0.95} />
       <sprite material={MAT_HALO} position={[0, 7.1, 0]} scale={[3.4, 3.4, 1]} />
       {/* no celular, de longe, a árvore fica com a forma e a estrela; bolas, pisca-pisca e presentes só de perto */}
@@ -334,11 +338,13 @@ function Treno({ position, giro = 0 }: { position: V3; giro?: number }) {
   const g = geoTreno();
   return (
     <group position={position} rotation={[0, giro, 0]}>
-      <mesh geometry={g.corpo} material={mat("#B3121F", { rough: 0.45, metal: 0.1 })} castShadow receiveShadow />
-      <mesh geometry={g.banco} material={mat("#6E0E18", { rough: 0.75 })} position={[-0.15, 0.61, 0]} />
-      <mesh geometry={g.patins} material={mat("#D9A520", { rough: 0.3, metal: 0.8 })} castShadow />
-      <mesh geometry={g.saco} material={mat("#A0784C", { rough: 0.95 })} position={[-0.5, 1.0, 0]} castShadow />
-      <mesh geometry={g.amarra} material={mat("#D9A520", { rough: 0.3, metal: 0.8 })} position={[-0.5, 1.42, 0]} rotation={[Math.PI / 2, 0, 0]} />
+      <Estatico>
+        <mesh geometry={g.corpo} material={mat("#B3121F", { rough: 0.45, metal: 0.1 })} castShadow receiveShadow />
+        <mesh geometry={g.banco} material={mat("#6E0E18", { rough: 0.75 })} position={[-0.15, 0.61, 0]} />
+        <mesh geometry={g.patins} material={mat("#D9A520", { rough: 0.3, metal: 0.8 })} castShadow />
+        <mesh geometry={g.saco} material={mat("#A0784C", { rough: 0.95 })} position={[-0.5, 1.0, 0]} castShadow />
+        <mesh geometry={g.amarra} material={mat("#D9A520", { rough: 0.3, metal: 0.8 })} position={[-0.5, 1.42, 0]} rotation={[Math.PI / 2, 0, 0]} />
+      </Estatico>
       <Presentes lista={PRESENTES_TRENO} />
     </group>
   );

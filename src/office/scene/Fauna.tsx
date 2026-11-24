@@ -8,6 +8,7 @@ import * as THREE from "three";
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { caixa, esfera, mat } from "./geo";
+import { Estatico } from "./Estatico";
 import { leve } from "./qualidade";
 import { ceu } from "./CicloDia";
 import { clima } from "../clima";
@@ -169,13 +170,14 @@ function Cachorro({ c }: { c: Cao }) {
         {[[0.09, 0.22], [-0.09, 0.22], [0.09, -0.22], [-0.09, -0.22]].map(([x, z], k) => (
           <mesh key={k} ref={(el) => { pernas.current[k] = el; }} geometry={caixa(0.07, 0.3, 0.07)} material={corpo} position={[x, 0.22, z]} />
         ))}
-        <group ref={cab} position={[0, 0.56, 0.32]}>
+        {/* a cabeça se mexe inteira: as 7 peças viram uma malha só (24/11/2026, mapa lento) */}
+        <group ref={cab} position={[0, 0.56, 0.32]}><Estatico>
           <mesh geometry={caixa(0.22, 0.2, 0.22)} material={corpo} position={[0, 0.02, 0.06]} />
           <mesh geometry={caixa(0.13, 0.1, 0.14)} material={det} position={[0, -0.03, 0.22]} />
           <mesh geometry={esfera(0.025, 6)} material={escuro} position={[0, 0.0, 0.3]} />
           {[-0.08, 0.08].map((x) => <mesh key={x} geometry={caixa(0.06, 0.12, 0.04)} material={det} position={[x, 0.14, 0.0]} rotation={[0, 0, x > 0 ? -0.3 : 0.3]} />)}
           {[-0.055, 0.055].map((x) => <mesh key={`o${x}`} geometry={esfera(0.018, 6)} material={escuro} position={[x, 0.06, 0.17]} />)}
-        </group>
+        </Estatico></group>
         <mesh ref={rabo} geometry={caixa(0.05, 0.05, 0.26)} material={det} position={[0, 0.54, -0.38]} rotation={[0.7, 0, 0]} />
       </group>
       {c.dono != null && <mesh ref={guia} material={mat("#D64545", { rough: 0.6 })} visible={false}><cylinderGeometry args={[0.012, 0.012, 1, 4]} /></mesh>}

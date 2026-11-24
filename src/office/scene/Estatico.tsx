@@ -9,8 +9,12 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { leve } from "./qualidade";
 
 const basicos = new Map<string, THREE.Material>();
+// 24/11/2026 (mapa lento): cada aspereza/brilho diferente virava uma malha (e um desenho) a mais. Completo: os valores
+// arredondados em degraus de 0,25, invisível na tela; leve: o material simples não usa nenhum dos dois, nem sombra, então
+// todas as peças lisas de um grupo viram uma malha só.
+const degrau = (v: number) => Math.round(v * 4) / 4;
 function materialDeVertice(rough: number, metal: number) {
-  const k = `${rough}|${metal}`; let m = basicos.get(k);
+  const k = leve() ? "leve" : `${rough}|${metal}`; let m = basicos.get(k);
   if (!m) { m = leve() ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: metal }); basicos.set(k, m); }
   return m;
 }
@@ -22,6 +26,7 @@ function juntar(fonte: THREE.Object3D): THREE.Group {
   const inv = new THREE.Matrix4().copy(fonte.matrixWorld).invert();
   const m4 = new THREE.Matrix4();
   const lotes = new Map<string, Lote>();
+  const semSombra = leve();
   fonte.traverse((o) => {
     const m = o as THREE.Mesh;
     if (!m.isMesh || (m as THREE.InstancedMesh).isInstancedMesh || (m as THREE.SkinnedMesh).isSkinnedMesh || Array.isArray(m.material) || !m.visible) return;
@@ -30,8 +35,13 @@ function juntar(fonte: THREE.Object3D): THREE.Group {
     const mat = m.material as THREE.MeshStandardMaterial & { isMeshLambertMaterial?: boolean };
     const semEmissao = !mat.emissive || mat.emissiveIntensity === 0 || mat.emissive.getHex() === 0;
     const simples = (mat.isMeshStandardMaterial || mat.isMeshLambertMaterial) && !mat.map && !mat.transparent && semEmissao && mat.side === THREE.FrontSide;
-    const rough = mat.isMeshStandardMaterial ? mat.roughness : 1, metal = mat.isMeshStandardMaterial ? mat.metalness : 0;
-    const chave = simples ? `v|${rough}|${metal}|${m.castShadow}|${m.receiveShadow}` : `m|${mat.uuid}|${m.castShadow}|${m.receiveShadow}`;
+    const rough = mat.isMeshStandardMaterial ? degrau(mat.roughness) : 1, metal = mat.isMeshStandardMaterial ? degrau(mat.metalness) : 0;
+    const sombra = semSombra ? "" : `|${m.castShadow}|${m.receiveShadow}`;
+    // com textura, opaco e sem brilho próprio: materiais iguais (mesma textura, cor e acabamento) feitos em separado caem
+    // na mesma malha; o que acende ou fica transparente continua pelo próprio material (pode mudar com a hora)
+    const igual = !simples && !!mat.map && !mat.transparent && semEmissao && (mat.isMeshStandardMaterial || mat.isMeshLambertMaterial)
+      ? `${mat.type}|${mat.map.uuid}|${mat.color.getHex()}|${mat.side}|${mat.alphaTest}|${rough}|${metal}|${mat.vertexColors}` : null;
+    const chave = simples ? (semSombra ? "v" : `v|${rough}|${metal}${sombra}`) : igual ? `t|${igual}${sombra}` : `m|${mat.uuid}${sombra}`;
     const geo = g0.index ? g0.toNonIndexed() : g0.clone();
     for (const nome of Object.keys(geo.attributes)) if (nome !== "position" && nome !== "normal" && nome !== "uv") geo.deleteAttribute(nome);
     if (!geo.attributes.normal) geo.computeVertexNormals();

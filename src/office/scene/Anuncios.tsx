@@ -197,8 +197,11 @@ export function Outdoors() {
   // lâmpadas dos refletores (acendem à noite) e o leque de luz na arte
   const lampada = mat("#F5F3EA", { emissive: "#FFF1C9", ei: 1.4 });
   const camera = useThree((st) => st.camera); const passo = useRef(0);
+  const leques = useRef<THREE.Group>(null);
   useFrame((_, dt) => {
     acender(); if (MAT_LEQUE) MAT_LEQUE.opacity = Math.max(0, ceu.noite - 0.15) * 0.75;
+    // de dia o leque fica com opacidade zero: nem desenha (eram 3 desenhos por outdoor à toa)
+    if (leques.current) leques.current.visible = !!MAT_LEQUE && MAT_LEQUE.opacity > 0.01;
     // o vídeo dos outdoors livres só toca com um deles na tela (e a aba visível), conferido 2 vezes por segundo
     const v = VIDEO_LIVRE.el; if (!v) return;
     passo.current += dt; if (passo.current < 0.5) return; passo.current = 0;
@@ -216,17 +219,27 @@ export function Outdoors() {
   });
   return (
     <group>
+      {/* 24/11/2026 (mapa lento): as lâmpadas dos refletores (material fixo) entram na malha da estrutura e os leques de luz
+          de todos os outdoors viram uma malha só, que só aparece à noite */}
       <Estatico>
         {OUTDOORS.map((v) => (
-          <group key={v.id} position={[v.pos[0], 0, v.pos[1]]} rotation={[0, v.rot, 0]}><EstruturaOutdoor /></group>
+          <group key={v.id} position={[v.pos[0], 0, v.pos[1]]} rotation={[0, v.rot, 0]}>
+            <EstruturaOutdoor />
+            {REFLETORES.map((x) => <mesh key={x} geometry={caixa(0.46, 0.06, 0.24)} material={lampada} position={[x, FY0 - 0.2, 1.3]} rotation={[-0.75, 0, 0]} />)}
+          </group>
         ))}
       </Estatico>
+      {MAT_LEQUE && <group ref={leques} visible={false}><Estatico>
+        {OUTDOORS.map((v) => (
+          <group key={v.id} position={[v.pos[0], 0, v.pos[1]]} rotation={[0, v.rot, 0]}>
+            {REFLETORES.map((x) => <mesh key={`l${x}`} geometry={plano(3.6, FACE_OUTDOOR.alt * 0.9)} material={MAT_LEQUE!} position={[x, FY0 + FACE_OUTDOOR.alt * 0.42, 0.55]} rotation={[-0.12, 0, 0]} />)}
+          </group>
+        ))}
+      </Estatico></group>}
       {OUTDOORS.map((v) => (
         <group key={v.id} position={[v.pos[0], 0, v.pos[1]]} rotation={[0, v.rot, 0]}
           onClick={(e) => { e.stopPropagation(); const o = outdoors.find((x) => x.slot === v.id); abrir(v.id); abrirModal(!o || o.status === "livre" ? v.id : null); }} onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = ""; }}>
           <PainelOutdoor o={outdoors.find((x) => x.slot === v.id)} preco={preco} />
-          {REFLETORES.map((x) => <mesh key={x} geometry={caixa(0.46, 0.06, 0.24)} material={lampada} position={[x, FY0 - 0.2, 1.3]} rotation={[-0.75, 0, 0]} />)}
-          {MAT_LEQUE && REFLETORES.map((x) => <mesh key={`l${x}`} geometry={plano(3.6, FACE_OUTDOOR.alt * 0.9)} material={MAT_LEQUE} position={[x, FY0 + FACE_OUTDOOR.alt * 0.42, 0.55]} rotation={[-0.12, 0, 0]} />)}
         </group>
       ))}
     </group>

@@ -72,6 +72,24 @@ export function qualidadeManual(): Qualidade | null {
 // a cena travou mesmo com tudo reduzido: a próxima visita já começa nos gráficos leves
 export function lembrarLeveAuto() { try { window.localStorage.setItem(CHAVE_AUTO, "leve"); } catch { /* ignora */ } }
 
+// 24/11/2026 (mapa lento): começou nos gráficos completos e não deu conta. Antes a cena só baixava a resolução e travava em
+// 30 quadros por segundo, ainda desenhando tudo, e depois caía para o mapa 2D. Agora a cidade recarrega já nos gráficos
+// leves (sem enfeites, menos peças, material simples) e mostra o aviso com "Voltar aos completos"; o 2D só vem se o leve
+// também não der conta. Sem armazenamento no aparelho não recarrega (voltaria nos completos e repetiria): devolve false.
+const CHAVE_AVISO = "nuvem:qualidade-aviso";
+export function recarregarLeve(): boolean {
+  // o navegador de robô dos testes desenha a menos de 1 quadro por segundo: só troca com ?queda2d=1 (como a queda para o 2D)
+  if (navigator.webdriver === true && new URLSearchParams(window.location.search).get("queda2d") !== "1") return false;
+  try { window.localStorage.setItem(CHAVE_AUTO, "leve"); if (window.localStorage.getItem(CHAVE_AUTO) !== "leve") return false; window.sessionStorage.setItem(CHAVE_AVISO, "1"); } catch { return false; }
+  const u = new URL(window.location.href); u.searchParams.delete("qualidade");
+  window.location.replace(u.toString());
+  return true;
+}
+// a carga veio da troca automática? (mostra o aviso uma vez)
+export function avisoDeLevePendente(): boolean {
+  try { const v = window.sessionStorage.getItem(CHAVE_AVISO); if (v) window.sessionStorage.removeItem(CHAVE_AVISO); return !!v; } catch { return false; }
+}
+
 // ---------- mapa simples (2D) ----------
 // Para aparelho sem WebGL ou fraco demais: ?mapa=2d força, ?mapa=3d volta; a escolha do botão fica salva no aparelho.
 // Plano B (WE-20, 22/11/2026): a cena 3D também cai sozinha para cá quando perde o contexto do WebGL (faltou memória de

@@ -19,7 +19,8 @@ import { Acabamento, TOM_PROPRIO } from "./Acabamento";
 import { MiniMapaRender } from "./MiniMapaRender";
 import { precarregarCidade } from "./Modelos";
 import { Agente, handlers } from "./Agente";
-import { qualidade, qualidadeManual, lembrarLeveAuto, escolherQualidade, escolherMapa, cairPara2D } from "./qualidade";
+import { qualidade, qualidadeManual, lembrarLeveAuto, escolherQualidade, escolherMapa, cairPara2D, recarregarLeve, avisoDeLevePendente } from "./qualidade";
+import { MateriaisLeves } from "./MateriaisLeves";
 import { useEscritorio } from "../store";
 import { useMundo, modoMundo } from "../mundoStore";
 import { MESA } from "../data/layout";
@@ -207,8 +208,8 @@ function Limite30() {
 
 // ?medir=1: expõe o renderer em window.__cena pra medir draw calls nas prévias (scripts/medir.mjs)
 function Medidor() {
-  const gl = useThree((s) => s.gl), cena = useThree((s) => s.scene);
-  useEffect(() => { const w = window as unknown as { __cena?: unknown; __cenaObjetos?: unknown }; w.__cena = gl; w.__cenaObjetos = cena; }, [gl, cena]);
+  const gl = useThree((s) => s.gl), cena = useThree((s) => s.scene), camera = useThree((s) => s.camera);
+  useEffect(() => { const w = window as unknown as { __cena?: unknown; __cenaObjetos?: unknown; __camera?: unknown }; w.__cena = gl; w.__cenaObjetos = cena; w.__camera = camera; }, [gl, cena, camera]);
   return null;
 }
 const MEDIR = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("medir");
@@ -249,7 +250,8 @@ function QualidadeViva({ nivel, maximo, aoBaixar, aoTravar, aoCair }: { nivel: n
     if (fps < (nivel >= 2 ? 18 : 24)) x.ruins++; else x.ruins = 0;
     if (x.ruins < 5) return; // 5 segundos seguidos ruins
     x.ruins = 0; x.inicio = agora - 7000; // espera 3 s antes de julgar o nível novo
-    if (nivel < maximo) aoBaixar(nivel + 1);
+    // bem abaixo (menos de 15 quadros por segundo) pula o 1º degrau e vai direto para os gráficos leves
+    if (nivel < maximo) aoBaixar(nivel === 0 && fps < 15 ? 2 : nivel + 1);
     else if (!x.avisou) { x.avisou = true; aoTravar(); }
   });
   return null;
@@ -363,7 +365,9 @@ export function Cena3D() {
   const [dprMonitor, setDpr] = useState(maxDpr);
   const dpr = Math.min(dprMonitor, maxDpr);
   const fecharAviso = useCallback(() => setAviso(null), []);
-  const baixar = (n: number) => { setNivel(n); setAviso("baixou"); if (n >= 2) lembrarLeveAuto(); };
+  // nos completos, o 2º degrau recarrega a cidade já nos gráficos leves (scene/qualidade › recarregarLeve)
+  const baixar = (n: number) => { if (n >= 2 && !leveInicial && recarregarLeve()) return; setNivel(n); setAviso("baixou"); if (n >= 2) lembrarLeveAuto(); };
+  useEffect(() => { if (leveInicial && avisoDeLevePendente()) setAviso("baixou"); }, [leveInicial]);
   useRodaNoCanvas(); // zoom com a roda em qualquer lugar da tela (barra, botões, crachás, balões)
   const cam = CAM_INICIAL;
   return (
@@ -395,6 +399,8 @@ export function Cena3D() {
       {modoMundo() && !leveInicial && <Acabamento hemi={hemi} preench={preench} />}
       {/* v67: cada parte com o próprio limite de carregamento. O letreiro em texto 3D da Nuvem (<Text> do drei) suspende até
           gerar as letras; no mesmo limite, ele segurava a cidade inteira (o mundo só aparecia ~30 s depois num celular) */}
+      {/* gráficos leves: material simples no lugar do físico em tudo o que entra na cena (24/11/2026) */}
+      {leveInicial && <MateriaisLeves />}
       <Suspense fallback={null}><Mundo /></Suspense>
       <Suspense fallback={null}><Predio /></Suspense>
       <Suspense fallback={null}><Fachada /></Suspense>

@@ -99,30 +99,18 @@ function PartesFixas({ simples }: { simples: boolean }) {
   );
 }
 
-// materiais das lâmpadas (um por grupo/eixo/cor), criados uma vez; acender() liga a cor da vez a cada quadro
-let MATS_LUZ: Record<string, THREE.MeshStandardMaterial> | null = null;
-function materiaisLuz() {
-  if (!MATS_LUZ) {
-    MATS_LUZ = {};
-    for (const g of [0, 1]) for (const e of ["x", "z"]) for (const l of ORDEM_LUZ) MATS_LUZ[`${g}${e}${l}`] = new THREE.MeshStandardMaterial({ color: "#30343B", emissive: CORES[l], emissiveIntensity: 0, roughness: 0.35 });
-  }
-  return MATS_LUZ;
-}
-function acender(t: number) {
-  const mats = materiaisLuz();
-  for (const g of [0, 1]) for (const e of ["x", "z"] as const) {
-    const luz = luzDe(g, e, t);
-    for (const l of ORDEM_LUZ) { const m = mats[`${g}${e}${l}`]; const acesa = l === luz; m.emissiveIntensity = acesa ? 2.6 : 0; m.color.set(acesa ? CORES[l] : "#30343B"); }
-  }
-}
+// Lâmpadas (24/11/2026, mapa lento): eram 12 malhas, uma por grupo/eixo/cor, cada uma com o próprio material aceso ou
+// apagado; agora é uma malha só, com a cor de cada lâmpada gravada por instância e trocada quando o sinal muda.
+const APAGADA = new THREE.Color("#30343B");
+const ACESA: Record<Luz, THREE.Color> = { vermelho: new THREE.Color(CORES.vermelho).multiplyScalar(1.5), amarelo: new THREE.Color(CORES.amarelo).multiplyScalar(1.5), verde: new THREE.Color(CORES.verde).multiplyScalar(1.5) };
+const MAT_LAMPADA = new THREE.MeshBasicMaterial({ toneMapped: false });
 
 function Lampadas({ simples }: { simples: boolean }) {
-  const mats = materiaisLuz();
   const geo = useMemo(() => new THREE.SphereGeometry(0.115, 10, 8), []);
-  // posições de cada lâmpada (no mundo) por grupo/eixo/cor
-  const posicoes = useMemo(() => {
-    const p: Record<string, THREE.Matrix4[]> = {};
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), v = new THREE.Vector3();
+  // cada lâmpada: onde fica e de qual grupo/eixo/cor ela é
+  const lampadas = useMemo(() => {
+    const out: { m: THREE.Matrix4; g: number; e: "x" | "z"; l: Luz }[] = [];
+    const q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), v = new THREE.Vector3();
     for (const a of APROXIMACOES) {
       const { px, pz, rotY } = posteDe(a);
       const eixo = a.d[0] !== 0 ? "x" : "z";
@@ -131,24 +119,30 @@ function Lampadas({ simples }: { simples: boolean }) {
       for (const [cx, cy, cz] of cabecas) {
         ORDEM_LUZ.forEach((l, k) => {
           v.set(cx, cy + 0.34 - k * 0.34, cz).applyQuaternion(q).add(new THREE.Vector3(px, 0, pz));
-          (p[`${a.c.grupo}${eixo}${l}`] ??= []).push(m.compose(v, new THREE.Quaternion(), s).clone());
+          out.push({ m: new THREE.Matrix4().compose(v, new THREE.Quaternion(), s), g: a.c.grupo, e: eixo, l });
         });
       }
     }
-    return p;
+    return out;
   }, [simples]);
-  const refs = useRef<Record<string, THREE.InstancedMesh | null>>({});
+  const im = useRef<THREE.InstancedMesh>(null);
+  const ultima = useRef("");
   useEffect(() => {
-    for (const [k, lista] of Object.entries(posicoes)) { const im = refs.current[k]; if (!im) continue; lista.forEach((mm, i) => im.setMatrixAt(i, mm)); im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); }
-  }, [posicoes]);
-  useFrame(() => acender(agora()));
-  return (
-    <>
-      {Object.entries(posicoes).map(([k, lista]) => (
-        <instancedMesh key={k} ref={(el) => { refs.current[k] = el; }} args={[geo, mats[k], lista.length]} frustumCulled={false} />
-      ))}
-    </>
-  );
+    const m = im.current; if (!m) return;
+    lampadas.forEach((x, i) => { m.setMatrixAt(i, x.m); m.setColorAt(i, APAGADA); });
+    m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.computeBoundingSphere();
+    ultima.current = "";
+  }, [lampadas]);
+  useFrame(() => {
+    const m = im.current; if (!m) return;
+    const t = agora(), luzes = { "0x": luzDe(0, "x", t), "0z": luzDe(0, "z", t), "1x": luzDe(1, "x", t), "1z": luzDe(1, "z", t) };
+    const chave = `${luzes["0x"]}${luzes["0z"]}${luzes["1x"]}${luzes["1z"]}`;
+    if (chave === ultima.current) return; // só repinta quando algum sinal troca de cor
+    ultima.current = chave;
+    lampadas.forEach((x, i) => m.setColorAt(i, luzes[`${x.g}${x.e}` as keyof typeof luzes] === x.l ? ACESA[x.l] : APAGADA));
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  });
+  return <instancedMesh ref={im} args={[geo, MAT_LAMPADA, lampadas.length]} frustumCulled={false} />;
 }
 
 // ---------- faixas de pedestre e linhas de parada ----------
@@ -732,20 +726,24 @@ function Bicicleta({ c }: { c: Carro }) {
   return (
     <group>
       {[0.52, -0.52].map((x, k) => <mesh key={x} ref={(el) => { rodas.current[k] = el; }} geometry={toro(0.32, 0.035, 20)} material={preto} position={[x, 0.36, 0]} />)}
-      <mesh geometry={caixa(0.78, 0.05, 0.05)} material={quadro} position={[0.02, 0.62, 0]} rotation={[0, 0, -0.18]} />
-      <mesh geometry={caixa(0.62, 0.05, 0.05)} material={quadro} position={[-0.2, 0.5, 0]} rotation={[0, 0, 0.72]} />
-      <mesh geometry={caixa(0.5, 0.05, 0.05)} material={quadro} position={[0.28, 0.5, 0]} rotation={[0, 0, -0.95]} />
-      <mesh geometry={caixa(0.05, 0.05, 0.5)} material={preto} position={[0.46, 0.92, 0]} />
-      <mesh geometry={caixa(0.2, 0.05, 0.1)} material={preto} position={[-0.2, 0.86, 0]} />
       <group ref={pedal} position={[0, 0.36, 0]}><mesh geometry={caixa(0.34, 0.04, 0.04)} material={metal()} /></group>
-      {/* ciclista: tronco inclinado, braços no guidão, capacete; as pernas acompanham os pedais */}
-      <mesh geometry={caixa(0.26, 0.52, 0.32)} material={camisa} position={[0.0, 1.18, 0]} rotation={[0, 0, -0.55]} castShadow />
-      {[-0.16, 0.16].map((z) => <mesh key={z} geometry={caixa(0.48, 0.08, 0.08)} material={camisa} position={[0.26, 1.12, z]} rotation={[0, 0, -0.3]} />)}
       {[0, 1].map((k) => <mesh key={`l${k}`} ref={(el) => { pernas.current[k] = el; }} geometry={caixa(0.11, 0.62, 0.11)} material={mat("#2B2F36", { rough: 0.85 })} />)}
-      <mesh geometry={esfera(0.13, 10)} material={pele} position={[0.24, 1.46, 0]} />
-      <mesh geometry={esfera(0.15, 10)} material={mat(c.bici?.cor ?? "#E2575B", { rough: 0.4 })} position={[0.22, 1.53, 0]} scale={[1.15, 0.7, 1]} />
-      <mesh geometry={caixa(0.05, 0.07, 0.1)} material={FAROL} position={[0.5, 0.98, 0]} />
-      <mesh geometry={caixa(0.04, 0.06, 0.08)} material={LUZ_FREIO_ACESA} position={[-0.62, 0.78, 0]} />
+      {/* 24/11/2026 (mapa lento): o que não se mexe (quadro, guidão, banco, tronco, braços, cabeça, capacete e luzes) vira
+          uma malha só (eram 13 desenhos por ciclista); rodas, pedal e pernas continuam soltos porque giram */}
+      <Estatico>
+        <mesh geometry={caixa(0.78, 0.05, 0.05)} material={quadro} position={[0.02, 0.62, 0]} rotation={[0, 0, -0.18]} />
+        <mesh geometry={caixa(0.62, 0.05, 0.05)} material={quadro} position={[-0.2, 0.5, 0]} rotation={[0, 0, 0.72]} />
+        <mesh geometry={caixa(0.5, 0.05, 0.05)} material={quadro} position={[0.28, 0.5, 0]} rotation={[0, 0, -0.95]} />
+        <mesh geometry={caixa(0.05, 0.05, 0.5)} material={preto} position={[0.46, 0.92, 0]} />
+        <mesh geometry={caixa(0.2, 0.05, 0.1)} material={preto} position={[-0.2, 0.86, 0]} />
+        {/* ciclista: tronco inclinado, braços no guidão, capacete; as pernas acompanham os pedais */}
+        <mesh geometry={caixa(0.26, 0.52, 0.32)} material={camisa} position={[0.0, 1.18, 0]} rotation={[0, 0, -0.55]} castShadow />
+        {[-0.16, 0.16].map((z) => <mesh key={z} geometry={caixa(0.48, 0.08, 0.08)} material={camisa} position={[0.26, 1.12, z]} rotation={[0, 0, -0.3]} castShadow />)}
+        <mesh geometry={esfera(0.13, 10)} material={pele} position={[0.24, 1.46, 0]} castShadow />
+        <mesh geometry={esfera(0.15, 10)} material={mat(c.bici?.cor ?? "#E2575B", { rough: 0.4 })} position={[0.22, 1.53, 0]} scale={[1.15, 0.7, 1]} castShadow />
+        <mesh geometry={caixa(0.05, 0.07, 0.1)} material={FAROL} position={[0.5, 0.98, 0]} />
+        <mesh geometry={caixa(0.04, 0.06, 0.08)} material={LUZ_FREIO_ACESA} position={[-0.62, 0.78, 0]} />
+      </Estatico>
     </group>
   );
 }
