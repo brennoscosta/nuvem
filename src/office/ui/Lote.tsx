@@ -1,12 +1,13 @@
 "use client";
 // Cartão do lote (o que tem ali, status, "Transformar em minha empresa") e o painel "Montar minha empresa" (nome, logo, cor),
 // que reflete ao vivo na placa e no tapume do lote. Reservar precisa da conta do WorkEnd.
+import { EspacosAVenda, espacosOcupados } from "./EspacosAVenda";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useMundo, LOTE_POR_CHAVE, descricaoLote, linkCadastro, modoMundo, CORES_EMPRESA, useAgora, promocaoAtiva } from "../mundoStore";
 import { NICHOS, bairroDoLote, nomeNicho } from "../data/mundo";
 // expandir o terreno e quiosques (20/11/2026)
 import { ExpandirTerreno } from "./ExpandirTerreno";
-import { QUIOSQUE_POR_CHAVE, ehQuiosque } from "../data/quiosques";
+import { QUIOSQUE_POR_CHAVE, ehQuiosque, rotuloQuiosque } from "../data/quiosques";
 import { NomearRua } from "./NomearRua";
 import { FotoPredio } from "./FotoPredio";
 import { useEscritorio } from "../store";
@@ -211,6 +212,7 @@ export function CartaoLote() {
   const numeroPrincipal = (principal ? LOTE_POR_CHAVE[principal.chave]?.numero : null) ?? l.numero;
   // expandir o terreno (20/11/2026): o botão, o realce e o Pix ficam em ui/ExpandirTerreno.tsx
   const livre = !terreno;
+  const dividido = livre && espacosOcupados(chave, terrenos) > 0;
   const ativo = terreno?.status === "ativo";
   const diasRestantes = terreno?.pagoAte ? Math.ceil((new Date(terreno.pagoAte).getTime() - agora) / 86400000) : null;
   const clicarPagar = async (meses = 1, creditos = false) => { setErro(null); const e = await pagar(meses, "lote", creditos); if (e) setErro(e); };
@@ -229,7 +231,10 @@ export function CartaoLote() {
         <button onClick={() => selecionarLote(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
       </div>
 
-      {livre && (
+      {/* lote dividido em espaços de 5 × 5 m (24/11/2026): com algum espaço alugado, o lote não aluga inteiro */}
+      {livre && dividido && <EspacosAVenda chaveLote={chave} />}
+
+      {livre && !dividido && (
         <>
           {/* ponto disponível (18/11/2026, pedido do dono: "transforme em pontos que podem ser transformados"): o cartão
               vende a ideia antes do preço; o botão é o mesmo fluxo de reserva de sempre */}
@@ -248,6 +253,8 @@ export function CartaoLote() {
           )}
           {!usuario && <div className="mt-2 text-center text-[11px] text-[#5B6472]">Você cria sua conta no WorkEnd e volta direto pra este lote.{!modoMundo() && " Abre em workend.online."}</div>}
           {usuario && meu && !admin && <div className="mt-2 text-center text-[11px] text-[#5B6472]">Nesta fase cada conta tem um chão; a reserva atual (Lote {LOTE_POR_CHAVE[meu]?.numero}) fica livre.</div>}
+          {/* espaço de 5 × 5 m (24/11/2026): a outra opção, mais barata, no mesmo lote */}
+          <EspacosAVenda chaveLote={chave} />
         </>
       )}
 
@@ -516,7 +523,7 @@ export function PainelEmpresa() {
     <div data-guia={passo ? "configurar-empresa" : pago ? undefined : "formulario-reserva"} className={`${FLUTUANTE} ${LARGO} painel-entra overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-[12px] font-bold text-[#1D4ED8]">{qk ? `Quiosque ${qk.numero}` : `Lote ${l?.numero}`} · {passo ? "pagamento confirmado" : editando ? (qk ? "seu letreiro" : "sua placa") : qk ? "abrir meu quiosque" : "montar minha empresa"}</div>
+          <div className="text-[12px] font-bold text-[#1D4ED8]">{qk ? rotuloQuiosque(qk) : `Lote ${l?.numero}`} · {passo ? "pagamento confirmado" : editando ? (qk ? "seu letreiro" : "sua placa") : qk ? "abrir meu quiosque" : "montar minha empresa"}</div>
           <div className="text-lg font-bold">{passo ? "Último passo: a cara da empresa" : editando ? "Editar a placa" : "Como vai se chamar?"}</div>
           <div className="text-xs text-[#5B6472]">{passo ? "Já deixamos sugestões, e elas já valem no mapa. Troque o que quiser agora ou depois, em Marca e logo." : "Olhe o lote no mapa: a placa e o tapume mudam enquanto você preenche."}</div>
         </div>

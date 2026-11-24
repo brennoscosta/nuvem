@@ -19,7 +19,7 @@ import { liberarAgente, reverterAgente, liberarPersonalidade } from "./agentesVe
 import { empresaIdDe } from "./equipeCliente";
 // lote extra e quiosque (20/11/2026, frente terreno): cotação e efeito em terrenoExtra.ts; aqui só a cobrança
 import { cotacaoLoteExtra, liberarLoteExtra, devolverLoteExtra } from "./terrenoExtra";
-import { QUIOSQUE_POR_CHAVE, ehQuiosque } from "@/office/data/quiosques";
+import { QUIOSQUE_POR_CHAVE, ehQuiosque, rotuloQuiosque } from "@/office/data/quiosques";
 import { numeroDaLoja, rotuloLoja } from "@/office/data/numeroLoja";
 import type { Terreno } from "./terrenos";
 // telão, destaque e patrocínio da Praça de Eventos (20/11/2026, frente praca)
@@ -183,7 +183,7 @@ export async function criarCobrancaQuiosque(u: Usuario, t: Terreno, base: string
   const k = QUIOSQUE_POR_CHAVE[t.chave]; if (!k) throw new Error("Quiosque inválido.");
   const cot = await cotacaoLote(u, t.chave, meses);
   const r = await criarPix(u, base, { valor: cot.valor, tipo: "quiosque", chave: t.chave, meses, metadata: { terreno: t.chave, meses, quiosque: k.numero },
-    descricao: `WorkEnd · Quiosque ${k.numero} · ${meses} ${meses === 1 ? "mês" : "meses"} (${t.empresaNome})${cot.creditoUsado ? " · desconto de indicação" : ""}` }, opc);
+    descricao: `WorkEnd · ${rotuloQuiosque(k)} · ${meses} ${meses === 1 ? "mês" : "meses"} (${t.empresaNome})${cot.creditoUsado ? " · desconto de indicação" : ""}` }, opc);
   await sql`UPDATE pagamento SET oferta = NULL, desconto = 0, credito_usado = ${cot.creditoUsado} WHERE id = ${r.id}`;
   if (t.status === "reservado" && r.status !== "aprovado") await estenderReserva(t.chave, 70);
   return r;

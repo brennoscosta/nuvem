@@ -23,13 +23,13 @@ import type { Usuario } from "./usuarios";
 import { obterTerreno, estenderReserva, ehAdmin, PRECO_LOTE, DIAS_TOLERANCIA } from "./terrenos";
 import { cotacaoLote } from "./ofertas";
 import { lotesExtrasAtivos } from "./terrenoExtra";
-import { PRECO_LOTE_EXTRA, PRECO_QUIOSQUE } from "@/office/data/precosTerreno";
+import { PRECO_LOTE_EXTRA } from "@/office/data/precosTerreno";
 import { aplicar, pagamentoLigado, type PagamentoMP } from "./mercadopago";
 import { avisar } from "./avisos";
 import { registrar } from "./eventos";
 import { brl, dataBR } from "./email";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
-import { QUIOSQUE_POR_CHAVE, ehQuiosque } from "@/office/data/quiosques";
+import { QUIOSQUE_POR_CHAVE, ehQuiosque, precoDoQuiosque, rotuloQuiosque } from "@/office/data/quiosques";
 import { numeroDaLoja, rotuloLoja } from "@/office/data/numeroLoja";
 
 declare global {
@@ -76,7 +76,7 @@ const tokenValido = (x: unknown) => (typeof x === "string" && /^[A-Za-z0-9_-]{8,
 const ehDuplicado = (e: unknown) => (e as { code?: string } | null)?.code === "23505";
 const PAGADOR_RESERVA = (uid: string) => `pagador-${uid.replace(/[^a-z0-9]/gi, "").toLowerCase()}@workend.online`;
 const DIA = 86400_000;
-const rotuloDe = (chave: string) => (ehQuiosque(chave) ? `Quiosque ${QUIOSQUE_POR_CHAVE[chave]?.numero ?? ""}`.trim() : rotuloLoja(numeroDaLoja({ chave })) || `Lote ${LOTE_POR_CHAVE[chave]?.numero ?? "?"}`);
+const rotuloDe = (chave: string) => (ehQuiosque(chave) ? (QUIOSQUE_POR_CHAVE[chave] ? rotuloQuiosque(QUIOSQUE_POR_CHAVE[chave]) : "Quiosque") : rotuloLoja(numeroDaLoja({ chave })) || `Lote ${LOTE_POR_CHAVE[chave]?.numero ?? "?"}`);
 const linkPainel = "/app#assinatura";
 
 async function porId(aid: string) { const [a] = await sql<Assinatura[]>`SELECT * FROM assinatura WHERE id = ${aid}`; return a ?? null; }
@@ -87,7 +87,7 @@ async function primeiraPaga(aid: string) { const [r] = await sql`SELECT 1 FROM p
 export interface CotacaoAssinatura { tipo: "lote" | "quiosque"; primeiro: number; mensal: number; oferta: { id: string; nome: string; desconto: number } | null; extras: number; inicio: "agora" | "vencimento"; primeiraCobranca: string; admin: boolean }
 // mensalidade das renovações: lote + lotes extras ativos, ou quiosque; a conta admin paga 1/100 (como no Pix)
 async function mensalidade(u: Pick<Usuario, "papel" | "email">, chave: string) {
-  const mensal = ehQuiosque(chave) ? PRECO_QUIOSQUE : PRECO_LOTE + (await lotesExtrasAtivos(chave)) * PRECO_LOTE_EXTRA;
+  const mensal = ehQuiosque(chave) ? precoDoQuiosque(chave) : PRECO_LOTE + (await lotesExtrasAtivos(chave)) * PRECO_LOTE_EXTRA;
   return ehAdmin(u as Usuario) ? Math.max(0.01, Math.round(mensal) / 100) : centavos(mensal);
 }
 export async function cotacaoAssinatura(u: Usuario, chave: string): Promise<CotacaoAssinatura> {

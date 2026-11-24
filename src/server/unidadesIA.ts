@@ -11,7 +11,7 @@
 //  - Extrato imutável em ia_lancamento (migração 0042), com o agente, o tipo (conversa, tarefa, imagem) e o custo real.
 import { sql, migrar, id } from "./db";
 import { avisar } from "./avisos";
-import { QUIOSQUES } from "@/office/data/quiosques";
+import { TODOS_QUIOSQUES } from "@/office/data/quiosques";
 
 type Db = typeof sql;
 
@@ -41,8 +41,9 @@ const nomeMes = (m: string) => { const [a, n] = m.split("-").map(Number); return
 
 // Quanto a empresa recebe por mês: lote ativo (não ampliação) = UNIDADES_MES_LOTE. Sem lote ativo, nada.
 // A empresa do lote segue equipeCliente.ts › empresaIdDe: emp_<usuário> ou, para admin e sedes, emp_<usuário>_<chave>.
-// lotes que recebem a mensalidade de quiosque: os 14 quiosques da frente terreno (data/quiosques.ts, quiosque-101 a 114)
-export const LOTES_QUIOSQUE = new Set<string>(QUIOSQUES.map((q) => q.chave));
+// lotes que recebem a mensalidade de quiosque: os 14 quiosques da frente terreno (data/quiosques.ts, quiosque-101 a 114) e,
+// desde 24/11/2026, os espaços de 5 × 5 m dos lotes (quiosque-201 em diante)
+export const LOTES_QUIOSQUE = new Set<string>(TODOS_QUIOSQUES.map((q) => q.chave));
 export function mensalidadeDoLote(chave: string) { return LOTES_QUIOSQUE.has(chave) ? UNIDADES_MES_QUIOSQUE : UNIDADES_MES_LOTE; }
 // Plano Vitrine (WE-13): sem lote nem quiosque, a página grátis publicada recebe UNIDADES_MES_VITRINE
 async function mensalidadeDa(db: Db, empId: string) { return (await mensalidadeComPlano(db, empId)).unidades; }

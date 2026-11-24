@@ -13,7 +13,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { caixa } from "./geo";
 import { LOTE, LOTE_POR_CHAVE, LIMITE_CAMERA, frenteDoLote } from "../data/mundo";
-import { QUIOSQUE_POR_CHAVE, pegadaQuiosque } from "../data/quiosques";
+import { QUIOSQUE_POR_CHAVE, pegadaQuiosque, rotuloQuiosque } from "../data/quiosques";
 import { useMundo } from "../mundoStore";
 import { RAIO_MAXIMO } from "../cameraStore";
 import { ponteCamera } from "./fotoPredio";
@@ -133,7 +133,7 @@ function Moldura({ chave, cor }: { chave: string; cor: string }) {
       <mesh geometry={caixa(w, 0.02, d)} material={MAT_CHAO} position={[cx, 0.07, cz]} />
       <Html position={[cx, q ? 4.4 : 6.5, cz]} center zIndexRange={[8, 0]}>
         <div data-realce-reserva={chave} className="pointer-events-none flex w-max select-none items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[13px] font-bold text-[#1D2128]" style={{ boxShadow: `0 0 0 2px ${cor}, 0 10px 24px rgba(15,23,42,.28)` }}>
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: cor }} />{q ? `Quiosque ${q.numero} · aqui fica o seu balcão` : `Lote ${l.numero} · aqui fica a sua empresa`}
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: cor }} />{q ? `${rotuloQuiosque(q)} · aqui fica o seu balcão` : `Lote ${l.numero} · aqui fica a sua empresa`}
         </div>
       </Html>
     </group>

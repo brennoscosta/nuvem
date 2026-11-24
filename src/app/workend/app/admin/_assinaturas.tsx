@@ -4,7 +4,7 @@
 // mão no Mercado Pago; aqui só se marca como devolvido).
 import { useEffect, useState } from "react";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
-import { QUIOSQUE_POR_CHAVE } from "@/office/data/quiosques";
+import { QUIOSQUE_POR_CHAVE, rotuloQuiosque } from "@/office/data/quiosques";
 
 type Linha = { id: string; estado: string; meio: string; tipo: string; terrenoChave: string; valor: string; primeiroValor: string; oferta: string | null; proximaCobranca: string | null; tentativas: number; ultimaFalha: string | null; ultimaFalhaEm: string | null; criadoEm: string; canceladaEm: string | null; motivoFim: string | null; externoId: string | null; primeira: boolean; email: string | null; empresaNome: string | null; pagoAte: string | null; cobradas: number; recebido: number; falhas: number };
 type Devolucao = { id: string; assinaturaId: string; valor: string; pagamentos: string[]; motivo: string; estado: string; criadoEm: string; resolvidoEm: string | null; resolvidoPor: string | null; email: string | null; terrenoChave: string | null };
@@ -14,7 +14,7 @@ const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 const dia = (d: string | null) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—");
 const ROTULO: Record<string, string> = { pendente: "aguardando", ativa: "ativa", falhando: "cobrança falhando", cancelada: "cancelada", encerrada: "encerrada", recusada: "1ª cobrança recusada" };
 const COR: Record<string, string> = { ativa: "text-[#166534]", falhando: "text-[#B42318]", recusada: "text-[#B42318]" };
-const lote = (ch: string | null) => (!ch ? "—" : QUIOSQUE_POR_CHAVE[ch] ? `Quiosque ${QUIOSQUE_POR_CHAVE[ch].numero}` : LOTE_POR_CHAVE[ch] ? `Lote ${LOTE_POR_CHAVE[ch].numero}` : ch);
+const lote = (ch: string | null) => (!ch ? "—" : QUIOSQUE_POR_CHAVE[ch] ? rotuloQuiosque(QUIOSQUE_POR_CHAVE[ch]) : LOTE_POR_CHAVE[ch] ? `Lote ${LOTE_POR_CHAVE[ch].numero}` : ch);
 
 export function AssinaturasAdmin() {
   const [d, setD] = useState<Dados | null>(null);

@@ -13,8 +13,8 @@ import type { Usuario } from "./usuarios";
 import { PRECO_LOTE, ADMIN_EMAIL, ehAdmin, obterTerreno } from "./terrenos";
 // lote extra e quiosque (20/11/2026, data/precosTerreno.ts): preço do quiosque e renovação do lote extra junto com o principal
 import { cotacaoLoteExtra, lotesExtrasAtivos } from "./terrenoExtra";
-import { PRECO_QUIOSQUE, PRECO_LOTE_EXTRA } from "@/office/data/precosTerreno";
-import { ehQuiosque } from "@/office/data/quiosques";
+import { PRECO_LOTE_EXTRA } from "@/office/data/precosTerreno";
+import { ehQuiosque, precoDoQuiosque } from "@/office/data/quiosques";
 import { avisar } from "./avisos";
 import { saldoDe, lancar, debitarAte } from "./creditos";
 
@@ -66,7 +66,7 @@ export async function cotacaoLote(u: Usuario, chave: string, meses = 1): Promise
   // quiosque: preço próprio e sem as ofertas de entrada do lote; o lote com extras ativos renova os extras junto
   const quiosque = ehQuiosque(chave);
   const extras = quiosque || !t || t.anexoDe ? 0 : await lotesExtrasAtivos(chave);
-  const mensal = quiosque ? PRECO_QUIOSQUE : PRECO_LOTE + extras * PRECO_LOTE_EXTRA;
+  const mensal = quiosque ? precoDoQuiosque(chave) : PRECO_LOTE + extras * PRECO_LOTE_EXTRA; // espaço de 5 × 5 m: R$ 49,90
   const base = mensal * meses;
   const novo = !!t && t.usuarioId === u.id && t.status === "reservado" && !t.anexoDe && !quiosque;
   const restam = await vagasFundador(u.id);

@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useMundo, linkCadastro, modoMundo } from "../mundoStore";
 import { useEscritorio } from "../store";
 import { usePersonagem } from "../personagemStore";
-import { QUIOSQUES, QUIOSQUE_POR_CHAVE, NOME_AREA_QUIOSQUE, NOME_MODELO_QUIOSQUE, PRECO_QUIOSQUE, QUIOSQUE_LARGURA, QUIOSQUE_FUNDO, balcaoDoQuiosque, ehQuiosque, type QuiosqueInfo } from "../data/quiosques";
+import { QUIOSQUES, QUIOSQUE_POR_CHAVE, NOME_AREA_QUIOSQUE, NOME_MODELO_QUIOSQUE, QUIOSQUE_LARGURA, QUIOSQUE_FUNDO, balcaoDoQuiosque, ehQuiosque, type QuiosqueInfo, rotuloQuiosque, precoDoQuiosque, LOTE_DO_ESPACO } from "../data/quiosques";
 import { nomeNicho, LOTE } from "../data/mundo";
 import { PRECO_LOTE } from "../data/precosTerreno";
 import { Icone } from "./Icone";
@@ -22,7 +22,7 @@ import { BotaoEditarPosicao } from "./EditorPosicao";
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataBR = (d: string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
-const COR_AREA: Record<string, string> = { orlaNorte: "#0E7490", orlaCentro: "#0F8A7E", orlaSul: "#C2410C" };
+const COR_AREA: Record<string, string> = { orlaNorte: "#0E7490", orlaCentro: "#0F8A7E", orlaSul: "#C2410C", lote: "#1D4ED8" };
 
 // valor do quiosque para esta conta (crédito de indicação e conta admin), vindo do servidor; vale para créditos e Pix
 function useValorPix(chave: string | null, ligado: boolean, versao: string) {
@@ -71,7 +71,9 @@ export function CartaoQuiosque() {
   if (!k || !chave || painel || painelEsc || agenteSelecionado) return null;
   const m = useMundo.getState();
   const livre = !terreno, ativo = terreno?.status === "ativo";
-  const preco = admin ? Math.round(PRECO_QUIOSQUE) / 100 : PRECO_QUIOSQUE;
+  const mensal = precoDoQuiosque(chave); // R$ 47 na orla, R$ 49,90 no espaço de 5 × 5 m de um lote (24/11/2026)
+  const preco = admin ? Math.round(mensal) / 100 : mensal;
+  const espaco = k.area === "lote", loteDoEspaco = espaco ? LOTE_DO_ESPACO[k.chave] : null;
   // cobrança única (frente creditos): créditos, Pix ou os dois; no servidor vira o tipo "quiosque"
   const pagar = async (creditos = false) => { setErro(null); const e = await m.pagar(1, "lote", creditos); if (e) setErro(e); };
   const atendente = terreno?.escritorio?.equipe.find((x) => x.papel === "atendente") ?? null;
@@ -79,10 +81,12 @@ export function CartaoQuiosque() {
     <div data-tour="cartao-loja" className={`${FLUTUANTE} ${ESTREITO} painel-entra !z-10 overflow-y-auto p-4`}>
       <div className="flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-1 text-[12px] font-semibold text-[#1D4ED8]"><Icone nome="quiosque" tamanho={14} />Quiosque {k.numero}</div>
-          <div className="text-lg font-bold">{livre ? "Quiosque disponível" : ehMeu ? (ativo ? terreno.empresaNome : "Seu quiosque") : terreno.empresaNome}</div>
+          <div className="flex items-center gap-1 text-[12px] font-semibold text-[#1D4ED8]"><Icone nome="quiosque" tamanho={14} />{rotuloQuiosque(k)}</div>
+          <div className="text-lg font-bold">{livre ? (espaco ? "Espaço de 5 × 5 m disponível" : "Quiosque disponível") : ehMeu ? (ativo ? terreno.empresaNome : "Seu quiosque") : terreno.empresaNome}</div>
           <div className="text-xs text-[#5B6472]">{livre ? NOME_MODELO_QUIOSQUE[k.modelo] : ativo ? `${nomeNicho(terreno.nicho)} · aberto` : "Reservado · em montagem"}</div>
           <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ background: COR_AREA[k.area] }}>{NOME_AREA_QUIOSQUE[k.area]}</span>
+          {/* espaço de lote (24/11/2026): volta para o cartão do lote, com os 4 espaços */}
+          {loteDoEspaco && <button onClick={() => m.selecionarLote(loteDoEspaco)} className="ml-2 text-[11px] font-semibold text-[#1D4ED8] underline">ver os 4 espaços do lote</button>}
         </div>
         <button onClick={() => m.selecionarLote(null)} className="rounded-full px-2 text-[#5B6472] hover:bg-black/5"><Icone nome="fechar" tamanho={16} /><span className="sr-only">Fechar</span></button>
       </div>

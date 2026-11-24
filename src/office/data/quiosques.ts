@@ -20,10 +20,12 @@
 // pos0 e rot0: a vaga (centro e para onde o balcão olha com giro 0; 0 = +z, como frenteDoLote). pos e rot: onde o quiosque
 // está agora (o giro e o ajuste do dono, aplicarPosesQuiosques); quem desenha e desvia usa estes.
 import type { Escritorio, Decoracao } from "./escritorio";
-import { PRECO_QUIOSQUE } from "./precosTerreno";
+import { PRECO_QUIOSQUE, PRECO_ESPACO } from "./precosTerreno";
+import { LOTES, frenteDoLote, type LoteInfo } from "./mundo";
 
-export { PRECO_QUIOSQUE };
-export type AreaQuiosque = "orlaNorte" | "orlaCentro" | "orlaSul";
+export { PRECO_QUIOSQUE, PRECO_ESPACO };
+// "lote": espaço de 5 × 5 m dentro de um lote da cidade (24/11/2026, ESPACOS abaixo)
+export type AreaQuiosque = "orlaNorte" | "orlaCentro" | "orlaSul" | "lote";
 export type ModeloQuiosque = "toldo" | "chale" | "redondo";
 export interface RetQuiosque { x0: number; x1: number; z0: number; z1: number }
 export interface QuiosqueInfo {
@@ -34,6 +36,7 @@ export interface QuiosqueInfo {
 
 export const NOME_AREA_QUIOSQUE: Record<AreaQuiosque, string> = {
   orlaNorte: "Quiosques da Orla · norte", orlaCentro: "Quiosques da Orla · centro", orlaSul: "Quiosques da Orla · sul",
+  lote: "Espaço de 5 × 5 m",
 };
 export const NOME_MODELO_QUIOSQUE: Record<ModeloQuiosque, string> = { toldo: "quiosque com toldo listrado", chale: "quiosque chalé de madeira", redondo: "quiosque redondo de praia" };
 
@@ -68,8 +71,58 @@ export const QUIOSQUES: QuiosqueInfo[] = [
   // quadra sul: entre o outdoor L1 e a travessia de z = 73,3
   q(111, "orlaSul", S, 42, "chale"), q(112, "orlaSul", S, 49.5, "redondo"), q(113, "orlaSul", S, 57, "toldo"), q(114, "orlaSul", S, 64.5, "chale"),
 ];
-export const QUIOSQUE_POR_CHAVE: Record<string, QuiosqueInfo> = Object.fromEntries(QUIOSQUES.map((x) => [x.chave, x]));
-export const QUIOSQUE_POR_NUMERO: Record<number, QuiosqueInfo> = Object.fromEntries(QUIOSQUES.map((x) => [x.numero, x]));
+
+// ---------- espaços de 5 × 5 m nos lotes (24/11/2026) ----------
+// Pedido do dono: "o cliente que vai locar o lote pode selecionar 20x20 m, também quero agora a possibilidade 5x5 m, valor
+// 49,90... um 20x20 quando tocar em cima mostra possibilidade de terrenos menores 5x5 m, um 20x20 pode ter 4 lojas de
+// diferentes clientes" e "qualquer pessoa que encontrar um lote vazio pode adquirir apenas um 5x5". Os 20 m da frente do
+// lote se dividem em 4 espaços de 5 m, lado a lado, de frente para a calçada (o resto do lote fica na grama). Cada espaço
+// é um quiosque (o mesmo desenho, a atendente no balcão, a mesma reserva, o Pix e a renovação), com chave própria e preço
+// próprio (PRECO_ESPACO). Regra: lote alugado inteiro não aluga espaço, e lote com espaço alugado não aluga inteiro
+// (src/server/terrenos.ts › conferirEspacosDoLote). Só aparecem no mapa depois de reservados (scene/Quiosques.tsx).
+// Número: 200 + (número do lote − 1) × 4 + a posição (1 a 4, da esquerda para a direita de quem olha da rua).
+export const LADO_ESPACO = 5; // m
+export const LETRA_ESPACO = ["A", "B", "C", "D"] as const;
+const PRIMEIRO_ESPACO = 201;
+const numeroEspaco = (l: LoteInfo, p: number) => PRIMEIRO_ESPACO - 1 + (l.numero - 1) * 4 + p + 1;
+// centro do espaço a 7,3 m do centro do lote (a frente do lote fica a 10 m): os banquinhos do quiosque não passam da
+// divisa e o cliente é atendido em pé na calçada
+const FUNDO_ESPACO = 7.3;
+function espacosDe(l: LoteInfo): QuiosqueInfo[] {
+  const [cx, cz] = l.centro, s = l.k >= 2 ? 1 : -1, rot = frenteDoLote(l.k);
+  // da esquerda para a direita de quem está na calçada olhando o lote: no sul (s = 1) a esquerda é o oeste; no norte, o leste
+  return [0, 1, 2, 3].map((p) => {
+    const x = cx + s * (-7.5 + p * 5), z = cz + s * FUNDO_ESPACO;
+    const zFrente = cz + s * 10, zFundo = cz + s * (10 - LADO_ESPACO);
+    return {
+      chave: `quiosque-${numeroEspaco(l, p)}`, numero: numeroEspaco(l, p), area: "lote" as const,
+      ponto: `no Lote ${l.numero}, espaço ${LETRA_ESPACO[p]} (de 4), de frente para a rua`, modelo: (["toldo", "chale", "redondo", "toldo"] as const)[p],
+      terreno: { x0: x - LADO_ESPACO / 2, x1: x + LADO_ESPACO / 2, z0: Math.min(zFrente, zFundo), z1: Math.max(zFrente, zFundo) },
+      pos0: [x, z] as [number, number], rot0: rot, pos: [x, z] as [number, number], rot,
+    };
+  });
+}
+export const ESPACOS: QuiosqueInfo[] = LOTES.filter((l) => l.lote.tipo !== "praca").flatMap(espacosDe);
+export const ehEspaco = (chave: string | null | undefined) => !!chave && ESPACOS.some((e) => e.chave === chave);
+// os 4 espaços de um lote (pela chave do lote) e o lote de um espaço
+export const ESPACOS_DO_LOTE: Record<string, QuiosqueInfo[]> = {};
+export const LOTE_DO_ESPACO: Record<string, string> = {};
+for (const l of LOTES) if (l.lote.tipo !== "praca") {
+  ESPACOS_DO_LOTE[l.chave] = ESPACOS.filter((e) => e.numero > numeroEspaco(l, -1) && e.numero <= numeroEspaco(l, 3));
+  for (const e of ESPACOS_DO_LOTE[l.chave]) LOTE_DO_ESPACO[e.chave] = l.chave;
+}
+// "Espaço B do Lote 12" (e "Quiosque 105" na orla)
+export function rotuloQuiosque(k: QuiosqueInfo): string {
+  if (k.area !== "lote") return `Quiosque ${k.numero}`;
+  const lote = LOTES.find((l) => l.chave === LOTE_DO_ESPACO[k.chave]);
+  return `Espaço ${LETRA_ESPACO[(k.numero - PRIMEIRO_ESPACO) % 4]} do Lote ${lote?.numero ?? ""}`.trim();
+}
+export const precoDoQuiosque = (chave: string | null | undefined) => (ehEspaco(chave) ? PRECO_ESPACO : PRECO_QUIOSQUE);
+
+// os quiosques da orla e os espaços dos lotes, para quem acha um ponto pela chave ou pelo número (o servidor, a página da loja)
+export const TODOS_QUIOSQUES: QuiosqueInfo[] = [...QUIOSQUES, ...ESPACOS];
+export const QUIOSQUE_POR_CHAVE: Record<string, QuiosqueInfo> = Object.fromEntries(TODOS_QUIOSQUES.map((x) => [x.chave, x]));
+export const QUIOSQUE_POR_NUMERO: Record<number, QuiosqueInfo> = Object.fromEntries(TODOS_QUIOSQUES.map((x) => [x.numero, x]));
 export const ehQuiosque = (chave: string | null | undefined): boolean => !!chave && chave.startsWith("quiosque-");
 
 // do local (lx, lz) do quiosque para o mundo (mesma conta do rotation.y do three.js), na posição de agora
@@ -92,13 +145,13 @@ export function quiosqueNoPonto(x: number, z: number, folga = 0): QuiosqueInfo |
 }
 // o terreninho do quiosque no ponto (x, z), com o quiosque dentro ou não
 export const terreninhoNoPonto = (x: number, z: number): QuiosqueInfo | null => QUIOSQUES.find((k) => x >= k.terreno.x0 && x <= k.terreno.x1 && z >= k.terreno.z0 && z <= k.terreno.z1) ?? null;
-export const descricaoQuiosque = (k: QuiosqueInfo) => `${NOME_AREA_QUIOSQUE[k.area]} · ${k.ponto}`;
+export const descricaoQuiosque = (k: QuiosqueInfo) => `${k.area === "lote" ? rotuloQuiosque(k) : NOME_AREA_QUIOSQUE[k.area]} · ${k.ponto}`;
 
 // Giro e ajuste do dono (decor.giro e decor.desloc, data/posicaoPredio.ts): leva cada quiosque para onde o dono deixou.
 // Chamado quando os terrenos chegam ou mudam (mundoStore); devolve true se algum mudou de lugar (o caminho é refeito).
 export function aplicarPosesQuiosques(terrenos: Record<string, { chave: string; escritorio: Escritorio | null } | undefined>, poseDe: (chave: string) => { centro: [number, number]; rot: number } | null): boolean {
   let mudou = false;
-  for (const k of QUIOSQUES) {
+  for (const k of TODOS_QUIOSQUES) {
     const t = terrenos[k.chave], p = t ? poseDe(k.chave) : null;
     const pos: [number, number] = p ? [p.centro[0], p.centro[1]] : [k.pos0[0], k.pos0[1]], rot = p ? p.rot : k.rot0;
     if (pos[0] !== k.pos[0] || pos[1] !== k.pos[1] || Math.abs(rot - k.rot) > 1e-9) { k.pos = pos; k.rot = rot; mudou = true; }

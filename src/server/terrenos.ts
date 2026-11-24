@@ -13,8 +13,8 @@ import { ehKit } from "@/office/data/predios";
 import { registrar } from "./eventos";
 import { enviarEmail, emailLigado, brl, dataBR } from "./email";
 import { LOTE_POR_CHAVE } from "@/office/data/mundo";
-import { QUIOSQUE_POR_CHAVE, ehQuiosque, equipeDoQuiosque } from "@/office/data/quiosques";
-import { PRECO_QUIOSQUE, PRECO_LOTE } from "@/office/data/precosTerreno";
+import { QUIOSQUE_POR_CHAVE, ehQuiosque, equipeDoQuiosque, ehEspaco, ESPACOS_DO_LOTE, LOTE_DO_ESPACO, precoDoQuiosque } from "@/office/data/quiosques";
+import { PRECO_LOTE } from "@/office/data/precosTerreno";
 import { numeroDaLoja, rotuloLoja } from "@/office/data/numeroLoja";
 
 declare global {
@@ -58,6 +58,24 @@ export function loteAVenda(chave: string) {
   return !!l && l.lote.tipo !== "praca"; // a praça de eventos não está à venda
 }
 
+// Espaços de 5 × 5 m (24/11/2026, data/quiosques.ts › ESPACOS): o lote inteiro e os 4 espaços dele não convivem. Quem
+// reserva um espaço não pode pegar um lote alugado inteiro; quem reserva o lote (ou o usa para ampliar o seu) não pode
+// pegar um lote que já tem espaço alugado. A trava por lote (pg_advisory_xact_lock) faz duas reservas ao mesmo tempo,
+// uma do lote e outra de um espaço, esperarem uma pela outra dentro da transação.
+async function conferirEspacosDoLote(db: Db, chave: string) {
+  const lote = ehEspaco(chave) ? LOTE_DO_ESPACO[chave] : ESPACOS_DO_LOTE[chave] ? chave : null;
+  if (!lote) return;
+  await db`SELECT pg_advisory_xact_lock(hashtext(${`lote:${lote}`}))`;
+  if (ehEspaco(chave)) {
+    const [inteiro] = await db`SELECT 1 FROM terreno WHERE chave = ${lote} LIMIT 1`;
+    if (inteiro) throw new Error("Esse lote já foi reservado inteiro por outra empresa e não está à venda em espaços. Escolha um espaço em outro lote.");
+  } else {
+    const espacos = ESPACOS_DO_LOTE[lote].map((e) => e.chave);
+    const [ocupado] = await db`SELECT 1 FROM terreno WHERE chave = ANY(${sql.array(espacos)}::text[]) LIMIT 1`;
+    if (ocupado) throw new Error("Esse lote já tem espaço de 5 × 5 m de outra empresa e não está à venda inteiro. Escolha um dos espaços livres dele ou outro lote.");
+  }
+}
+
 // trecho comum do SELECT (função, não constante: no build do Next não existe banco e o `sql` não pode ser tocado na importação)
 const CAMPOS = () => sql`t.chave, t.usuario_id, t.status, t.empresa_nome, t.cor, (t.logo IS NOT NULL) AS tem_logo, t.reservado_em, t.reservado_ate, t.pago_ate, t.escritorio, t.nicho, t.anexo_de,
   CASE WHEN (t.promocao->>'ate')::timestamptz > now() THEN t.promocao END AS promocao, t.inaugurado_em, t.socios`;
@@ -92,7 +110,7 @@ export async function avisarVencimentos() {
       RETURNING t.chave, t.empresa_nome, t.pago_ate, u.email, u.nome, u.id AS usuario_id, u.papel`;
     const { cotacaoLote } = await import("./ofertas"); // importado na hora: ofertas.ts já importa este arquivo
     for (const d of lista) {
-      const valor = await cotacaoLote({ id: d.usuarioId, email: d.email, papel: d.papel } as Usuario, d.chave, 1).then((c) => c.base).catch(() => (ehQuiosque(d.chave) ? PRECO_QUIOSQUE : PRECO_LOTE));
+      const valor = await cotacaoLote({ id: d.usuarioId, email: d.email, papel: d.papel } as Usuario, d.chave, 1).then((c) => c.base).catch(() => (ehQuiosque(d.chave) ? precoDoQuiosque(d.chave) : PRECO_LOTE));
       void enviarEmail("vencimento", d.email, { nome: d.nome, empresa: d.empresaNome, lote: rotuloLoja(numeroDaLoja({ chave: d.chave })) || `Lote ${LOTE_POR_CHAVE[d.chave]?.numero ?? "?"}`, valor: brl(valor), pago_ate: dataBR(d.pagoAte), link_pagar: `https://workend.online/mundo?lote=${encodeURIComponent(d.chave)}` });
     }
   } catch (e) { console.error("[vencimento]", (e as Error).message); }
@@ -161,6 +179,7 @@ export async function reservarTerreno(u: Usuario, chave: string, d: { empresaNom
   return sql.begin(async (tx) => {
     const [dono] = await tx<{ usuarioId: string; status: string; escritorio: Escritorio | null }[]>`SELECT usuario_id, status, escritorio FROM terreno WHERE chave = ${chave} FOR UPDATE`;
     if (dono && dono.usuarioId !== u.id) throw new Error("Esse lote acabou de ser reservado por outra empresa.");
+    if (!dono) await conferirEspacosDoLote(tx as unknown as Db, chave);
     if (!admin) {
       const [ativo] = await tx<{ chave: string }[]>`SELECT chave FROM terreno WHERE usuario_id = ${u.id} AND status = 'ativo' AND chave <> ${chave}`;
       if (ativo) throw new Error("Você já tem um chão ativo. Nesta fase cada conta tem um lote.");
@@ -465,6 +484,7 @@ export async function reservarAnexo(u: Usuario, anexo: string) {
     if (ja) throw new Error("O seu lote já tem uma ampliação.");
     const [dono] = await tx<{ usuarioId: string }[]>`SELECT usuario_id FROM terreno WHERE chave = ${anexo} FOR UPDATE`;
     if (dono && dono.usuarioId !== u.id) throw new Error("Esse lote já tem dono.");
+    if (!dono) await conferirEspacosDoLote(tx as unknown as Db, anexo); // lote com espaço de 5 × 5 m alugado não serve de ampliação
     if (!dono) await tx`INSERT INTO terreno (chave, usuario_id, empresa_nome, cor, nicho, status, reservado_ate, anexo_de) VALUES (${anexo}, ${u.id}, ${principal.empresaNome}, ${principal.cor}, ${principal.nicho}, 'reservado', now() + make_interval(mins => ${MINUTOS_RESERVA}), ${principal.chave})`;
     void registrar("reserva", `${principal.empresaNome} reservou a ampliação do lote`, { usuarioId: u.id, terrenoChave: anexo, dados: { detalhes: `Lote duplo com ${principal.chave}.` } });
     const [t] = await tx<Terreno[]>`SELECT ${CAMPOS()} FROM terreno t WHERE t.chave = ${anexo}`;

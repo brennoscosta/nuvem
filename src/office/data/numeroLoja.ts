@@ -5,7 +5,7 @@
 import { LOTES, LOTE_POR_CHAVE } from "./mundo";
 import { SEDE_POR_CHAVE, SEDE_POR_NUMERO } from "./sedes";
 // quiosques (20/11/2026, data/quiosques.ts): número próprio a partir de 101, fora da lista de lotes
-import { QUIOSQUE_POR_CHAVE, QUIOSQUE_POR_NUMERO } from "./quiosques";
+import { QUIOSQUE_POR_CHAVE, QUIOSQUE_POR_NUMERO, rotuloQuiosque } from "./quiosques";
 
 export function numeroDaLoja(t: { chave: string; anexoDe?: string | null } | null | undefined): number | null {
   if (!t) return null;
@@ -18,6 +18,6 @@ export function numeroDaLoja(t: { chave: string; anexoDe?: string | null } | nul
 // número que existe (0 é a sede da Social RP): para usar no lugar de `if (numero)`
 export const temNumero = (n: number | null | undefined): n is number => typeof n === "number" && n >= 0;
 // como o número aparece na tela: "Lote 12" ou "Sede"
-export const rotuloLoja = (n: number | null | undefined) => (n != null && SEDE_POR_NUMERO[n] ? "Sede" : n != null && QUIOSQUE_POR_NUMERO[n] ? `Quiosque ${n}` : n != null ? `Lote ${n}` : "");
+export const rotuloLoja = (n: number | null | undefined) => (n != null && SEDE_POR_NUMERO[n] ? "Sede" : n != null && QUIOSQUE_POR_NUMERO[n] ? rotuloQuiosque(QUIOSQUE_POR_NUMERO[n]) : n != null ? `Lote ${n}` : "");
 // o contrário: de que terreno é a loja N (sedes e quiosques pelo número deles)
 export const chaveDaLoja = (numero: number): string | null => SEDE_POR_NUMERO[numero]?.chave ?? QUIOSQUE_POR_NUMERO[numero]?.chave ?? LOTES.find((x) => x.numero === numero)?.chave ?? null;

@@ -4,6 +4,7 @@
 // embasamento acima do quintal (scene/KitPredio.tsx › CasasDesenhadas). Desde 18/11/2026 cada lote
 // livre é um "ponto disponível" (scene/PontoDisponivel.tsx): divisa com mureta ou meio-fio, quintal bem acabado, número
 // do lote e a placa "Ponto disponível · Lote N", acesa à noite. As peças fixas são juntadas num <Estatico>.
+import { ESPACOS_DO_LOTE } from "../data/quiosques";
 import { Icone } from "../ui/Icone";
 import * as THREE from "three";
 import { useLotesComEscritorio } from "./EscritorioCliente";
@@ -56,7 +57,13 @@ export function Lotes() {
   const anexoAtivo = useMemo(() => { const m: Record<string, string> = {}; for (const t of Object.values(reservados)) if (t.anexoDe && t.status === "ativo") m[t.anexoDe] = t.chave; return m; }, [reservados]);
   // placa "Ponto disponível" só nos lotes livres (o lote reservado ganha a placa da empresa). O lote em rascunho também perde a placa.
   const emRascunho = rascunho && selecionado ? selecionado : null;
-  const comPlaca = useMemo(() => { const res = new Set(chavesReservadas ? chavesReservadas.split("|") : []); return new Set(LOTES.filter((l) => !res.has(l.chave) && l.chave !== emRascunho).map((l) => l.chave)); }, [chavesReservadas, emRascunho]);
+  // espaço de 5 × 5 m (24/11/2026): o lote com espaço reservado, alugado ou em rascunho também perde a placa, que fica
+  // na faixa da frente, onde os espaços nascem (data/quiosques.ts › ESPACOS)
+  const comPlaca = useMemo(() => {
+    const res = new Set(chavesReservadas ? chavesReservadas.split("|") : []);
+    const ocupado = (ch: string) => (ESPACOS_DO_LOTE[ch] ?? []).some((e) => res.has(e.chave) || e.chave === emRascunho);
+    return new Set(LOTES.filter((l) => !res.has(l.chave) && l.chave !== emRascunho && !ocupado(l.chave)).map((l) => l.chave));
+  }, [chavesReservadas, emRascunho]);
   return (
     <group>
       <Estatico key={chavesReservadas + "|" + (emRascunho ?? "") + "|" + [...comEscritorio].join(",")}>

@@ -4,6 +4,7 @@
 // os dois: reserva o vizinho como lote extra (o lote duplo de 12/11/2026) e já abre o Pix. O prédio cresce e passa a ocupar
 // os dois terrenos. Preço em data/precosTerreno.ts: o mesmo do lote (R$ 97/mês desde a WE-19) por lote extra, renovado junto com o principal; no dia da
 // compra paga só os dias até o vencimento do principal (proporcional, mínimo R$ 9,90).
+import { ESPACOS_DO_LOTE } from "../data/quiosques";
 import { useState } from "react";
 import { create } from "zustand";
 import { useMundo, LOTE_POR_CHAVE, useAgora } from "../mundoStore";
@@ -33,7 +34,8 @@ export const useExpandir = create<{ principal: string | null; abrir: (chave: str
 export function vizinhoParaExpandir(chave: string, terrenos: Record<string, unknown>): { lote: LoteInfo | null; livre: boolean } {
   const l = LOTE_POR_CHAVE[chave]; const v = l ? vizinhoDoLado(l) : null;
   if (!v || v.lote.tipo === "praca") return { lote: null, livre: false };
-  return { lote: v, livre: !terrenos[v.chave] };
+  // lote com espaço de 5 × 5 m de outra empresa (24/11/2026) não serve de ampliação
+  return { lote: v, livre: !terrenos[v.chave] && !(ESPACOS_DO_LOTE[v.chave] ?? []).some((e) => !!terrenos[e.chave]) };
 }
 // valor do 1º pagamento (só os dias até o vencimento do principal); o Pix confirma o valor certo no servidor
 export function valorProporcional(pagoAte: string | null, agora: number) {

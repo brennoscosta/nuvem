@@ -12,7 +12,7 @@ import { useMundo, travarSelecao } from "./mundoStore";
 import { anexosDe, poseCrua, conferirComEnfeites, ajustarPose, encaixar, giroValido, quartosDoTerreno, estruturasDoLote, conferirQuartos, lugarMaisPerto, girosParaTentar, giroPreferido, centroDoRet, retDoQuarto, retDaMetade, type Giro, type Ponto, type PosePredio, type Conferencia, type TamanhoEstrutura } from "./data/posicaoPredio";
 import type { Quarto, Metade } from "./data/quartosLote";
 import { ehSede, sedeDe } from "./data/sedes";
-import { ehQuiosque, QUIOSQUE_POR_CHAVE } from "./data/quiosques";
+import { ehQuiosque, QUIOSQUE_POR_CHAVE, rotuloQuiosque } from "./data/quiosques";
 import { LOTE_POR_CHAVE } from "./data/mundo";
 import { useSede } from "./sedeStore";
 
@@ -52,7 +52,7 @@ export function podeEditarPosicao(chave: string | null | undefined): { pode: boo
 }
 function nomeDe(chave: string) {
   const sd = sedeDe(chave), qk = QUIOSQUE_POR_CHAVE[chave], l = LOTE_POR_CHAVE[chave];
-  return sd ? `Sede da ${sd.nome}` : qk ? `Quiosque ${qk.numero}` : l ? `Lote ${l.numero}` : "Prédio";
+  return sd ? `Sede da ${sd.nome}` : qk ? rotuloQuiosque(qk) : l ? `Lote ${l.numero}` : "Prédio";
 }
 // a pose e a conferência de um rascunho (o escritório em edição no painel, se for deste lote)
 function calcular(chave: string, giro: Giro, desloc: Ponto) {

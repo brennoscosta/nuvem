@@ -20,7 +20,7 @@ import { ceu } from "./CicloDia";
 import { leve } from "./qualidade";
 import { BonecoProcedural, HIPS, useAnimacao, type BonecoHandle } from "./Boneco";
 import { BONECO } from "../data/bonecos";
-import { QUIOSQUES, QUIOSQUE_LARGURA as LQ, QUIOSQUE_FUNDO as FQ, TOLDO_Q, PRECO_QUIOSQUE, balcaoDoQuiosque, type QuiosqueInfo } from "../data/quiosques";
+import { QUIOSQUES, ESPACOS, QUIOSQUE_POR_CHAVE, PRECO_QUIOSQUE, QUIOSQUE_LARGURA as LQ, QUIOSQUE_FUNDO as FQ, TOLDO_Q, balcaoDoQuiosque, precoDoQuiosque, rotuloQuiosque, type QuiosqueInfo } from "../data/quiosques";
 import { useMundo, promocaoAtiva, useAgora, type Terreno, type Rascunho } from "../mundoStore";
 import { nomeNicho, LOTE_POR_CHAVE } from "../data/mundo";
 import { anexosDe, quartosDoTerreno, conferirQuartos, ID_PREDIO } from "../data/posicaoPredio";
@@ -145,14 +145,19 @@ export function Quiosques() {
   const agora = useAgora();
   const filtro = useMemo(() => nichoDestacado(), []);
   useFrame(() => { MAT_LAMPADA.emissiveIntensity = 0.2 + ceu.noite * 2.6; MAT_LUZ_DENTRO.emissiveIntensity = 0.1 + ceu.noite * 1.4; });
-  const dados = QUIOSQUES.map((k) => dadosDe(k, terrenos, sel, rascunho));
+  // os 14 da orla sempre; os espaços de 5 × 5 m dos lotes (24/11/2026) só quando reservados ou alugados (ou sendo reservados
+  // agora, com o rascunho): o lote vazio fica só na grama. O espaço livre selecionado ganha só o contorno no chão (MarcaEspaco).
+  const espacos = ESPACOS.filter((k) => terrenos[k.chave] || (sel === k.chave && rascunho));
+  const dados = [...QUIOSQUES, ...espacos].map((k) => dadosDe(k, terrenos, sel, rascunho));
+  const espacoLivre = sel && !terrenos[sel] && !rascunho ? ESPACOS.find((k) => k.chave === sel) ?? null : null;
   // tudo o que é parado, de todos os quiosques menos o que está em edição, num desenho só; muda quando muda um deles
   const juntos = dados.filter((d) => d.k.chave !== editando);
   const assinatura = juntos.map((d) => `${d.k.chave}|${d.estado}|${d.cor}|${d.nome}|${d.logo ?? ""}|${d.k.pos.join(",")}|${d.k.rot.toFixed(4)}`).join(";") + (leve() ? "|leve" : "");
   const emEdicao = editando ? dados.find((d) => d.k.chave === editando) ?? null : null;
   return (
     <group>
-      <Terreninhos editando={editando} />
+      <Terreninhos editando={editando} espacos={espacos} />
+      {espacoLivre && <MarcaEspaco k={espacoLivre} />}
       <Estatico key={assinatura}>
         {juntos.map((d) => <group key={d.k.chave} position={[d.k.pos[0], 0, d.k.pos[1]]} rotation={[0, d.k.rot, 0]}><Corpo d={d} /></group>)}
       </Estatico>
@@ -184,10 +189,10 @@ function Vivo({ d, marcado, promo, filtro }: { d: Dados; marcado: "sel" | "hover
   return (
     <group ref={g} position={[k.pos[0], 0, k.pos[1]]} rotation={[0, k.rot, 0]}>
       {atendente && <Atendente m={atendente} chave={k.chave} nome={nome} />}
-      {estado !== "livre" && <Balao position={[0, k.modelo === "chale" ? 5.2 : 4.6, 0]} nome={nome} cor={cor} logo={logo} subtitulo={estado === "ativo" ? `Quiosque ${k.numero} · ${nomeNicho(nicho)}` : "Quiosque · em montagem"} onClick={() => useMundo.getState().selecionarLote(k.chave)} apagado={apagado} destaque={!!filtro && !apagado} promo={promo} />}
+      {estado !== "livre" && <Balao position={[0, k.modelo === "chale" ? 5.2 : 4.6, 0]} nome={nome} cor={cor} logo={logo} subtitulo={estado === "ativo" ? `${rotuloQuiosque(k)} · ${nomeNicho(nicho)}` : `${k.area === "lote" ? "Espaço" : "Quiosque"} · em montagem`} onClick={() => useMundo.getState().selecionarLote(k.chave)} apagado={apagado} destaque={!!filtro && !apagado} promo={promo} />}
       {estado === "livre" && marcado && (
         <Html position={[0, 4.2, 0]} center zIndexRange={[4, 0]} style={{ pointerEvents: "none" }}>
-          <div className="w-max select-none rounded-full bg-[#0F766E] px-3 py-1 text-[12px] font-bold text-white shadow-lg">Quiosque {k.numero} · {brl(PRECO_QUIOSQUE)}/mês</div>
+          <div className="w-max select-none rounded-full bg-[#0F766E] px-3 py-1 text-[12px] font-bold text-white shadow-lg">{rotuloQuiosque(k)} · {brl(precoDoQuiosque(k.chave))}/mês</div>
         </Html>
       )}
       {/* área de clique e contorno no chão (sob o mouse ou selecionado) */}
@@ -205,13 +210,26 @@ function Contorno({ cor, forte }: { cor: string; forte: boolean }) {
   return <group>{[[0, z0 - d / 2, w, 0.12], [0, z0 + d / 2, w, 0.12], [-w / 2, z0, 0.12, d], [w / 2, z0, 0.12, d]].map(([x, z, a, b], i) => <mesh key={i} geometry={caixa(a, 0.06, b)} material={m} position={[x, 0.05, z]} />)}</group>;
 }
 
+// espaço de 5 × 5 m livre selecionado no cartão do lote (24/11/2026): só o contorno dele no chão, com o preço por cima
+function MarcaEspaco({ k }: { k: QuiosqueInfo }) {
+  const r = k.terreno, w = r.x1 - r.x0, d = r.z1 - r.z0, m = mat("#1D4ED8", { emissive: "#1D4ED8", ei: 0.6 });
+  return (
+    <group position={[(r.x0 + r.x1) / 2, 0, (r.z0 + r.z1) / 2]}>
+      {[[0, -d / 2, w, 0.14], [0, d / 2, w, 0.14], [-w / 2, 0, 0.14, d], [w / 2, 0, 0.14, d]].map(([x, z, a, b], i) => <mesh key={i} geometry={caixa(a, 0.06, b)} material={m} position={[x, 0.05, z]} />)}
+      <Html position={[0, 1.6, 0]} center zIndexRange={[4, 0]} style={{ pointerEvents: "none" }}>
+        <div className="w-max select-none rounded-full bg-[#1D4ED8] px-3 py-1 text-[12px] font-bold text-white shadow-lg">{rotuloQuiosque(k)} · 5 × 5 m · {brl(precoDoQuiosque(k.chave))}/mês</div>
+      </Html>
+    </group>
+  );
+}
+
 // os terreninhos marcados no chão (pedra clara com a borda e os cantos), num desenho só; o do quiosque em edição fica de
 // fora (o modo de edição desenha a grade nele)
-function Terreninhos({ editando }: { editando: string | null }) {
+function Terreninhos({ editando, espacos }: { editando: string | null; espacos: QuiosqueInfo[] }) {
   const pedra = mat("#E7E0D2", { rough: 0.95 }), borda = mat("#B9AE98", { rough: 0.9 }), canto = mat("#0F766E", { rough: 0.8 });
   return (
-    <Estatico key={editando ?? "-"}>
-      {QUIOSQUES.filter((k) => k.chave !== editando).map((k) => {
+    <Estatico key={`${editando ?? "-"}|${espacos.map((k) => k.chave).join(",")}`}>
+      {[...QUIOSQUES, ...espacos].filter((k) => k.chave !== editando).map((k) => {
         const r = k.terreno, w = r.x1 - r.x0, d = r.z1 - r.z0, cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
         return (
           <group key={k.chave} position={[cx, 0, cz]}>
@@ -237,7 +255,7 @@ function Atendente({ m, chave, nome, balcao }: { m: Membro; chave: string; nome:
   const acc = useRef(0);
   useFrame((_, dt) => {
     acc.current += dt; if (acc.current < 0.4) return; acc.current = 0;
-    const k = balcao ? null : QUIOSQUES.find((q) => q.chave === chave); if ((!balcao && !k) || !ativo) { if (perto) setPerto(false); return; }
+    const k = balcao ? null : QUIOSQUE_POR_CHAVE[chave] ?? null; if ((!balcao && !k) || !ativo) { if (perto) setPerto(false); return; }
     const [bx, bz] = balcao ?? balcaoDoQuiosque(k!);
     const p = Math.hypot(minhaPos.x - bx, minhaPos.z - bz) < 2.4;
     if (p !== perto) setPerto(p);
