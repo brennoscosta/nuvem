@@ -26,7 +26,11 @@ import { LOTES, frenteDoLote, type LoteInfo } from "./mundo";
 export { PRECO_QUIOSQUE, PRECO_ESPACO };
 // "lote": 1/4 de um lote da cidade (10 × 10 m) (24/11/2026, ESPACOS abaixo)
 export type AreaQuiosque = "orlaNorte" | "orlaCentro" | "orlaSul" | "lote";
-export type ModeloQuiosque = "toldo" | "chale" | "redondo";
+export type ModeloQuiosque = "toldo" | "chale" | "redondo" | ModeloShopping;
+// quiosques de shopping, abertos, dos espaços de 10 × 10 m dos lotes (24/11/2026, scene/QuiosqueShopping.tsx)
+export type ModeloShopping = "ilha" | "letraL" | "carrinho" | "circular" | "vitrine" | "pergolado";
+export const MODELOS_SHOPPING: ModeloShopping[] = ["ilha", "letraL", "carrinho", "circular", "vitrine", "pergolado"];
+export const ehShopping = (m: ModeloQuiosque): m is ModeloShopping => (MODELOS_SHOPPING as string[]).includes(m);
 export interface RetQuiosque { x0: number; x1: number; z0: number; z1: number }
 export interface QuiosqueInfo {
   chave: string; numero: number; area: AreaQuiosque; ponto: string; modelo: ModeloQuiosque;
@@ -38,7 +42,11 @@ export const NOME_AREA_QUIOSQUE: Record<AreaQuiosque, string> = {
   orlaNorte: "Quiosques da Orla · norte", orlaCentro: "Quiosques da Orla · centro", orlaSul: "Quiosques da Orla · sul",
   lote: "1/4 de lote · 10 × 10 m",
 };
-export const NOME_MODELO_QUIOSQUE: Record<ModeloQuiosque, string> = { toldo: "quiosque com toldo listrado", chale: "quiosque chalé de madeira", redondo: "quiosque redondo de praia" };
+export const NOME_MODELO_QUIOSQUE: Record<ModeloQuiosque, string> = {
+  toldo: "quiosque com toldo listrado", chale: "quiosque chalé de madeira", redondo: "quiosque redondo de praia",
+  ilha: "quiosque de shopping · ilha", letraL: "quiosque de shopping · balcão em L", carrinho: "quiosque de shopping · carrinho",
+  circular: "quiosque de shopping · redondo", vitrine: "quiosque de shopping · vitrine", pergolado: "quiosque de shopping · pergolado",
+};
 
 // medidas do quiosque (as três variações cabem nesta caixa): 4,2 m de frente e 3 m de fundo; o balcão fica na frente (+z local)
 export const QUIOSQUE_LARGURA = 4.2, QUIOSQUE_FUNDO = 3.0;
@@ -108,7 +116,8 @@ function espacosDe(l: LoteInfo): QuiosqueInfo[] {
     return {
       chave: `quiosque-${numeroEspaco(l, p)}`, numero: numeroEspaco(l, p), area: "lote" as const,
       ponto: `no Lote ${l.numero}, espaço ${LETRA_ESPACO[p]} (${frente ? "na frente, de frente para a rua" : "no fundo, de frente para o corredor do lote"})`,
-      modelo: (["toldo", "chale", "redondo", "toldo"] as const)[p],
+      // um dos 6 quiosques de shopping pelo número: o vizinho (no lote e no lote do lado) nunca repete
+      modelo: MODELOS_SHOPPING[numeroEspaco(l, p) % MODELOS_SHOPPING.length],
       terreno: { x0: xq - LADO_ESPACO / 2, x1: xq + LADO_ESPACO / 2, z0: zq - LADO_ESPACO / 2, z1: zq + LADO_ESPACO / 2 },
       pos0: pos, rot0: rot, pos: [pos[0], pos[1]] as [number, number], rot,
     };

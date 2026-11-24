@@ -9,6 +9,7 @@
 // dono gira e ajusta no modo "Editar posição". Desempenho: as peças paradas de TODOS os quiosques vão para um <Estatico> só
 // (as lâmpadas também: o brilho é do material); o letreiro dos livres é uma textura só com os 14 números. O quiosque em edição
 // sai do desenho junto e vira fantasma (scene/EditorPosicao.tsx).
+import { QuiosqueShopping } from "./QuiosqueShopping";
 import * as THREE from "three";
 import { useMemo, useRef, useState } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
@@ -20,7 +21,7 @@ import { ceu } from "./CicloDia";
 import { leve } from "./qualidade";
 import { BonecoProcedural, HIPS, useAnimacao, type BonecoHandle } from "./Boneco";
 import { BONECO } from "../data/bonecos";
-import { QUIOSQUES, ESPACOS, QUIOSQUE_POR_CHAVE, PRECO_QUIOSQUE, QUIOSQUE_LARGURA as LQ, QUIOSQUE_FUNDO as FQ, TOLDO_Q, balcaoDoQuiosque, precoDoQuiosque, rotuloQuiosque, corredorDoLote, ehEspacoDoFundo, LOTE_DO_ESPACO, TAMANHO_ESPACO, type QuiosqueInfo } from "../data/quiosques";
+import { QUIOSQUES, ESPACOS, QUIOSQUE_POR_CHAVE, PRECO_QUIOSQUE, QUIOSQUE_LARGURA as LQ, QUIOSQUE_FUNDO as FQ, TOLDO_Q, balcaoDoQuiosque, precoDoQuiosque, rotuloQuiosque, corredorDoLote, ehEspacoDoFundo, ehShopping, LOTE_DO_ESPACO, TAMANHO_ESPACO, type QuiosqueInfo } from "../data/quiosques";
 import { useMundo, promocaoAtiva, useAgora, type Terreno, type Rascunho } from "../mundoStore";
 import { nomeNicho, LOTE_POR_CHAVE } from "../data/mundo";
 import { anexosDe, quartosDoTerreno, conferirQuartos, ID_PREDIO } from "../data/posicaoPredio";
@@ -296,6 +297,8 @@ function Atendente({ m, chave, nome, balcao }: { m: Membro; chave: string; nome:
 // e a geladeira no fundo, toldo de 1,1 m e quatro banquinhos (dois no modo leve).
 function Corpo({ d }: { d: Dados }) {
   const { k, estado, nome, cor, logo } = d;
+  // espaço de 10 × 10 m num lote (24/11/2026): um dos 6 quiosques de shopping, abertos (scene/QuiosqueShopping.tsx)
+  if (ehShopping(k.modelo)) return <QuiosqueShopping modelo={k.modelo} cor={cor} letreiro={matTextura(texturaLetreiro(nome, cor, logo, estado), true)} painel={estado === "livre" ? null : matTextura(texturaBalcao(nome, cor, logo))} lampada={MAT_LAMPADA} />;
   const poucos = leve();
   const corEf = estado === "livre" ? "#0F766E" : cor;
   const indice = QUIOSQUES.indexOf(k);

@@ -95,7 +95,7 @@ export function CartaoQuiosque() {
         <>
           <div className="mt-3 rounded-2xl border border-[#0F766E]/20 bg-gradient-to-br from-[#E9F7F4] to-[#F7FBFA] p-3">
             <div className="text-sm font-bold leading-snug text-[#1D2128]">Um balcão com a sua marca no caminho de quem passa</div>
-            <p className="mt-1 text-xs leading-snug text-[#4B5563]">Fica {k.ponto}. Toldo e letreiro com a sua logo e as suas cores, três banquinhos e a atendente de IA no balcão, conversando com quem chega e anotando os contatos.</p>
+            <p className="mt-1 text-xs leading-snug text-[#4B5563]">Fica {k.ponto}. {espaco ? "Quiosque de shopping aberto, com o balcão, os expositores e o letreiro na sua marca e nas suas cores, e a atendente de IA no balcão, conversando com quem chega e anotando os contatos." : "Toldo e letreiro com a sua logo e as suas cores, três banquinhos e a atendente de IA no balcão, conversando com quem chega e anotando os contatos."}</p>
           </div>
           <div className="mt-2 rounded-2xl bg-[#F1F3F6] px-3 py-2 text-sm">
             <div className="flex items-center justify-between"><span className="text-[#5B6472]">Mensalidade</span><span className="font-semibold">{brl(preco)}/mês</span></div>
